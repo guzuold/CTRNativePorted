@@ -280,10 +280,10 @@ std::wstring relative_to_root(const std::wstring& folder) {
 
 void load_config() {
     std::error_code ec;
-    const fs::path staging = g.root.empty() ? fs::path() : g.root.parent_path() / "dump/CUSA14876";
-    for (const fs::path candidate : {fs::path(L"dump\\CUSA14876"), staging})
+    // Default locations: the dump folder next to the launcher. Saved settings override them.
+    for (const fs::path candidate : {fs::path(L"dump\\CUSA14876")})
         if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.base_dir = candidate.wstring(); break; }
-    for (const fs::path candidate : {fs::path(L"dump\\CUSA14876-patch"), fs::path(L"dump/CUSA14876-patch"),
+    for (const fs::path candidate : {fs::path(L"dump\\CUSA14876-patch"),
                                      resolve(g.cfg.base_dir).parent_path() / L"CUSA14876-patch"})
         if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.patch_dir = candidate.wstring(); g.cfg.use_patch = true; break; }
     std::ifstream in(config_path(), std::ios::binary);
