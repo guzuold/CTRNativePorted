@@ -1,0 +1,19 @@
+# Build outputs and local state
+/build/
+/runtime/
+
+# shadPS4 v0.18.0 sources, cloned by tools/bootstrap.ps1
+/engine/
+
+# Toolchain downloaded by tools/toolchains/fetch_llvm.ps1
+/tools/toolchains/llvm-19.1.1/
+/tools/toolchains/*.tar.xz
+/tools/toolchains/*.partial
+
+/Saved/
+
+# Game files must never be committed
+*.bin
+*.prx
+*.sprx
+*.pkg

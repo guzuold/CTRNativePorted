@@ -56,25 +56,44 @@ is switched on in the runtime yet.
 - Windows 10/11 x64, a Vulkan 1.3 GPU, an XInput controller.
 - Your own dump of CUSA14876 v01.00 (eboot SHA256 `ca9c9441…`), optionally with the
   v01.21 update folder (eboot SHA256 `39d716b7…`). Other versions are rejected.
-- Visual Studio 2022 (MSVC, MASM, CMake, Ninja), Python 3.12 (for build scripts),
-  LLVM/clang-cl 19.1.1 in `tools/toolchains/llvm-19.1.1` (see
-  [`tools/toolchains/README.md`](tools/toolchains/README.md)).
-- shadPS4 v0.18.0 sources (tag `v.0.18.0`, commit `e3ce810f`) with submodules in
-  `engine/shadPS4`.
+- Visual Studio 2022 **Community** in its default path (MSVC, MASM, "C++ CMake tools
+  for Windows"); the build scripts currently use that fixed path. Python 3.12. Git.
+- LLVM/clang-cl 19.1.1 in `tools/toolchains/llvm-19.1.1`: downloaded and verified
+  (size and SHA256) by `tools/bootstrap.ps1`, see
+  [`tools/toolchains/README.md`](tools/toolchains/README.md).
+- shadPS4 v0.18.0 sources in `engine/shadPS4`: cloned by `tools/bootstrap.ps1` at tag
+  `v.0.18.0` (commit `e3ce810f3a653f43ac64ebab63023de281a4103a`, checked after
+  checkout) together with its own submodules.
 
 ## Build and run
 
-From the repository root:
+Clone and prepare the dependencies (once):
+
+```powershell
+git clone https://github.com/guzuold/CTRNativePorted.git
+cd CTRNativePorted
+powershell -File tools/bootstrap.ps1
+```
+
+Then, from the repository root:
 
 ```powershell
 powershell -File ctrport/build_audio_backend.ps1
 powershell -File ctrport/build_font_backend.ps1
-powershell -File ctrport/video/build.ps1        # ctr_video.lib
+powershell -File ctrport/video/build.ps1     # ctr_video.lib
 powershell -File ctrport/build.ps1              # build/CTRPort-infra
 powershell -File ctrport/build_profile.ps1      # build/CTRPort-dev/ctrport.exe
 powershell -File ctrport/build_launcher.ps1     # build/CTRPort-dev/CTRNativePorted.exe
-powershell -File ctrport/gpu/build.ps1          # build/CTRPort-gpu/ctr_gpu.dll, ctr_hle.dll
+powershell -File ctrport/gpu/build.ps1  # ctr_gpu.dll, ctr_hle.dll
 ```
+
+`ctrport/video/build.ps1` and the scripts it calls refuse to run without the build lock,
+hence `tools/lane_lock.py`.
+
+> **Known limitation:** `ctrport/video/build.ps1` still reads compile and control results
+> from (development notes), which is local material not published in this
+> repository. Until that step is separated from the local evidence, `ctr_video.lib`
+> cannot be built from a fresh clone.
 
 Start the native launcher (`build/CTRPort-dev/CTRNativePorted.exe`), or run from the
 command line:
