@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
+#include "ctr/auto/auto_0143c110.hpp"
+#include "ctr/core/allocation_dispatch.h"
+#include <cstring>
+namespace ctr {std::uint64_t auto_0143c110(std::span<const std::byte> descriptor,std::uint64_t first,std::uint64_t second){std::uint32_t fourth;std::memcpy(&fourth,descriptor.data()+48,4);(void)fourth;return dispatch_allocation(descriptor,first,second);}}

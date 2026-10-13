@@ -1,0 +1,26 @@
+[
+  {
+    "source": "src/shader_recompiler/ir/program.cpp",
+    "changes": "Only dump includes/path/file operations; stream Finish explicit, existing files rejected, parents preexisting.",
+    "source_sha256": "1a66433170d712b18baba0895d6e1444ab52c441938d5d0ac70c124e379e82df",
+    "adapted_sha256": "361b42e3f8a85d710f333960005fbedbba47be29f55671c28f7d7e4eb50ad424",
+    "adapted": "ctrport/video/adapted/src_shader_recompiler_ir_program.cpp",
+    "license": "GPL-2.0-or-later"
+  },
+  {
+    "source": "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
+    "changes": "Retain whole IR root discovery/deduplication/offset pass; GenerateSrtProgram rejects nonempty roots explicitly until checked descriptor capture traversal exists. Serialized walker registration rejects. Removed JIT, process-global signals and fault-load-zero recovery; no false-success root handling. Other units retain dump adaptation. Missing exception carries metadata-only IR root SGPR/offset shape without guest dereference.",
+    "source_sha256": "62c7ca094ca60822588f6848efaad0408090c6d4c53a1906b22718e7cfc45eca",
+    "adapted_sha256": "d08fb9124ca108d5715e31d0d6bf71e00d55d7187aeb2e6ad0f24515343fefff",
+    "adapted": "ctrport/video/adapted/src_shader_recompiler_ir_passes_flatten_extended_userdata_pass.cpp",
+    "license": "GPL-2.0-or-later"
+  },
+  {
+    "source": "src/shader_recompiler/frontend/translate/translate.cpp",
+    "changes": "Only dump includes/path/file operations; stream Finish explicit, existing files rejected, parents preexisting. Fetch attribute descriptors captured through checked owned mapping lease instead of raw ReadUdReg.",
+    "source_sha256": "5423c46605238db1af7808babbfe2ea7ddef93e9943f5a38468f91bf0fcaddd3",
+    "adapted_sha256": "10180ba20c92f0a41588526b976bac9c61a739055ae4c1640486718615642801",
+    "adapted": "ctrport/video/adapted/src_shader_recompiler_frontend_translate_translate.cpp",
+    "license": "GPL-2.0-or-later"
+  }
+]

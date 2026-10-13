@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "policy": "AGENTS.md Declared compatibility stubs; user confirmation 2026-10-10",
+  "entries": [
+    {
+      "nid": "Cxwy7wHq4J0",
+      "library": "libSceJson2",
+      "module": "libSceJson",
+      "public_name": "initialize",
+      "returned_value": 0,
+      "justification": "User-authorized offline compatibility for Json2 startup; original behavior unavailable, matches baseline stub policy without claiming implementation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "PR5k1penBLM",
+      "library": "libSceJson2",
+      "module": "libSceJson",
+      "public_name": "terminate",
+      "returned_value": 0,
+      "justification": "User-authorized offline compatibility for Json2 startup; original behavior unavailable, matches baseline stub policy without claiming implementation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "cK6bYHf-Q5E",
+      "library": "libSceJson2",
+      "module": "libSceJson",
+      "public_name": "InitializerC1",
+      "returned_value": 0,
+      "justification": "User-authorized offline compatibility for Json2 startup; original behavior unavailable, matches baseline stub policy without claiming implementation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "RujUxbr3haM",
+      "library": "libSceJson2",
+      "module": "libSceJson",
+      "public_name": "InitializerD1",
+      "returned_value": 0,
+      "justification": "User-authorized offline compatibility for Json2 startup; original behavior unavailable, matches baseline stub policy without claiming implementation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "i-XwZjw0OOY",
+      "library": "libSceJson2",
+      "module": "libSceJson",
+      "public_name": "notifyError",
+      "returned_value": 0,
+      "justification": "User-authorized offline compatibility for Json2 startup; original behavior unavailable, matches baseline stub policy without claiming implementation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "-hJRce8wn1U",
+      "library": "libSceJson2",
+      "module": "libSceJson",
+      "public_name": "MemAllocatorC2",
+      "returned_value": 0,
+      "justification": "User-authorized offline compatibility for Json2 startup; original behavior unavailable, matches baseline stub policy without claiming implementation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "OcAgPxcq5Vk",
+      "library": "libSceJson2",
+      "module": "libSceJson",
+      "public_name": "MemAllocatorD2",
+      "returned_value": 0,
+      "justification": "User-authorized offline compatibility for Json2 startup; original behavior unavailable, matches baseline stub policy without claiming implementation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "public_name": "sceSysmoduleLoadModule(libSceJson2=0xe7)",
+      "returned_value": 0,
+      "justification": "Only Json2 module activation compatibility exception; all other module policies unchanged.",
+      "tag": "R8",
+      "module_id": 231
+    },
+    {
+      "nid": "Nlev7Lg8k3A",
+      "library": "libSceNet",
+      "module": "libSceNet",
+      "public_name": "sceNetInit",
+      "returned_value": 0,
+      "justification": "Offline-only compatibility: network initialization has no functional network backend. Baseline net.cpp sceNetInit explicitly DUMMY returns ORBIS_OK. R8 requires real networking.",
+      "tag": "R8"
+    },
+    {
+      "nid": "gky0+oaNM4k",
+      "library": "libSceNetCtl",
+      "module": "libSceNetCtl",
+      "public_name": "sceNetCtlInit",
+      "returned_value": 0,
+      "justification": "Declared offline compatibility: network control initialization unused by offline play; no network state query or fabricated outputs.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "module_id": 25,
+      "public_name": "sceSysmoduleLoadModule(libSceNpUtility)",
+      "returned_value": 0,
+      "justification": "Declared offline compatibility for NP utility module only (0x19); no service/state query implemented by activation.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "module_id": 157,
+      "public_name": "sceSysmoduleLoadModule(libSceNpAuth)",
+      "returned_value": 0,
+      "justification": "Declared offline compatibility: NP authentication module0x9d activation only; no authentication result or credentials fabricated.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "module_id": 173,
+      "public_name": "sceSysmoduleLoadModule(libSceNpTrophy)",
+      "returned_value": 0,
+      "justification": "Declared compatibility for optional offline trophies/social NP module activation only. No trophy query, unlock or game state result fabricated; observed original startup module0xad. Public identity sysmodule_table.h pinned shadPS4 e3ce810f3a653f43ac64ebab63023de281a4103a.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "module_id": 211,
+      "public_name": "sceSysmoduleLoadModule(libSceSharePlay)",
+      "returned_value": 0,
+      "justification": "Observed startup module0xd3. Optional remote SharePlay online/social activation only, unnecessary for offline play. No local video output, graphics, encoding, game-state query or actual streaming service is implemented or replaced. Public identity pinned shadPS4 sysmodule_table.h e3ce810f3a653f43ac64ebab63023de281a4103a.",
+      "tag": "R8"
+    },
+    {
+      "nid": "isruqthpYcw",
+      "library": "libSceSharePlay",
+      "module": "libSceSharePlay",
+      "public_name": "sceSharePlayInitialize",
+      "returned_value": 0,
+      "justification": "Optional online/social remote SharePlay initialization observed at original startup; not needed offline. No local video output or graphics implementation replaced, no connection/state query fabricated, no streaming started. Public export pinned shadPS4 share_play/shareplay.cpp e3ce810f3a653f43ac64ebab63023de281a4103a.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "module_id": 129,
+      "public_name": "sceSysmoduleLoadModule(libSceGameLiveStreaming)",
+      "returned_value": 0,
+      "justification": "Observed optional social broadcast module activation only, unneeded offline. No local video output, encoder, audio, capture or game-state query implemented or replaced; all streaming exports remain missing. Public module0x81 identity pinned shadPS4 sysmodule_table.h e3ce810f3a653f43ac64ebab63023de281a4103a.",
+      "tag": "R8"
+    },
+    {
+      "nid": "kvYEw2lBndk",
+      "library": "libSceGameLiveStreaming",
+      "module": "libSceGameLiveStreaming",
+      "public_name": "sceGameLiveStreamingInitialize",
+      "returned_value": 0,
+      "justification": "Observed social broadcast initialization, not required offline. Declared compatibility only: no capture, encoding, local audio/video, broadcast started or state query fabricated. Pinned shadPS4 gamelivestreaming.cpp e3ce810f3a653f43ac64ebab63023de281a4103a public export.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "module_id": 156,
+      "public_name": "sceSysmoduleLoadModule(libSceScreenShot)",
+      "returned_value": 0,
+      "justification": "Optional OS screenshot/share accessory module activation only, unnecessary offline. No game rendering, video output, capture, readback or screenshot export is stubbed; all such exports remain missing pending genuine behavior. Public identity shadPS4 sysmodule_table.h e3ce810f3a653f43ac64ebab63023de281a4103a.",
+      "tag": "R8"
+    },
+    {
+      "nid": "g8cM39EUZ6o",
+      "library": "libSceSysmodule",
+      "module": "libSceSysmodule",
+      "module_id": 168,
+      "public_name": "sceSysmoduleLoadModule(libSceNpCommerce)",
+      "returned_value": 0,
+      "justification": "Observed retail startup module0xa8 activation. Optional PSN commerce storefront service, unnecessary offline. Only module activation is declared compatibility; no purchase, entitlement, inventory or game-state query fabricated. Public identity pinned shadPS4 sysmodule_table.h e3ce810f3a653f43ac64ebab63023de281a4103a. All commerce exports remain missing.",
+      "tag": "R8"
+    },
+    {
+      "nid": "+MCXJlWdi+s",
+      "library": "libSceSharePlay",
+      "module": "libSceSharePlay",
+      "public_name": "sceSharePlayGetCurrentConnectionInfo",
+      "returned_value": 0,
+      "justification": "Explicit user exception 2026-10-11: offline declared R8 Dormant query. Clears public 56-byte connection info, returns zero; pinned shadPS4 e3ce810f3a653f43ac64ebab63023de281a4103a shareplay.cpp/header GPL-2.0-or-later reference. Compatibility only, not original PS4 behavior or reconstruction.",
+      "tag": "R8"
+    },
+    {
+      "nid": "co2NCj--pnc",
+      "library": "libSceSharePlay",
+      "module": "libSceSharePlay",
+      "public_name": "sceSharePlaySetProhibition",
+      "returned_value": 0,
+      "justification": "Claude lane 2026-10-12: reached by the original intro with the shadPS4 GPU library (run claude_profile_20261012_181930, caller offset 10220847). SharePlay is a social streaming feature not needed offline; pinned shadPS4 v0.18.0 shareplay.cpp79-82 returns ORBIS_OK without effect. Logged on every call; compatibility only, not original PS4 behavior or reconstruction.",
+      "tag": "R8"
+    },
+    {
+      "nid": "d9jpdPz5f-8",
+      "library": "libSceNpTrophy",
+      "module": "libSceNpTrophy",
+      "public_name": "sceNpTrophyShowTrophyList",
+      "returned_value": 0,
+      "justification": "Claude lane 2026-10-12: implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1097-1101), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
+      "tag": "R8"
+    },
+    {
+      "nid": "aTnHs7W-9Uk",
+      "library": "libSceNpTrophy",
+      "module": "libSceNpTrophy",
+      "public_name": "sceNpTrophyAbortHandle",
+      "returned_value": 0,
+      "justification": "Claude lane 2026-10-12: implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1318-1321), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
+      "tag": "R8"
+    },
+    {
+      "nid": "cqGkYAN-gRw",
+      "library": "libSceNpTrophy",
+      "module": "libSceNpTrophy",
+      "public_name": "sceNpTrophyCaptureScreenshot",
+      "returned_value": 0,
+      "justification": "Claude lane 2026-10-12: implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1323-1326), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
+      "tag": "R8"
+    }
+  ]
+}

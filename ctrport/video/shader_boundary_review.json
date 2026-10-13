@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "scope": "Static boundary review, not compiler/link closure or validated adapters",
+  "dependency_inventory_sha256": "7ca82233b4b5f718895d5f7ae376614b89d772dff77e9f84039bc099dab74cf0",
+  "headers": [
+    {
+      "header": "src/core/address_space.h",
+      "sha256": "48a219638d731509408ef87119a9a6b236f09ccd139555315f72df890ba7b69e",
+      "included_by": [
+        "src/core/memory.h"
+      ],
+      "decision": "Transitive memory-manager dependency through buffer-cache headers; do not import emulator address-space singleton.",
+      "implemented": false
+    },
+    {
+      "header": "src/core/cpu_patches.h",
+      "sha256": "54668d5515ade5c2ea2ad566af61290cd3de76aa3de4367406cd477e63d5d0a2",
+      "included_by": [
+        "src/core/emulator_settings.h"
+      ],
+      "decision": "Transitive memory/signal dependency; no CPU-patch service implemented by graphics.",
+      "implemented": false
+    },
+    {
+      "header": "src/core/emulator_settings.h",
+      "sha256": "5fb65121d7c4fdec24809d33e769f4ae4bb985035ab4a6848c80046ab1b03e65",
+      "included_by": [
+        "src/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp",
+        "src/shader_recompiler/frontend/translate/translate.cpp",
+        "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
+        "src/shader_recompiler/ir/passes/shader_info_collection_pass.cpp",
+        "src/shader_recompiler/ir/program.cpp"
+      ],
+      "decision": "Replace shader dump and direct-memory settings with explicit immutable compile configuration; disabling direct memory requires its buffer-cache fallback, not a success stub.",
+      "implemented": false
+    },
+    {
+      "header": "src/core/libraries/kernel/memory.h",
+      "sha256": "a0bb5618b2c5ed2b2511cfa5647d1d13419553dc6e45ccb276d8f21400e9013a",
+      "included_by": [
+        "src/core/memory.h"
+      ],
+      "decision": "Transitive memory manager types; runtime-owned ledger/lease adapter required.",
+      "implemented": false
+    },
+    {
+      "header": "src/core/libraries/kernel/process.h",
+      "sha256": "7ebd3b2cddb91bd7ee39dd2879a4016f46caaf2bb012dc326560363b6b2faa36",
+      "included_by": [
+        "src/shader_recompiler/frontend/decode.cpp",
+        "src/shader_recompiler/frontend/translate/translate.cpp"
+      ],
+      "decision": "Included by decoder and translator; no Kernel:: call found there in lexical review. Preserve header/ABI until actual compile proves a safe narrower dependency.",
+      "implemented": false
+    },
+    {
+      "header": "src/core/memory.h",
+      "sha256": "6cf4c2a3d1224272279e4ce349c45afe5d91b833e78335d0c852aab123315ea8",
+      "included_by": [
+        "src/video_core/buffer_cache/buffer.h"
+      ],
+      "decision": "Buffer-cache header exposes Core::MemoryManager pointer; host lease boundary required, no second memory manager.",
+      "implemented": false
+    },
+    {
+      "header": "src/core/signals.h",
+      "sha256": "e276c642b3cdf245c91b3c666c29630863a11cac4d71240822b29874899ca610",
+      "included_by": [
+        "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp"
+      ],
+      "decision": "SRT walker registers a fault handler which patches faulting loads; keep unavailable until validated owned-memory access and exception lifecycle exist. Never silently zero invalid guest reads.",
+      "implemented": false
+    }
+  ],
+  "additional_sites": [
+    {
+      "source": "src/shader_recompiler/info.h",
+      "sha256": "2c38ebb01528950923726d2715ca8887c20242b448d552531b43637163d4542a",
+      "observation": "GetSharp nested address dereference and tessellation constants pointer need bounded lease-backed snapshots; host callbacks alone do not make these accesses safe."
+    },
+    {
+      "source": "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
+      "sha256": "62c7ca094ca60822588f6848efaad0408090c6d4c53a1906b22718e7cfc45eca",
+      "observation": "SRT JIT32MiB plus signal handler registration and fault-load patching require separate ownership/lifetime design."
+    },
+    {
+      "source": "src/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+      "sha256": "9e48006a2e15adf75df8b280e119bf0d29f47f7045dbf64f7a3bfda49c5cc04d",
+      "observation": "Buffer-cache constants consumed even in shader-only seed selection."
+    },
+    {
+      "source": "src/shader_recompiler/ir/passes/shader_info_collection_pass.cpp",
+      "sha256": "9fe6576bd6e41cc5cb15c32ba1ff8058ebc886fdb036e02e40f5f09d6b4c737d",
+      "observation": "Non-direct-memory path creates buffer-cache page-table resource."
+    }
+  ],
+  "callbacks_implemented": false,
+  "retail_shaders_tested": 0
+}

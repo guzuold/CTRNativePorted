@@ -1,0 +1,3 @@
+add_library(ctr_igz_read_completion STATIC src/data/igz_read_completion.cpp)
+target_include_directories(ctr_igz_read_completion PUBLIC include)
+target_compile_features(ctr_igz_read_completion PUBLIC cxx_std_20)

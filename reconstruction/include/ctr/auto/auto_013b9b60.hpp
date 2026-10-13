@@ -1,0 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
+#pragma once
+#include <cstdint>
+namespace ctr { std::uint16_t auto_013b9b60(const std::uint8_t* object, std::uint64_t unused1, std::uint64_t unused2); }

@@ -1,0 +1,4 @@
+add_library(ctr_zero_field_object_construction STATIC src/core/zero_field_object_construction.cpp)
+target_include_directories(ctr_zero_field_object_construction PUBLIC include)
+target_compile_features(ctr_zero_field_object_construction PUBLIC cxx_std_20)
+target_link_libraries(ctr_zero_field_object_construction PUBLIC ctr_reconstructed)

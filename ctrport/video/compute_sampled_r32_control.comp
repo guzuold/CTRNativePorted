@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#version 450
+#extension GL_EXT_samplerless_texture_functions : require
+layout(local_size_x=8,local_size_y=1) in;
+layout(set=0,binding=0,std430) buffer Data {uint words[];} data;
+layout(set=0,binding=1) uniform texture2D pixels;
+void main(){uint x=gl_GlobalInvocationID.x,y=gl_GlobalInvocationID.y;
+ uvec4 v=floatBitsToUint(texelFetch(pixels,ivec2(x,y),0));uint i=(y*uint(textureSize(pixels,0).x)+x)*4;
+ data.words[i]=v.x;data.words[i+1]=v.y;data.words[i+2]=v.z;data.words[i+3]=v.w;}
