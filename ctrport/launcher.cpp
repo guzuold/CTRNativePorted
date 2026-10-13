@@ -58,12 +58,12 @@ const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 21
 
 enum : int {
     ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_TOGGLE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
-    ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_UNLOCK, ID_LAUNCH
+    ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_NATIVE_4K, ID_UNLOCK, ID_LAUNCH
 };
 
 struct Config {
     std::wstring base_dir, patch_dir, resolution = L"1920x1080 (1080p)", custom_w = L"1920", custom_h = L"1080";
-    bool use_patch = false, fps_60 = true, ps4_pro = false, unlock_all = false, fullscreen = false;
+    bool use_patch = false, fps_60 = true, ps4_pro = false, native_4k = false, unlock_all = false, fullscreen = false;
 };
 
 // ---- settings file: flat JSON object, compatible with the Python launcher's json.dump ----
@@ -233,7 +233,7 @@ struct Status { std::wstring text; int kind = 0; };  // 0 neutral, 1 ok, 2 error
 
 struct App {
     HWND window = nullptr, base_edit = nullptr, patch_edit = nullptr, width_edit = nullptr, height_edit = nullptr;
-    HWND patch_browse = nullptr, fps_toggle = nullptr, launch = nullptr, hot = nullptr;
+    HWND patch_browse = nullptr, fps_toggle = nullptr, pro_toggle = nullptr, native_4k_toggle = nullptr, launch = nullptr, hot = nullptr;
     std::vector<HWND> pills;
     std::map<HWND, Control> controls;
     float scale = 1;
@@ -300,9 +300,10 @@ void load_config() {
             text(L"base_dir", g.cfg.base_dir); text(L"patch_dir", g.cfg.patch_dir); text(L"resolution", g.cfg.resolution);
             text(L"custom_w", g.cfg.custom_w); text(L"custom_h", g.cfg.custom_h);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
-            flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
+            flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
         }
     }
+    if (g.cfg.native_4k) g.cfg.ps4_pro = true;
     for (std::wstring* folder : {&g.cfg.base_dir, &g.cfg.patch_dir})
         if (!folder->empty()) *folder = fs::path(*folder).make_preferred().wstring();
     g.resolution = 1;
@@ -325,7 +326,7 @@ void save_config() {
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
     const std::string json = "{\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
-        ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) +
+        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) +
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
         ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) + "\n}";
     std::error_code ec;
@@ -730,7 +731,8 @@ void validate() {
         summary += g.cfg.use_patch ? L"v01.21" : L"v01.00";
         if (g.cfg.use_patch && g.cfg.fps_60) summary += L" · 60 FPS";
         summary += g.cfg.fullscreen ? L" · schermo intero" : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
-        if (g.cfg.ps4_pro) summary += L" · PS4 Pro";
+        if (g.cfg.native_4k) summary += L" · PS4 Pro (3D 4K nativo)";
+        else if (g.cfg.ps4_pro) summary += L" · PS4 Pro (3D 1440p)";
         if (g.cfg.unlock_all) summary += L" · tutto sbloccato (salvataggi copiati prima)";
         g.global = {summary, 1};
     }
@@ -835,12 +837,13 @@ void launch_game() {
                                              {L"CTR_NO_FRAME_OBSERVATION", L"1"}, {L"CTR_BASE_DIR", base.wstring()}};
     if (g.cfg.use_patch) set[L"CTR_PATCH_DIR"] = patch.wstring();
     if (g.cfg.use_patch && g.cfg.fps_60) set[L"CTR_60FPS_PATCH"] = L"1";
-    if (g.cfg.ps4_pro) set[L"CTR_NEO_MODE"] = L"1";
+    if (g.cfg.ps4_pro || g.cfg.native_4k) set[L"CTR_NEO_MODE"] = L"1";
+    if (g.cfg.native_4k) set[L"CTR_NATIVE_4K"] = L"1";
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
     if (g.cfg.fullscreen) set[L"CTR_GPU_FULLSCREEN"] = L"1";
     else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
     auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR", L"CTR_STARTUP_MUTEX_DLL_DIR", L"CTR_PARK_MISSING_NID",
-        L"CTR_PARK_MISSING_SERVICE", L"CTR_TILING_TIMING", L"CTR_60FPS_PATCH", L"CTR_NEO_MODE", L"CTR_UNLOCK_ALL",
+        L"CTR_PARK_MISSING_SERVICE", L"CTR_TILING_TIMING", L"CTR_60FPS_PATCH", L"CTR_NEO_MODE", L"CTR_NATIVE_4K", L"CTR_UNLOCK_ALL",
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
@@ -965,7 +968,8 @@ void create_controls() {
     g.height_edit = add_edit(ID_HEIGHT, kHeightField, g.cfg.custom_h, ES_NUMBER | ES_CENTER);
     add_button(ID_FULLSCREEN, Kind::Toggle, rect(536, 410, 150, 26), L"Schermo intero", &g.cfg.fullscreen);
     g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(692, 410, 194, 26), L"60 FPS (v01.21)", &g.cfg.fps_60);
-    add_button(ID_PRO, Kind::Toggle, rect(536, 438, 340, 26), L"Modalità PS4 Pro (sperimentale)", &g.cfg.ps4_pro);
+    g.pro_toggle = add_button(ID_PRO, Kind::Toggle, rect(536, 438, 172, 26), L"PS4 Pro (1440p 3D)", &g.cfg.ps4_pro);
+    g.native_4k_toggle = add_button(ID_NATIVE_4K, Kind::Toggle, rect(712, 438, 174, 26), L"3D 4K nativo", &g.cfg.native_4k);
     add_button(ID_UNLOCK, Kind::Toggle, rect(616, 502, 270, 26), L"Sblocca tutti gli sbloccabili", &g.cfg.unlock_all);
     g.launch = add_button(ID_LAUNCH, Kind::Launch, kLaunch, L"AVVIA IL GIOCO");
 }
@@ -1025,6 +1029,13 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             const auto found = g.controls.find(reinterpret_cast<HWND>(lparam));
             if (found != g.controls.end() && found->second.kind == Kind::Toggle) {
                 *found->second.value = !*found->second.value;
+                if (id == ID_NATIVE_4K && g.cfg.native_4k && !g.cfg.ps4_pro) {
+                    g.cfg.ps4_pro = true;
+                    InvalidateRect(g.pro_toggle, nullptr, FALSE);
+                } else if (id == ID_PRO && !g.cfg.ps4_pro && g.cfg.native_4k) {
+                    g.cfg.native_4k = false;
+                    InvalidateRect(g.native_4k_toggle, nullptr, FALSE);
+                }
                 InvalidateRect(found->first, nullptr, FALSE);
                 validate();
             }

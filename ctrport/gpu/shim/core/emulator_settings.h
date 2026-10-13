@@ -29,11 +29,11 @@ public:
         return value;
     }
     u32 GetInternalScreenWidth() {
-        static const auto value = u32(Number("CTR_GPU_INTERNAL_WIDTH", 1280));
+        static const auto value = u32(Number("CTR_GPU_INTERNAL_WIDTH", Flag("CTR_NEO_MODE", false) ? 3840 : 1920));
         return value;
     }
     u32 GetInternalScreenHeight() {
-        static const auto value = u32(Number("CTR_GPU_INTERNAL_HEIGHT", 720));
+        static const auto value = u32(Number("CTR_GPU_INTERNAL_HEIGHT", Flag("CTR_NEO_MODE", false) ? 2160 : 1080));
         return value;
     }
     std::string GetPresentMode() {
