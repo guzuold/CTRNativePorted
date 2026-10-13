@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "upstream": "https://github.com/shadps4-emu/ext-LibAtrac9.git",
+  "revision": "946e05a9212976626a9f5e52f29c0a7202871f29",
+  "license": "MIT",
+  "copyright": "2018 Alex Barney",
+  "license_files": [
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/LICENSE",
+      "sha256": "06a7e63d1e48754e925339e0df0abc62f0ac828196c0783cb156ff69334fa737"
+    }
+  ],
+  "files": [
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/band_extension.c",
+      "sha256": "2cb865f6bb1ba7f94e967c93d1622cdbad4dc4dd531ae83d9367fcd214578445",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/band_extension.h",
+      "sha256": "48d81243bee6f1cd9555638eb4188b026fe4a887f98a44dcc6ad2dba1b3e4bef",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/bit_allocation.c",
+      "sha256": "c3718517cd32f7e30b1d7fed2fb334be436fb9555cd4ac7158be8ddc8fc2eacf",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/bit_allocation.h",
+      "sha256": "973fd0f8809fc3106bfc7b84b9ab27decf1a006af485f97293c340e51d793fc6",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/bit_reader.c",
+      "sha256": "2caee8a705de5a4e601b2b8c512d814a27ef942b0be33f081e3c87fd833a6aac",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/bit_reader.h",
+      "sha256": "6f8d8adcb04dba8f5255c380b943a04f4ff8aab8f984a117c08e9ab109f02569",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/decinit.c",
+      "sha256": "81a5291e9d8fe4102727ceb1d128024a449190a808d2461ace75d43e9a7a14e7",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/decinit.h",
+      "sha256": "d271bb8c65d8bfc40b9717bbf41153bd5149e7564bc42a863667dbf5b057a2ba",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/decoder.c",
+      "sha256": "9f1305abbd2c3abc8c4d4fdbed9d2b2c2cb0f74b815c33d634b8c8e0f3c1a76a",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/decoder.h",
+      "sha256": "5b59eaa7f77c74e36983e16f59108c2b7c8537b656d637e816b4cdbf95252b54",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/error_codes.h",
+      "sha256": "db20575155312a52a38f8fd7def8a36454dca2797c7ce590de02ac562a9b019e",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/huffCodes.c",
+      "sha256": "fdc3bd3688827a969c256270e0c09b81c0b22282ca414cdecec7d6867aade7bd",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/huffCodes.h",
+      "sha256": "dc8c5cdba3529515e999cb8b2fcc5d446ccc0b2abae8f54951e19f9395263eaf",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/imdct.c",
+      "sha256": "d5fd67d75be5ad566b7a97a4f799c8c27be68fa5b8aaab89a5f0a08ca564f46d",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/imdct.h",
+      "sha256": "93bc53f3c8352b35fa72fa44e55b65e2f9e05af162dea4c51022fb398a25fb53",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/libatrac9.c",
+      "sha256": "ce2874d5ce19db235a0f3d559b1a1836cdf687c1a832d40f3f346e30ae74b500",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/libatrac9.h",
+      "sha256": "deca0ca54de80c6ae18eb0f0b80aa6e4aaed5f6722f2610bf543ef123d5ae33f",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/quantization.c",
+      "sha256": "6b9f20b71663bbb84cfe78f875993df96f2c0935906f6df110b2a0e72d0bbf98",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/quantization.h",
+      "sha256": "c2f4c4da8d39a06abb0a672481482de7f84ca93e1bf56a361f0801fb9ae08601",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/scale_factors.c",
+      "sha256": "8e2e6f68de833c061a4542d1ed3f32fe207d011a4507142991018f083b4f9675",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/scale_factors.h",
+      "sha256": "684f2e4340a6ad02d79ae5f3c71e69c4a1b4e51222ed0614740f2a929bd3b21f",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/structures.h",
+      "sha256": "0d778339829bced41f3bf9eb8864cf5e6b38d85805bed8a734b59edd896757f4",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/tables.c",
+      "sha256": "98d854fd036c1cb137896f39667ddd1e264924fd16bd0ea745aebf429d34cb90",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/tables.h",
+      "sha256": "7116700de8c981fd8f2da68bfe1aeec739e0f5408bfba97ca8f450e8ee045265",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/unpack.c",
+      "sha256": "4bf0efdeedfa58e9cdf499f32f3cd0b88600d1d964c9b523041c7ae9754a8455",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/unpack.h",
+      "sha256": "05d629db2f6070b3f5f5a8e76564b83686b9a15eebf78942f7065f2893072664",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/utility.c",
+      "sha256": "335c98fca7edcd670c5eae187171d46403cfef0af43061d186a73279742f649c",
+      "license": "MIT",
+      "use": "compiled C decoder"
+    },
+    {
+      "path": "engine/shadPS4/externals/LibAtrac9/C/src/utility.h",
+      "sha256": "1271aafec9268ab82beb48eddd75df4f1f065dc19b9a0c29bf41c4de17f2a511",
+      "license": "MIT",
+      "use": "decoder header dependency"
+    }
+  ],
+  "changes": "None; existing pinned sources compiled in place. Guest decode binding remains missing.",
+  "public_contract_sources": [
+    {
+      "path": "engine/shadPS4/src/core/libraries/kernel/time.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "license": "GPL-2.0-or-later",
+      "sha256": "b97eaaf2e9b36a0279cbc3c3b327ae7fb2d2ba2e23aa2a1e0b45fdf3a0440997",
+      "use": "reviewed validation/error contract; Windows owner and ABI bridge implemented locally"
+    },
+    {
+      "path": "engine/shadPS4/src/core/libraries/ajm/ajm.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "license": "GPL-2.0-or-later",
+      "sha256": "dec3b8ad18f4b4846856d1aa446093e1a8f95a62a6ddb566eca13a70ed4df059",
+      "use": "reviewed validation/error contract; Windows owner and ABI bridge implemented locally"
+    },
+    {
+      "path": "engine/shadPS4/src/core/libraries/ajm/ajm_context.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "license": "GPL-2.0-or-later",
+      "sha256": "8c1ecdf48f5bd6084f51d86f6125cfa0861390c00d3184b4d5f0b52b72d73c33",
+      "use": "reviewed validation/error contract; Windows owner and ABI bridge implemented locally"
+    },
+    {
+      "path": "engine/shadPS4/src/core/libraries/ajm/ajm_error.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "license": "GPL-2.0-or-later",
+      "sha256": "4803dcd4b961465f668d9db330f6b803909a98cdb61383cd31b2c36bb4bb61fd",
+      "use": "reviewed validation/error contract; Windows owner and ABI bridge implemented locally"
+    },
+    {
+      "path": "engine/shadPS4/src/core/libraries/audio/audioout.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "license": "GPL-2.0-or-later",
+      "sha256": "678b5a4a5d98b8a950cf57370ee358846a0922f7a96720a21c7672506a576ba9",
+      "use": "reviewed validation/error contract; Windows owner and ABI bridge implemented locally"
+    },
+    {
+      "path": "engine/shadPS4/src/core/libraries/audio/audioout_error.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "license": "GPL-2.0-or-later",
+      "sha256": "f27a0f95cb31c7495b02c19e6f71896335cbd74a723b9d06b0e8a909c0fb9847",
+      "use": "reviewed validation/error contract; Windows owner and ABI bridge implemented locally"
+    }
+  ]
+}

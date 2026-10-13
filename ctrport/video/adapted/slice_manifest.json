@@ -1,0 +1,9 @@
+{
+  "source": "engine/shadPS4/src/shader_recompiler/frontend/decode.h",
+  "source_sha256": "7893815f1f1d525deb436ddde9b414944477a48a5dfa9a8bcb48660b0b99e137",
+  "adapted": "ctrport/video/adapted/include/shader_recompiler/frontend/decode.h",
+  "adapted_sha256": "e66958bd4ee8961bf61d9ed9ad761129277702eb650ebaed90336bc29abfce1c",
+  "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+  "license": "GPL-2.0-or-later",
+  "changes": "GcnCodeSlice at/read32/read64 reject out-of-bounds before cursor mutation; read64 uses memcpy for unaligned storage. Endpoints must belong to same live array. Not selected in existing upstream compiler objects yet."
+}

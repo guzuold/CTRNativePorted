@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#version 450
+#extension GL_EXT_samplerless_texture_functions : require
+layout(local_size_x=8,local_size_y=1) in;
+layout(set=0,binding=0,std430) buffer Data {uint words[];} data;
+layout(set=0,binding=1) uniform texture2DMS pixels;
+// Exact dispatch480x1080: two interleaved samples for each1920-wide row.
+void main(){uint x=gl_GlobalInvocationID.x,y=gl_GlobalInvocationID.y;
+ data.words[y*3840+x]=floatBitsToUint(texelFetch(pixels,ivec2(x/2,y),int(x%2)).r);}

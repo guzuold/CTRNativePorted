@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "reviews": {
+    "engine/shadPS4/src/video_core/host_shaders/fsr/ffx_a.h": {
+      "sha256": "94d8d663b6925c72fbecc8a5a6d6dcc88cd99a82033c8b8663a83f1938a192c6",
+      "license_observed": "MIT-style permission and warranty notice in file header; no SPDX identifier",
+      "notice_lines": "9-45",
+      "copyright": "AMD 2021; additionally Michal Drobot 2014 in ffx_a.h",
+      "port_decision": "defer_optional_fsr",
+      "reason": " excludes FSR from initial graphics bring-up; retain notices if reused later. Include graph retains these dependencies and does not prove FSR can be removed without changes."
+    },
+    "engine/shadPS4/src/video_core/host_shaders/fsr/ffx_fsr1.h": {
+      "sha256": "4dc2022ee8a0463446f5d56ae8bc310a6bba1079e1d92235e35c324fee66fc22",
+      "license_observed": "MIT-style permission and warranty notice in file header; no SPDX identifier",
+      "notice_lines": "13-30",
+      "copyright": "AMD 2021; additionally Michal Drobot 2014 in ffx_a.h",
+      "port_decision": "defer_optional_fsr",
+      "reason": " excludes FSR from initial graphics bring-up; retain notices if reused later. Include graph retains these dependencies and does not prove FSR can be removed without changes."
+    }
+  }
+}

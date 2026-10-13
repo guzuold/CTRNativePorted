@@ -1,0 +1,3499 @@
+{
+  "schema": 1,
+  "method": "Per-file SPDX/source revision/hash review; proposed selections remain unapproved until marked actually reused. Adapted public helpers and compiled sources are recorded individually; no runtime support inferred from source presence.",
+  "files": [
+    {
+      "source": "engine/shadPS4/src/common/adaptive_mutex.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7be574a8250af109f9066c51e0ed834ac54167188ce09c77434d55e3ed82226c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/alignment.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ece4dd8adaf49b95226bf8865119c21a9c58d37206a55a37d527046fc1244024",
+      "spdx": [
+        "CC0-1.0"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/arch.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "65b26d9a277d0be4c8f49face5f345a53b69a264efdeeb67b790e2316736d89f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/assert.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d0b09c3f389647a67154fc6ba96f642bbb1af098256da659f2d25cd507a165d8",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/bit_array.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1b1370d85c1ef18de38e163ebd3e9d9b242ebb5cd80d52cf09d9bc9c66f99b36",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/bit_field.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "133164b935fcbc0698b8607a0bc9e493cd46b0372c6ece630b2add450c62a503",
+      "spdx": [
+        "BSD-3-Clause AND GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/concepts.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ab4b7f9feef67ef50b1b7fabf5132dad2018d39316aeb74e2ef66ae59a62c989",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/debug.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c61261a1df5831068b16cc284156c861e46558df6b133b703af573c27a2f9d83",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/decoder.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d62f4a2d226e9a0ff6ccf3989ce37ebcef7306de085e68b310ef30b263242e38",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/div_ceil.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0eca366a6137cb1192a37afee10c409ab3e75af103bb8c5c301482da21ee130b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/elf_info.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2b5b99ebe379266cefe6fb25dd96149a83fd63374fca2a7f2d44c825454dd775",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/enum.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e89e3938e08c784a750797d36b4f53a81810a353fc9b4d04f92720a5ed248168",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/error.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "df69dd7376debee634361ca7fbec6a8af89abe946bc4b48848b3b3ea3e89485c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/func_traits.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b173cf9998f7bbf7c0283366cd0240b236d9f40626652e9292f6ef264042c96c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/hash.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2224707221bb00fc510c8a3559e6a3d3de0c6b4544a1699cda3f678039418f37",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/incremental_id.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9e6f4eb82700ed0292825c43ab021ac9de580e48d69039d3f86ced1e053ec1e3",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/io_file.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0469f018cb4c68abcf1b685ad862e10d223266b7489119e311ebc9ead3eab274",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/logging/classes.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "19a3aaf6a559f5ccfd6eedc1b5141f6c7809d977c3d442e82ffc44fe7f3eb3db",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/logging/formatter.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "de68f73fa3e605445dc4c2e915c9111e50b775becb3f956f07a7b7d62de7c13f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/logging/log.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "04634c2d466ae0102aa6c0daf48ca1bf84a418dee63a5daf9f00851144abbc2c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/lru_cache.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c02cfc6d50ef53c1fb6b5366724538df903066ce1ab40aa89743cd43cb9c46e0",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/number_utils.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "81b37cb6441c53cbe733c580624877b1310360a9949cea759699a7de71d40bdb",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/object_pool.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5275e69f732ea243b565bc6c9e4d41cc210febf2ed63c625839e03952d3307aa",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/path_util.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7951b8b02ec01f0baa17587978372a060f8e60602ff68bea9b5321d6bd57cf08",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/polyfill_thread.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d57d22c64765e145361e0241ec15342a18c3b76ff6584623afc52d8f36e776fb",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/range_lock.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "965ff51a13fd413f9248743ca408f3b1b2facd1eea5f1fe6cfb1a8c259b2f2cf",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/rdtsc.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "fff4cbe7a68f7afe244c98f62f9a677fb4bab4949214f175adb1f6f98bebc8a4",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/recursive_lock.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ab7b8a736e0d0a6d7751aada3d91408de6c4beb94b8910cab0e7dce73daa2f2b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/ring_buffer_queue.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3038b3fd13c35b911191c3c7c0006de70138184bf1b62df20984782adbd4d95c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/scope_exit.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0ab104a16cd56ae17ad4c4755f85cdaa23c112fa6e5acc712b026b07ad79e03a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/serdes.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2553eea433a2910283a3ec04338a2b44f7afd7f888cdabf5ed54904534355d8f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/shared_first_mutex.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "067815b9a7c5e2cad71a5527335aab78d87ef8246f0d32a98a3c591dd64ed3b5",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/signal_context.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "31f3bf86a03b1946c0a8fb6a73617be0d271500210ad02f50a469753b6754630",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/singleton.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "51113d29554ec09613d33425cee0eff189df091150dc6b57a918750c3a179b28",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/slot_vector.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b8fd1198742dfbc70c8c2387246b14caef616cfef89d7f424132b677833e8bb1",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/spin_lock.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "18065a656b6193130495fa42fc1314d2d2d1caa5ff6467878ecdbfee679c1e83",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/string_literal.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "51dab04f29dd84dfe4148a6968f13f9d27225da33dfa3e5cfb8a8c34249f4630",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/thread.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3941743ea2a37353f60f585b1dbd597242c0b79893493a469b0a7ddb23f2fa2e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/types.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e22a770377555894e03a9cb59e7fd2d6fc50e1ca500c3d0de2ceba171b53703d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/uint128.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5d0c51828cd2180d58d8a5d7df40a396ac725bc0c1b23870baaef0d7d538a763",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/common/unique_function.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0f9f95367fced953f813d60c32a399e9d23f6c022c5d2b282299783d481189b9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/address_space.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "48a219638d731509408ef87119a9a6b236f09ccd139555315f72df890ba7b69e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/cpu_patches.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "54668d5515ade5c2ea2ad566af61290cd3de76aa3de4367406cd477e63d5d0a2",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/debug_state.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "68c41504b2988a06f522067a07b452b75227615bec6aa6f6b1eef2bbfef2919e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/devtools/layer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7083c9f4e1ad7be799241c49f023ae430f0b277d9ba6723a586af7a414664317",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/emulator_settings.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5fb65121d7c4fdec24809d33e769f4ae4bb985035ab4a6848c80046ab1b03e65",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/file_sys/ifile.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a31cb7accfd73974e5a2b88bb0f1c5982b566f43326bbd8822ef78e29a028255",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/error_codes.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a0346c868f21a27791999a27d0f0f7b542404c78044932107439eb44107fa277",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/gnmdriver/gnm_error.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "dbe9d31742f2e9ca105e9b5e3d37911fb6247c75147d6d6878e72d9614867417",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/gnmdriver/gnmdriver.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "034c59669d0ee6a48fa654d97449624e9ca50e5695638a42a57f40c29e7722fd",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/gnmdriver/gnmdriver.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1f0c13f24e1d6935f0d6d3fb6cf40069bffc8ab427dfc82476c9aab174843154",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/gnmdriver/gnmdriver_init.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "91192b45770a5530a7f2b8ca3d708d6511aefdd38d1e84b7fbad370f481925be",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/kernel/equeue.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "903256b0d2f23eaf30ef3e09410873e4a9e324360f144c21e53ee91b8a47c9d2",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/kernel/memory.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a0bb5618b2c5ed2b2511cfa5647d1d13419553dc6e45ccb276d8f21400e9013a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/kernel/orbis_error.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a04bbf0af6b9f4bd779c771262cbfd4331b7f8d2452522278dcc5698e6341b66",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/kernel/process.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7ebd3b2cddb91bd7ee39dd2879a4016f46caaf2bb012dc326560363b6b2faa36",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/kernel/time.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "39d6d7d5e3efb16d981c80393895181ff1e0a0dc5297d29285e85027f7d4bcc4",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/libs.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c69ba5e02ceac4cfdb3650a8f481fc0d1a3345009c5719447d6740a8efb5e04c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/pad/pad.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d6a5d1c48e1c0cfb27dc15f80b0fe32efb810199800985a9f7e11cc605afec24",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/system/systemservice.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c92a4e159ae62205f90b94b8bfdd0c09a50d00cbacf0928c48824c4a63452a3c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/system/userservice.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c7ca1d343214c4c2fe217917b0a66d9e2b83d5b1072c631581d8cbe2fed189dd",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/buffer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b82dc3c67f2927ce317af9732ade6ca9c701b68cc72becc550acdb02810d6b4d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/driver.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "11b4103ee2676acc985f13e5345a8569efbd588f071c424b4ad4c014c640411f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/driver.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "95f40f7222b768414c5f76c7442b2f1a897e5014dfbe0a2d197984c630190264",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/video_out.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9abae8fd87e5f8816467dc18343469d33249d1aa48b14ed6811013840323ecc1",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/video_out.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "366bf8c9ae8e5cc1dd79b67bb855b34f75596487dae3af3e6af92e02569f5f34",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/videoout_error.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "94746e937545bd36d2cc314d0ab407f733ede14d74a101b07ab931d8733ebdfd",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/loader/elf.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "18f0e9f591c5b2989c9f6317ec9ca423c87c38731b15ad03aee5f9fe0f1b3d43",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/loader/symbols_resolver.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4e0a2ff2558dd8571a73f00c8863db0359c7a23f3df6796a6551e92176fa60b9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/memory.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6cf4c2a3d1224272279e4ce349c45afe5d91b833e78335d0c852aab123315ea8",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/platform.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4a00aa77065aa7014e8261be09cb4e3c6f16890b763868caad957a03eed3bfac",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/signals.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e276c642b3cdf245c91b3c666c29630863a11cac4d71240822b29874899ca610",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/tls.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ccdf3cec9913ae71770a79d797dacdf60b384e138b539c169b50e5039845d076",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "host_boundary_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/friends_layer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "22c813cdb49a2861dfbe5a8dcb567ad232307a16558ed3a577d39df94f4f8924",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/imgui_layer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "11d750c2e321e4f6bbe38ed2f425668271ba9df88d4cf8910824bcef33bc15a9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/imgui_texture.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3db34dcc4b617312e9a36061eb795bd3e12e71f03b4df90cdef3f958d4a712d4",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/invitation_prompt_layer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b6377e0d44064a099c80f19e7eecd4236f68ac192ed79b39d00958220410541f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/notifications_layer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d0f1fb2ae824fbea10d2d9ea2f1f34d537d0ea7b40ba24ec345dcc9d924eb3ba",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/renderer/imgui_core.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "612a3b01fe2b9d1363022c3cc350b5f85cf21f26a37b2b94ba98f6b26b3a69e3",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/renderer/imgui_impl_vulkan.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "df4b29a459679e7a0f7f6a3d703d036d494e3418444e5516e165677f6dda8e51",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/renderer/texture_manager.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "de8eb77f708b8622daea59565ba37f87eaa42650d7778e91436c96eabc56217c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/imgui/shadnet_notifications_layer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "eb9a1bed37af57d9b71217c5b77e19d6ce3264c29fae1eb110835eaf1019a28d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/input/controller.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3d8137a386e3a97e9de52a1d9438e24755a03b26a4e4732c62f9bc4e2410419a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/sdl_window.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "73e03c18d0be53afbc656e4cd8b50fba44a87f2604145a369acab8e9c74a0ce3",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/bindings.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "88ae2be1e790928b6ffe4803cac9ad53e38c89432449047636b148bdbe5d20ed",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6f69ee44e82f62eaf21332bc94e39ff23b19ee939c552696876e9e1f44239297",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "8174754462b5b2791b070428b46d7e4292f17d3602cd90187bbd869a4f31c632",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_atomic.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c961a083c736e3122fac0e919fa8b7d426f6f7b19b3d4dc7c0579d40c57d8d75",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_barriers.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "329bd7a3e3fe0e49ba0c1d2b2d5c7715eb5ad5393c3d9f97dc293f016df63298",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_bitwise_conversion.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4a5b0320ed5dd2313c587ef4c58b892dccf9b7e723f0b7c81ed15cca6802b5cc",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_composite.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "22cc682aadb001f2d153d6464685e93422a05ecfb9fc410d88a83caefb582668",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7da58171b5ccb06a1ff463e155b2dddbc37b50818a5353c73e45d0994f95df4e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_convert.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "74d8b3cf263a6e0d7c67077691ae5b412555bf31778835ce235aad45c74654bd",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "339a40ab05be417c8cb342ba67242733dc1cb288a6357727905031e74d78a5d6",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "996e42f267b4806872a316068aa2dedb0d96d16713e7544c3fc5cc22b63a3996",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_floating_point.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4d5fe543211357fcf533a2650014db4ade3c2fc1ec19786ec315cd672d76689c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_image.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "791aed3138156b64ebc375a5bd7b1919b4fcac90e1a5546fd72e293662231cad",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "debce9967b705a099445fa2a292d4c142bbf13a1ec94a9e0768a3ad4e94b3fa6",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_integer.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b35d81ecc7d387f221edd7895c73899b8d647b63d1f8ff611ac5d6e9cf81211f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_logical.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "53039b38828dc2565169919ad4b25feac68bc6ee9783f9208a041b41461ccbc6",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "099e6ee6855362442e98805cebe582f4c740f2313681d15464fc2e29f8a39a98",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "aab7bb3c4c0539f918e86d5c204bf9f4c82165d85c13d3e696854835c24795c0",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_select.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ff2d2f478e9723d53faa872a7b5c2dc1534994172c8870d71e28a3d75ba13c62",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_shared_memory.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "bddb59f91c9b410012b32189ae14203261f37469369077b1267a993d0b1e21f6",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_special.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "92db053683393c9f218feac8e5c6a2232f0c71eebf970c7d18e58ecbc90ec77b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_undefined.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "96b5049714732a850fb31b8a4964ca1dac24cfe360103c3e54a89bef52196e7d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/emit_spirv_warp.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "29ebdbf55afca78825ebff019340897e10d2738b6fed1c1d0df008d9f15f84a7",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9e48006a2e15adf75df8b280e119bf0d29f47f7045dbf64f7a3bfda49c5cc04d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/backend/spirv/spirv_emit_context.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "603dc5ace98f55018e773b8a59bc09db9da08cadc4821492194814b759565e9e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/control_flow_graph.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ae901a0636f115b423c8ba0810a7a16f7efe05c3af4b05dc2d27998ce1bea8c5",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/control_flow_graph.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c7eafb8714121e28373ce923b4dbfde10ffbdd4cbc0fccb5f7f09c17642d467b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/copy_shader.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "01ba1d5cfb6b555327d4d689e55311a09be4aec10c9f18ce020b87d937162b67",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/copy_shader.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "41be93e08169cc14a6a32be57e27c4efef5cc6be0bcf4b7341f7374f9b9dbe3a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/decode.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "90adf469f5efa882f51cbe5e222b386c26fbda56d82e90d7468343cce3e87043",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/decode.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7893815f1f1d525deb436ddde9b414944477a48a5dfa9a8bcb48660b0b99e137",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/fetch_shader.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "42b420edfd10ed14f0f12501ce1773ac92b47255b2ef543e246b47fa92d97879",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/fetch_shader.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3320cd90ba49297357501076faf72f14b215b18a47a0abfd302c5f59113a1699",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/format.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a99cc53d802eec144091e27f15d31b5e015d86eeb3571d6b5c85b7597334e370",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/instruction.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e06d4085b83d754ef4ed5be8ee13fdd0029fea814762c7132ba811edc4ed9ecd",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/instruction.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a96f5c4cb1fc26f7d19a9ea2ca6908d0ec1f1a7e79c643b63eee7d56e09188d8",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/opcodes.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a3fc5fd776f9cbf241b916f09f0ff8498ea9c10db6d3b10e00dacaf20e086eaf",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c8d66f0a01dc610ba58fca76375a2e48ea614ff445d3d8649160e4c598b7942f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/structured_control_flow.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d85bee1274987c762319dffcf00fcaf11f2468e0ba06d94f2e72f7ec2f8d0b18",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/tessellation.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "851e2081f90a2da6e635ded7b9c16c7a65696a4cd997486b63134ea11fa2495c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/data_share.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "620c90c7af9f63df8d6de709c3eecbe01b0cff84e83e2b54c5e8c092b0e47a27",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/export.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4a1e0670bd413896d02b1adc21b53a240881d4185e92ed979ccc69608475f919",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/scalar_alu.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "931c00406e643505c287007c566ed885c094606aac53c4de34be0a9d1264716c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/scalar_flow.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "46e22b862860fabdd2c76d40bbfc32431398355c3686abaf72efd9c4ee1d988e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/scalar_memory.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e13809b2d98dc8f1a7e2cfbf10171512e9874a9c7ca416ad8045637c197e78ab",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/translate.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5423c46605238db1af7808babbfe2ea7ddef93e9943f5a38468f91bf0fcaddd3",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/translate.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b4d9a4581d60876a26e6913ce4206652f989b9c9083e75787eb710e21ce39864",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/vector_alu.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3923e5ecc183db48b802bf5e8df1b2d15c5f55d9d5f8b23bc5e876e321dccd91",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/vector_interpolation.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "8f1e6b49c4aa2bffe2f7f3db5d2b6197921928eb4457f19da067ce94d534607b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/frontend/translate/vector_memory.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4735477e63d7a426cc2f1e2657ec44b5cad7edde7c89adb0d434237526f757be",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/info.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2c38ebb01528950923726d2715ca8887c20242b448d552531b43637163d4542a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/abstract_syntax_list.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b0a92b103aec4ac41af8eada3e8a6733db79d22b86e2958de94fe759060b7e6a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/abstract_syntax_list.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3ed99adbf3a5fadfd88f6740886a3cf428944e5c70f4ca84554e3c73703e9e65",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/attribute.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "21e92c587c7888827648774e72f0e0ecf088c4a39fbbd979af6667da67c8f216",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/attribute.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "093db42ed3061cc7c6b5549fb46b6a58a1ef78b149b80bcea1d8011eeb066909",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/basic_block.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "522cea9a3b0ba351287420008b42f616c8898d5e2eea8333ac268e6735fcf2f4",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/basic_block.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "43e3d4da55bd5bcd8aa305011ac9fd7515e510a3df26477ecd7f7fca0b78ceca",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/breadth_first_search.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0c691b6b40d0b7c7809f8da46f7940f9733e38e590a721e34981a0ca26322985",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/condition.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "be1af3973bb1d216f4121a0b930edf4586aaf808dfe1f50192d3d203be7bca73",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/debug_print.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4dfd74581645e17606ded7c19134504c3bf285d1e7bb780366a44a3ea6bb2938",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/ir_emitter.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4f038e4148c9e11bb680f31f8c2dd6301e30f5601b5061768e942150f5f2cbaa",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/ir_emitter.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "71c00896086b8a75695d5a5094e8a32a74ae9a06b720e174acbda0436207d30d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/microinstruction.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "12c0952054a75f2cd56f5a098aaf80d03547254c661114012c8255f502637ff5",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/opcodes.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "877d0c13f4225730d4bd28ab1b7449c62fb8bbe11c67118ec13cc918a6ef4832",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/opcodes.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1474a612d2fadb3c33273a46b296d666beaf3c227c943a1726a7ac8671754d3b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/opcodes.inc",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "82355c7daced7f60b4c5aeee6142e9846bf509e41fc6e6386986a81dff7ebdcd",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/operand_helper.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "09c3cf643f73dc905bb4de5d2368e5d2180a0a1d82a1789ebb607c3e5e6faf66",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/constant_propagation_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "510d884ffbba9f05c6a5d578e631062237bc25d8c53a424b66d5a428a59dbde6",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/dead_code_elimination_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "012c8abfcb7a8564db2371a43529fa5f8072ca1a206bea832e0eefbaaec07414",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "62c7ca094ca60822588f6848efaad0408090c6d4c53a1906b22718e7cfc45eca",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/hull_shader_transform.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "f9097157ed251a4a7c512f4e673e4f13fa7dd9e88ee0f26430367aac9ea611f9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/identity_removal_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "91588e58e45736d308a6150dc1cb1c8c900f672df3a1fb91e09f3ca2c0ca6e54",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/inject_clip_distance_attributes.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "f226c3a70a77ed557809693abe87a3a900a8017d65921eb034fdbb82152dd48c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/ir_passes.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "563cb76ad7a4f1edb677ed805b38843a53e2cb57a553933b3e10b2ee86de8da2",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/lower_buffer_format_to_raw.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "81b89614fb7d99d7c153a9cb7a065f5ca912b86c32619c88313db02507f14b03",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/lower_fp64_to_fp32.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "8bcdbdf57f02dd0726015fb0ea752b4cd6c02778a557fa1bc221f315d023b770",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/lower_user_clip_planes.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "073ecec020a8dd9772dcd5a69942945cd9ddbdc7affd90da34aa47e566ddaea9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/readlane_elimination_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b05de79ba70c698aabc51a73c25a3152a674b1aa4055031ffe4e516f400e72ad",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/resource_tracking_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6e7865d973a0807ed99831e12202ff43938f1d8477edb74b021506b30949aaca",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/ring_access_elimination.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "07fb288fb06ba147c1f4202e7dc80c9ef14fff8e3d1f571316d3b47f6115e8c7",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/shader_info_collection_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9fe6576bd6e41cc5cb15c32ba1ff8058ebc886fdb036e02e40f5f09d6b4c737d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/shared_memory_barrier_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7d4d2ca048d8ce30e1e2bf406dc20d19ffad2f678ef8aaf52ce9ed4d176e0066",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/shared_memory_simplify_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7bccd0c436b5208205afbdbd56af00dea5caaae76f018f886a75e2e485fc56ed",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/shared_memory_to_storage_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7fedd8a62bff9a7d5617cef02df80311610889c8681c3527ea91a7e47e123280",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/srt.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e8f1a3c0a76ea8b54e59888b0cbc532aa79c7ce6378d958ec8a666601800099e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/passes/ssa_rewrite_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2ab07c13058083ad091acfa4f767dd5ff8218206ab5a3971ecad8bc9b70037ef",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/patch.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "fdc23b0edb97f011a149674fc898deb99effe710ce512f9a6cc038412a94c359",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/patch.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "22458f4540f6ad514112d8ce98ce4527b4d32ac77235bca7f41596b5d94b07cb",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/pattern_matching.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1dede1256f544967667bbd5fbf555661af42f935f8f7c3ced0fe1835cdcd9708",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/position.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7a8df7a609ebfa617c92b385cb9b379e0bf0310d96d9c0c6d437c7e8c0dfc3e9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/post_order.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "895c51b2b6a4d8af7a20dc4494b43637aaa2b1cf513add50cdaf3ffd30796b31",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/post_order.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6a2ac299be5a89428abcb3bf46c367fa5fed132b2947c146f5b75af3045e24ce",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/program.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1a66433170d712b18baba0895d6e1444ab52c441938d5d0ac70c124e379e82df",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/program.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5d4950ee6f957622689ecd6d82f28a7235df1bd8887b6acb2533ed59f907ad3a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/reg.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2b0f97baebb75d2f7c8c6ef5e6bf99058f7d8015db7b9bd090c41473805fdac9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/reinterpret.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2168fb191023e27a513939b87e737b86e7191d424a15577c62213d8e1a3ae003",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/srt_gvn_table.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1a9aa90b855bcce55449af7692e925e871b790b5dd7a8557d71fd39de3c5b2d9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/type.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0a5a210f89a23a1fd7f0fabd6e4512ba42e1264717f17501b9b35821adf7d372",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/type.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6e671def206eaf8c1b3286dfa2abf6d483400adcb21abf5ddae60c5829c8ae00",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/value.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d0637cd8a4ec4961d1517e8131e4c06261a2fcba458996a8de0f92b58ffd13e0",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/ir/value.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "714ad69f022a1177db820622e3d0ac31753f5aef23e732a2cb23c657514051e5",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/params.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "dbdae6e5155ab86b8732f63dba7bb29216c3f4bac24b3ade4a2cdbf17ef90f6f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/profile.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d497da541f9b9c3d8ef0f60e00469aec48bdc0526fe2e6a4b39ae4852f40ac39",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/recompiler.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5c53b2d7099b64f9142a0787df5cb35024244c4163430a292e1bf63ae553ef45",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/recompiler.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e610e3432ee62f3f1d5cd5cdf74da8bb71657194b0e87624278474b4c9ac9cec",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/resource.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3a8bf21e76d37e1a1c70deee3be0fdc208b7b803ab50f66ef8b40a4db3452c15",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/runtime_info.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b2c6d54f5526858615040dbe52f859f77cc17d24fbe17fd817905647e426f25a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/shader_recompiler/specialization.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a5c9f3bbc510813d2580f412f7f14f8e85d2ba6434fa269a424f2b67ea7aff73",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/cb_db_extent.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "f673bb3e3a753fcf9993e510aa01ada9191c56ed9633607c4126964418f3695f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/liverpool.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e0bf809241763f53c318ec7eb833297f1001e978e98d3eb71faaa638d4d53dc2",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/liverpool.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4aeee0a62e49c52690918181f1656f7f13e9fd2d31ff068c5438b806b2cfe504",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/pixel_format.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "10fb8b514ac09fa917b5046a358f94b321e75bd25be53e000bb0b9c0b7578a38",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/pixel_format.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3031c5de014abc4ed226363e5d297b23a01070f579cf2865d6aaf0039fb7ae89",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/pm4_cmds.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "70f160de3ff25bcbf6241ab345199f3e117fc137664df8d482158a60b18d305b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/pm4_opcodes.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "8bcc1ca9016fbdbd3dfc3f8d64bc506cb739986c7a9da4e51f7e4f30934f00ca",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "602781c2a86eb824b27da0818ce107441eb5b1d7c7ac8807fa5c482c4adf0a3b",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "7bd789720742816ee9e3f4849b6f4b8b2125e27562d4ae332aa1487989b75e69",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs_color.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ff7a8478c7d4e8a604d25f4c500b6a5f6b28037d211ff2a9e9c95478377d8af3",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs_depth.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "957c79c816e5a2bd8267a3902190fcb6c3aa507fe3b7ab0b8139ac9f6bd8f62c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs_primitive.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "f47c952ac2e6b03456296c4e019c7c0279c14d326e52029de397a185391ccf96",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs_shader.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "651dec541ce11a5a12601952be993953ede9d9936f894dba30c00029cbc3b082",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs_texture.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "02ff8d29919b7f56195fe7ed1e8dc16faac8aead4dbf221d170f1bb0041fbbab",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/regs_vertex.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9066593988015eda60ff219247c0c9f00a77ddb8de524fea5f952ab0702d742e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/resource.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "636623aa093c19c3ecddb8872710cf65729cc1544c14724c12b5b393e50f4952",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/tiling.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "f063de5a75c9fd83040a680559a27f82ce36e0f4b6a3bc895fbd4ed0881779d0",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/amdgpu/tiling.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "07363856a750eaf42021df17167e281fa5a534af097e789d9f0ba9d257a86b5e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/buffer.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4ca2e39c6830c5301c71040397ace5d9a1cc2653f2a4f22f77d4897b146305d3",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/buffer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a68c6a47c66769eb5f6b2378b807bbd5a1b6d95b2b96364a3a369ffbd379243d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/buffer_cache.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5c0b9bf3cb42515cb18ef11ec4b7a43c5c7d64aa5bc1bdbb0d03475e4c652e47",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/buffer_cache.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c0a8e71db3459f88dbe81de897787113c414ceba3d21c42ac850247590dc81df",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/fault_manager.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "159ee2196bb3458c1f51ad8575abaf5a188e111402d24846ce50d6a234a4e6be",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/fault_manager.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5b5b3047f1ba367380059cc7bfc68eb21de00a88d90dcc0edcd1142bda8bd0b6",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/memory_tracker.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "50409f7f21fd4393a5914634d88cc9314292a2ab9a687270b9bb7bc091bb3875",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/range_set.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6c114e821dd93a50e281641aa530a0beae3376af0a9e3c35ec89996048001ed0",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/region_definitions.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "bc53be50a3b5aafea25d193303128436483f3df00e36887e80d6a5e6c99d6f54",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/buffer_cache/region_manager.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9777573babb084d8266ec1bf92e269007cf15685f690dc8218da650bad7c0f5d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/cache_storage.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "8c7369cf08ddf524f1c48a832109736d9db5840f47094e724be6ca416935c595",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/cache_storage.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a435e0a4fb632dbc1208864255bbe38b75317576688c031462fc477e4f9ebbc5",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/host_shaders/fsr/ffx_a.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "94d8d663b6925c72fbecc8a5a6d6dcc88cd99a82033c8b8663a83f1938a192c6",
+      "spdx": [],
+      "license_status": "header_notice_reviewed_no_spdx",
+      "decision": "defer_optional_fsr",
+      "actually_reused_in_ctr_video": false,
+      "destination": null,
+      "license_review": {
+        "sha256": "94d8d663b6925c72fbecc8a5a6d6dcc88cd99a82033c8b8663a83f1938a192c6",
+        "license_observed": "MIT-style permission and warranty notice in file header; no SPDX identifier",
+        "notice_lines": "9-45",
+        "copyright": "AMD 2021; additionally Michal Drobot 2014 in ffx_a.h",
+        "port_decision": "defer_optional_fsr",
+        "reason": " excludes FSR from initial graphics bring-up; retain notices if reused later. Include graph retains these dependencies and does not prove FSR can be removed without changes."
+      }
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/host_shaders/fsr/ffx_fsr1.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4dc2022ee8a0463446f5d56ae8bc310a6bba1079e1d92235e35c324fee66fc22",
+      "spdx": [],
+      "license_status": "header_notice_reviewed_no_spdx",
+      "decision": "defer_optional_fsr",
+      "actually_reused_in_ctr_video": false,
+      "destination": null,
+      "license_review": {
+        "sha256": "4dc2022ee8a0463446f5d56ae8bc310a6bba1079e1d92235e35c324fee66fc22",
+        "license_observed": "MIT-style permission and warranty notice in file header; no SPDX identifier",
+        "notice_lines": "13-30",
+        "copyright": "AMD 2021; additionally Michal Drobot 2014 in ffx_a.h",
+        "port_decision": "defer_optional_fsr",
+        "reason": " excludes FSR from initial graphics bring-up; retain notices if reused later. Include graph retains these dependencies and does not prove FSR can be removed without changes."
+      }
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/multi_level_page_table.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "fe8f6adc34ec9090c309b7adafe819e16fe2f3abf51c7799ae59191652486632",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/page_manager.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "adc5dcdf21a564538a256c4ce2b29497498d50b6643bd6906dfc69b72bfeed98",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/page_manager.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e1a90faf3880268146b75884594492035348910e214dc7e8f33c839450159e24",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderdoc.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "35a34eeb69029036f8ca7c330c87a3584be7e21273cdc8fa208620f4eca8dbb5",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderdoc.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d67d11fa8ce1d3c120ff7df11cbfd3c75b3ebdf5e2e8ebeeb5c4d5ca3a129817",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/host_passes/fsr_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2de3679e5c49212579715ebe395e2625de9472cfb367845fa2419258a340d318",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/host_passes/fsr_pass.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b70821f38d5f2c91f306688c370e639e2cb9219b3a85a9f636c67838eae66f59",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/host_passes/pp_pass.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "175bf94816a20cb9e60074c88898d671ff1c4cb9cfae18d515479a0c96522a6c",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/host_passes/pp_pass.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "acce19f6b8b5a1eb035b671d8e3a6a697b81c7ed23e4d79ba53705ee07cc3463",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/liverpool_to_vk.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1edd2ca5bfa5c7ab059352ccf1343ef32e797258d62c5c51824d2aac0fc7d46f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/liverpool_to_vk.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "e434157a38b5f854180a8ab7db340bfa5062dfe0fa5312385a6d4ae4e25fe599",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_common.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0156835ff5c7dcc5242f7ef4197d77723a3bc935061e8290ab283b6bd022dba2",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_common.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "341b63c99ec6ee75d4d46036a897c041e0bffdf1f0ea18f70cee14f12b08471d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_compute_pipeline.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "ceeb1648711bb8fa0173bd77d5ce108d592bf17aa264788cb7bf99c1bf85d426",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_compute_pipeline.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1e549b4eeae3fef96e247680d947076cae76c4bc1c2fc277ee1c79ca6a32367f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_graphics_pipeline.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9ffcc76892ede12be18010e2fad6f83e0b7361ba8edd54efa8331ec90942fa59",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_graphics_pipeline.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9e92da01b47bb3a7c4da19f66dbad89c0ef5144725871e182dfd06d3d304427d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_instance.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "67cf18f33aa2b8a9439167e977b6ba39009e2d4657456bc13e03b44dd12b6cd0",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_instance.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a7c9be1016aaaec8a79b107fb3e07d3fe5532e200331a6c99ade59aed4bc98b5",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_master_semaphore.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "178300f976338381e8400f8c13cd3c01190fdd692f0322755dc6ce2930a7a105",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_master_semaphore.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c757b980ed32fb9f5b425963e23967d776fac96ac69dad86184f0c5babd20029",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2dd72b21566ccb6683894399660f16b19af0cf2acd6627dd68fe80a5b9885e4f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_pipeline_cache.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d1cac08a2e6f4b0879170b6f0a7ff817998705933fe0e4213b22a189020b289d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_pipeline_common.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "1db7fc346af050285727ea47bba5c28e24b55c4aee7e4297e211ca173f3dc3ae",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_pipeline_common.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "0e93f4cf1b947cfb06614df6a665c772ff111dc74c428924f68109abba5a0074",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_pipeline_serialization.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "70c33b144ea2f14d9e6060044f49c4f40ba8a6dccc8f5f8e289104c03a3c029f",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_pipeline_serialization.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9868c10247fb3d971985f5d342f91abd4366f32042b862b823ee123ef168a455",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_platform.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "26e7d50fec2d832ffcfd01a35709c1877798ecff2103e3a707215388431d6bc9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_platform.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a1dcef1110ac8e9c9949cecca6a31f6dbd8eb7ad43b9704eb009fbe644806178",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_presenter.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "33d6a919d249936ac165e27b14e0fdadb301481361f4d8c83471ee6babed8f02",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_presenter.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "feeeabd9eaca4b2a5964285e2d5ff05db09ea4536ec6fbd3eedabce70f855626",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_rasterizer.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a42318186f083974aca9fe22a064eb7ed95e3c391cdac519fb8eb6a49b414d65",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_rasterizer.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "5d4ada44614613d6253b2326c7c29019237c8c44f6e2f66246e4e881585f69e9",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_resource_pool.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "29855693889bfa45ffaae30fb6b9539eca5967c37166b392d9c5510011971881",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_resource_pool.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "10e2776f10223c3f974496c677011c22b5e944310b3067156cfab82a00974429",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_scheduler.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b676650c5d9aecb081fe220e1b9bb2c0ceed560b7b06db5819a333bdab467433",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_scheduler.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "bb86e3d967098d3217a3c2e8a4c0d06a052552469401f602d82f38f7be8f0e7a",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_shader_hle.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "a5fb051677fbab26aac5b1010493a71bc09a299feb86c11b2a7f2c1d13731d34",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_shader_hle.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b1f8b6d090193702790f1029729ec18da8ad1e64ae1709fda2feb23d547eb7e1",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_shader_util.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c6d659fb9f0c660fad2650cb3bde5ce6e54bd228f2eb2812b455b99df31a6730",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_shader_util.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "202ee00b9444be5226aa1d084ccae28b0f8bb00ba7dce79944a71ef5f5eb3fd2",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_swapchain.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4fbe9b0504f4f9476759ccb68f2f63a40794d5489f9858a3f4fa8b5eb3426a33",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/renderer_vulkan/vk_swapchain.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "323260b14010846d88c6d33b273fc8cd7a7d960725d9b7d5a2d86c69d8f966e1",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/blit_helper.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "67e593adcfbec649e54bec9570a662af921875217707e9c25035591e7083f961",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/blit_helper.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "26db6f728a0ecb097570b053a58ea4d94b5cbc3f0244bdeaf939f81acb39a6c7",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/host_compatibility.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "2dce23bed3bac0b3a2d5e188c448aedff1b71bd57e11aafe394c0c06a1675d91",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/host_compatibility.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "d74bdeccf821bbde28aabfc63001b298ba24f3ad92e19bc036a11afacc89cf5d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/image.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "fd9ee80855d735b70b76177951907979cfc5162ce5252544ef10feae3e9b5bc6",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/image.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "c8aa20532f8166254c1fce4434bd75ad6e5f5f5a8d2931934d72306f455c72e8",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/image_info.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "87eeb40163d7a99223abbe0e0da21811d792dbcbcad120f99add858f0626fbec",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/image_info.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "dd1636613f151b35af7ef2b82ce6820a998259608f868884aff09e7fe6d66123",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/image_view.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "640585d61a37b9ea37e26f1d61d53c17a6e162e27548938f23625a084d3ed7fb",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/image_view.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "beba4f9fb4cab53ed0f0a7b80261b3bc3fb72aca73c1e33fbe6b77d4ae8da040",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/sampler.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "3eabe6a01d010ea40841a2dd8d08b9af942e094fa24ba3184468c0c19f54d2c7",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/sampler.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6bb0660c5c483e0641a314982af061e85a9936e957eadfb444dc5d55fafce875",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/texture_cache.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "aa80dce442c41025b89fc4b6c43c1632bc244cdbb868342f5446c6f0d1097d5e",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/texture_cache.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "6266690f567f3cb9072e32d9a9e153d0070b6bc64d330d816a48f9ba77c6245d",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/tile.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "418a31522322524c9ba9b01fafb768bc1c9bebd2f6ef76cf0db69023b5ec4b34",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/tile_manager.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "4800cb6a9c1060e82731f0ab8a3fc0146f17d037939b46fb3a59c33917571521",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/tile_manager.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "b36164f732f9ea4cd86fb63c6be044082fe4db3cf16565a7547704f309462872",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/video_core/texture_cache/types.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "cf3e55938cd8fc0882593441a46c056394ad159107c69c4599712999b4329336",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "proposed_reuse_review",
+      "actually_reused_in_ctr_video": false,
+      "destination": null
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/video_out.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9abae8fd87e5f8816467dc18343469d33249d1aa48b14ed6811013840323ecc1",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "adapted_SetBufferAttribute_only",
+      "actually_reused_in_ctr_video": true,
+      "destination": "ctrport/video/guest_attribute_write.h",
+      "adaptation": "initialize local40B public attributes then checked-copy; preserve32bit args, no SysV binding or retail claim"
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/videoout/video_out.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "9abae8fd87e5f8816467dc18343469d33249d1aa48b14ed6811013840323ecc1",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "adapted_ColorSettingsSetGamma_only",
+      "actually_reused_in_ctr_video": true,
+      "destination": "ctrport/video/guest_color_write.h",
+      "adaptation": "public bounds then checked4B field write; no renderer application or SysV binding"
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/gnmdriver/gnmdriver.cpp",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "034c59669d0ee6a48fa654d97449624e9ca50e5695638a42a57f40c29e7722fd",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "adapted_whole_DrawInitDefaultHardwareState350",
+      "actually_reused_in_ctr_video": true,
+      "destination": "ctrport/video/gnm_init.cpp",
+      "adaptation": "whole350 base/Neo public sequences; checked read-modify-write preserves unwritten NOP payload; explicit runtime Neo policy"
+    },
+    {
+      "source": "engine/shadPS4/src/core/libraries/gnmdriver/gnmdriver_init.h",
+      "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+      "sha256": "91192b45770a5530a7f2b8ca3d708d6511aefdd38d1e84b7fbad370f481925be",
+      "spdx": [
+        "GPL-2.0-or-later"
+      ],
+      "license_status": "declared_in_file",
+      "decision": "compiled_public_init_arrays",
+      "actually_reused_in_ctr_video": true,
+      "destination": "ctrport/video/gnm_init.cpp",
+      "adaptation": "whole350 base/Neo public sequences; checked read-modify-write preserves unwritten NOP payload; explicit runtime Neo policy"
+    }
+  ],
+  "file_count": 285,
+  "entry_count": 289,
+  "missing_spdx_count": 2,
+  "host_boundary_count": 22,
+  "actually_reused_count": 4,
+  "actually_reused_source_count": 3,
+  "count_semantics": "file_count counts distinct source paths; entry_count counts review/adaptation records; actually_reused_count counts adaptation records, not whole files or runtime services.",
+  "external_dependency_license_review": "pending; unresolved includes remain in dependency_inventory.json",
+  "bbport_status": "reference_only; no source copied or compiled"
+}

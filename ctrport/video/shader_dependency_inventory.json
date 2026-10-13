@@ -1,0 +1,3915 @@
+{
+  "schema": 1,
+  "upstream_revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+  "method": "All selected module cpp seeds, recursively resolve sibling/src includes. Conditional branches all retained. External/system includes unresolved explicitly. This is not a compile/link closure.",
+  "seed_count": 64,
+  "local_file_count": 147,
+  "files": {
+    "src/common/alignment.h": {
+      "sha256": "ece4dd8adaf49b95226bf8865119c21a9c58d37206a55a37d527046fc1244024",
+      "includes": [
+        {
+          "include": "cstddef",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/arch.h": {
+      "sha256": "65b26d9a277d0be4c8f49face5f345a53b69a264efdeeb67b790e2316736d89f",
+      "includes": []
+    },
+    "src/common/assert.h": {
+      "sha256": "d0b09c3f389647a67154fc6ba96f642bbb1af098256da659f2d25cd507a165d8",
+      "includes": [
+        {
+          "include": "common/logging/log.h",
+          "local": "src/common/logging/log.h"
+        }
+      ]
+    },
+    "src/common/bit_field.h": {
+      "sha256": "133164b935fcbc0698b8607a0bc9e493cd46b0372c6ece630b2add450c62a503",
+      "includes": [
+        {
+          "include": "cstddef",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "limits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/concepts.h": {
+      "sha256": "ab4b7f9feef67ef50b1b7fabf5132dad2018d39316aeb74e2ef66ae59a62c989",
+      "includes": [
+        {
+          "include": "concepts",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "iterator",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/decoder.h": {
+      "sha256": "d62f4a2d226e9a0ff6ccf3989ce37ebcef7306de085e68b310ef30b263242e38",
+      "includes": [
+        {
+          "include": "Zydis/Zydis.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/singleton.h",
+          "local": "src/common/singleton.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/common/div_ceil.h": {
+      "sha256": "0eca366a6137cb1192a37afee10c409ab3e75af103bb8c5c301482da21ee130b",
+      "includes": [
+        {
+          "include": "cstddef",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/enum.h": {
+      "sha256": "e89e3938e08c784a750797d36b4f53a81810a353fc9b4d04f92720a5ed248168",
+      "includes": [
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/common/func_traits.h": {
+      "sha256": "b173cf9998f7bbf7c0283366cd0240b236d9f40626652e9292f6ef264042c96c",
+      "includes": [
+        {
+          "include": "tuple",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/hash.h": {
+      "sha256": "2224707221bb00fc510c8a3559e6a3d3de0c6b4544a1699cda3f678039418f37",
+      "includes": [
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/common/io_file.h": {
+      "sha256": "0469f018cb4c68abcf1b685ad862e10d223266b7489119e311ebc9ead3eab274",
+      "includes": [
+        {
+          "include": "cstdio",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "filesystem",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/concepts.h",
+          "local": "src/common/concepts.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "enum.h",
+          "local": "src/common/enum.h"
+        }
+      ]
+    },
+    "src/common/logging/classes.h": {
+      "sha256": "19a3aaf6a559f5ccfd6eedc1b5141f6c7809d977c3d442e82ffc44fe7f3eb3db",
+      "includes": [
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/logging/log.h": {
+      "sha256": "04634c2d466ae0102aa6c0daf48ca1bf84a418dee63a5daf9f00851144abbc2c",
+      "includes": [
+        {
+          "include": "iostream",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "spdlog/details/fmt_helper.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "spdlog/sinks/basic_file_sink.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "spdlog/sinks/stdout_color_sinks.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "spdlog/sinks/msvc_sink.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "spdlog/sinks/wincolor_sink.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "spdlog/spdlog.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/logging/classes.h",
+          "local": "src/common/logging/classes.h"
+        },
+        {
+          "include": "common/path_util.h",
+          "local": "src/common/path_util.h"
+        },
+        {
+          "include": "common/thread.h",
+          "local": "src/common/thread.h"
+        }
+      ]
+    },
+    "src/common/lru_cache.h": {
+      "sha256": "c02cfc6d50ef53c1fb6b5366724538df903066ce1ab40aa89743cd43cb9c46e0",
+      "includes": [
+        {
+          "include": "deque",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/common/object_pool.h": {
+      "sha256": "5275e69f732ea243b565bc6c9e4d41cc210febf2ed63c625839e03952d3307aa",
+      "includes": [
+        {
+          "include": "memory",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "utility",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/path_util.h": {
+      "sha256": "7951b8b02ec01f0baa17587978372a060f8e60602ff68bea9b5321d6bd57cf08",
+      "includes": [
+        {
+          "include": "filesystem",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "optional",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/shared_first_mutex.h": {
+      "sha256": "067815b9a7c5e2cad71a5527335aab78d87ef8246f0d32a98a3c591dd64ed3b5",
+      "includes": [
+        {
+          "include": "chrono",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "condition_variable",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "mutex",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/signal_context.h": {
+      "sha256": "31f3bf86a03b1946c0a8fb6a73617be0d271500210ad02f50a469753b6754630",
+      "includes": [
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/common/singleton.h": {
+      "sha256": "51113d29554ec09613d33425cee0eff189df091150dc6b57a918750c3a179b28",
+      "includes": [
+        {
+          "include": "memory",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/common/slot_vector.h": {
+      "sha256": "b8fd1198742dfbc70c8c2387246b14caef616cfef89d7f424132b677833e8bb1",
+      "includes": [
+        {
+          "include": "numeric",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "utility",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/common/thread.h": {
+      "sha256": "3941743ea2a37353f60f585b1dbd597242c0b79893493a469b0a7ddb23f2fa2e",
+      "includes": [
+        {
+          "include": "chrono",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/common/types.h": {
+      "sha256": "e22a770377555894e03a9cb59e7fd2d6fc50e1ca500c3d0de2ceba171b53703d",
+      "includes": [
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "cstdint",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/core/address_space.h": {
+      "sha256": "48a219638d731509408ef87119a9a6b236f09ccd139555315f72df890ba7b69e",
+      "includes": [
+        {
+          "include": "memory",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/icl/separate_interval_set.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/arch.h",
+          "local": "src/common/arch.h"
+        },
+        {
+          "include": "common/enum.h",
+          "local": "src/common/enum.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/core/cpu_patches.h": {
+      "sha256": "54668d5515ade5c2ea2ad566af61290cd3de76aa3de4367406cd477e63d5d0a2",
+      "includes": [
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/core/emulator_settings.h": {
+      "sha256": "5fb65121d7c4fdec24809d33e769f4ae4bb985035ab4a6848c80046ab1b03e65",
+      "includes": [
+        {
+          "include": "atomic",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "filesystem",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "functional",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "memory",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "mutex",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "ostream",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "sstream",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "nlohmann/json.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/logging/log.h",
+          "local": "src/common/logging/log.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "core/cpu_patches.h",
+          "local": "src/core/cpu_patches.h"
+        }
+      ]
+    },
+    "src/core/libraries/kernel/memory.h": {
+      "sha256": "a0bb5618b2c5ed2b2511cfa5647d1d13419553dc6e45ccb276d8f21400e9013a",
+      "includes": [
+        {
+          "include": "common/bit_field.h",
+          "local": "src/common/bit_field.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/core/libraries/kernel/process.h": {
+      "sha256": "7ebd3b2cddb91bd7ee39dd2879a4016f46caaf2bb012dc326560363b6b2faa36",
+      "includes": [
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/core/memory.h": {
+      "sha256": "6cf4c2a3d1224272279e4ce349c45afe5d91b833e78335d0c852aab123315ea8",
+      "includes": [
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "mutex",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string_view",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/enum.h",
+          "local": "src/common/enum.h"
+        },
+        {
+          "include": "common/shared_first_mutex.h",
+          "local": "src/common/shared_first_mutex.h"
+        },
+        {
+          "include": "common/singleton.h",
+          "local": "src/common/singleton.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "core/address_space.h",
+          "local": "src/core/address_space.h"
+        },
+        {
+          "include": "core/libraries/kernel/memory.h",
+          "local": "src/core/libraries/kernel/memory.h"
+        }
+      ]
+    },
+    "src/core/signals.h": {
+      "sha256": "e276c642b3cdf245c91b3c666c29630863a11cac4d71240822b29874899ca610",
+      "includes": [
+        {
+          "include": "set",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "signal.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/singleton.h",
+          "local": "src/common/singleton.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/bindings.h": {
+      "sha256": "88ae2be1e790928b6ffe4803cac9ad53e38c89432449047636b148bdbe5d20ed",
+      "includes": [
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv.cpp": {
+      "sha256": "6f69ee44e82f62eaf21332bc94e39ff23b19ee939c552696876e9e1f44239297",
+      "includes": [
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "utility",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "magic_enum/magic_enum.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/func_traits.h",
+          "local": "src/common/func_traits.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.inc",
+          "local": "src/shader_recompiler/ir/opcodes.inc"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv.h": {
+      "sha256": "8174754462b5b2791b070428b46d7e4292f17d3602cd90187bbd869a4f31c632",
+      "includes": [
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/backend/bindings.h",
+          "local": "src/shader_recompiler/backend/bindings.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_atomic.cpp": {
+      "sha256": "c961a083c736e3122fac0e919fa8b7d426f6f7b19b3d4dc7c0579d40c57d8d75",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_barriers.cpp": {
+      "sha256": "329bd7a3e3fe0e49ba0c1d2b2d5c7715eb5ad5393c3d9f97dc293f016df63298",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_bitwise_conversion.cpp": {
+      "sha256": "4a5b0320ed5dd2313c587ef4c58b892dccf9b7e723f0b7c81ed15cca6802b5cc",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_composite.cpp": {
+      "sha256": "22cc682aadb001f2d153d6464685e93422a05ecfb9fc410d88a83caefb582668",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp": {
+      "sha256": "7da58171b5ccb06a1ff463e155b2dddbc37b50818a5353c73e45d0994f95df4e",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "core/emulator_settings.h",
+          "local": "src/core/emulator_settings.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        },
+        {
+          "include": "shader_recompiler/ir/patch.h",
+          "local": "src/shader_recompiler/ir/patch.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        },
+        {
+          "include": "magic_enum/magic_enum.hpp",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_convert.cpp": {
+      "sha256": "74d8b3cf263a6e0d7c67077691ae5b412555bf31778835ce235aad45c74654bd",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.cpp": {
+      "sha256": "339a40ab05be417c8cb342ba67242733dc1cb288a6357727905031e74d78a5d6",
+      "includes": [
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "set",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "sirit/sirit.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_discard_frag.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.h": {
+      "sha256": "996e42f267b4806872a316068aa2dedb0d96d16713e7544c3fc5cc22b63a3996",
+      "includes": [
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_floating_point.cpp": {
+      "sha256": "4d5fe543211357fcf533a2650014db4ade3c2fc1ec19786ec315cd672d76689c",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_image.cpp": {
+      "sha256": "791aed3138156b64ebc375a5bd7b1919b4fcac90e1a5546fd72e293662231cad",
+      "includes": [
+        {
+          "include": "boost/container/static_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h": {
+      "sha256": "debce9967b705a099445fa2a292d4c142bbf13a1ec94a9e0768a3ad4e94b3fa6",
+      "includes": [
+        {
+          "include": "sirit/sirit.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_integer.cpp": {
+      "sha256": "b35d81ecc7d387f221edd7895c73899b8d647b63d1f8ff611ac5d6e9cf81211f",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_logical.cpp": {
+      "sha256": "53039b38828dc2565169919ad4b25feac68bc6ee9783f9208a041b41461ccbc6",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.cpp": {
+      "sha256": "099e6ee6855362442e98805cebe582f4c740f2313681d15464fc2e29f8a39a98",
+      "includes": [
+        {
+          "include": "sirit/sirit.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_quad_rect.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.h": {
+      "sha256": "aab7bb3c4c0539f918e86d5c204bf9f4c82165d85c13d3e696854835c24795c0",
+      "includes": [
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_select.cpp": {
+      "sha256": "ff2d2f478e9723d53faa872a7b5c2dc1534994172c8870d71e28a3d75ba13c62",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_shared_memory.cpp": {
+      "sha256": "bddb59f91c9b410012b32189ae14203261f37469369077b1267a993d0b1e21f6",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_special.cpp": {
+      "sha256": "92db053683393c9f218feac8e5c6a2232f0c71eebf970c7d18e58ecbc90ec77b",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        },
+        {
+          "include": "shader_recompiler/ir/debug_print.h",
+          "local": "src/shader_recompiler/ir/debug_print.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_undefined.cpp": {
+      "sha256": "96b5049714732a850fb31b8a4964ca1dac24cfe360103c3e54a89bef52196e7d",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/emit_spirv_warp.cpp": {
+      "sha256": "29ebdbf55afca78825ebff019340897e10d2738b6fed1c1d0df008d9f15f84a7",
+      "includes": [
+        {
+          "include": "shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+          "local": "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/spirv_emit_context.cpp": {
+      "sha256": "9e48006a2e15adf75df8b280e119bf0d29f47f7045dbf64f7a3bfda49c5cc04d",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/div_ceil.h",
+          "local": "src/common/div_ceil.h"
+        },
+        {
+          "include": "shader_recompiler/backend/spirv/spirv_emit_context.h",
+          "local": "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/fetch_shader.h",
+          "local": "src/shader_recompiler/frontend/fetch_shader.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        },
+        {
+          "include": "video_core/buffer_cache/buffer_cache.h",
+          "local": "src/video_core/buffer_cache/buffer_cache.h"
+        },
+        {
+          "include": "boost/container/static_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "numbers",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string_view",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/shader_recompiler/backend/spirv/spirv_emit_context.h": {
+      "sha256": "603dc5ace98f55018e773b8a59bc09db9da08cadc4821492194814b759565e9e",
+      "includes": [
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "sirit/sirit.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/backend/bindings.h",
+          "local": "src/shader_recompiler/backend/bindings.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/control_flow_graph.cpp": {
+      "sha256": "ae901a0636f115b423c8ba0810a7a16f7efe05c3af4b05dc2d27998ce1bea8c5",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/logging/log.h",
+          "local": "src/common/logging/log.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/control_flow_graph.h",
+          "local": "src/shader_recompiler/frontend/control_flow_graph.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/control_flow_graph.h": {
+      "sha256": "c7eafb8714121e28373ce923b4dbfde10ffbdd4cbc0fccb5f7f09c17642d467b",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/intrusive/set.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/object_pool.h",
+          "local": "src/common/object_pool.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/instruction.h",
+          "local": "src/shader_recompiler/frontend/instruction.h"
+        },
+        {
+          "include": "shader_recompiler/ir/condition.h",
+          "local": "src/shader_recompiler/ir/condition.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/copy_shader.cpp": {
+      "sha256": "01ba1d5cfb6b555327d4d689e55311a09be4aec10c9f18ce020b87d937162b67",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/copy_shader.h",
+          "local": "src/shader_recompiler/frontend/copy_shader.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/decode.h",
+          "local": "src/shader_recompiler/frontend/decode.h"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/copy_shader.h": {
+      "sha256": "41be93e08169cc14a6a32be57e27c4efef5cc6be0bcf4b7341f7374f9b9dbe3a",
+      "includes": [
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/decode.cpp": {
+      "sha256": "90adf469f5efa882f51cbe5e222b386c26fbda56d82e90d7468343cce3e87043",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "core/libraries/kernel/process.h",
+          "local": "src/core/libraries/kernel/process.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/decode.h",
+          "local": "src/shader_recompiler/frontend/decode.h"
+        },
+        {
+          "include": "magic_enum/magic_enum.hpp",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/decode.h": {
+      "sha256": "7893815f1f1d525deb436ddde9b414944477a48a5dfa9a8bcb48660b0b99e137",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/instruction.h",
+          "local": "src/shader_recompiler/frontend/instruction.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/fetch_shader.cpp": {
+      "sha256": "42b420edfd10ed14f0f12501ce1773ac92b47255b2ef543e246b47fa92d97879",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/decode.h",
+          "local": "src/shader_recompiler/frontend/decode.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/fetch_shader.h",
+          "local": "src/shader_recompiler/frontend/fetch_shader.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/fetch_shader.h": {
+      "sha256": "3320cd90ba49297357501076faf72f14b215b18a47a0abfd302c5f59113a1699",
+      "includes": [
+        {
+          "include": "optional",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/format.cpp": {
+      "sha256": "a99cc53d802eec144091e27f15d31b5e015d86eeb3571d6b5c85b7597334e370",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/decode.h",
+          "local": "src/shader_recompiler/frontend/decode.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/instruction.cpp": {
+      "sha256": "e06d4085b83d754ef4ed5be8ee13fdd0029fea814762c7132ba811edc4ed9ecd",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/instruction.h",
+          "local": "src/shader_recompiler/frontend/instruction.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/instruction.h": {
+      "sha256": "a96f5c4cb1fc26f7d19a9ea2ca6908d0ec1f1a7e79c643b63eee7d56e09188d8",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/opcodes.h",
+          "local": "src/shader_recompiler/frontend/opcodes.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/opcodes.h": {
+      "sha256": "a3fc5fd776f9cbf241b916f09f0ff8498ea9c10db6d3b10e00dacaf20e086eaf",
+      "includes": [
+        {
+          "include": "magic_enum/magic_enum.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/enum.h",
+          "local": "src/common/enum.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/structured_control_flow.cpp": {
+      "sha256": "c8d66f0a01dc610ba58fca76375a2e48ea614ff445d3d8649160e4c598b7942f",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "memory",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "optional",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "utility",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/intrusive/list.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/frontend/structured_control_flow.h",
+          "local": "src/shader_recompiler/frontend/structured_control_flow.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/structured_control_flow.h": {
+      "sha256": "d85bee1274987c762319dffcf00fcaf11f2468e0ba06d94f2e72f7ec2f8d0b18",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/control_flow_graph.h",
+          "local": "src/shader_recompiler/frontend/control_flow_graph.h"
+        },
+        {
+          "include": "shader_recompiler/ir/abstract_syntax_list.h",
+          "local": "src/shader_recompiler/ir/abstract_syntax_list.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/tessellation.h": {
+      "sha256": "851e2081f90a2da6e635ded7b9c16c7a65696a4cd997486b63134ea11fa2495c",
+      "includes": [
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/data_share.cpp": {
+      "sha256": "620c90c7af9f63df8d6de709c3eecbe01b0cff84e83e2b54c5e8c092b0e47a27",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/export.cpp": {
+      "sha256": "4a1e0670bd413896d02b1adc21b53a240881d4185e92ed979ccc69608475f919",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        },
+        {
+          "include": "shader_recompiler/ir/position.h",
+          "local": "src/shader_recompiler/ir/position.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reinterpret.h",
+          "local": "src/shader_recompiler/ir/reinterpret.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/scalar_alu.cpp": {
+      "sha256": "931c00406e643505c287007c566ed885c094606aac53c4de34be0a9d1264716c",
+      "includes": [
+        {
+          "include": "magic_enum/magic_enum.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/scalar_flow.cpp": {
+      "sha256": "46e22b862860fabdd2c76d40bbfc32431398355c3686abaf72efd9c4ee1d988e",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/opcodes.h",
+          "local": "src/shader_recompiler/frontend/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/scalar_memory.cpp": {
+      "sha256": "e13809b2d98dc8f1a7e2cfbf10171512e9874a9c7ca416ad8045637c197e78ab",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/translate.cpp": {
+      "sha256": "5423c46605238db1af7808babbfe2ea7ddef93e9943f5a38468f91bf0fcaddd3",
+      "includes": [
+        {
+          "include": "common/io_file.h",
+          "local": "src/common/io_file.h"
+        },
+        {
+          "include": "common/path_util.h",
+          "local": "src/common/path_util.h"
+        },
+        {
+          "include": "core/emulator_settings.h",
+          "local": "src/core/emulator_settings.h"
+        },
+        {
+          "include": "core/libraries/kernel/process.h",
+          "local": "src/core/libraries/kernel/process.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/decode.h",
+          "local": "src/shader_recompiler/frontend/decode.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/fetch_shader.h",
+          "local": "src/shader_recompiler/frontend/fetch_shader.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reinterpret.h",
+          "local": "src/shader_recompiler/ir/reinterpret.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        },
+        {
+          "include": "video_core/amdgpu/resource.h",
+          "local": "src/video_core/amdgpu/resource.h"
+        },
+        {
+          "include": "numbers",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "magic_enum/magic_enum.hpp",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/translate.h": {
+      "sha256": "b4d9a4581d60876a26e6913ce4206652f989b9c9083e75787eb710e21ce39864",
+      "includes": [
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/frontend/instruction.h",
+          "local": "src/shader_recompiler/frontend/instruction.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/vector_alu.cpp": {
+      "sha256": "3923e5ecc183db48b802bf5e8df1b2d15c5f55d9d5f8b23bc5e876e321dccd91",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/opcodes.h",
+          "local": "src/shader_recompiler/frontend/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/vector_interpolation.cpp": {
+      "sha256": "8f1e6b49c4aa2bffe2f7f3db5d2b6197921928eb4457f19da067ce94d534607b",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/frontend/translate/vector_memory.cpp": {
+      "sha256": "4735477e63d7a426cc2f1e2657ec44b5cad7edde7c89adb0d434237526f757be",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/translate/translate.h",
+          "local": "src/shader_recompiler/frontend/translate/translate.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/info.h": {
+      "sha256": "2c38ebb01528950923726d2715ca8887c20242b448d552531b43637163d4542a",
+      "includes": [
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/static_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/backend/bindings.h",
+          "local": "src/shader_recompiler/backend/bindings.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/copy_shader.h",
+          "local": "src/shader_recompiler/frontend/copy_shader.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/tessellation.h",
+          "local": "src/shader_recompiler/frontend/tessellation.h"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        },
+        {
+          "include": "shader_recompiler/ir/passes/srt.h",
+          "local": "src/shader_recompiler/ir/passes/srt.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/ir/type.h",
+          "local": "src/shader_recompiler/ir/type.h"
+        },
+        {
+          "include": "shader_recompiler/params.h",
+          "local": "src/shader_recompiler/params.h"
+        },
+        {
+          "include": "shader_recompiler/resource.h",
+          "local": "src/shader_recompiler/resource.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/abstract_syntax_list.cpp": {
+      "sha256": "b0a92b103aec4ac41af8eada3e8a6733db79d22b86e2958de94fe759060b7e6a",
+      "includes": [
+        {
+          "include": "abstract_syntax_list.h",
+          "local": "src/shader_recompiler/ir/abstract_syntax_list.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/abstract_syntax_list.h": {
+      "sha256": "3ed99adbf3a5fadfd88f6740886a3cf428944e5c70f4ca84554e3c73703e9e65",
+      "includes": [
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/attribute.cpp": {
+      "sha256": "21e92c587c7888827648774e72f0e0ecf088c4a39fbbd979af6667da67c8f216",
+      "includes": [
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/attribute.h": {
+      "sha256": "093db42ed3061cc7c6b5549fb46b6a58a1ef78b149b80bcea1d8011eeb066909",
+      "includes": [
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/basic_block.cpp": {
+      "sha256": "522cea9a3b0ba351287420008b42f616c8898d5e2eea8333ac268e6735fcf2f4",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "initializer_list",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/basic_block.h": {
+      "sha256": "43e3d4da55bd5bcd8aa305011ac9fd7515e510a3df26477ecd7f7fca0b78ceca",
+      "includes": [
+        {
+          "include": "initializer_list",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/intrusive/list.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/object_pool.h",
+          "local": "src/common/object_pool.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/breadth_first_search.h": {
+      "sha256": "0c691b6b40d0b7c7809f8da46f7940f9733e38e590a721e34981a0ca26322985",
+      "includes": [
+        {
+          "include": "optional",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "queue",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/condition.h": {
+      "sha256": "be1af3973bb1d216f4121a0b930edf4586aaf808dfe1f50192d3d203be7bca73",
+      "includes": [
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/debug_print.h": {
+      "sha256": "4dfd74581645e17606ded7c19134504c3bf285d1e7bb780366a44a3ea6bb2938",
+      "includes": [
+        {
+          "include": "common/bit_field.h",
+          "local": "src/common/bit_field.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "src/common/types.h",
+          "local": null,
+          "delimiter": "\""
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/ir_emitter.cpp": {
+      "sha256": "4f038e4148c9e11bb680f31f8c2dd6301e30f5601b5061768e942150f5f2cbaa",
+      "includes": [
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "source_location",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/ir/debug_print.h",
+          "local": "src/shader_recompiler/ir/debug_print.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/ir_emitter.h": {
+      "sha256": "71c00896086b8a75695d5a5094e8a32a74ae9a06b720e174acbda0436207d30d",
+      "includes": [
+        {
+          "include": "cstring",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/condition.h",
+          "local": "src/shader_recompiler/ir/condition.h"
+        },
+        {
+          "include": "shader_recompiler/ir/patch.h",
+          "local": "src/shader_recompiler/ir/patch.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/microinstruction.cpp": {
+      "sha256": "12c0952054a75f2cd56f5a098aaf80d03547254c661114012c8255f502637ff5",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "memory",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/type.h",
+          "local": "src/shader_recompiler/ir/type.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/opcodes.cpp": {
+      "sha256": "877d0c13f4225730d4bd28ab1b7449c62fb8bbe11c67118ec13cc918a6ef4832",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/opcodes.h": {
+      "sha256": "1474a612d2fadb3c33273a46b296d666beaf3c227c943a1726a7ac8671754d3b",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/ir/type.h",
+          "local": "src/shader_recompiler/ir/type.h"
+        },
+        {
+          "include": "opcodes.inc",
+          "local": "src/shader_recompiler/ir/opcodes.inc"
+        },
+        {
+          "include": "opcodes.inc",
+          "local": "src/shader_recompiler/ir/opcodes.inc"
+        },
+        {
+          "include": "opcodes.inc",
+          "local": "src/shader_recompiler/ir/opcodes.inc"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/opcodes.inc": {
+      "sha256": "82355c7daced7f60b4c5aeee6142e9846bf509e41fc6e6386986a81dff7ebdcd",
+      "includes": []
+    },
+    "src/shader_recompiler/ir/operand_helper.h": {
+      "sha256": "09c3cf643f73dc905bb4de5d2368e5d2180a0a1d82a1789ebb607c3e5e6faf66",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/constant_propagation_pass.cpp": {
+      "sha256": "510d884ffbba9f05c6a5d578e631062237bc25d8c53a424b66d5a428a59dbde6",
+      "includes": [
+        {
+          "include": "bit",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "optional",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/func_traits.h",
+          "local": "src/common/func_traits.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/dead_code_elimination_pass.cpp": {
+      "sha256": "012c8abfcb7a8564db2371a43529fa5f8072ca1a206bea832e0eefbaaec07414",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp": {
+      "sha256": "62c7ca094ca60822588f6848efaad0408090c6d4c53a1906b22718e7cfc45eca",
+      "includes": [
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/flat_map.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "xbyak/xbyak.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "xbyak/xbyak_util.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/arch.h",
+          "local": "src/common/arch.h"
+        },
+        {
+          "include": "common/decoder.h",
+          "local": "src/common/decoder.h"
+        },
+        {
+          "include": "common/io_file.h",
+          "local": "src/common/io_file.h"
+        },
+        {
+          "include": "common/logging/log.h",
+          "local": "src/common/logging/log.h"
+        },
+        {
+          "include": "common/path_util.h",
+          "local": "src/common/path_util.h"
+        },
+        {
+          "include": "common/signal_context.h",
+          "local": "src/common/signal_context.h"
+        },
+        {
+          "include": "core/emulator_settings.h",
+          "local": "src/core/emulator_settings.h"
+        },
+        {
+          "include": "core/signals.h",
+          "local": "src/core/signals.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/breadth_first_search.h",
+          "local": "src/shader_recompiler/ir/breadth_first_search.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/passes/srt.h",
+          "local": "src/shader_recompiler/ir/passes/srt.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/ir/srt_gvn_table.h",
+          "local": "src/shader_recompiler/ir/srt_gvn_table.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/hull_shader_transform.cpp": {
+      "sha256": "f9097157ed251a4a7c512f4e673e4f13fa7dd9e88ee0f26430367aac9ea611f9",
+      "includes": [
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        },
+        {
+          "include": "shader_recompiler/ir/breadth_first_search.h",
+          "local": "src/shader_recompiler/ir/breadth_first_search.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/operand_helper.h",
+          "local": "src/shader_recompiler/ir/operand_helper.h"
+        },
+        {
+          "include": "shader_recompiler/ir/passes/ir_passes.h",
+          "local": "src/shader_recompiler/ir/passes/ir_passes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/pattern_matching.h",
+          "local": "src/shader_recompiler/ir/pattern_matching.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/identity_removal_pass.cpp": {
+      "sha256": "91588e58e45736d308a6150dc1cb1c8c900f672df3a1fb91e09f3ca2c0ca6e54",
+      "includes": [
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/inject_clip_distance_attributes.cpp": {
+      "sha256": "f226c3a70a77ed557809693abe87a3a900a8017d65921eb034fdbb82152dd48c",
+      "includes": [
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/ir_passes.h": {
+      "sha256": "563cb76ad7a4f1edb677ed805b38843a53e2cb57a553933b3e10b2ee86de8da2",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/lower_buffer_format_to_raw.cpp": {
+      "sha256": "81b89614fb7d99d7c153a9cb7a065f5ca912b86c32619c88313db02507f14b03",
+      "includes": [
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reinterpret.h",
+          "local": "src/shader_recompiler/ir/reinterpret.h"
+        },
+        {
+          "include": "video_core/amdgpu/resource.h",
+          "local": "src/video_core/amdgpu/resource.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/lower_fp64_to_fp32.cpp": {
+      "sha256": "8bcdbdf57f02dd0726015fb0ea752b4cd6c02778a557fa1bc221f315d023b770",
+      "includes": [
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/lower_user_clip_planes.cpp": {
+      "sha256": "073ecec020a8dd9772dcd5a69942945cd9ddbdc7affd90da34aa47e566ddaea9",
+      "includes": [
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/logging/log.h",
+          "local": "src/common/logging/log.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/readlane_elimination_pass.cpp": {
+      "sha256": "b05de79ba70c698aabc51a73c25a3152a674b1aa4055031ffe4e516f400e72ad",
+      "includes": [
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "queue",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/resource_tracking_pass.cpp": {
+      "sha256": "6e7865d973a0807ed99831e12202ff43938f1d8477edb74b021506b30949aaca",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/control_flow_graph.h",
+          "local": "src/shader_recompiler/frontend/control_flow_graph.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/breadth_first_search.h",
+          "local": "src/shader_recompiler/ir/breadth_first_search.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/operand_helper.h",
+          "local": "src/shader_recompiler/ir/operand_helper.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reinterpret.h",
+          "local": "src/shader_recompiler/ir/reinterpret.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        },
+        {
+          "include": "video_core/amdgpu/resource.h",
+          "local": "src/video_core/amdgpu/resource.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/ring_access_elimination.cpp": {
+      "sha256": "07fb288fb06ba147c1f4202e7dc80c9ef14fff8e3d1f571316d3b47f6115e8c7",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/operand_helper.h",
+          "local": "src/shader_recompiler/ir/operand_helper.h"
+        },
+        {
+          "include": "shader_recompiler/ir/position.h",
+          "local": "src/shader_recompiler/ir/position.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/recompiler.h",
+          "local": "src/shader_recompiler/recompiler.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/shader_info_collection_pass.cpp": {
+      "sha256": "9fe6576bd6e41cc5cb15c32ba1ff8058ebc886fdb036e02e40f5f09d6b4c737d",
+      "includes": [
+        {
+          "include": "core/emulator_settings.h",
+          "local": "src/core/emulator_settings.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        },
+        {
+          "include": "video_core/buffer_cache/buffer_cache.h",
+          "local": "src/video_core/buffer_cache/buffer_cache.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/shared_memory_barrier_pass.cpp": {
+      "sha256": "7d4d2ca048d8ce30e1e2bf406dc20d19ffad2f678ef8aaf52ce9ed4d176e0066",
+      "includes": [
+        {
+          "include": "unordered_set",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/breadth_first_search.h",
+          "local": "src/shader_recompiler/ir/breadth_first_search.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/shared_memory_simplify_pass.cpp": {
+      "sha256": "7bccd0c436b5208205afbdbd56af00dea5caaae76f018f886a75e2e485fc56ed",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/shared_memory_to_storage_pass.cpp": {
+      "sha256": "7fedd8a62bff9a7d5617cef02df80311610889c8681c3527ea91a7e47e123280",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/srt.h": {
+      "sha256": "e8f1a3c0a76ea8b54e59888b0cbc532aa79c7ce6378d958ec8a666601800099e",
+      "includes": [
+        {
+          "include": "boost/container/set.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/passes/ssa_rewrite_pass.cpp": {
+      "sha256": "2ab07c13058083ad091acfa4f767dd5ff8218206ab5a3971ecad8bc9b70037ef",
+      "includes": [
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "variant",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/patch.cpp": {
+      "sha256": "fdc23b0edb97f011a149674fc898deb99effe710ce512f9a6cc038412a94c359",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/patch.h",
+          "local": "src/shader_recompiler/ir/patch.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/patch.h": {
+      "sha256": "22458f4540f6ad514112d8ce98ce4527b4d32ac77235bca7f41596b5d94b07cb",
+      "includes": [
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/pattern_matching.h": {
+      "sha256": "1dede1256f544967667bbd5fbf555661af42f935f8f7c3ced0fe1835cdcd9708",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/position.h": {
+      "sha256": "7a8df7a609ebfa617c92b385cb9b379e0bf0310d96d9c0c6d437c7e8c0dfc3e9",
+      "includes": [
+        {
+          "include": "magic_enum/magic_enum.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/logging/log.h",
+          "local": "src/common/logging/log.h"
+        },
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "shader_recompiler/runtime_info.h",
+          "local": "src/shader_recompiler/runtime_info.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/post_order.cpp": {
+      "sha256": "895c51b2b6a4d8af7a20dc4494b43637aaa2b1cf513add50cdaf3ffd30796b31",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/flat_set.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/post_order.h",
+          "local": "src/shader_recompiler/ir/post_order.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/post_order.h": {
+      "sha256": "6a2ac299be5a89428abcb3bf46c367fa5fed132b2947c146f5b75af3045e24ce",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/abstract_syntax_list.h",
+          "local": "src/shader_recompiler/ir/abstract_syntax_list.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/program.cpp": {
+      "sha256": "1a66433170d712b18baba0895d6e1444ab52c441938d5d0ac70c124e379e82df",
+      "includes": [
+        {
+          "include": "map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/io_file.h",
+          "local": "src/common/io_file.h"
+        },
+        {
+          "include": "common/path_util.h",
+          "local": "src/common/path_util.h"
+        },
+        {
+          "include": "core/emulator_settings.h",
+          "local": "src/core/emulator_settings.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/program.h": {
+      "sha256": "5d4950ee6f957622689ecd6d82f28a7235df1bd8887b6acb2533ed59f907ad3a",
+      "includes": [
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/frontend/instruction.h",
+          "local": "src/shader_recompiler/frontend/instruction.h"
+        },
+        {
+          "include": "shader_recompiler/info.h",
+          "local": "src/shader_recompiler/info.h"
+        },
+        {
+          "include": "shader_recompiler/ir/abstract_syntax_list.h",
+          "local": "src/shader_recompiler/ir/abstract_syntax_list.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/reg.h": {
+      "sha256": "2b0f97baebb75d2f7c8c6ef5e6bf99058f7d8015db7b9bd090c41473805fdac9",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/bit_field.h",
+          "local": "src/common/bit_field.h"
+        },
+        {
+          "include": "common/enum.h",
+          "local": "src/common/enum.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "video_core/amdgpu/pixel_format.h",
+          "local": "src/video_core/amdgpu/pixel_format.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/reinterpret.h": {
+      "sha256": "2168fb191023e27a513939b87e737b86e7191d424a15577c62213d8e1a3ae003",
+      "includes": [
+        {
+          "include": "shader_recompiler/ir/ir_emitter.h",
+          "local": "src/shader_recompiler/ir/ir_emitter.h"
+        },
+        {
+          "include": "video_core/amdgpu/pixel_format.h",
+          "local": "src/video_core/amdgpu/pixel_format.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/srt_gvn_table.h": {
+      "sha256": "1a9aa90b855bcce55449af7692e925e871b790b5dd7a8557d71fd39de3c5b2d9",
+      "includes": [
+        {
+          "include": "unordered_map",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/set.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/hash.h",
+          "local": "src/common/hash.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/ir/breadth_first_search.h",
+          "local": "src/shader_recompiler/ir/breadth_first_search.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/type.cpp": {
+      "sha256": "0a5a210f89a23a1fd7f0fabd6e4512ba42e1264717f17501b9b35821adf7d372",
+      "includes": [
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "shader_recompiler/ir/type.h",
+          "local": "src/shader_recompiler/ir/type.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/type.h": {
+      "sha256": "6e671def206eaf8c1b3286dfa2abf6d483400adcb21abf5ddae60c5829c8ae00",
+      "includes": [
+        {
+          "include": "string",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/enum.h",
+          "local": "src/common/enum.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/value.cpp": {
+      "sha256": "d0637cd8a4ec4961d1517e8131e4c06261a2fcba458996a8de0f92b58ffd13e0",
+      "includes": [
+        {
+          "include": "cstddef",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "string_view",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/hash.h",
+          "local": "src/common/hash.h"
+        },
+        {
+          "include": "shader_recompiler/ir/value.h",
+          "local": "src/shader_recompiler/ir/value.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/ir/value.h": {
+      "sha256": "714ad69f022a1177db820622e3d0ac31753f5aef23e732a2cb23c657514051e5",
+      "includes": [
+        {
+          "include": "array",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "bit",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "cstring",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "utility",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/list.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/intrusive/list.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "shader_recompiler/ir/attribute.h",
+          "local": "src/shader_recompiler/ir/attribute.h"
+        },
+        {
+          "include": "shader_recompiler/ir/opcodes.h",
+          "local": "src/shader_recompiler/ir/opcodes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/patch.h",
+          "local": "src/shader_recompiler/ir/patch.h"
+        },
+        {
+          "include": "shader_recompiler/ir/reg.h",
+          "local": "src/shader_recompiler/ir/reg.h"
+        },
+        {
+          "include": "shader_recompiler/ir/type.h",
+          "local": "src/shader_recompiler/ir/type.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/params.h": {
+      "sha256": "dbdae6e5155ab86b8732f63dba7bb29216c3f4bac24b3ade4a2cdbf17ef90f6f",
+      "includes": [
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/profile.h": {
+      "sha256": "d497da541f9b9c3d8ef0f60e00469aec48bdc0526fe2e6a4b39ae4852f40ac39",
+      "includes": [
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/recompiler.cpp": {
+      "sha256": "5c53b2d7099b64f9142a0787df5cb35024244c4163430a292e1bf63ae553ef45",
+      "includes": [
+        {
+          "include": "shader_recompiler/frontend/control_flow_graph.h",
+          "local": "src/shader_recompiler/frontend/control_flow_graph.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/decode.h",
+          "local": "src/shader_recompiler/frontend/decode.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/structured_control_flow.h",
+          "local": "src/shader_recompiler/frontend/structured_control_flow.h"
+        },
+        {
+          "include": "shader_recompiler/ir/passes/ir_passes.h",
+          "local": "src/shader_recompiler/ir/passes/ir_passes.h"
+        },
+        {
+          "include": "shader_recompiler/ir/post_order.h",
+          "local": "src/shader_recompiler/ir/post_order.h"
+        },
+        {
+          "include": "shader_recompiler/profile.h",
+          "local": "src/shader_recompiler/profile.h"
+        },
+        {
+          "include": "shader_recompiler/recompiler.h",
+          "local": "src/shader_recompiler/recompiler.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/recompiler.h": {
+      "sha256": "e610e3432ee62f3f1d5cd5cdf74da8bb71657194b0e87624278474b4c9ac9cec",
+      "includes": [
+        {
+          "include": "common/object_pool.h",
+          "local": "src/common/object_pool.h"
+        },
+        {
+          "include": "shader_recompiler/ir/basic_block.h",
+          "local": "src/shader_recompiler/ir/basic_block.h"
+        },
+        {
+          "include": "shader_recompiler/ir/program.h",
+          "local": "src/shader_recompiler/ir/program.h"
+        }
+      ]
+    },
+    "src/shader_recompiler/resource.h": {
+      "sha256": "3a8bf21e76d37e1a1c70deee3be0fdc208b7b803ab50f66ef8b40a4db3452c15",
+      "includes": [
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/ir/type.h",
+          "local": "src/shader_recompiler/ir/type.h"
+        },
+        {
+          "include": "video_core/amdgpu/resource.h",
+          "local": "src/video_core/amdgpu/resource.h"
+        },
+        {
+          "include": "boost/container/static_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    },
+    "src/shader_recompiler/runtime_info.h": {
+      "sha256": "b2c6d54f5526858615040dbe52f859f77cc17d24fbe17fd817905647e426f25a",
+      "includes": [
+        {
+          "include": "algorithm",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "ranges",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "span",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/frontend/tessellation.h",
+          "local": "src/shader_recompiler/frontend/tessellation.h"
+        },
+        {
+          "include": "video_core/amdgpu/pixel_format.h",
+          "local": "src/video_core/amdgpu/pixel_format.h"
+        },
+        {
+          "include": "video_core/amdgpu/regs_shader.h",
+          "local": "src/video_core/amdgpu/regs_shader.h"
+        },
+        {
+          "include": "video_core/amdgpu/regs_vertex.h",
+          "local": "src/video_core/amdgpu/regs_vertex.h"
+        }
+      ]
+    },
+    "src/video_core/amdgpu/pixel_format.h": {
+      "sha256": "3031c5de014abc4ed226363e5d297b23a01070f579cf2865d6aaf0039fb7ae89",
+      "includes": [
+        {
+          "include": "string_view",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "fmt/format.h",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/video_core/amdgpu/regs_shader.h": {
+      "sha256": "651dec541ce11a5a12601952be993953ede9d9936f894dba30c00029cbc3b082",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "shader_recompiler/params.h",
+          "local": "src/shader_recompiler/params.h"
+        }
+      ]
+    },
+    "src/video_core/amdgpu/regs_vertex.h": {
+      "sha256": "9066593988015eda60ff219247c0c9f00a77ddb8de524fea5f952ab0702d742e",
+      "includes": [
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/video_core/amdgpu/resource.h": {
+      "sha256": "636623aa093c19c3ecddb8872710cf65729cc1544c14724c12b5b393e50f4952",
+      "includes": [
+        {
+          "include": "common/alignment.h",
+          "local": "src/common/alignment.h"
+        },
+        {
+          "include": "common/assert.h",
+          "local": "src/common/assert.h"
+        },
+        {
+          "include": "common/bit_field.h",
+          "local": "src/common/bit_field.h"
+        },
+        {
+          "include": "video_core/amdgpu/pixel_format.h",
+          "local": "src/video_core/amdgpu/pixel_format.h"
+        },
+        {
+          "include": "video_core/amdgpu/tiling.h",
+          "local": "src/video_core/amdgpu/tiling.h"
+        }
+      ]
+    },
+    "src/video_core/amdgpu/tiling.h": {
+      "sha256": "07363856a750eaf42021df17167e281fa5a534af097e789d9f0ba9d257a86b5e",
+      "includes": [
+        {
+          "include": "string_view",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/video_core/buffer_cache/buffer.h": {
+      "sha256": "a68c6a47c66769eb5f6b2378b807bbd5a1b6d95b2b96364a3a369ffbd379243d",
+      "includes": [
+        {
+          "include": "cstddef",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "optional",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "utility",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "core/memory.h",
+          "local": "src/core/memory.h"
+        },
+        {
+          "include": "video_core/amdgpu/resource.h",
+          "local": "src/video_core/amdgpu/resource.h"
+        },
+        {
+          "include": "video_core/renderer_vulkan/vk_common.h",
+          "local": "src/video_core/renderer_vulkan/vk_common.h"
+        }
+      ]
+    },
+    "src/video_core/buffer_cache/buffer_cache.h": {
+      "sha256": "c0a8e71db3459f88dbe81de897787113c414ceba3d21c42ac850247590dc81df",
+      "includes": [
+        {
+          "include": "boost/container/small_vector.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/lru_cache.h",
+          "local": "src/common/lru_cache.h"
+        },
+        {
+          "include": "common/slot_vector.h",
+          "local": "src/common/slot_vector.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        },
+        {
+          "include": "video_core/buffer_cache/buffer.h",
+          "local": "src/video_core/buffer_cache/buffer.h"
+        },
+        {
+          "include": "video_core/buffer_cache/fault_manager.h",
+          "local": "src/video_core/buffer_cache/fault_manager.h"
+        },
+        {
+          "include": "video_core/buffer_cache/range_set.h",
+          "local": "src/video_core/buffer_cache/range_set.h"
+        },
+        {
+          "include": "video_core/multi_level_page_table.h",
+          "local": "src/video_core/multi_level_page_table.h"
+        }
+      ]
+    },
+    "src/video_core/buffer_cache/fault_manager.h": {
+      "sha256": "5b5b3047f1ba367380059cc7bfc68eb21de00a88d90dcc0edcd1142bda8bd0b6",
+      "includes": [
+        {
+          "include": "video_core/buffer_cache/buffer.h",
+          "local": "src/video_core/buffer_cache/buffer.h"
+        },
+        {
+          "include": "video_core/buffer_cache/range_set.h",
+          "local": "src/video_core/buffer_cache/range_set.h"
+        }
+      ]
+    },
+    "src/video_core/buffer_cache/range_set.h": {
+      "sha256": "6c114e821dd93a50e281641aa530a0beae3376af0a9e3c35ec89996048001ed0",
+      "includes": [
+        {
+          "include": "boost/icl/discrete_interval.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/icl/interval_map.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/icl/split_interval_map.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/icl/split_interval_set.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/pool/pool.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/pool/pool_alloc.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "boost/pool/poolfwd.hpp",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/video_core/multi_level_page_table.h": {
+      "sha256": "fe8f6adc34ec9090c309b7adafe819e16fe2f3abf51c7799ae59191652486632",
+      "includes": [
+        {
+          "include": "type_traits",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "utility",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "vector",
+          "local": null,
+          "delimiter": "<"
+        },
+        {
+          "include": "common/object_pool.h",
+          "local": "src/common/object_pool.h"
+        },
+        {
+          "include": "common/types.h",
+          "local": "src/common/types.h"
+        }
+      ]
+    },
+    "src/video_core/renderer_vulkan/vk_common.h": {
+      "sha256": "341b63c99ec6ee75d4d46036a897c041e0bffdf1f0ea18f70cee14f12b08471d",
+      "includes": [
+        {
+          "include": "vulkan/vulkan.hpp",
+          "local": null,
+          "delimiter": "<"
+        }
+      ]
+    }
+  },
+  "external_or_system": {
+    "Zydis/Zydis.h": [
+      "src/common/decoder.h"
+    ],
+    "algorithm": [
+      "src/shader_recompiler/frontend/control_flow_graph.cpp",
+      "src/shader_recompiler/frontend/control_flow_graph.h",
+      "src/shader_recompiler/frontend/decode.cpp",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/ir/basic_block.cpp",
+      "src/shader_recompiler/ir/microinstruction.cpp",
+      "src/shader_recompiler/ir/opcodes.h",
+      "src/shader_recompiler/ir/post_order.cpp",
+      "src/shader_recompiler/runtime_info.h"
+    ],
+    "array": [
+      "src/common/logging/classes.h",
+      "src/common/types.h",
+      "src/shader_recompiler/backend/spirv/spirv_emit_context.h",
+      "src/shader_recompiler/ir/ir_emitter.cpp",
+      "src/shader_recompiler/ir/opcodes.h",
+      "src/shader_recompiler/ir/passes/lower_user_clip_planes.cpp",
+      "src/shader_recompiler/ir/type.cpp",
+      "src/shader_recompiler/ir/value.h"
+    ],
+    "atomic": [
+      "src/core/emulator_settings.h"
+    ],
+    "bit": [
+      "src/shader_recompiler/ir/passes/constant_propagation_pass.cpp",
+      "src/shader_recompiler/ir/value.h"
+    ],
+    "boost/container/flat_map.hpp": [
+      "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp"
+    ],
+    "boost/container/flat_set.hpp": [
+      "src/shader_recompiler/ir/post_order.cpp"
+    ],
+    "boost/container/list.hpp": [
+      "src/shader_recompiler/ir/value.h"
+    ],
+    "boost/container/set.hpp": [
+      "src/shader_recompiler/ir/passes/srt.h",
+      "src/shader_recompiler/ir/srt_gvn_table.h"
+    ],
+    "boost/container/small_vector.hpp": [
+      "src/shader_recompiler/frontend/control_flow_graph.h",
+      "src/shader_recompiler/ir/breadth_first_search.h",
+      "src/shader_recompiler/ir/ir_emitter.cpp",
+      "src/shader_recompiler/ir/passes/srt.h",
+      "src/shader_recompiler/ir/post_order.cpp",
+      "src/shader_recompiler/ir/srt_gvn_table.h",
+      "src/shader_recompiler/ir/value.h",
+      "src/video_core/buffer_cache/buffer_cache.h"
+    ],
+    "boost/container/static_vector.hpp": [
+      "src/shader_recompiler/backend/spirv/emit_spirv_image.cpp",
+      "src/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+      "src/shader_recompiler/info.h",
+      "src/shader_recompiler/resource.h"
+    ],
+    "boost/icl/discrete_interval.hpp": [
+      "src/video_core/buffer_cache/range_set.h"
+    ],
+    "boost/icl/interval_map.hpp": [
+      "src/video_core/buffer_cache/range_set.h"
+    ],
+    "boost/icl/separate_interval_set.hpp": [
+      "src/core/address_space.h"
+    ],
+    "boost/icl/split_interval_map.hpp": [
+      "src/video_core/buffer_cache/range_set.h"
+    ],
+    "boost/icl/split_interval_set.hpp": [
+      "src/video_core/buffer_cache/range_set.h"
+    ],
+    "boost/intrusive/list.hpp": [
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/ir/basic_block.h",
+      "src/shader_recompiler/ir/value.h"
+    ],
+    "boost/intrusive/set.hpp": [
+      "src/shader_recompiler/frontend/control_flow_graph.h"
+    ],
+    "boost/pool/pool.hpp": [
+      "src/video_core/buffer_cache/range_set.h"
+    ],
+    "boost/pool/pool_alloc.hpp": [
+      "src/video_core/buffer_cache/range_set.h"
+    ],
+    "boost/pool/poolfwd.hpp": [
+      "src/video_core/buffer_cache/range_set.h"
+    ],
+    "chrono": [
+      "src/common/shared_first_mutex.h",
+      "src/common/thread.h"
+    ],
+    "concepts": [
+      "src/common/concepts.h"
+    ],
+    "condition_variable": [
+      "src/common/shared_first_mutex.h"
+    ],
+    "cstddef": [
+      "src/common/alignment.h",
+      "src/common/bit_field.h",
+      "src/common/div_ceil.h",
+      "src/shader_recompiler/ir/value.cpp",
+      "src/video_core/buffer_cache/buffer.h"
+    ],
+    "cstdint": [
+      "src/common/types.h"
+    ],
+    "cstdio": [
+      "src/common/io_file.h"
+    ],
+    "cstring": [
+      "src/shader_recompiler/ir/ir_emitter.h",
+      "src/shader_recompiler/ir/value.h"
+    ],
+    "deque": [
+      "src/common/lru_cache.h"
+    ],
+    "filesystem": [
+      "src/common/io_file.h",
+      "src/common/path_util.h",
+      "src/core/emulator_settings.h"
+    ],
+    "fmt/format.h": [
+      "src/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/ir/attribute.cpp",
+      "src/shader_recompiler/ir/attribute.h",
+      "src/shader_recompiler/ir/condition.h",
+      "src/shader_recompiler/ir/opcodes.h",
+      "src/shader_recompiler/ir/patch.h",
+      "src/shader_recompiler/ir/program.cpp",
+      "src/shader_recompiler/ir/type.h",
+      "src/video_core/amdgpu/pixel_format.h"
+    ],
+    "functional": [
+      "src/core/emulator_settings.h"
+    ],
+    "initializer_list": [
+      "src/shader_recompiler/ir/basic_block.cpp",
+      "src/shader_recompiler/ir/basic_block.h"
+    ],
+    "iostream": [
+      "src/common/logging/log.h"
+    ],
+    "iterator": [
+      "src/common/concepts.h"
+    ],
+    "limits": [
+      "src/common/bit_field.h"
+    ],
+    "magic_enum/magic_enum.hpp": [
+      "src/shader_recompiler/backend/spirv/emit_spirv.cpp",
+      "src/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp",
+      "src/shader_recompiler/frontend/decode.cpp",
+      "src/shader_recompiler/frontend/opcodes.h",
+      "src/shader_recompiler/frontend/translate/scalar_alu.cpp",
+      "src/shader_recompiler/frontend/translate/translate.cpp",
+      "src/shader_recompiler/ir/position.h"
+    ],
+    "map": [
+      "src/core/memory.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.cpp",
+      "src/shader_recompiler/frontend/copy_shader.h",
+      "src/shader_recompiler/ir/abstract_syntax_list.h",
+      "src/shader_recompiler/ir/basic_block.cpp",
+      "src/shader_recompiler/ir/basic_block.h",
+      "src/shader_recompiler/ir/passes/ssa_rewrite_pass.cpp",
+      "src/shader_recompiler/ir/program.cpp"
+    ],
+    "memory": [
+      "src/common/object_pool.h",
+      "src/common/singleton.h",
+      "src/core/address_space.h",
+      "src/core/emulator_settings.h",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/ir/microinstruction.cpp"
+    ],
+    "mutex": [
+      "src/common/shared_first_mutex.h",
+      "src/core/emulator_settings.h",
+      "src/core/memory.h"
+    ],
+    "nlohmann/json.hpp": [
+      "src/core/emulator_settings.h"
+    ],
+    "numbers": [
+      "src/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+      "src/shader_recompiler/frontend/translate/translate.cpp"
+    ],
+    "numeric": [
+      "src/common/slot_vector.h"
+    ],
+    "optional": [
+      "src/common/path_util.h",
+      "src/shader_recompiler/frontend/fetch_shader.h",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/ir/breadth_first_search.h",
+      "src/shader_recompiler/ir/passes/constant_propagation_pass.cpp",
+      "src/video_core/buffer_cache/buffer.h"
+    ],
+    "ostream": [
+      "src/core/emulator_settings.h"
+    ],
+    "queue": [
+      "src/shader_recompiler/ir/breadth_first_search.h",
+      "src/shader_recompiler/ir/passes/readlane_elimination_pass.cpp"
+    ],
+    "ranges": [
+      "src/shader_recompiler/runtime_info.h"
+    ],
+    "set": [
+      "src/core/signals.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.cpp"
+    ],
+    "signal.h": [
+      "src/core/signals.h"
+    ],
+    "sirit/sirit.h": [
+      "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.cpp",
+      "src/shader_recompiler/backend/spirv/emit_spirv_instructions.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.cpp",
+      "src/shader_recompiler/backend/spirv/spirv_emit_context.h"
+    ],
+    "source_location": [
+      "src/shader_recompiler/ir/ir_emitter.cpp"
+    ],
+    "span": [
+      "src/common/io_file.h",
+      "src/core/cpu_patches.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv.cpp",
+      "src/shader_recompiler/frontend/control_flow_graph.h",
+      "src/shader_recompiler/frontend/copy_shader.h",
+      "src/shader_recompiler/frontend/translate/translate.h",
+      "src/shader_recompiler/info.h",
+      "src/shader_recompiler/ir/basic_block.h",
+      "src/shader_recompiler/ir/passes/ssa_rewrite_pass.cpp",
+      "src/shader_recompiler/params.h",
+      "src/shader_recompiler/runtime_info.h"
+    ],
+    "spdlog/details/fmt_helper.h": [
+      "src/common/logging/log.h"
+    ],
+    "spdlog/sinks/basic_file_sink.h": [
+      "src/common/logging/log.h"
+    ],
+    "spdlog/sinks/msvc_sink.h": [
+      "src/common/logging/log.h"
+    ],
+    "spdlog/sinks/stdout_color_sinks.h": [
+      "src/common/logging/log.h"
+    ],
+    "spdlog/sinks/wincolor_sink.h": [
+      "src/common/logging/log.h"
+    ],
+    "spdlog/spdlog.h": [
+      "src/common/logging/log.h"
+    ],
+    "src/common/types.h": [
+      "src/shader_recompiler/ir/debug_print.h"
+    ],
+    "sstream": [
+      "src/core/emulator_settings.h"
+    ],
+    "string": [
+      "src/core/emulator_settings.h",
+      "src/core/memory.h",
+      "src/shader_recompiler/frontend/control_flow_graph.h",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/ir/program.cpp",
+      "src/shader_recompiler/ir/program.h",
+      "src/shader_recompiler/ir/type.cpp",
+      "src/shader_recompiler/ir/type.h"
+    ],
+    "string_view": [
+      "src/core/memory.h",
+      "src/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+      "src/shader_recompiler/ir/value.cpp",
+      "src/video_core/amdgpu/pixel_format.h",
+      "src/video_core/amdgpu/tiling.h"
+    ],
+    "tuple": [
+      "src/common/func_traits.h"
+    ],
+    "type_traits": [
+      "src/common/alignment.h",
+      "src/common/bit_field.h",
+      "src/common/concepts.h",
+      "src/common/div_ceil.h",
+      "src/common/enum.h",
+      "src/common/io_file.h",
+      "src/common/lru_cache.h",
+      "src/common/object_pool.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv.cpp",
+      "src/shader_recompiler/ir/breadth_first_search.h",
+      "src/shader_recompiler/ir/ir_emitter.h",
+      "src/shader_recompiler/ir/passes/constant_propagation_pass.cpp",
+      "src/shader_recompiler/ir/value.h",
+      "src/video_core/multi_level_page_table.h"
+    ],
+    "unordered_map": [
+      "src/common/logging/log.h",
+      "src/shader_recompiler/backend/spirv/spirv_emit_context.h",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/frontend/translate/translate.h",
+      "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
+      "src/shader_recompiler/ir/passes/hull_shader_transform.cpp",
+      "src/shader_recompiler/ir/passes/readlane_elimination_pass.cpp",
+      "src/shader_recompiler/ir/passes/ssa_rewrite_pass.cpp",
+      "src/shader_recompiler/ir/srt_gvn_table.h"
+    ],
+    "unordered_set": [
+      "src/shader_recompiler/ir/passes/shared_memory_barrier_pass.cpp"
+    ],
+    "utility": [
+      "src/common/object_pool.h",
+      "src/common/slot_vector.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv.cpp",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/ir/value.h",
+      "src/video_core/buffer_cache/buffer.h",
+      "src/video_core/multi_level_page_table.h"
+    ],
+    "variant": [
+      "src/shader_recompiler/ir/passes/ssa_rewrite_pass.cpp"
+    ],
+    "vector": [
+      "src/common/logging/log.h",
+      "src/common/object_pool.h",
+      "src/common/path_util.h",
+      "src/common/slot_vector.h",
+      "src/core/emulator_settings.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv.cpp",
+      "src/shader_recompiler/backend/spirv/emit_spirv.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.h",
+      "src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.h",
+      "src/shader_recompiler/frontend/fetch_shader.h",
+      "src/shader_recompiler/frontend/structured_control_flow.cpp",
+      "src/shader_recompiler/info.h",
+      "src/shader_recompiler/ir/abstract_syntax_list.h",
+      "src/shader_recompiler/ir/basic_block.h",
+      "src/shader_recompiler/ir/passes/identity_removal_pass.cpp",
+      "src/video_core/buffer_cache/buffer.h",
+      "src/video_core/multi_level_page_table.h"
+    ],
+    "vulkan/vulkan.hpp": [
+      "src/video_core/renderer_vulkan/vk_common.h"
+    ],
+    "xbyak/xbyak.h": [
+      "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp"
+    ],
+    "xbyak/xbyak_util.h": [
+      "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp"
+    ]
+  },
+  "bbport_shim": {
+    "bbgpu.cpp": "03ab51f813a031aac89a64ec816677769f323235d8758cda9fc061ba69a33e4f",
+    "bbport_copy.cpp": "8fa69a80156f58626b1e2ea688714dcc37ef4f324fa72ba47c3dd2c58b7c3b1f",
+    "bbport_copy.h": "0d77f72e3fa3435c68c5a2aff1c9ed0d12bf95a7ff3c0fc4ce2b6476297159d7",
+    "bbport_overlay.cpp": "d34086aa424335c67dc953d92d5642c5bea120671dad2a25f74b3f740747ade7",
+    "bbport_overlay.h": "11ce8a111b8d18c9b986262d7c2161fe76216d44af0eedfa6a4f7cd52d4b4ad5",
+    "bbport_settings.cpp": "2ea5927c04bb99490e51d5ad34369bee7060d388860aed409f7fa2f851ee9c42",
+    "bbport_settings.h": "9b414c55356a29811743b835e67f0bb65214e1f69110b9b0399206579ea236f1",
+    "bbport_threads.h": "1e40cbe261a777dd0840015da68ac0831ffd73696fdb3afc49691d906f7c349d",
+    "bbport_toggles.h": "2f3d41a3db7f50880d46d2f05d9af7343415f8ebe4bc8b90fd77b834642050d4",
+    "bbport_write_log.cpp": "09292c79b9482f808557be05a8454cbc05fcdf69fe4f930d1f529e30462177c7",
+    "bbport_write_log.h": "fcc617e7b53d2354cec84a40cb40d212ecdc56f0752b738ba55dd9f182f446d9",
+    "common/assert.cpp": "cb70a7656c0be59892ee3a900ee181683ccea6272b4fa94d960e6a23faaa8323",
+    "common/debug.h": "0280e6b10ca362795058c16fddc949e9db1dba8cc4f35c6bbfc48bbbf3bb1df1",
+    "common/logging/log.cpp": "860ac6c295d92d595ae6e69c1a6ce36b1896b0f0e6380b88a136748d63a7c235",
+    "common/logging/log.h": "3229c183095eba87c39ba4d6d36ef0407d704d5a97d2ab8cbe92982c63bb76b0",
+    "core/address_space.h": "d780698994cc352d6a4861f29bc54eb186b7bd6ca41ac0785a574ec0a08ee285",
+    "core/debug_state.h": "e5944216e52071c90babc10e5e7c3161659f9f5f8ab77095afb5954e3d876b6c",
+    "core/devtools/widget/gpu_memory.h": "a214ad23b74ceae16a8db6eacaa9be07d0dba1e6372c935658b1717c7d70589b",
+    "core/emulator_settings.h": "cfca3c9001714af640ec48b7d4e456c793365e1488ccb53bcac671698a7a0ee8",
+    "core/libraries/kernel/kernel.h": "31e445655b962b08b19b47e8d098967f943a698ce8588b6e86769fad6b1a65f4",
+    "core/libraries/kernel/threads.h": "d085206badb79a4352321b0a651f9ef7e3d0765cd75b913ee335e48f1871b8f3",
+    "core/libraries/libs.h": "4655eb18f9ad202d5c1abb2d3576ddec809c87acf12684416b09bf6bf121b5e9",
+    "core/memory.h": "7950d2ecc89969b129015c8abb04a7470b0e57f281720de275cbaf2da41e7312",
+    "core/signals.h": "11044e905991b287fffa26e755f78033a9857abf92fc49c391e4aeaa14fac5dc",
+    "imgui/renderer/imgui_core.h": "98b478ae6ba588cd04e537adbcaed9781c486d8b1f7947190356f5a4b706689a",
+    "imgui/renderer/texture_manager.h": "98b478ae6ba588cd04e537adbcaed9781c486d8b1f7947190356f5a4b706689a",
+    "sdl_window.h": "ab1e0b84138762f087c0445ffdd6dc27475bf652a5ce16e3c6ef15f71742e706",
+    "tracy/Tracy.hpp": "4177011114d63ff5df304514864dbbd70e72a23af364911ffa122d164255dda9",
+    "tracy/TracyVulkan.hpp": "0aa59c49fc8fc6ba142d16c381323b439e978e2d0d2cfa40607aefd8b10eb267",
+    "window.cpp": "d77e4864566280cee3e95eee80e69e1d6c0e4d0fdb74378167406a401546b47e"
+  },
+  "runtime_core_headers": [
+    "src/core/address_space.h",
+    "src/core/cpu_patches.h",
+    "src/core/emulator_settings.h",
+    "src/core/libraries/kernel/memory.h",
+    "src/core/libraries/kernel/process.h",
+    "src/core/memory.h",
+    "src/core/signals.h"
+  ],
+  "compiled_renderer": false,
+  "retail_shaders_tested": 0,
+  "compile_sources": [
+    "src/shader_recompiler/backend/spirv/emit_spirv.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_atomic.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_barriers.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_bitwise_conversion.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_composite.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_convert.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_discard_frag.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_floating_point.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_image.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_integer.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_logical.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_quad_rect.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_select.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_shared_memory.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_special.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_undefined.cpp",
+    "src/shader_recompiler/backend/spirv/emit_spirv_warp.cpp",
+    "src/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+    "src/shader_recompiler/frontend/control_flow_graph.cpp",
+    "src/shader_recompiler/frontend/copy_shader.cpp",
+    "src/shader_recompiler/frontend/decode.cpp",
+    "src/shader_recompiler/frontend/fetch_shader.cpp",
+    "src/shader_recompiler/frontend/format.cpp",
+    "src/shader_recompiler/frontend/instruction.cpp",
+    "src/shader_recompiler/frontend/structured_control_flow.cpp",
+    "src/shader_recompiler/frontend/translate/data_share.cpp",
+    "src/shader_recompiler/frontend/translate/export.cpp",
+    "src/shader_recompiler/frontend/translate/scalar_alu.cpp",
+    "src/shader_recompiler/frontend/translate/scalar_flow.cpp",
+    "src/shader_recompiler/frontend/translate/scalar_memory.cpp",
+    "src/shader_recompiler/frontend/translate/translate.cpp",
+    "src/shader_recompiler/frontend/translate/vector_alu.cpp",
+    "src/shader_recompiler/frontend/translate/vector_interpolation.cpp",
+    "src/shader_recompiler/frontend/translate/vector_memory.cpp",
+    "src/shader_recompiler/ir/abstract_syntax_list.cpp",
+    "src/shader_recompiler/ir/attribute.cpp",
+    "src/shader_recompiler/ir/basic_block.cpp",
+    "src/shader_recompiler/ir/ir_emitter.cpp",
+    "src/shader_recompiler/ir/microinstruction.cpp",
+    "src/shader_recompiler/ir/opcodes.cpp",
+    "src/shader_recompiler/ir/passes/constant_propagation_pass.cpp",
+    "src/shader_recompiler/ir/passes/dead_code_elimination_pass.cpp",
+    "src/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
+    "src/shader_recompiler/ir/passes/hull_shader_transform.cpp",
+    "src/shader_recompiler/ir/passes/identity_removal_pass.cpp",
+    "src/shader_recompiler/ir/passes/inject_clip_distance_attributes.cpp",
+    "src/shader_recompiler/ir/passes/lower_buffer_format_to_raw.cpp",
+    "src/shader_recompiler/ir/passes/lower_fp64_to_fp32.cpp",
+    "src/shader_recompiler/ir/passes/lower_user_clip_planes.cpp",
+    "src/shader_recompiler/ir/passes/readlane_elimination_pass.cpp",
+    "src/shader_recompiler/ir/passes/resource_tracking_pass.cpp",
+    "src/shader_recompiler/ir/passes/ring_access_elimination.cpp",
+    "src/shader_recompiler/ir/passes/shader_info_collection_pass.cpp",
+    "src/shader_recompiler/ir/passes/shared_memory_barrier_pass.cpp",
+    "src/shader_recompiler/ir/passes/shared_memory_simplify_pass.cpp",
+    "src/shader_recompiler/ir/passes/shared_memory_to_storage_pass.cpp",
+    "src/shader_recompiler/ir/passes/ssa_rewrite_pass.cpp",
+    "src/shader_recompiler/ir/patch.cpp",
+    "src/shader_recompiler/ir/post_order.cpp",
+    "src/shader_recompiler/ir/program.cpp",
+    "src/shader_recompiler/ir/type.cpp",
+    "src/shader_recompiler/ir/value.cpp",
+    "src/shader_recompiler/recompiler.cpp"
+  ],
+  "upstream_cmake_sha256": "328a358adcebf0bb01c419574da1659149e6ed3b9b2d0748d4354e7564142f49",
+  "selection_check": "exact_cpp_set_matches_upstream_CMake_SHADER_RECOMPILER"
+}

@@ -1,0 +1,2951 @@
+{
+  "schema": 1,
+  "upstream_revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+  "upstream_label": "shadPS4 v0.18.0",
+  "method": "Exact library/NID registration join and unique source definition; lexical body flags are not semantic validation. No upstream stub is approved for runtime binding.",
+  "input_sha256": "85acf7897beaf39c4699cc12bd1bb4b9f1e66dc048ab8ab6529d7cff89e11462",
+  "sources": [
+    {
+      "file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+      "sha256": "034c59669d0ee6a48fa654d97449624e9ca50e5695638a42a57f40c29e7722fd",
+      "license": "GPL-2.0-or-later",
+      "direct_includes": [
+        "gnm_error.h",
+        "gnmdriver.h",
+        "common/assert.h",
+        "common/debug.h",
+        "common/elf_info.h",
+        "common/logging/log.h",
+        "common/slot_vector.h",
+        "core/address_space.h",
+        "core/debug_state.h",
+        "core/emulator_settings.h",
+        "core/libraries/gnmdriver/gnm_error.h",
+        "core/libraries/gnmdriver/gnmdriver_init.h",
+        "core/libraries/kernel/orbis_error.h",
+        "core/libraries/kernel/process.h",
+        "core/libraries/libs.h",
+        "core/libraries/videoout/video_out.h",
+        "core/memory.h",
+        "core/platform.h",
+        "video_core/amdgpu/liverpool.h",
+        "video_core/amdgpu/pm4_cmds.h",
+        "video_core/renderer_vulkan/vk_presenter.h"
+      ]
+    },
+    {
+      "file": "src/core/libraries/videoout/video_out.cpp",
+      "sha256": "9abae8fd87e5f8816467dc18343469d33249d1aa48b14ed6811013840323ecc1",
+      "license": "GPL-2.0-or-later",
+      "direct_includes": [
+        "common/assert.h",
+        "common/elf_info.h",
+        "common/logging/log.h",
+        "core/emulator_settings.h",
+        "core/libraries/libs.h",
+        "core/libraries/system/userservice.h",
+        "core/libraries/videoout/driver.h",
+        "core/libraries/videoout/video_out.h",
+        "core/libraries/videoout/videoout_error.h",
+        "core/platform.h",
+        "video_core/renderer_vulkan/vk_presenter.h"
+      ]
+    }
+  ],
+  "versions": [
+    {
+      "version": "01.00",
+      "eboot_sha256": "ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1",
+      "counts": {
+        "libSceGnmDriver": 112,
+        "libSceGnmDriverResourceRegistration": 1,
+        "libSceVideoOut": 14
+      },
+      "source_matches": 127,
+      "records": [
+        {
+          "library": "libSceGnmDriver",
+          "nid": "+AFvOEXrKJk",
+          "retail_name": "sceGnmSetEmbeddedVsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetEmbeddedVsShader",
+          "definition_line": 1509,
+          "registration_line": 3077,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "+xuDhxlWRPg",
+          "retail_name": "sceGnmSetupMipStatsReport",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetupMipStatsReport",
+          "definition_line": 1787,
+          "registration_line": 3092,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "0BzLGljcwBo",
+          "retail_name": "sceGnmDispatchDirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchDirect",
+          "definition_line": 374,
+          "registration_line": 2927,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "1qXLHIpROPE",
+          "retail_name": "sceGnmInsertWaitFlipDone",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertWaitFlipDone",
+          "definition_line": 1150,
+          "registration_line": 3032,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "26PM5Mzl8zc",
+          "retail_name": "sceGnmLogicalCuIndexToPhysicalCuIndex",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmLogicalCuIndexToPhysicalCuIndex",
+          "definition_line": 1183,
+          "registration_line": 3035,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "29oKvKXzEZo",
+          "retail_name": "sceGnmMapComputeQueue",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmMapComputeQueue",
+          "definition_line": 1199,
+          "registration_line": 3041,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "4Mv9OXypBG8",
+          "retail_name": "sceGnmFindResourcesPublic",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmFindResourcesPublic",
+          "definition_line": 890,
+          "registration_line": 2983,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "4PKnYXOhcx4",
+          "retail_name": "sceGnmGetResourceBaseAddressAndSizeInBytes",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceBaseAddressAndSizeInBytes",
+          "definition_line": 988,
+          "registration_line": 3007,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "4v+otIIdjqg",
+          "retail_name": "sceGnmDrawIndirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndirect",
+          "definition_line": 603,
+          "registration_line": 2943,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "5SHGNwLXBV4",
+          "retail_name": "sceGnmValidateGetDiagnostics",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateGetDiagnostics",
+          "definition_line": 2576,
+          "registration_line": 3173,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "5uFKckiJYRM",
+          "retail_name": "sceGnmSetPsShader350",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetPsShader350",
+          "definition_line": 1725,
+          "registration_line": 3084,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "5udAm+6boVg",
+          "retail_name": "sceGnmCreateWorkloadStream",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmCreateWorkloadStream",
+          "definition_line": 206,
+          "registration_line": 2901,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "6IMbpR7nTzA",
+          "retail_name": "sceGnmQueryResourceRegistrationUserMemoryRequirements",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmQueryResourceRegistrationUserMemoryRequirements",
+          "definition_line": 1263,
+          "registration_line": 3049,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "6YRHhh5mHCs",
+          "retail_name": "sceGnmRequestFlipAndSubmitDoneForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRequestFlipAndSubmitDoneForWorkload",
+          "definition_line": 1305,
+          "registration_line": 3060,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "7qZVNgEu+SY",
+          "retail_name": "sceGnmInsertPopMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertPopMarker",
+          "definition_line": 1062,
+          "registration_line": 3023,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "9Mv61HaMhfA",
+          "retail_name": "sceGnmRegisterGdsResource",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterGdsResource",
+          "definition_line": 1275,
+          "registration_line": 3053,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "A+uGq+3KFtQ",
+          "retail_name": "sceGnmMapComputeQueueWithPriority",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmMapComputeQueueWithPriority",
+          "definition_line": 1236,
+          "registration_line": 3042,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ArSg-TGinhk",
+          "retail_name": "sceGnmUnmapComputeQueue",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnmapComputeQueue",
+          "definition_line": 2327,
+          "registration_line": 3150,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "BgM3t3LvcNk",
+          "retail_name": "sceGnmValidateDisableDiagnostics2",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDisableDiagnostics2",
+          "definition_line": 2552,
+          "registration_line": 3165,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ED9-Fjr8Ta4",
+          "retail_name": "sceGnmDrawIndexIndirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexIndirect",
+          "definition_line": 488,
+          "registration_line": 2935,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "EJapNl2+pgU",
+          "retail_name": "sceGnmComputeWaitSemaphore",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmComputeWaitSemaphore",
+          "definition_line": 201,
+          "registration_line": 2899,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "FFVZcCu3zWU",
+          "retail_name": "sceGnmGetOffChipTessellationBufferSize",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetOffChipTessellationBufferSize",
+          "definition_line": 965,
+          "registration_line": 3000,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "FUHG8sQ3R58",
+          "retail_name": "sceGnmSetEsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetEsShader",
+          "definition_line": 1561,
+          "registration_line": 3078,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Fa3x75OOLRA",
+          "retail_name": "sceGnmEndWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmEndWorkload",
+          "definition_line": 883,
+          "registration_line": 2982,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "GGsn7jMTxw4",
+          "retail_name": "sceGnmDrawIndexAuto",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexAuto",
+          "definition_line": 474,
+          "registration_line": 2934,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "GNlx+y7xPdE",
+          "retail_name": "sceGnmUpdateHsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdateHsShader",
+          "definition_line": 2381,
+          "registration_line": 3157,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Ga6r7H6Y0RI",
+          "retail_name": "sceGnmSubmitAndFlipCommandBuffersForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitAndFlipCommandBuffersForWorkload",
+          "definition_line": 2181,
+          "registration_line": 3143,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "H7-fgvEutM0",
+          "retail_name": "sceGnmGetEqTimeStamp",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetEqTimeStamp",
+          "definition_line": 931,
+          "registration_line": 2992,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "HHo1BAljZO8",
+          "retail_name": "sceGnmDisableMipStatsReport",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDisableMipStatsReport",
+          "definition_line": 369,
+          "registration_line": 2925,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "HlTPoZ-oY7Y",
+          "retail_name": "sceGnmDrawIndex",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndex",
+          "definition_line": 453,
+          "registration_line": 2933,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "HzMN7ANqYEc",
+          "retail_name": "sceGnmValidateGetVersion",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateGetVersion",
+          "definition_line": 2582,
+          "registration_line": 3175,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "K3BKBBYKUSE",
+          "retail_name": "sceGnmSetResourceUserData",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetResourceUserData",
+          "definition_line": 1769,
+          "registration_line": 3087,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Kl0Z3LH07QI",
+          "retail_name": "sceGnmLogicalTcaUnitToPhysical",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmLogicalTcaUnitToPhysical",
+          "definition_line": 1194,
+          "registration_line": 3039,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "KnldROUkWJY",
+          "retail_name": "sceGnmGetNumTcaUnits",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetNumTcaUnits",
+          "definition_line": 960,
+          "registration_line": 2999,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Kx-h-nWQJ8A",
+          "retail_name": "sceGnmSetCsShaderWithModifier",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetCsShaderWithModifier",
+          "definition_line": 1407,
+          "registration_line": 3074,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "MBMa6EFu4Ko",
+          "retail_name": "sceGnmValidateResetState",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateResetState",
+          "definition_line": 2594,
+          "registration_line": 3178,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "MYRtYhojKdA",
+          "retail_name": "sceGnmResetVgtControl",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmResetVgtControl",
+          "definition_line": 1315,
+          "registration_line": 3064,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "NfvOrNzy6sk",
+          "retail_name": "sceGnmInsertDingDongMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertDingDongMarker",
+          "definition_line": 1052,
+          "registration_line": 3021,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "O0S96YnD04U",
+          "retail_name": "sceGnmGetResourceName",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceName",
+          "definition_line": 994,
+          "registration_line": 3009,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "PVT+fuoS9gU",
+          "retail_name": "sceGnmDeleteEqEvent",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDeleteEqEvent",
+          "definition_line": 273,
+          "registration_line": 2920,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Q7t4VEYLafI",
+          "retail_name": "sceGnmValidationRegisterMemoryCheckCallback",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidationRegisterMemoryCheckCallback",
+          "definition_line": 2600,
+          "registration_line": 3179,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "QJjPjlmPAL0",
+          "retail_name": "sceGnmGetOwnerName",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetOwnerName",
+          "definition_line": 970,
+          "registration_line": 3002,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "R6z1xM3pW-w",
+          "retail_name": "sceGnmDriverTraceInProgress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDriverTraceInProgress",
+          "definition_line": 871,
+          "registration_line": 2978,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "RU74kek-N0c",
+          "retail_name": "sceGnmLogicalCuMaskToPhysicalCuMask",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmLogicalCuMaskToPhysicalCuMask",
+          "definition_line": 1189,
+          "registration_line": 3037,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "RX7XCNSaL6I",
+          "retail_name": "sceGnmValidateGetDiagnosticInfo",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateGetDiagnosticInfo",
+          "definition_line": 2570,
+          "registration_line": 3171,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "SXw4dZEkgpA",
+          "retail_name": "sceGnmValidateDisableDiagnostics",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDisableDiagnostics",
+          "definition_line": 2546,
+          "registration_line": 3163,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "TLV4mswiZ4A",
+          "retail_name": "sceGnmDriverCaptureInProgress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDriverCaptureInProgress",
+          "definition_line": 817,
+          "registration_line": 2960,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UBv7FkVfzcQ",
+          "retail_name": "sceGnmGetResourceShaderGuid",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceShaderGuid",
+          "definition_line": 1000,
+          "registration_line": 3010,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UJwNuMBcUAk",
+          "retail_name": "sceGnmSetGsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetGsShader",
+          "definition_line": 1597,
+          "registration_line": 3080,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UoBuWAhKk7U",
+          "retail_name": "sceGnmGetResourceUserData",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceUserData",
+          "definition_line": 1012,
+          "registration_line": 3013,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UoYY0DWMC0U",
+          "retail_name": "sceGnmGetEqEventType",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetEqEventType",
+          "definition_line": 926,
+          "registration_line": 2991,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UtObDRQiGbs",
+          "retail_name": "sceGnmDestroyWorkloadStream",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDestroyWorkloadStream",
+          "definition_line": 287,
+          "registration_line": 2921,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "V31V01UiScY",
+          "retail_name": "sceGnmUpdateVsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdateVsShader",
+          "definition_line": 2502,
+          "registration_line": 3160,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "VJNjFtqiF5w",
+          "retail_name": "sceGnmSetHsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetHsShader",
+          "definition_line": 1625,
+          "registration_line": 3081,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "W1Etj-jlW7Y",
+          "retail_name": "sceGnmInsertPushMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertPushMarker",
+          "definition_line": 1097,
+          "registration_line": 3026,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "X9Omw9dwv5M",
+          "retail_name": "sceGnmSetEmbeddedPsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetEmbeddedPsShader",
+          "definition_line": 1440,
+          "registration_line": 3076,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "XiyzNZ9J4nQ",
+          "retail_name": "sceGnmSetWaveLimitMultipliers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetWaveLimitMultipliers",
+          "definition_line": 1861,
+          "registration_line": 3097,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Z43vKp5k7r0",
+          "retail_name": "sceGnmDispatchIndirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchIndirect",
+          "definition_line": 391,
+          "registration_line": 2928,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ZFqKFl23aMc",
+          "retail_name": "sceGnmRegisterOwner",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterOwner",
+          "definition_line": 1286,
+          "registration_line": 3056,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "aPIZJTXC+cU",
+          "retail_name": "sceGnmInsertPushColorMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertPushColorMarker",
+          "definition_line": 1074,
+          "registration_line": 3024,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "aj3L-iaFmyk",
+          "retail_name": "sceGnmInsertSetColorMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertSetColorMarker",
+          "definition_line": 1118,
+          "registration_line": 3027,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "b08AgtPlHPg",
+          "retail_name": "sceGnmAreSubmitsAllowed",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmAreSubmitsAllowed",
+          "definition_line": 162,
+          "registration_line": 2895,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "b0xyllnVY-I",
+          "retail_name": "sceGnmAddEqEvent",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmAddEqEvent",
+          "definition_line": 126,
+          "registration_line": 2894,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "bX5IbRvECXk",
+          "retail_name": "sceGnmDingDong",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDingDong",
+          "definition_line": 292,
+          "registration_line": 2923,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "bdqdvIkLPIU",
+          "retail_name": "sceGnmGetResourceType",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceType",
+          "definition_line": 1006,
+          "registration_line": 3012,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "byXlqupd8cE",
+          "retail_name": "sceGnmDingDongForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDingDongForWorkload",
+          "definition_line": 364,
+          "registration_line": 2924,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "cFCp0NX8wf0",
+          "retail_name": "sceGnmSetVgtControl",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetVgtControl",
+          "definition_line": 1792,
+          "registration_line": 3093,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "cUCo8OvArrw",
+          "retail_name": "sceGnmDrawIndirectCountMulti",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndirectCountMulti",
+          "definition_line": 628,
+          "registration_line": 2944,
+          "upstream_body_flags": [
+            "STUBBED",
+            "UNREACHABLE"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "d88anrgNoKY",
+          "retail_name": "sceGnmDriverTriggerCapture",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDriverTriggerCapture",
+          "definition_line": 877,
+          "registration_line": 2980,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "dewXw5roLs0",
+          "retail_name": "sceGnmGetPhysicalCounterFromVirtualized",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetPhysicalCounterFromVirtualized",
+          "definition_line": 976,
+          "registration_line": 3003,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "f33OrruQYbM",
+          "retail_name": "sceRazorIsLoaded",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceRazorIsLoaded",
+          "definition_line": 2630,
+          "registration_line": 3188,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "f85orjx7qts",
+          "retail_name": "sceGnmRequestMipStatsReportAndReset",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRequestMipStatsReportAndReset",
+          "definition_line": 1310,
+          "registration_line": 3062,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ffrNQOshows",
+          "retail_name": "sceGnmComputeWaitOnAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmComputeWaitOnAddress",
+          "definition_line": 175,
+          "registration_line": 2897,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "fhKwCVVj9nk",
+          "retail_name": "sceGnmUnregisterOwnerAndResources",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnregisterOwnerAndResources",
+          "definition_line": 2338,
+          "registration_line": 3153,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "fzJdEihTFV4",
+          "retail_name": "sceGnmGetProtectionFaultTimeStamp",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetProtectionFaultTimeStamp",
+          "definition_line": 982,
+          "registration_line": 3005,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "gAhCn6UiU4Y",
+          "retail_name": "sceGnmSetVsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetVsShader",
+          "definition_line": 1823,
+          "registration_line": 3094,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "gObODli-OH8",
+          "retail_name": "sceGnmRequestFlipAndSubmitDone",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRequestFlipAndSubmitDone",
+          "definition_line": 1300,
+          "registration_line": 3058,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "hsZPf1lON7E",
+          "retail_name": "sceGnmValidateDrawCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDrawCommandBuffers",
+          "definition_line": 2564,
+          "registration_line": 3169,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "iBt3Oe00Kvc",
+          "retail_name": "sceGnmFlushGarlic",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmFlushGarlic",
+          "definition_line": 896,
+          "registration_line": 2984,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "iFirFzgYsvw",
+          "retail_name": "sceGnmGetLastWaitedAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetLastWaitedAddress",
+          "definition_line": 954,
+          "registration_line": 2997,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ihxrbsoSKWc",
+          "retail_name": "sceGnmBeginWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmBeginWorkload",
+          "definition_line": 167,
+          "registration_line": 2896,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "im2ZuItabu4",
+          "retail_name": "sceGnmDrawInitToDefaultContextState400",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawInitToDefaultContextState400",
+          "definition_line": 791,
+          "registration_line": 2957,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jHdPvIzlpKc",
+          "retail_name": "sceGnmDrawIndexMultiInstanced",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexMultiInstanced",
+          "definition_line": 580,
+          "registration_line": 2940,
+          "upstream_body_flags": [
+            "STUBBED",
+            "UNREACHABLE"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jRcI8VcgTz4",
+          "retail_name": "sceGnmSubmitCommandBuffersForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitCommandBuffersForWorkload",
+          "definition_line": 2200,
+          "registration_line": 3147,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jg33rEKLfVs",
+          "retail_name": "sceGnmIsUserPaEnabled",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmIsUserPaEnabled",
+          "definition_line": 1177,
+          "registration_line": 3034,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jiItzS6+22g",
+          "retail_name": "sceGnmInsertSetMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertSetMarker",
+          "definition_line": 1123,
+          "registration_line": 3029,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jtkqXpAOY6w",
+          "retail_name": "sceGnmSetGsRingSizes",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetGsRingSizes",
+          "definition_line": 1592,
+          "registration_line": 3079,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "k7iGTvDQPLQ",
+          "retail_name": "sceGnmGetShaderStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetShaderStatus",
+          "definition_line": 1024,
+          "registration_line": 3016,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "k8EXkhIP+lM",
+          "retail_name": "sceGnmUnregisterResource",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnregisterResource",
+          "definition_line": 2344,
+          "registration_line": 3155,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ln33zjBrfjk",
+          "retail_name": "sceGnmGetTheTessellationFactorRingBufferBaseAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetTheTessellationFactorRingBufferBaseAddress",
+          "definition_line": 1030,
+          "registration_line": 3017,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "mLVL7N7BVBg",
+          "retail_name": "sceGnmUpdatePsShader350",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdatePsShader350",
+          "definition_line": 2457,
+          "registration_line": 3159,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nEyFbYUloIM",
+          "retail_name": "sceGnmGetShaderProgramBaseAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetShaderProgramBaseAddress",
+          "definition_line": 1018,
+          "registration_line": 3014,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nF6bFRUBRAU",
+          "retail_name": "sceGnmDispatchInitDefaultHardwareState",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchInitDefaultHardwareState",
+          "definition_line": 419,
+          "registration_line": 2931,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nLM2i2+65hA",
+          "retail_name": "sceGnmUpdateGsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdateGsShader",
+          "definition_line": 2350,
+          "registration_line": 3156,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nvEwfYAImTs",
+          "retail_name": "sceGnmRegisterResource",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterResource",
+          "definition_line": 1292,
+          "registration_line": 3057,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "oL4hGI1PMpw",
+          "retail_name": "sceGnmGetGpuBlockStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetGpuBlockStatus",
+          "definition_line": 936,
+          "registration_line": 2993,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "oYM+YzfCm2Y",
+          "retail_name": "sceGnmDrawIndexOffset",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexOffset",
+          "definition_line": 586,
+          "registration_line": 2942,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "q-qhDxP67Hg",
+          "retail_name": "sceGnmSetResourceRegistrationUserMemory",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetResourceRegistrationUserMemory",
+          "definition_line": 1763,
+          "registration_line": 3085,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "qGP74T5OWJc",
+          "retail_name": "sceGnmValidateDispatchCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDispatchCommandBuffers",
+          "definition_line": 2558,
+          "registration_line": 3167,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "qpGITzPE+Zc",
+          "retail_name": "sceGnmDebugHardwareStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDebugHardwareStatus",
+          "definition_line": 268,
+          "registration_line": 2919,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "rTIV11nMQuM",
+          "retail_name": "sceGnmValidateOnSubmitEnabled",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateOnSubmitEnabled",
+          "definition_line": 2588,
+          "registration_line": 3176,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "stDSYW2SBVM",
+          "retail_name": "sceGnmDrawOpaqueAuto",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawOpaqueAuto",
+          "definition_line": 812,
+          "registration_line": 2959,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "tZCSL5ulnB4",
+          "retail_name": "sceGnmGetGpuInfoStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetGpuInfoStatus",
+          "definition_line": 948,
+          "registration_line": 2996,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "thbPcG7E7qk",
+          "retail_name": "sceGnmDrawIndexIndirectCountMulti",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexIndirectCountMulti",
+          "definition_line": 514,
+          "registration_line": 2936,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "u9YKpRRHe-M",
+          "retail_name": "sceRazorCaptureImmediate",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceRazorCaptureImmediate",
+          "definition_line": 2618,
+          "registration_line": 3185,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "vckdzbQ46SI",
+          "retail_name": "sceGnmSetLsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetLsShader",
+          "definition_line": 1655,
+          "registration_line": 3082,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "wED4ZXCFJT0",
+          "retail_name": "sceGnmDispatchIndirectOnMec",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchIndirectOnMec",
+          "definition_line": 407,
+          "registration_line": 2929,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "xbxNatawohc",
+          "retail_name": "sceGnmSubmitAndFlipCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitAndFlipCommandBuffers",
+          "definition_line": 2172,
+          "registration_line": 3141,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "yb2cRhagD1I",
+          "retail_name": "sceGnmDrawInitDefaultHardwareState350",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawInitDefaultHardwareState350",
+          "definition_line": 739,
+          "registration_line": 2953,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "yhFCnaz5daw",
+          "retail_name": "sceGnmUnregisterAllResourcesForOwner",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnregisterAllResourcesForOwner",
+          "definition_line": 2332,
+          "registration_line": 3151,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "yvZ73uQUqrk",
+          "retail_name": "sceGnmSubmitDone",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitDone",
+          "definition_line": 2313,
+          "registration_line": 3149,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "zwY0YV91TTI",
+          "retail_name": "sceGnmSubmitCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitCommandBuffers",
+          "definition_line": 2306,
+          "registration_line": 3145,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriverResourceRegistration",
+          "nid": "j6mSQs3UgaY",
+          "retail_name": "sceGnmRegisterOwnerForSystem",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterOwnerForSystem",
+          "definition_line": 2846,
+          "registration_line": 3234,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "6kPnj51T62Y",
+          "retail_name": "sceVideoOutGetResolutionStatus",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutGetResolutionStatus",
+          "definition_line": 287,
+          "registration_line": 479,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "CBiu4mCE1DA",
+          "retail_name": "sceVideoOutSetFlipRate",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutSetFlipRate",
+          "definition_line": 141,
+          "registration_line": 476,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "DYhhWbJSeRg",
+          "retail_name": "sceVideoOutColorSettingsSetGamma_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutColorSettingsSetGamma",
+          "definition_line": 386,
+          "registration_line": 500,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "N1bEoJ4SRw4",
+          "retail_name": "sceVideoOutConfigureOutputMode_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutConfigureOutputMode_",
+          "definition_line": 424,
+          "registration_line": 507,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "SbU3dwp80lQ",
+          "retail_name": "sceVideoOutGetFlipStatus",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutGetFlipStatus",
+          "definition_line": 244,
+          "registration_line": 471,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "U46NwOiJpys",
+          "retail_name": "sceVideoOutSubmitFlip",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutSubmitFlip",
+          "definition_line": 155,
+          "registration_line": 472,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "Up36PTk687E",
+          "retail_name": "sceVideoOutOpen",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutOpen",
+          "definition_line": 298,
+          "registration_line": 485,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "Xru92wHJRmg",
+          "retail_name": "sceVideoOutAddVblankEvent",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutAddVblankEvent",
+          "definition_line": 83,
+          "registration_line": 475,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "i6-sR91Wt-4",
+          "retail_name": "sceVideoOutSetBufferAttribute",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutSetBufferAttribute",
+          "definition_line": 22,
+          "registration_line": 477,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "j6RaAUlaLv0",
+          "retail_name": "sceVideoOutWaitVblank",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutWaitVblank",
+          "definition_line": 374,
+          "registration_line": 496,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "kGVLc3htQE8",
+          "retail_name": "sceVideoOutGetDeviceCapabilityInfo_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutGetDeviceCapabilityInfo",
+          "definition_line": 362,
+          "registration_line": 494,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "pjkDsgxli6c",
+          "retail_name": "sceVideoOutModeSetAny_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutModeSetAny_",
+          "definition_line": 419,
+          "registration_line": 506,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "pv9CI5VC+R0",
+          "retail_name": "sceVideoOutAdjustColor_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutAdjustColor",
+          "definition_line": 394,
+          "registration_line": 502,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "w3BY+tAEiQY",
+          "retail_name": "sceVideoOutRegisterBuffers",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutRegisterBuffers",
+          "definition_line": 125,
+          "registration_line": 473,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        }
+      ]
+    },
+    {
+      "version": "01.21",
+      "eboot_sha256": "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5",
+      "counts": {
+        "libSceGnmDriver": 112,
+        "libSceGnmDriverResourceRegistration": 1,
+        "libSceVideoOut": 14
+      },
+      "source_matches": 127,
+      "records": [
+        {
+          "library": "libSceGnmDriver",
+          "nid": "+AFvOEXrKJk",
+          "retail_name": "sceGnmSetEmbeddedVsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetEmbeddedVsShader",
+          "definition_line": 1509,
+          "registration_line": 3077,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "+xuDhxlWRPg",
+          "retail_name": "sceGnmSetupMipStatsReport",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetupMipStatsReport",
+          "definition_line": 1787,
+          "registration_line": 3092,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "0BzLGljcwBo",
+          "retail_name": "sceGnmDispatchDirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchDirect",
+          "definition_line": 374,
+          "registration_line": 2927,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "1qXLHIpROPE",
+          "retail_name": "sceGnmInsertWaitFlipDone",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertWaitFlipDone",
+          "definition_line": 1150,
+          "registration_line": 3032,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "26PM5Mzl8zc",
+          "retail_name": "sceGnmLogicalCuIndexToPhysicalCuIndex",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmLogicalCuIndexToPhysicalCuIndex",
+          "definition_line": 1183,
+          "registration_line": 3035,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "29oKvKXzEZo",
+          "retail_name": "sceGnmMapComputeQueue",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmMapComputeQueue",
+          "definition_line": 1199,
+          "registration_line": 3041,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "4Mv9OXypBG8",
+          "retail_name": "sceGnmFindResourcesPublic",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmFindResourcesPublic",
+          "definition_line": 890,
+          "registration_line": 2983,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "4PKnYXOhcx4",
+          "retail_name": "sceGnmGetResourceBaseAddressAndSizeInBytes",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceBaseAddressAndSizeInBytes",
+          "definition_line": 988,
+          "registration_line": 3007,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "4v+otIIdjqg",
+          "retail_name": "sceGnmDrawIndirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndirect",
+          "definition_line": 603,
+          "registration_line": 2943,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "5SHGNwLXBV4",
+          "retail_name": "sceGnmValidateGetDiagnostics",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateGetDiagnostics",
+          "definition_line": 2576,
+          "registration_line": 3173,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "5uFKckiJYRM",
+          "retail_name": "sceGnmSetPsShader350",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetPsShader350",
+          "definition_line": 1725,
+          "registration_line": 3084,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "5udAm+6boVg",
+          "retail_name": "sceGnmCreateWorkloadStream",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmCreateWorkloadStream",
+          "definition_line": 206,
+          "registration_line": 2901,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "6IMbpR7nTzA",
+          "retail_name": "sceGnmQueryResourceRegistrationUserMemoryRequirements",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmQueryResourceRegistrationUserMemoryRequirements",
+          "definition_line": 1263,
+          "registration_line": 3049,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "6YRHhh5mHCs",
+          "retail_name": "sceGnmRequestFlipAndSubmitDoneForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRequestFlipAndSubmitDoneForWorkload",
+          "definition_line": 1305,
+          "registration_line": 3060,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "7qZVNgEu+SY",
+          "retail_name": "sceGnmInsertPopMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertPopMarker",
+          "definition_line": 1062,
+          "registration_line": 3023,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "9Mv61HaMhfA",
+          "retail_name": "sceGnmRegisterGdsResource",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterGdsResource",
+          "definition_line": 1275,
+          "registration_line": 3053,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "A+uGq+3KFtQ",
+          "retail_name": "sceGnmMapComputeQueueWithPriority",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmMapComputeQueueWithPriority",
+          "definition_line": 1236,
+          "registration_line": 3042,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ArSg-TGinhk",
+          "retail_name": "sceGnmUnmapComputeQueue",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnmapComputeQueue",
+          "definition_line": 2327,
+          "registration_line": 3150,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "BgM3t3LvcNk",
+          "retail_name": "sceGnmValidateDisableDiagnostics2",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDisableDiagnostics2",
+          "definition_line": 2552,
+          "registration_line": 3165,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ED9-Fjr8Ta4",
+          "retail_name": "sceGnmDrawIndexIndirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexIndirect",
+          "definition_line": 488,
+          "registration_line": 2935,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "EJapNl2+pgU",
+          "retail_name": "sceGnmComputeWaitSemaphore",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmComputeWaitSemaphore",
+          "definition_line": 201,
+          "registration_line": 2899,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "FFVZcCu3zWU",
+          "retail_name": "sceGnmGetOffChipTessellationBufferSize",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetOffChipTessellationBufferSize",
+          "definition_line": 965,
+          "registration_line": 3000,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "FUHG8sQ3R58",
+          "retail_name": "sceGnmSetEsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetEsShader",
+          "definition_line": 1561,
+          "registration_line": 3078,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Fa3x75OOLRA",
+          "retail_name": "sceGnmEndWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmEndWorkload",
+          "definition_line": 883,
+          "registration_line": 2982,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "GGsn7jMTxw4",
+          "retail_name": "sceGnmDrawIndexAuto",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexAuto",
+          "definition_line": 474,
+          "registration_line": 2934,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "GNlx+y7xPdE",
+          "retail_name": "sceGnmUpdateHsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdateHsShader",
+          "definition_line": 2381,
+          "registration_line": 3157,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Ga6r7H6Y0RI",
+          "retail_name": "sceGnmSubmitAndFlipCommandBuffersForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitAndFlipCommandBuffersForWorkload",
+          "definition_line": 2181,
+          "registration_line": 3143,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "H7-fgvEutM0",
+          "retail_name": "sceGnmGetEqTimeStamp",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetEqTimeStamp",
+          "definition_line": 931,
+          "registration_line": 2992,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "HHo1BAljZO8",
+          "retail_name": "sceGnmDisableMipStatsReport",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDisableMipStatsReport",
+          "definition_line": 369,
+          "registration_line": 2925,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "HlTPoZ-oY7Y",
+          "retail_name": "sceGnmDrawIndex",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndex",
+          "definition_line": 453,
+          "registration_line": 2933,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "HzMN7ANqYEc",
+          "retail_name": "sceGnmValidateGetVersion",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateGetVersion",
+          "definition_line": 2582,
+          "registration_line": 3175,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "K3BKBBYKUSE",
+          "retail_name": "sceGnmSetResourceUserData",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetResourceUserData",
+          "definition_line": 1769,
+          "registration_line": 3087,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Kl0Z3LH07QI",
+          "retail_name": "sceGnmLogicalTcaUnitToPhysical",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmLogicalTcaUnitToPhysical",
+          "definition_line": 1194,
+          "registration_line": 3039,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "KnldROUkWJY",
+          "retail_name": "sceGnmGetNumTcaUnits",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetNumTcaUnits",
+          "definition_line": 960,
+          "registration_line": 2999,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Kx-h-nWQJ8A",
+          "retail_name": "sceGnmSetCsShaderWithModifier",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetCsShaderWithModifier",
+          "definition_line": 1407,
+          "registration_line": 3074,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "MBMa6EFu4Ko",
+          "retail_name": "sceGnmValidateResetState",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateResetState",
+          "definition_line": 2594,
+          "registration_line": 3178,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "MYRtYhojKdA",
+          "retail_name": "sceGnmResetVgtControl",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmResetVgtControl",
+          "definition_line": 1315,
+          "registration_line": 3064,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "NfvOrNzy6sk",
+          "retail_name": "sceGnmInsertDingDongMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertDingDongMarker",
+          "definition_line": 1052,
+          "registration_line": 3021,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "O0S96YnD04U",
+          "retail_name": "sceGnmGetResourceName",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceName",
+          "definition_line": 994,
+          "registration_line": 3009,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "PVT+fuoS9gU",
+          "retail_name": "sceGnmDeleteEqEvent",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDeleteEqEvent",
+          "definition_line": 273,
+          "registration_line": 2920,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Q7t4VEYLafI",
+          "retail_name": "sceGnmValidationRegisterMemoryCheckCallback",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidationRegisterMemoryCheckCallback",
+          "definition_line": 2600,
+          "registration_line": 3179,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "QJjPjlmPAL0",
+          "retail_name": "sceGnmGetOwnerName",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetOwnerName",
+          "definition_line": 970,
+          "registration_line": 3002,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "R6z1xM3pW-w",
+          "retail_name": "sceGnmDriverTraceInProgress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDriverTraceInProgress",
+          "definition_line": 871,
+          "registration_line": 2978,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "RU74kek-N0c",
+          "retail_name": "sceGnmLogicalCuMaskToPhysicalCuMask",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmLogicalCuMaskToPhysicalCuMask",
+          "definition_line": 1189,
+          "registration_line": 3037,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "RX7XCNSaL6I",
+          "retail_name": "sceGnmValidateGetDiagnosticInfo",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateGetDiagnosticInfo",
+          "definition_line": 2570,
+          "registration_line": 3171,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "SXw4dZEkgpA",
+          "retail_name": "sceGnmValidateDisableDiagnostics",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDisableDiagnostics",
+          "definition_line": 2546,
+          "registration_line": 3163,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "TLV4mswiZ4A",
+          "retail_name": "sceGnmDriverCaptureInProgress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDriverCaptureInProgress",
+          "definition_line": 817,
+          "registration_line": 2960,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UBv7FkVfzcQ",
+          "retail_name": "sceGnmGetResourceShaderGuid",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceShaderGuid",
+          "definition_line": 1000,
+          "registration_line": 3010,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UJwNuMBcUAk",
+          "retail_name": "sceGnmSetGsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetGsShader",
+          "definition_line": 1597,
+          "registration_line": 3080,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UoBuWAhKk7U",
+          "retail_name": "sceGnmGetResourceUserData",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceUserData",
+          "definition_line": 1012,
+          "registration_line": 3013,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UoYY0DWMC0U",
+          "retail_name": "sceGnmGetEqEventType",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetEqEventType",
+          "definition_line": 926,
+          "registration_line": 2991,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "UtObDRQiGbs",
+          "retail_name": "sceGnmDestroyWorkloadStream",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDestroyWorkloadStream",
+          "definition_line": 287,
+          "registration_line": 2921,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "V31V01UiScY",
+          "retail_name": "sceGnmUpdateVsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdateVsShader",
+          "definition_line": 2502,
+          "registration_line": 3160,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "VJNjFtqiF5w",
+          "retail_name": "sceGnmSetHsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetHsShader",
+          "definition_line": 1625,
+          "registration_line": 3081,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "W1Etj-jlW7Y",
+          "retail_name": "sceGnmInsertPushMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertPushMarker",
+          "definition_line": 1097,
+          "registration_line": 3026,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "X9Omw9dwv5M",
+          "retail_name": "sceGnmSetEmbeddedPsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetEmbeddedPsShader",
+          "definition_line": 1440,
+          "registration_line": 3076,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "XiyzNZ9J4nQ",
+          "retail_name": "sceGnmSetWaveLimitMultipliers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetWaveLimitMultipliers",
+          "definition_line": 1861,
+          "registration_line": 3097,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "Z43vKp5k7r0",
+          "retail_name": "sceGnmDispatchIndirect",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchIndirect",
+          "definition_line": 391,
+          "registration_line": 2928,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ZFqKFl23aMc",
+          "retail_name": "sceGnmRegisterOwner",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterOwner",
+          "definition_line": 1286,
+          "registration_line": 3056,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "aPIZJTXC+cU",
+          "retail_name": "sceGnmInsertPushColorMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertPushColorMarker",
+          "definition_line": 1074,
+          "registration_line": 3024,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "aj3L-iaFmyk",
+          "retail_name": "sceGnmInsertSetColorMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertSetColorMarker",
+          "definition_line": 1118,
+          "registration_line": 3027,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "b08AgtPlHPg",
+          "retail_name": "sceGnmAreSubmitsAllowed",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmAreSubmitsAllowed",
+          "definition_line": 162,
+          "registration_line": 2895,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "b0xyllnVY-I",
+          "retail_name": "sceGnmAddEqEvent",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmAddEqEvent",
+          "definition_line": 126,
+          "registration_line": 2894,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "bX5IbRvECXk",
+          "retail_name": "sceGnmDingDong",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDingDong",
+          "definition_line": 292,
+          "registration_line": 2923,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "bdqdvIkLPIU",
+          "retail_name": "sceGnmGetResourceType",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetResourceType",
+          "definition_line": 1006,
+          "registration_line": 3012,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "byXlqupd8cE",
+          "retail_name": "sceGnmDingDongForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDingDongForWorkload",
+          "definition_line": 364,
+          "registration_line": 2924,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "cFCp0NX8wf0",
+          "retail_name": "sceGnmSetVgtControl",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetVgtControl",
+          "definition_line": 1792,
+          "registration_line": 3093,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "cUCo8OvArrw",
+          "retail_name": "sceGnmDrawIndirectCountMulti",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndirectCountMulti",
+          "definition_line": 628,
+          "registration_line": 2944,
+          "upstream_body_flags": [
+            "STUBBED",
+            "UNREACHABLE"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "d88anrgNoKY",
+          "retail_name": "sceGnmDriverTriggerCapture",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDriverTriggerCapture",
+          "definition_line": 877,
+          "registration_line": 2980,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "dewXw5roLs0",
+          "retail_name": "sceGnmGetPhysicalCounterFromVirtualized",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetPhysicalCounterFromVirtualized",
+          "definition_line": 976,
+          "registration_line": 3003,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "f33OrruQYbM",
+          "retail_name": "sceRazorIsLoaded",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceRazorIsLoaded",
+          "definition_line": 2630,
+          "registration_line": 3188,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "f85orjx7qts",
+          "retail_name": "sceGnmRequestMipStatsReportAndReset",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRequestMipStatsReportAndReset",
+          "definition_line": 1310,
+          "registration_line": 3062,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ffrNQOshows",
+          "retail_name": "sceGnmComputeWaitOnAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmComputeWaitOnAddress",
+          "definition_line": 175,
+          "registration_line": 2897,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "fhKwCVVj9nk",
+          "retail_name": "sceGnmUnregisterOwnerAndResources",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnregisterOwnerAndResources",
+          "definition_line": 2338,
+          "registration_line": 3153,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "fzJdEihTFV4",
+          "retail_name": "sceGnmGetProtectionFaultTimeStamp",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetProtectionFaultTimeStamp",
+          "definition_line": 982,
+          "registration_line": 3005,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "gAhCn6UiU4Y",
+          "retail_name": "sceGnmSetVsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetVsShader",
+          "definition_line": 1823,
+          "registration_line": 3094,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "gObODli-OH8",
+          "retail_name": "sceGnmRequestFlipAndSubmitDone",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRequestFlipAndSubmitDone",
+          "definition_line": 1300,
+          "registration_line": 3058,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "hsZPf1lON7E",
+          "retail_name": "sceGnmValidateDrawCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDrawCommandBuffers",
+          "definition_line": 2564,
+          "registration_line": 3169,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "iBt3Oe00Kvc",
+          "retail_name": "sceGnmFlushGarlic",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmFlushGarlic",
+          "definition_line": 896,
+          "registration_line": 2984,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "iFirFzgYsvw",
+          "retail_name": "sceGnmGetLastWaitedAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetLastWaitedAddress",
+          "definition_line": 954,
+          "registration_line": 2997,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ihxrbsoSKWc",
+          "retail_name": "sceGnmBeginWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmBeginWorkload",
+          "definition_line": 167,
+          "registration_line": 2896,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "im2ZuItabu4",
+          "retail_name": "sceGnmDrawInitToDefaultContextState400",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawInitToDefaultContextState400",
+          "definition_line": 791,
+          "registration_line": 2957,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jHdPvIzlpKc",
+          "retail_name": "sceGnmDrawIndexMultiInstanced",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexMultiInstanced",
+          "definition_line": 580,
+          "registration_line": 2940,
+          "upstream_body_flags": [
+            "STUBBED",
+            "UNREACHABLE"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jRcI8VcgTz4",
+          "retail_name": "sceGnmSubmitCommandBuffersForWorkload",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitCommandBuffersForWorkload",
+          "definition_line": 2200,
+          "registration_line": 3147,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jg33rEKLfVs",
+          "retail_name": "sceGnmIsUserPaEnabled",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmIsUserPaEnabled",
+          "definition_line": 1177,
+          "registration_line": 3034,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jiItzS6+22g",
+          "retail_name": "sceGnmInsertSetMarker",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmInsertSetMarker",
+          "definition_line": 1123,
+          "registration_line": 3029,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "jtkqXpAOY6w",
+          "retail_name": "sceGnmSetGsRingSizes",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetGsRingSizes",
+          "definition_line": 1592,
+          "registration_line": 3079,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "k7iGTvDQPLQ",
+          "retail_name": "sceGnmGetShaderStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetShaderStatus",
+          "definition_line": 1024,
+          "registration_line": 3016,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "k8EXkhIP+lM",
+          "retail_name": "sceGnmUnregisterResource",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnregisterResource",
+          "definition_line": 2344,
+          "registration_line": 3155,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "ln33zjBrfjk",
+          "retail_name": "sceGnmGetTheTessellationFactorRingBufferBaseAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetTheTessellationFactorRingBufferBaseAddress",
+          "definition_line": 1030,
+          "registration_line": 3017,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "mLVL7N7BVBg",
+          "retail_name": "sceGnmUpdatePsShader350",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdatePsShader350",
+          "definition_line": 2457,
+          "registration_line": 3159,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nEyFbYUloIM",
+          "retail_name": "sceGnmGetShaderProgramBaseAddress",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetShaderProgramBaseAddress",
+          "definition_line": 1018,
+          "registration_line": 3014,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nF6bFRUBRAU",
+          "retail_name": "sceGnmDispatchInitDefaultHardwareState",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchInitDefaultHardwareState",
+          "definition_line": 419,
+          "registration_line": 2931,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nLM2i2+65hA",
+          "retail_name": "sceGnmUpdateGsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUpdateGsShader",
+          "definition_line": 2350,
+          "registration_line": 3156,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "nvEwfYAImTs",
+          "retail_name": "sceGnmRegisterResource",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterResource",
+          "definition_line": 1292,
+          "registration_line": 3057,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "oL4hGI1PMpw",
+          "retail_name": "sceGnmGetGpuBlockStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetGpuBlockStatus",
+          "definition_line": 936,
+          "registration_line": 2993,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "oYM+YzfCm2Y",
+          "retail_name": "sceGnmDrawIndexOffset",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexOffset",
+          "definition_line": 586,
+          "registration_line": 2942,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "q-qhDxP67Hg",
+          "retail_name": "sceGnmSetResourceRegistrationUserMemory",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetResourceRegistrationUserMemory",
+          "definition_line": 1763,
+          "registration_line": 3085,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "qGP74T5OWJc",
+          "retail_name": "sceGnmValidateDispatchCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateDispatchCommandBuffers",
+          "definition_line": 2558,
+          "registration_line": 3167,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "qpGITzPE+Zc",
+          "retail_name": "sceGnmDebugHardwareStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDebugHardwareStatus",
+          "definition_line": 268,
+          "registration_line": 2919,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "rTIV11nMQuM",
+          "retail_name": "sceGnmValidateOnSubmitEnabled",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmValidateOnSubmitEnabled",
+          "definition_line": 2588,
+          "registration_line": 3176,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "stDSYW2SBVM",
+          "retail_name": "sceGnmDrawOpaqueAuto",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawOpaqueAuto",
+          "definition_line": 812,
+          "registration_line": 2959,
+          "upstream_body_flags": [
+            "STUBBED"
+          ],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "tZCSL5ulnB4",
+          "retail_name": "sceGnmGetGpuInfoStatus",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmGetGpuInfoStatus",
+          "definition_line": 948,
+          "registration_line": 2996,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "thbPcG7E7qk",
+          "retail_name": "sceGnmDrawIndexIndirectCountMulti",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawIndexIndirectCountMulti",
+          "definition_line": 514,
+          "registration_line": 2936,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "u9YKpRRHe-M",
+          "retail_name": "sceRazorCaptureImmediate",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceRazorCaptureImmediate",
+          "definition_line": 2618,
+          "registration_line": 3185,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "vckdzbQ46SI",
+          "retail_name": "sceGnmSetLsShader",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSetLsShader",
+          "definition_line": 1655,
+          "registration_line": 3082,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "wED4ZXCFJT0",
+          "retail_name": "sceGnmDispatchIndirectOnMec",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDispatchIndirectOnMec",
+          "definition_line": 407,
+          "registration_line": 2929,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "xbxNatawohc",
+          "retail_name": "sceGnmSubmitAndFlipCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitAndFlipCommandBuffers",
+          "definition_line": 2172,
+          "registration_line": 3141,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "yb2cRhagD1I",
+          "retail_name": "sceGnmDrawInitDefaultHardwareState350",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmDrawInitDefaultHardwareState350",
+          "definition_line": 739,
+          "registration_line": 2953,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "yhFCnaz5daw",
+          "retail_name": "sceGnmUnregisterAllResourcesForOwner",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmUnregisterAllResourcesForOwner",
+          "definition_line": 2332,
+          "registration_line": 3151,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "yvZ73uQUqrk",
+          "retail_name": "sceGnmSubmitDone",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitDone",
+          "definition_line": 2313,
+          "registration_line": 3149,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriver",
+          "nid": "zwY0YV91TTI",
+          "retail_name": "sceGnmSubmitCommandBuffers",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmSubmitCommandBuffers",
+          "definition_line": 2306,
+          "registration_line": 3145,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceGnmDriverResourceRegistration",
+          "nid": "j6mSQs3UgaY",
+          "retail_name": "sceGnmRegisterOwnerForSystem",
+          "source_file": "src/core/libraries/gnmdriver/gnmdriver.cpp",
+          "function": "sceGnmRegisterOwnerForSystem",
+          "definition_line": 2846,
+          "registration_line": 3234,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "6kPnj51T62Y",
+          "retail_name": "sceVideoOutGetResolutionStatus",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutGetResolutionStatus",
+          "definition_line": 287,
+          "registration_line": 479,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "CBiu4mCE1DA",
+          "retail_name": "sceVideoOutSetFlipRate",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutSetFlipRate",
+          "definition_line": 141,
+          "registration_line": 476,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "DYhhWbJSeRg",
+          "retail_name": "sceVideoOutColorSettingsSetGamma_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutColorSettingsSetGamma",
+          "definition_line": 386,
+          "registration_line": 500,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "N1bEoJ4SRw4",
+          "retail_name": "sceVideoOutConfigureOutputMode_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutConfigureOutputMode_",
+          "definition_line": 424,
+          "registration_line": 507,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "SbU3dwp80lQ",
+          "retail_name": "sceVideoOutGetFlipStatus",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutGetFlipStatus",
+          "definition_line": 244,
+          "registration_line": 471,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "U46NwOiJpys",
+          "retail_name": "sceVideoOutSubmitFlip",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutSubmitFlip",
+          "definition_line": 155,
+          "registration_line": 472,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "Up36PTk687E",
+          "retail_name": "sceVideoOutOpen",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutOpen",
+          "definition_line": 298,
+          "registration_line": 485,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "Xru92wHJRmg",
+          "retail_name": "sceVideoOutAddVblankEvent",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutAddVblankEvent",
+          "definition_line": 83,
+          "registration_line": 475,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "i6-sR91Wt-4",
+          "retail_name": "sceVideoOutSetBufferAttribute",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutSetBufferAttribute",
+          "definition_line": 22,
+          "registration_line": 477,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "j6RaAUlaLv0",
+          "retail_name": "sceVideoOutWaitVblank",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutWaitVblank",
+          "definition_line": 374,
+          "registration_line": 496,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "kGVLc3htQE8",
+          "retail_name": "sceVideoOutGetDeviceCapabilityInfo_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutGetDeviceCapabilityInfo",
+          "definition_line": 362,
+          "registration_line": 494,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "pjkDsgxli6c",
+          "retail_name": "sceVideoOutModeSetAny_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutModeSetAny_",
+          "definition_line": 419,
+          "registration_line": 506,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "pv9CI5VC+R0",
+          "retail_name": "sceVideoOutAdjustColor_",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutAdjustColor",
+          "definition_line": 394,
+          "registration_line": 502,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        },
+        {
+          "library": "libSceVideoOut",
+          "nid": "w3BY+tAEiQY",
+          "retail_name": "sceVideoOutRegisterBuffers",
+          "source_file": "src/core/libraries/videoout/video_out.cpp",
+          "function": "sceVideoOutRegisterBuffers",
+          "definition_line": 125,
+          "registration_line": 473,
+          "upstream_body_flags": [],
+          "runtime_status": "missing_not_bound"
+        }
+      ]
+    }
+  ]
+}

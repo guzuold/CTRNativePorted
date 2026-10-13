@@ -1,0 +1,46 @@
+{
+  "revision": "e3ce810f3a653f43ac64ebab63023de281a4103a",
+  "license": "GPL-2.0-or-later",
+  "method": "Conservative transitive include reverse closure from decode.h among64implementation seeds;6affected. Other58objects do not include that header in inventory. Source copies for translate dump and recompiler empty guard; upstream untouched. Fetch code getter now fails closed until owned bounded nested snapshot authority exists; upstream raw getter/UINT32_MAX parser never reached for fetch shaders. Host-owned fetch span parser now bounded64KiB and requires S_SETPC; checked attribute/load bounds; legacy getter still failclosed.",
+  "inventory_sha256": "7ca82233b4b5f718895d5f7ae376614b89d772dff77e9f84039bc099dab74cf0",
+  "header": "ctrport/video/adapted/include/shader_recompiler/frontend/decode.h",
+  "header_sha256": "e66958bd4ee8961bf61d9ed9ad761129277702eb650ebaed90336bc29abfce1c",
+  "units": [
+    {
+      "source": "src/shader_recompiler/frontend/copy_shader.cpp",
+      "source_sha256": "01ba1d5cfb6b555327d4d689e55311a09be4aec10c9f18ce020b87d937162b67",
+      "compile_source": "engine/shadPS4/src/shader_recompiler/frontend/copy_shader.cpp",
+      "compile_source_sha256": "01ba1d5cfb6b555327d4d689e55311a09be4aec10c9f18ce020b87d937162b67"
+    },
+    {
+      "source": "src/shader_recompiler/frontend/decode.cpp",
+      "source_sha256": "90adf469f5efa882f51cbe5e222b386c26fbda56d82e90d7468343cce3e87043",
+      "compile_source": "engine/shadPS4/src/shader_recompiler/frontend/decode.cpp",
+      "compile_source_sha256": "90adf469f5efa882f51cbe5e222b386c26fbda56d82e90d7468343cce3e87043"
+    },
+    {
+      "source": "src/shader_recompiler/frontend/fetch_shader.cpp",
+      "source_sha256": "42b420edfd10ed14f0f12501ce1773ac92b47255b2ef543e246b47fa92d97879",
+      "compile_source": "ctrport/video/adapted/src_shader_recompiler_frontend_fetch_shader.cpp",
+      "compile_source_sha256": "d07c4e5a1ed6f073f25c06d01c64bf6843b60604ce283d8e70d902c2de0fa92b"
+    },
+    {
+      "source": "src/shader_recompiler/frontend/format.cpp",
+      "source_sha256": "a99cc53d802eec144091e27f15d31b5e015d86eeb3571d6b5c85b7597334e370",
+      "compile_source": "engine/shadPS4/src/shader_recompiler/frontend/format.cpp",
+      "compile_source_sha256": "a99cc53d802eec144091e27f15d31b5e015d86eeb3571d6b5c85b7597334e370"
+    },
+    {
+      "source": "src/shader_recompiler/frontend/translate/translate.cpp",
+      "source_sha256": "5423c46605238db1af7808babbfe2ea7ddef93e9943f5a38468f91bf0fcaddd3",
+      "compile_source": "ctrport/video/adapted/src_shader_recompiler_frontend_translate_translate.cpp",
+      "compile_source_sha256": "10180ba20c92f0a41588526b976bac9c61a739055ae4c1640486718615642801"
+    },
+    {
+      "source": "src/shader_recompiler/recompiler.cpp",
+      "source_sha256": "5c53b2d7099b64f9142a0787df5cb35024244c4163430a292e1bf63ae553ef45",
+      "compile_source": "ctrport/video/adapted/src_shader_recompiler_recompiler.cpp",
+      "compile_source_sha256": "1d72a306448bc4817a1908dcd383bd024fa65207282a5d11899984ca7294df68"
+    }
+  ]
+}
