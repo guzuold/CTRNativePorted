@@ -1627,9 +1627,9 @@ int main(int argc, char** argv) {
                 }
                 if (patch_len && patch_len < sizeof(patch_buf)) {
                     patch_path = fs::path(patch_buf);
-                } else if (!fs::exists(base_path / "sce_module") && fs::exists(fs::path("../Staging/NitroFueled_GameFiles/CUSA14876"))) {
+                } else if (!fs::exists(base_path / "sce_module") && fs::exists(fs::path("dump/CUSA14876"))) {
                     patch_path = base_path;
-                    base_path = fs::canonical("../Staging/NitroFueled_GameFiles/CUSA14876");
+                    base_path = fs::canonical("dump/CUSA14876");
                 }
                 ctrport::kernel_files.configure(base_path, patch_path);
                 ctrport::kernel_files.configure_user("runtime/user/data");
