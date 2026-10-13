@@ -13,21 +13,6 @@ against the execution of the original code.
 
 ## Status
 
-Two progress measures are tracked separately.
-
-**Runtime milestones**
-
-| Milestone | v01.00 | v01.21 (final update) |
-|---|---|---|
-| Boot, intro, title screen | ✅ | ✅ (window captures) |
-| Menus with controller and audio | ✅ (user observation) | ✅ reached |
-| Race playable | ✅ (user observation) | reached; formal capture pending |
-| 60 FPS | — | ✅ opt-in patch (`--60fps`), game runs in real time |
-| PS4 Pro mode (1440p 3D / 4K UI) | opt-in (`--pro`) | ✅ 2560×1440 3D, 3840×2160 video buffers |
-| Native 4K 3D mode (2160p 3D / 4K UI) | opt-in (`--native-4k`) | ✅ 3840×2160 3D + 1920 MiB Garlic VRAM |
-| Local split-screen | planned | planned |
-| Online | not available (planned: Demonware-compatible server) | — |
-
 **Reconstruction:** original functions replaced at run time by verified C++: **0** so
 far. The reconstructed modules in [`reconstruction/`](reconstruction/) are compiled and
 validated against original execution (thousands of fixtures, zero differences), but none
