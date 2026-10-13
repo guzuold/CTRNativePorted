@@ -10,6 +10,7 @@ in the mapped image, and checks the original bytes first.
 |---|---|---|---|---|---|
 | `CTR_TLS_PATCH=1` | any pinned eboot | every executed `mov rax, fs:[0]` | `64 48 8b 04 25 00 00 00 00` | `65 48 8b 04 25 <TEB slot>` | ctrport (`entry_boundary.hpp`) |
 | `CTR_60FPS_PATCH=1` | v01.21, `39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5` | `0x13a9d80` | `41 89 86 88 04 00 00` | `41 89 96 88 04 00 00` | third party, see below |
+| `CTR_NATIVE_4K=1` | v01.00 (`ca9c9441...`) and v01.21 (`39d716b7...`) | v01.00 `0x12e74c2`, `0x1aacfcb`; v01.21 `0x13aa652`, `0x1bbb918` | `41 8b 44 24 48` and `c7 45 c8 00 00 00 3c` | `b8 00 00 00 40` and `c7 45 c8 00 00 00 78` | ctrport (`entry_boundary.hpp`, `direct_memory.hpp`) |
 | `CTR_UNLOCK_ALL=1` | v01.00 and v01.21 | data, not code: byte `+0x81` of the current build record | `00` | `01` | ctrport (`unlock_all.hpp`), test only |
 
 ## CTR_TLS_PATCH
@@ -43,6 +44,45 @@ slot (`tls_storage.hpp`), so later executions no longer fault. Same length, same
   (same draws per frame, twice the frames), so the game runs in real time. Race
   physics at 60 FPS were not measured. Details in
   `reports/reconstruction/claude/v121_and_60fps_transition.json`.
+
+## CTR_NATIVE_4K
+
+Written for ctrport. Raises the internal 3D scene rendering resolution in PS4 Pro mode
+(`CTR_NEO_MODE=1`) from `2560x1440` (scale `1.3333334f` relative to `1920x1080`) to native
+4K `3840x2160` (scale `2.0f` relative to `1920x1080`), matching the `3840x2160` VideoOut
+buffer and 2D/UI buffer. Use it from `play_gpu.py --native-4k` or the launcher toggle
+(`3D 4K nativo`).
+
+- Why two sites are patched (retail disassembly of both eboots):
+  1. **Neo 3D scene scale factor (`0x12e74c2` in v01.00, `0x13aa652` in v01.21):**
+     When `sceKernelIsNeoMode()` returns 1 and `sceVideoOutGetResolutionStatus` reports
+     `paneHeight >= 1081` (`3840x2160`), the display setup function sets the 2D/UI target
+     dimensions (`[r14+0x490..0x49c]`) to `3840x2160` (`0xf00 x 0x870`) and loads the Neo
+     3D scene scale factor from `[r12+0x48]` (`0x3faaaaab` = `1.3333334f`) into `[r14+0x548]`,
+     which sizes the 3D scene render targets to `2560x1440`. Replacing the 5-byte load
+     `41 8b 44 24 48` (`mov eax, [r12+0x48]`) with `b8 00 00 00 40` (`mov eax, 0x40000000`
+     = `2.0f`) after verifying the 12-byte instruction pair `41 8b 44 24 48 41 89 86 48 05 00 00`
+     makes the 3D scene render targets `3840x2160`.
+  2. **Neo `Gfx/@vramBSize` / `[1]{7,Garlic}` pool size (`0x1aacfcb` in v01.00, `0x1bbb918` in v01.21):**
+     At `3840x2160`, the 3D scene color, depth, shadow, and post-processing targets use
+     2.25x the VRAM of `2560x1440`, exhausting the retail Neo `[1]{7,Garlic}` pool (`960 MiB`
+     = `0x3c000000`) when the 3D title scene loads (`Out of memory allocating from memory pool
+     "[1]{7,Garlic}"`, probe `20261013_033457_native4k_v121`). In the startup memory
+     configuration function (`0x1aac7df` in v01.00, `0x1bbb123` in v01.21), when
+     `sceKernelIsNeoMode()` is non-zero and no XML override is present for `"Gfx/@vramBSize"`,
+     execution branches to `0x1aacfcb` (v01.00) / `0x1bbb918` (v01.21) and executes
+     `c7 45 c8 00 00 00 3c` (`mov dword ptr [rbp-0x38], 0x3c000000`), which is then
+     sign-extended via `movsxd rdx, dword ptr [rbp-0x38]` and passed to the direct-memory
+     allocator (`0x1437c20` in v01.00, `0x1500320` in v01.21) for type 3 (`WC_GARLIC`).
+     Patching the immediate to `0x78000000` (`1920 MiB` = `2,013,265,920` bytes, bit 31 = 0
+     so `movsxd` sign-extends cleanly to `+0x78000000`) after verifying 8 original bytes
+     `c7 45 c8 00 00 00 3c e9`, together with expanding `DirectMemoryBacking` by `+960 MiB`
+     (`6336 MiB` total when `CTR_NATIVE_4K=1`), doubles the `[1]{7,Garlic}` pool to `1920 MiB`.
+- Observed on v01.21 (`20261013_035006_native4k_v121`): `guest_native_4k_patch_applied`
+  logged (`scale_target: 20620882`, `vram_b_target: 29079832`, `scene_scale: 2.0`,
+  `garlic_bytes: 2013265920`), type-3 direct memory allocated and mapped at `2,013,265,920`
+  bytes, and the 3D title scene rendered at a steady 30.0 flips/s (~4650 draws/s) with zero
+  pool OOM errors.
 
 ## CTR_UNLOCK_ALL
 

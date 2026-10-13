@@ -24,11 +24,22 @@ inline constexpr std::uint32_t retail_psf_attributes=545259552U;
 // flexible size, and SDK 0x6008001 >= 5.00 keeps both extended memory areas.
 inline constexpr std::uint64_t standard_direct_bytes=4736ULL*1024*1024;
 inline constexpr std::uint64_t neo_direct_bytes=5376ULL*1024*1024;
+inline constexpr std::uint64_t native_4k_direct_bytes=6336ULL*1024*1024;
 // PS4 Pro profile, opt-in with CTR_NEO_MODE=1 (experimental): like shadPS4's
 // sceKernelIsNeoMode, selected only when the title declares Neo support.
 inline bool neo_mode_selected() {
     static const bool requested=[]{char v[4]{};return GetEnvironmentVariableA("CTR_NEO_MODE",v,sizeof(v))==1 && v[0]=='1';}();
     return requested && ((retail_psf_attributes>>23)&1U);
+}
+// Native 4K 3D scene profile, opt-in with CTR_NATIVE_4K=1 (requires CTR_NEO_MODE=1):
+// expands direct memory by 960 MiB so Gfx/@vramBSize (Garlic pool) can double from
+// 960 MiB (0x3c000000) to 1920 MiB (0x78000000) for 3840x2160 3D render targets.
+inline bool native_4k_selected() {
+    static const bool requested=[]{char v[4]{};return GetEnvironmentVariableA("CTR_NATIVE_4K",v,sizeof(v))==1 && v[0]=='1';}();
+    return requested && neo_mode_selected();
+}
+inline std::uint64_t selected_direct_bytes() {
+    return native_4k_selected()?native_4k_direct_bytes:(neo_mode_selected()?neo_direct_bytes:standard_direct_bytes);
 }
 class DirectMemoryBacking {
     MappedImage region;
@@ -41,7 +52,7 @@ class DirectMemoryBacking {
 
 public:
     explicit DirectMemoryBacking(std::uint64_t bytes,std::uint64_t alignment=65536):capacity(bytes) {
-        if(!bytes || bytes%16384 || bytes>neo_direct_bytes) throw std::runtime_error("Direct backing size unsupported");
+        if(!bytes || bytes%16384 || bytes>native_4k_direct_bytes) throw std::runtime_error("Direct backing size unsupported");
         if(alignment<65536 || alignment>2097152 || (alignment&(alignment-1))) throw std::runtime_error("Direct backing alignment unsupported");
         // Retail libc mspace rejects backing ends above 0xfbffffffff.
         // Reserve only free windows; MEM_RESERVE never replaces an existing mapping.
@@ -272,13 +283,13 @@ inline void configure_direct_memory(const MappedImage& image,const ImageMetadata
     if(read(proc)!=88 || read(proc+16)!=0x6008001ULL || read(proc+64)!=reinterpret_cast<std::uint64_t>(image.get())+mem || read(mem)!=56) throw std::runtime_error("Direct memory process profile differs");
     for(unsigned i=1;i<7;++i) if(read(mem+i*8)!=0) throw std::runtime_error("Direct memory optional parameter unsupported");
     if(direct_memory_backing) throw std::runtime_error("Direct memory already configured");
-    direct_memory_backing=std::make_shared<DirectMemoryBacking>(neo_mode_selected()?neo_direct_bytes:standard_direct_bytes,2097152);
+    direct_memory_backing=std::make_shared<DirectMemoryBacking>(selected_direct_bytes(),2097152);
     // Same ATTRIBUTE in both versions' param.sfo, so the measured CPU mode holds for both.
     cpu_mode_retail_base=base || patch;
 }
 inline int process_neo_mode() {
     const bool neo=neo_mode_selected();
-    if(!direct_memory_backing || direct_memory_backing->size()!=(neo?neo_direct_bytes:standard_direct_bytes)) throw std::runtime_error("Validated memory profile unavailable");
+    if(!direct_memory_backing || direct_memory_backing->size()!=selected_direct_bytes()) throw std::runtime_error("Validated memory profile unavailable");
     return neo?1:0; // Selected hardware profile; not a service-success return.
 }
 inline std::uint64_t direct_memory_size() {

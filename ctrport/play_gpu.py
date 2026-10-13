@@ -25,11 +25,16 @@ if use_60fps:
     env['CTR_60FPS_PATCH'] = '1'
 elif '--60fps' in sys.argv:
     print('CTRPort: the 60 FPS patch exists only for v01.21; v01.00 runs at its original 30 FPS.', flush=True)
+# Native 4K 3D scene scale (2.0f + 1920 MiB Garlic pool) in PS4 Pro mode (ctrport/GUEST_PATCHES.md).
+use_native_4k = '--native-4k' in sys.argv or os.environ.get('CTR_NATIVE_4K') == '1'
 # PS4 Pro (Neo) hardware profile, experimental (ctrport/direct_memory.hpp).
-use_pro = '--pro' in sys.argv or '--neo' in sys.argv or os.environ.get('CTR_NEO_MODE') == '1'
+use_pro = '--pro' in sys.argv or '--neo' in sys.argv or use_native_4k or os.environ.get('CTR_NEO_MODE') == '1'
 env.pop('CTR_NEO_MODE', None)
+env.pop('CTR_NATIVE_4K', None)
 if use_pro:
     env['CTR_NEO_MODE'] = '1'
+if use_native_4k:
+    env['CTR_NATIVE_4K'] = '1'
 # Test-only: every unlockable reports unlocked while this run lasts (ctrport/GUEST_PATCHES.md).
 use_unlock_all = '--unlock-all' in sys.argv or os.environ.get('CTR_UNLOCK_ALL') == '1'
 env.pop('CTR_UNLOCK_ALL', None)
@@ -80,7 +85,7 @@ if use_unlock_all and saves.exists():
     backup = root / 'runtime/user/savedata_backups' / ('before_unlock_all_' + log.name.removeprefix('play_'))
     shutil.copytree(saves, backup)
     print('CTRPort: saves copied to', backup, flush=True)
-print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, 60fps={use_60fps}, unlock_all={use_unlock_all}, display={res_info}): close window to quit. Logs:', log, flush=True)
+print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, 60fps={use_60fps}, unlock_all={use_unlock_all}, display={res_info}): close window to quit. Logs:', log, flush=True)
 with lane_lock('shared', 'claude', timeout=600), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
     code = subprocess.run(command, env=env, stdout=out, stderr=err).returncode
 print('exit code', code)

@@ -23,7 +23,8 @@ Two progress measures are tracked separately.
 | Menus with controller and audio | ✅ (user observation) | ✅ reached |
 | Race playable | ✅ (user observation) | reached; formal capture pending |
 | 60 FPS | — | ✅ opt-in patch (`--60fps`), game runs in real time |
-| PS4 Pro mode (higher internal resolution) | opt-in (`--pro`) | ✅ 3840×2160 video buffers |
+| PS4 Pro mode (1440p 3D / 4K UI) | opt-in (`--pro`) | ✅ 2560×1440 3D, 3840×2160 video buffers |
+| Native 4K 3D mode (2160p 3D / 4K UI) | opt-in (`--native-4k`) | ✅ 3840×2160 3D + 1920 MiB Garlic VRAM |
 | Local split-screen | planned | planned |
 | Online | not available (planned: Demonware-compatible server) | — |
 
@@ -79,7 +80,7 @@ Start the native launcher (`build/CTRPort-claude/CTRNativePorted.exe`), or run f
 command line:
 
 ```powershell
-python -B ctrport/play_gpu.py --base-dir <CUSA14876 folder> [--1.21 --patch-dir <update folder>] [--60fps] [--pro] [--1080p | --fullscreen]
+python -B ctrport/play_gpu.py --base-dir <CUSA14876 folder> [--1.21 --patch-dir <update folder>] [--60fps] [--pro] [--native-4k] [--1080p | --fullscreen]
 ```
 
 Logs, saves and caches go to `runtime/user/`. The game folders are only read.
