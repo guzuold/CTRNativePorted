@@ -52,8 +52,8 @@ constexpr ARGB kField = 0xFF0C1735, kFieldOff = 0xFF0A1228, kGold = 0xFFFFC21A, 
 constexpr ARGB kOrange = 0xFFFF8A00, kRed = 0xFFE3262C, kRedDark = 0xFFA70F18, kText = 0xFFF5F7FF;
 constexpr ARGB kMuted = 0xFF9FB0D6, kOk = 0xFF59E08B, kError = 0xFFFF6B6B;
 
-const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)", L"3840x2160 (4K)", L"Personalizzata"};
-const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Altra"};
+const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)", L"3840x2160 (4K)", L"Custom"};
+const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
 
 enum : int {
@@ -211,11 +211,11 @@ struct LaneLock {
                 return true;
             }
             if (GetLastError() != ERROR_FILE_EXISTS) {
-                MessageBoxW(owner, (L"Impossibile creare il lock " + path.wstring()).c_str(), kTitle, MB_ICONERROR);
+                MessageBoxW(owner, (L"Unable to create lock file " + path.wstring()).c_str(), kTitle, MB_ICONERROR);
                 return false;
             }
-            const std::wstring text = L"Il runtime è già in uso da un altro processo (lock condiviso delle corsie):\n\n" +
-                widen(read_tail(path, 4096)) + L"\n\nRiprovare?";
+            const std::wstring text = L"The runtime is already in use by another process (shared lane lock):\n\n" +
+                widen(read_tail(path, 4096)) + L"\n\nRetry?";
             if (MessageBoxW(owner, text.c_str(), kTitle, MB_RETRYCANCEL | MB_ICONWARNING) != IDRETRY) return false;
         }
     }
@@ -308,7 +308,7 @@ void load_config() {
         if (!folder->empty()) *folder = fs::path(*folder).make_preferred().wstring();
     g.resolution = 1;
     for (int i = 0; i < 5; ++i)
-        if (g.cfg.resolution == kResolutions[i]) g.resolution = i;
+        if (g.cfg.resolution == kResolutions[i] || (i == 4 && g.cfg.resolution == L"Personalizzata")) g.resolution = i;
 }
 
 std::wstring window_text(HWND control) {
@@ -481,22 +481,22 @@ void render_base_layer() {
         gr.DrawPolygon(&ribbon_edge, ribbon, 4);
         text(gr, L"CRASH TEAM RACING", 0, 17, FontStyleBoldItalic, rect(26, 136, 264, 28), kText, StringAlignmentCenter);
         logo_text(gr, L"NATIVE PORTED", 52, PointF(18, 158), kGoldLight, kOrange, 0xFF4A1000, 7);
-        text(gr, L"Runtime nativo per Windows · gioca con il tuo dump PS4 di CTR Nitro-Fueled", 2, 13.5f, FontStyleRegular,
+        text(gr, L"Native Windows runtime · Play with your own CTR Nitro-Fueled PS4 dump", 2, 13.5f, FontStyleRegular,
              rect(30, 226, 620, 22), 0xF0FFFFFF);
         LinearGradientBrush accent(PointF(0, 0), PointF(kWidth, 0), Color(kGold), Color(kRed));
         accent.SetWrapMode(WrapModeTileFlipXY);
         gr.FillRectangle(&accent, 0.f, kHero - 3, kWidth, 3.f);
         checkered(gr, kHero, 5, 2);
         // Cards and fixed labels.
-        card(gr, kFilesCard, L"FILE DI GIOCO");
+        card(gr, kFilesCard, L"GAME FILES");
         card(gr, kVideoCard, L"VIDEO");
         card(gr, kTestCard, nullptr);
         LinearGradientBrush tag(PointF(0, 501), PointF(0, 529), Color(kGoldLight), Color(kGold));
         tag.SetWrapMode(WrapModeTileFlipXY);
         fill_round(gr, rect(536, 502, 66, 26), 13, tag);
-        text(gr, L"PROVA", 3, 12.5f, FontStyleRegular, rect(536, 502, 66, 26), kNight, StringAlignmentCenter);
-        text(gr, L"Gioco base · v01.00 (CUSA14876)", 2, 13.5f, FontStyleRegular, rect(44, 326, 436, 20), kText);
-        text(gr, L"Serve il tuo dump: eboot.bin e sce_module. L'update si sovrappone al gioco base.", 1, 11.5f,
+        text(gr, L"TEST", 3, 12.5f, FontStyleRegular, rect(536, 502, 66, 26), kNight, StringAlignmentCenter);
+        text(gr, L"Base game · v01.00 (CUSA14876)", 2, 13.5f, FontStyleRegular, rect(44, 326, 436, 20), kText);
+        text(gr, L"Your own dump is required: eboot.bin & sce_module. The update overlays the base game.", 1, 11.5f,
              FontStyleRegular, rect(44, 516, 436, 18), kMuted);
     }
     SelectObject(dc, previous);
@@ -553,12 +553,12 @@ void paint_window(HDC target) {
         draw_field(gr, kHeightField, g.height_edit);
         const bool size_on = IsWindowEnabled(g.width_edit) != FALSE;
         text(gr, L"×", 2, 16, FontStyleRegular, rect(620, 370, 24, 30), size_on ? kText : fade(kMuted, 0.6f), StringAlignmentCenter);
-        text(gr, L"pixel della finestra", 1, 12, FontStyleRegular, rect(738, 370, 150, 30), size_on ? kMuted : fade(kMuted, 0.6f));
+        text(gr, L"window pixels", 1, 12, FontStyleRegular, rect(738, 370, 150, 30), size_on ? kMuted : fade(kMuted, 0.6f));
         draw_status(gr, g.base_status, 44, 390, 436);
         draw_status(gr, g.patch_status, 44, 490, 436);
         const float status_width = std::min(860.f, 30.f + 7.2f * static_cast<float>(g.global.text.size()));
         draw_status(gr, g.global, (kWidth - status_width) / 2, 630, status_width);
-        text(gr, L"60 FPS: patch “60 FPS Unlock” di illusion (GoldHEN Patch Repository) · Crash Team Racing Native Ported è software GPL-2.0",
+        text(gr, L"60 FPS: '60 FPS Unlock' patch by illusion (GoldHEN Patch Repository) · Crash Team Racing Native Ported is GPL-2.0 software",
              1, 11, FontStyleRegular, rect(24, 654, 872, 18), fade(kMuted, 0.85f), StringAlignmentCenter);
     }
     BitBlt(target, 0, 0, w, h, dc, 0, 0, SRCCOPY);
@@ -643,11 +643,11 @@ void draw_control(const DRAWITEMSTRUCT& item) {
                 stroke_round(gr, full, 12, 0xFF7A2A00, 1.5f);
             }
             const ARGB ink = disabled ? 0xFF7F8CB0 : kNight;
-            const float cx = lw / 2 - 133;
+            const float cx = lw / 2 - 120;
             PointF arrow[] = {PointF(cx, lh / 2 - 11), PointF(cx + 18, lh / 2), PointF(cx, lh / 2 + 11)};
             SolidBrush arrow_brush{Color(ink)};
             gr.FillPolygon(&arrow_brush, arrow, 3);
-            text(gr, L"AVVIA IL GIOCO", 0, 26, FontStyleBoldItalic, rect(cx + 26, 0, 260, lh), ink);
+            text(gr, L"LAUNCH GAME", 0, 26, FontStyleBoldItalic, rect(cx + 26, 0, 260, lh), ink);
             break;
         }
         }
@@ -708,11 +708,11 @@ void validate() {
     const bool base_eboot = !g.cfg.base_dir.empty() && fs::exists(base / "eboot.bin", ec);
     const bool base_modules = base_eboot && fs::exists(base / "sce_module", ec);
     const bool patch_ok = !g.cfg.patch_dir.empty() && fs::exists(patch / "eboot.bin", ec);
-    g.base_status = !base_eboot ? Status{L"eboot.bin non trovato in questa cartella", 2}
-                  : !base_modules ? Status{L"Manca la cartella sce_module del gioco base", 2}
-                                  : Status{L"Gioco base trovato (eboot.bin e sce_module)", 1};
-    if (!g.cfg.use_patch) g.patch_status = {L"Update disattivato: verrà avviata la v01.00", 0};
-    else g.patch_status = patch_ok ? Status{L"Update v01.21 trovato (eboot.bin)", 1} : Status{L"Cartella dell'update o eboot.bin mancante", 2};
+    g.base_status = !base_eboot ? Status{L"eboot.bin not found in this folder", 2}
+                  : !base_modules ? Status{L"Missing sce_module folder for base game", 2}
+                                  : Status{L"Base game found (eboot.bin & sce_module)", 1};
+    if (!g.cfg.use_patch) g.patch_status = {L"Update disabled: v01.00 will be launched", 0};
+    else g.patch_status = patch_ok ? Status{L"Update v01.21 found (eboot.bin)", 1} : Status{L"Update folder or eboot.bin missing", 2};
     EnableWindow(g.patch_edit, g.cfg.use_patch);
     EnableWindow(g.patch_browse, g.cfg.use_patch);
     EnableWindow(g.fps_toggle, g.cfg.use_patch);
@@ -723,17 +723,17 @@ void validate() {
     const bool size_ok = g.cfg.fullscreen || (parse_size(window_text(g.width_edit), 320, 7680, width) && parse_size(window_text(g.height_edit), 240, 4320, height));
     const bool runtime_ok = !g.root.empty() && fs::exists(g.runtime_exe, ec);
     g.can_launch = runtime_ok && base_modules && (!g.cfg.use_patch || patch_ok) && size_ok;
-    if (!runtime_ok) g.global = {L"Runtime non trovato: servono ctrport.exe e build/CTRPort-gpu/ctr_gpu.dll", 2};
-    else if (!base_modules || (g.cfg.use_patch && !patch_ok)) g.global = {L"Seleziona cartelle valide per avviare il gioco", 2};
-    else if (!size_ok) g.global = {L"Risoluzione non valida (da 320×240 a 7680×4320)", 2};
+    if (!runtime_ok) g.global = {L"Runtime not found: ctrport.exe and build/CTRPort-gpu/ctr_gpu.dll required", 2};
+    else if (!base_modules || (g.cfg.use_patch && !patch_ok)) g.global = {L"Select valid dump folders to launch the game", 2};
+    else if (!size_ok) g.global = {L"Invalid resolution (from 320×240 to 7680×4320)", 2};
     else {
-        std::wstring summary = L"Pronto · ";
+        std::wstring summary = L"Ready · ";
         summary += g.cfg.use_patch ? L"v01.21" : L"v01.00";
         if (g.cfg.use_patch && g.cfg.fps_60) summary += L" · 60 FPS";
-        summary += g.cfg.fullscreen ? L" · schermo intero" : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
-        if (g.cfg.native_4k) summary += L" · PS4 Pro (3D 4K nativo)";
-        else if (g.cfg.ps4_pro) summary += L" · PS4 Pro (3D 1440p)";
-        if (g.cfg.unlock_all) summary += L" · tutto sbloccato (salvataggi copiati prima)";
+        summary += g.cfg.fullscreen ? L" · fullscreen" : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
+        if (g.cfg.native_4k) summary += L" · PS4 Pro (Native 4K 3D)";
+        else if (g.cfg.ps4_pro) summary += L" · PS4 Pro (1440p 3D)";
+        if (g.cfg.unlock_all) summary += L" · unlock all (saves backed up)";
         g.global = {summary, 1};
     }
     EnableWindow(g.launch, g.can_launch);
@@ -818,7 +818,7 @@ void launch_game() {
         fs::create_directories(backup.parent_path(), ec);
         fs::copy(saves, backup, fs::copy_options::recursive, ec);
         if (ec) {
-            MessageBoxW(g.window, (L"Copia dei salvataggi non riuscita, avvio annullato:\n" + widen(ec.message())).c_str(), kTitle, MB_ICONERROR);
+            MessageBoxW(g.window, (L"Save backup failed, launch aborted:\n" + widen(ec.message())).c_str(), kTitle, MB_ICONERROR);
             g.lock.release();
             return;
         }
@@ -865,7 +865,7 @@ void launch_game() {
     for (HANDLE handle : {out, err, nul}) if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
     if (!started) {
         g.lock.release();
-        MessageBoxW(g.window, (L"Avvio di ctrport.exe non riuscito (errore " + std::to_wstring(error) + L").").c_str(), kTitle, MB_ICONERROR);
+        MessageBoxW(g.window, (L"Failed to launch ctrport.exe (error " + std::to_wstring(error) + L").").c_str(), kTitle, MB_ICONERROR);
         return;
     }
     CloseHandle(info.hThread);
@@ -901,8 +901,8 @@ void game_finished(DWORD code) {
     SetForegroundWindow(g.window);
     const bool closed_by_user = !reasons.empty() && reasons.back().find("window closed") != std::string::npos;
     if (code == 0 && (reasons.empty() || closed_by_user)) return;
-    std::wstring message = L"Il gioco si è fermato (codice " + std::to_wstring(code) + L").\n\n";
-    if (reasons.empty()) message += L"Nessun motivo trovato nei log.\n";
+    std::wstring message = L"The game has stopped (exit code " + std::to_wstring(code) + L").\n\n";
+    if (reasons.empty()) message += L"No specific error found in logs.\n";
     for (std::size_t i = reasons.size() > 5 ? reasons.size() - 5 : 0; i < reasons.size(); ++i) message += widen(reasons[i]) + L"\n";
     message += L"\nLog: " + g.log_stem.wstring() + L".stdout.log";
     MessageBoxW(g.window, message.c_str(), kTitle, MB_ICONWARNING);
@@ -958,20 +958,20 @@ void create_controls() {
     g.edit_font = CreateFontW(-px(14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                               CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
     g.base_edit = add_edit(ID_BASE_EDIT, kBaseField, g.cfg.base_dir);
-    add_button(ID_BASE_BROWSE, Kind::Browse, rect(384, 350, 96, 34), L"SFOGLIA");
-    add_button(ID_PATCH_TOGGLE, Kind::Toggle, rect(44, 418, 436, 26), L"Title Update v01.21 (nuove piste, kart, Grand Prix)", &g.cfg.use_patch);
+    add_button(ID_BASE_BROWSE, Kind::Browse, rect(384, 350, 96, 34), L"BROWSE");
+    add_button(ID_PATCH_TOGGLE, Kind::Toggle, rect(44, 418, 436, 26), L"Title Update v01.21 (new tracks, karts, Grand Prix)", &g.cfg.use_patch);
     g.patch_edit = add_edit(ID_PATCH_EDIT, kPatchField, g.cfg.patch_dir);
-    g.patch_browse = add_button(ID_PATCH_BROWSE, Kind::Browse, rect(384, 450, 96, 34), L"SFOGLIA");
+    g.patch_browse = add_button(ID_PATCH_BROWSE, Kind::Browse, rect(384, 450, 96, 34), L"BROWSE");
     for (int i = 0; i < 5; ++i)
         g.pills.push_back(add_button(ID_PILL + i, Kind::Pill, rect(536 + i * 69.f, 330, 62, 30), kPills[i], nullptr, i));
     g.width_edit = add_edit(ID_WIDTH, kWidthField, g.cfg.custom_w, ES_NUMBER | ES_CENTER);
     g.height_edit = add_edit(ID_HEIGHT, kHeightField, g.cfg.custom_h, ES_NUMBER | ES_CENTER);
-    add_button(ID_FULLSCREEN, Kind::Toggle, rect(536, 410, 150, 26), L"Schermo intero", &g.cfg.fullscreen);
+    add_button(ID_FULLSCREEN, Kind::Toggle, rect(536, 410, 150, 26), L"Fullscreen", &g.cfg.fullscreen);
     g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(692, 410, 194, 26), L"60 FPS (v01.21)", &g.cfg.fps_60);
     g.pro_toggle = add_button(ID_PRO, Kind::Toggle, rect(536, 438, 172, 26), L"PS4 Pro (1440p 3D)", &g.cfg.ps4_pro);
-    g.native_4k_toggle = add_button(ID_NATIVE_4K, Kind::Toggle, rect(712, 438, 174, 26), L"3D 4K nativo", &g.cfg.native_4k);
-    add_button(ID_UNLOCK, Kind::Toggle, rect(616, 502, 270, 26), L"Sblocca tutti gli sbloccabili", &g.cfg.unlock_all);
-    g.launch = add_button(ID_LAUNCH, Kind::Launch, kLaunch, L"AVVIA IL GIOCO");
+    g.native_4k_toggle = add_button(ID_NATIVE_4K, Kind::Toggle, rect(712, 438, 174, 26), L"Native 4K 3D", &g.cfg.native_4k);
+    add_button(ID_UNLOCK, Kind::Toggle, rect(616, 502, 270, 26), L"Unlock all items & tracks", &g.cfg.unlock_all);
+    g.launch = add_button(ID_LAUNCH, Kind::Launch, kLaunch, L"LAUNCH GAME");
 }
 
 LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -1022,8 +1022,8 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         }
         if (code == EN_SETFOCUS || code == EN_KILLFOCUS) { InvalidateRect(window, nullptr, FALSE); return 0; }
         if (code != BN_CLICKED && code != BN_DOUBLECLICKED) break;
-        if (id == ID_BASE_BROWSE) browse(g.base_edit, L"Cartella del gioco base (CUSA14876, con eboot.bin)");
-        else if (id == ID_PATCH_BROWSE) browse(g.patch_edit, L"Cartella del Title Update v01.21 (es. CUSA14876-patch)");
+        if (id == ID_BASE_BROWSE) browse(g.base_edit, L"Base game dump folder (CUSA14876, with eboot.bin)");
+        else if (id == ID_PATCH_BROWSE) browse(g.patch_edit, L"Title Update v01.21 folder (e.g. CUSA14876-patch)");
         else if (id >= ID_PILL && id < ID_PILL + 5) select_resolution(id - ID_PILL);
         else {
             const auto found = g.controls.find(reinterpret_cast<HWND>(lparam));
