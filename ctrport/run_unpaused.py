@@ -9,7 +9,7 @@ env=os.environ.copy()
 for key in ('CTR_STARTUP_WRITE_DLL_DIR','CTR_STARTUP_MUTEX_DLL_DIR','CTR_PARK_MISSING_NID','CTR_PARK_MISSING_SERVICE','CTR_TILING_TIMING'):
  env.pop(key,None)
 env.update(CTR_NO_FRAME_OBSERVATION='1',CTR_RETURN_COMPLETED_GNM='1',CTR_PRIVATE_DESCRIPTOR_EVIDENCE='1',CTR_GRAPHICS_CENSUS_STAGES='128',CTR_VIDEO_TILING_SHADER_DIR='build/CTRPort-data/tiling-glslang-ninja')
-game=root.parent/'Staging/NitroFueled_GameFiles/CUSA14876'
+game=root/'dump/CUSA14876'
 exe=root/'build/CTRPort-infra/ctrport.exe'
 log=root/'runtime/user/logs'/('interactive_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
 print('Offline runtime; no artificial frame pause. Close the game window to finish. Logs:',log,flush=True)
