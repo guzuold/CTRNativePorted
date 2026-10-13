@@ -61,8 +61,8 @@ for i, arg in enumerate(sys.argv):
 if width and height:
     env['CTR_GPU_WIDTH'] = str(width)
     env['CTR_GPU_HEIGHT'] = str(height)
-game = Path(os.environ['CTR_BASE_DIR']) if 'CTR_BASE_DIR' in os.environ else (root.parent / 'dump/CUSA14876')
-patch = Path(os.environ['CTR_PATCH_DIR']) if 'CTR_PATCH_DIR' in os.environ else Path(r'dump/CUSA14876-patch')
+game = Path(os.environ['CTR_BASE_DIR']) if 'CTR_BASE_DIR' in os.environ else (root / 'dump/CUSA14876')
+patch = Path(os.environ['CTR_PATCH_DIR']) if 'CTR_PATCH_DIR' in os.environ else (root / 'dump/CUSA14876-patch')
 for i, arg in enumerate(sys.argv):
     if arg in ('--base-dir', '--game-dir') and i + 1 < len(sys.argv):
         game = Path(sys.argv[i + 1])

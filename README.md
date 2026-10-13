@@ -51,11 +51,34 @@ is switched on in the runtime yet.
   eboot SHA256 and checked against the original bytes, with its origin.
 - `reconstruction/` — reconstructed engine C++ code (`include/` and `src/`).
 
-## Requirements
+## Playing (release build)
 
-- Windows 10/11 x64, a Vulkan 1.3 GPU, an XInput controller.
+Download `CTRNativePorted-<version>-win64.zip` from
+[Releases](https://github.com/guzuold/CTRNativePorted/releases). It already contains the
+launcher, the runtime, the renderer and HLE DLLs and the Visual C++ runtime DLLs. Nothing
+else needs to be installed.
+
+You need:
+
+- Windows 10/11 x64, a GPU with Vulkan 1.3, an XInput controller.
 - Your own dump of CUSA14876 v01.00 (eboot SHA256 `ca9c9441…`), optionally with the
-  v01.21 update folder (eboot SHA256 `39d716b7…`). Other versions are rejected.
+  v01.21 update (eboot SHA256 `39d716b7…`, required for 60 FPS). Other versions are
+  rejected.
+
+Then:
+
+1. Extract the zip to a folder of your choice.
+2. Either select your dump folders in the launcher, or place them next to it as
+   `dump\CUSA14876` (base game) and `dump\CUSA14876-patch` (v01.21 update), where they
+   are found automatically.
+3. Run `CTRNativePorted.exe`, choose the options and start the game.
+
+Logs, saves and caches go to `runtime\user\`. The game folders are only read.
+
+## Building from source
+
+Everything in [Playing](#playing-release-build) applies, plus:
+
 - Visual Studio 2022 **Community** in its default path (MSVC, MASM, "C++ CMake tools
   for Windows"); the build scripts currently use that fixed path. Python 3.12. Git.
 - LLVM/clang-cl 19.1.1 in `tools/toolchains/llvm-19.1.1`: downloaded and verified
@@ -65,7 +88,7 @@ is switched on in the runtime yet.
   `v.0.18.0` (commit `e3ce810f3a653f43ac64ebab63023de281a4103a`, checked after
   checkout) together with its own submodules.
 
-## Build and run
+### Build and run
 
 Clone and prepare the dependencies (once):
 
