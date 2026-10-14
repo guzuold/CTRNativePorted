@@ -1,0 +1,12 @@
+Julio Cacko — Input Prompts Pack, XGamepad / Default
+License: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Author's license declaration:
+https://juliocacko.itch.io/free-input-prompts
+https://juliocacko.gumroad.com/l/free-input-pack
+
+Source: user-supplied Source.zip; author/origin confirmed by the user on
+2026-10-14. The archive itself did not include a license document.
+provenance.json records the archive and individual unmodified PNG hashes.
+These third-party images retain CC0 status, separately from the GPL-2.0 code.

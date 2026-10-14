@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include "xbox_asset_overlay.hpp"
 namespace ctrport {
 inline std::filesystem::path app0_read_path(const std::filesystem::path& base,
                                            const std::filesystem::path& patch,
@@ -34,10 +35,10 @@ inline std::filesystem::path app0_read_path(const std::filesystem::path& base,
     };
     if (!patch.empty()) {
         const auto candidate = resolve(patch);
-        if (!candidate.empty()) return candidate;
+        if (!candidate.empty()) return xbox_asset_overlay(candidate,relative);
     }
     const auto candidate = resolve(base);
     if (candidate.empty()) throw std::runtime_error("app0 file missing");
-    return candidate;
+    return xbox_asset_overlay(candidate,relative);
 }
 }

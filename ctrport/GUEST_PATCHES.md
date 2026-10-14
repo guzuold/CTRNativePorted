@@ -12,6 +12,7 @@ in the mapped image, and checks the original bytes first.
 | `CTR_60FPS_PATCH=1` | v01.21, `39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5` | `0x13a9d80` | `41 89 86 88 04 00 00` | `41 89 96 88 04 00 00` | third party, see below |
 | `CTR_NATIVE_4K=1` | v01.00 (`ca9c9441...`) and v01.21 (`39d716b7...`) | v01.00 `0x12e74c2`, `0x1aacfcb`; v01.21 `0x13aa652`, `0x1bbb918` | `41 8b 44 24 48` and `c7 45 c8 00 00 00 3c` | `b8 00 00 00 40` and `c7 45 c8 00 00 00 78` | ctrport (`entry_boundary.hpp`, `direct_memory.hpp`) |
 | `CTR_UNLOCK_ALL=1` | v01.00 and v01.21 | data, not code: byte `+0x81` of the current build record | `00` | `01` | ctrport (`unlock_all.hpp`), test only |
+| `CTR_ONLINE=1` | v01.00 (`ca9c9441...`) and v01.21 (`39d716b7...`) | data: v01.00 `0x1ade440`, v01.21 `0x1becf40`, 0x126 bytes | Demonware auth3 traffic key (SHA-256 `356c4bc3...`) | project server public key (`CTR_ONLINE_TRAFFIC_KEY`) | ctrport (`online_traffic_key.hpp`), see below |
 
 ## CTR_TLS_PATCH
 
@@ -121,3 +122,15 @@ because the game keeps saving during the run.
   the user confirmed on screen that every unlockable was available. In that run the game
   also unlocked trophy 46 in `runtime/user/trophies/unlocks.jsonl` and rewrote the global
   save. v01.00 is bound statically but has not been run with the switch.
+
+## CTR_ONLINE (auth3 traffic key)
+
+Written for ctrport (R8, (development notes)). The game's Demonware client
+accepts an auth3 login reply only if its `X-Signature` header verifies (RSA-PSS, SHA-256,
+salt length 0) against an RSA-2048 public key stored in the eboot, the only
+SubjectPublicKeyInfo in the image. The project server cannot sign with that key. With
+`CTR_ONLINE=1` the runtime replaces those 0x126 bytes in memory with the project server's
+public key (downloaded by `play_gpu.py --online` from `/ctr/v1/traffic-key` into
+`runtime/user/online/`), after checking the original bytes by SHA-256 so that no game data
+is stored in the repository. The verification code itself is unchanged. Without
+`CTR_ONLINE` nothing is patched.

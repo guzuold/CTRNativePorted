@@ -133,3 +133,7 @@ target_compile_options(ctr_hle PRIVATE -Wno-unused-command-line-argument)
 if (CLANG_RT)
     target_link_libraries(ctr_hle PRIVATE ${CLANG_RT})
 endif()
+
+# Unit test of the online services (R8): loads ctr_hle.dll with CTR_ONLINE=1.
+add_executable(ctr_hle_online_test ${CMAKE_CURRENT_SOURCE_DIR}/../hle_tests/online_services_test.cpp)
+target_link_libraries(ctr_hle_online_test PRIVATE ws2_32 crypt32)

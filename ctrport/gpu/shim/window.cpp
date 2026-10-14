@@ -8,6 +8,7 @@
 #include "sdl_window.h"
 
 namespace Frontend {
+bool PollControllerExit(SDL_Window* window);
 
 WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}, height{height_} {
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
@@ -44,6 +45,7 @@ WindowSDL::~WindowSDL() {
 }
 
 bool WindowSDL::PollEvents() {
+    if(PollControllerExit(window))is_open=false;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {

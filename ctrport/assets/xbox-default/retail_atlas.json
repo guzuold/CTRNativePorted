@@ -1,0 +1,17 @@
+{
+  "sha256": "e360b4a23745a096cbc4f76dc16d3103c6ec6f799c38862edb3df944dd8f50cd",
+  "width": 512,
+  "height": 263,
+  "storage_height": 264,
+  "source": "Retail CUSA14876 base permanent.pak fonts/GeekSpeak_Outline.igz; visual inspection and retail IGZ metrics",
+  "update_variants": {
+    "6c0b9319cd2bd0bfe07c4d7b8633d9aff71dd932a04f3df5766095f4f5b48dee": [
+      "fonts/GeekSpeak.igz",
+      "fonts/GeekSpeak_Outline.igz"
+    ],
+    "5a509c8fb94dc40796669863a7e8c6941f4332c629df0e08de22cd3daa9a13c9": [
+      "fonts/Zoinks_Outline.igz"
+    ]
+  },
+  "update_source": "Retail CUSA14876 v01.21 update.pak; atlas and 14 metric rectangles visually inspected"
+}
