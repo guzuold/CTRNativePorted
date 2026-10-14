@@ -15,6 +15,7 @@
 #include "kernel_condition.hpp"
 #include "sysmodule_service.hpp"
 #include "direct_memory.hpp"
+#include "online_traffic_key.hpp"
 #include "gnm_init_dispatch.hpp"
 #include "gnm_submission_snapshot.hpp"
 #include "gnm_command_cursor.hpp"
@@ -2637,6 +2638,7 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     if(initialize_libc_only) services.push_back({"BmMjYxmew1w","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_condition_timedwait)});
     if(initialize_libc_only) services.push_back({"WKAXJ4XBPQ4","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_condition_wait_owned)});
     if(initialize_libc_only) services.push_back({"onNY9Byn-W8","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_thread_join_owned)});
+    if(initialize_libc_only) services.push_back({"3kg7rT0NQIs","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_pthread_exit)});
     if(initialize_libc_only) services.push_back({"T72hz6ffq08","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_thread_yield)});
     if(initialize_libc_only) services.push_back({"EI-5-jlq2dE","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_thread_numeric_id)});
     if(initialize_libc_only) services.push_back({"rcrVFJsQWRY","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_thread_get_affinity)});
@@ -2811,6 +2813,8 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
             std::cout<<"{\"scope\":\"guest_60fps_patch_applied\",\"target\":20618624,\"bytes\":7,\"origin\":\"GoldHEN_Patch_Repository 60 FPS Unlock 2.0 by illusion\"}\n"<<std::flush;
         }
     }
+    // CTR_ONLINE=1: project server key in place of the auth3 traffic signing key (R8).
+    apply_online_traffic_key(images.front().get(),pin);
     // CTR_NATIVE_4K=1 (with CTR_NEO_MODE=1, ctrport/GUEST_PATCHES.md):
     // 1. In the Neo branch of graphics device init (v01.00 0x12e74a8, v01.21 0x13aa638),
     //    the backbuffer at [r14+0x540..0x544] is doubled to 3840x2160 while [r14+0x548] is

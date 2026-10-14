@@ -30,6 +30,17 @@ public:
     std::size_t size()const{return usable;}
 };
 extern "C" std::uint64_t ctr_guest_stack_call(void*,void*,void*,void*);
+// Guest thread entry with an exit frame for scePthreadExit (abi_probe.asm).
+extern "C" std::uint64_t ctr_guest_thread_call(void*,void*,void*,void*,void**);
+inline thread_local void* guest_thread_exit_frame=nullptr;
+// scePthreadExit: returns the calling worker's exit frame (ctr_sysv_pthread_exit jumps to it).
+// A thread without a published frame (the main thread) cannot exit this way: fail loudly.
+extern "C" void* ctr_thread_exit_frame(std::uint64_t value,std::uint64_t caller){
+ if(!guest_thread_exit_frame){std::fprintf(stderr,"NID=3kg7rT0NQIs library=libkernel caller=0x%llx unsupported: scePthreadExit outside a runtime worker thread\n",static_cast<unsigned long long>(caller));std::fflush(stderr);ExitProcess(4);}
+ std::printf("{\"scope\":\"thread_exit\",\"nid\":\"3kg7rT0NQIs\",\"caller\":%llu,\"value\":%llu}\n",static_cast<unsigned long long>(caller),static_cast<unsigned long long>(value));std::fflush(stdout);
+ return guest_thread_exit_frame;
+}
+extern "C" void ctr_sysv_pthread_exit();
 extern "C" void ctr_guest_stack_fixture();
 extern "C" int ctr_guest_stack_xmm_control(void*,void*,void*);
 extern "C" void ctr_guest_stack_exception_fixture();

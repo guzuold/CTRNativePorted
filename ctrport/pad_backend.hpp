@@ -2,6 +2,7 @@
 #pragma once
 #include "kernel_time.hpp"
 #include <Xinput.h>
+#include "pad_test_input.hpp"
 #include "user_service.hpp"
 extern "C" std::uint64_t ctr_kernel_process_time();
 namespace ctrport {
@@ -76,6 +77,11 @@ public:
   if(result!=ERROR_SUCCESS && result!=ERROR_DEVICE_NOT_CONNECTED)throw std::runtime_error("XInput read failed status="+std::to_string(result));
   std::array<unsigned char,120> sample{};const float identity=1.0f;std::memcpy(sample.data()+24,&identity,4);
   if(result==ERROR_SUCCESS){
+   apply_pad_test_input(state.Gamepad);
+   // Host exit confirmation consumes input; preserve physical connection and time.
+   using CaptureQuery=int(*)();
+   static CaptureQuery capture=[] {auto module=GetModuleHandleW(L"ctr_gpu.dll");return module?reinterpret_cast<CaptureQuery>(GetProcAddress(module,"ctr_gpu_input_captured")):nullptr;}();
+   if(capture && capture())state.Gamepad={};
    if(!port->connected){if(port->connections!=255)++port->connections;}
    sample=pad_connected_sample(state.Gamepad,port->connections,ctr_kernel_process_time());
   }

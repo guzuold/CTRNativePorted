@@ -546,6 +546,121 @@ ctr_guest_stack_call PROC
     pop rdi
     ret
 ctr_guest_stack_call ENDP
+; Guest thread entry used by GuestWorkerControl: as ctr_guest_stack_call, and also saves
+; rbx, rbp, r13-r15 and publishes the frame in *frame_slot (5th argument) so that
+; scePthreadExit (ctr_sysv_pthread_exit) can return from the guest thread at any depth
+; with its exit value, exactly as if the entry function had returned that value.
+; Frame: 8 pushes, then 200 bytes; the 5th argument is at [frame+304].
+PUBLIC ctr_guest_thread_call
+ctr_guest_thread_call PROC
+    push rdi
+    push rsi
+    push rbx
+    push rbp
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 200
+    movdqu [rsp+0], xmm6
+    movdqu [rsp+16], xmm7
+    movdqu [rsp+32], xmm8
+    movdqu [rsp+48], xmm9
+    movdqu [rsp+64], xmm10
+    movdqu [rsp+80], xmm11
+    movdqu [rsp+96], xmm12
+    movdqu [rsp+112], xmm13
+    movdqu [rsp+128], xmm14
+    movdqu [rsp+144], xmm15
+    mov r10, gs:[08h]
+    mov [rsp+160], r10
+    mov r10, gs:[10h]
+    mov [rsp+168], r10
+    mov gs:[08h], r8
+    mov gs:[10h], r9
+    stmxcsr [rsp+176]
+    fnstcw [rsp+180]
+    mov dword ptr [rsp+184], 09fc0h
+    mov word ptr [rsp+188], 037fh
+    ldmxcsr [rsp+184]
+    fldcw [rsp+188]
+    mov r12, rsp
+    mov r10, [rsp+304]
+    mov [r10], r12
+    mov rdi, rdx
+    xor esi, esi
+    mov rsp, r8
+    and rsp, -16
+    call rcx
+    mov rsp, r12
+ctr_guest_thread_return::
+    mov r10, [rsp+304]
+    mov qword ptr [r10], 0
+    mov r10, [rsp+160]
+    mov gs:[08h], r10
+    mov r10, [rsp+168]
+    mov gs:[10h], r10
+    movdqu xmm6, [rsp+0]
+    movdqu xmm7, [rsp+16]
+    movdqu xmm8, [rsp+32]
+    movdqu xmm9, [rsp+48]
+    movdqu xmm10, [rsp+64]
+    movdqu xmm11, [rsp+80]
+    movdqu xmm12, [rsp+96]
+    movdqu xmm13, [rsp+112]
+    movdqu xmm14, [rsp+128]
+    movdqu xmm15, [rsp+144]
+    ldmxcsr [rsp+176]
+    fldcw [rsp+180]
+    add rsp, 200
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    pop rbx
+    pop rsi
+    pop rdi
+    ret
+ctr_guest_thread_call ENDP
+; scePthreadExit(void* value), SysV, called by guest code on a GuestWorkerControl thread.
+; ctr_thread_exit_frame(value, caller) logs the exit and returns the published frame, or
+; reports the unsupported call (no worker frame) and ends the process.
+EXTERN ctr_thread_exit_frame:PROC
+PUBLIC ctr_sysv_pthread_exit
+ctr_sysv_pthread_exit PROC
+    mov r15, rdi
+    mov rdx, [rsp]
+    mov rcx, rdi
+    and rsp, -16
+    sub rsp, 32
+    call ctr_thread_exit_frame
+    mov rsp, rax
+    mov rax, r15
+    jmp ctr_guest_thread_return
+ctr_sysv_pthread_exit ENDP
+; Control fixture (SysV, rdi = exit value): overwrites every callee-saved register and
+; exits from a nested call, so the host thread must get the value and its own registers back.
+PUBLIC ctr_thread_exit_fixture
+ctr_thread_exit_fixture PROC
+    push rbp
+    mov rbx, 1111h
+    mov rbp, 2222h
+    mov r12, 3333h
+    mov r13, 4444h
+    mov r14, 5555h
+    mov r15, 6666h
+    call ctr_thread_exit_fixture_inner
+    xor eax, eax
+    pop rbp
+    ret
+ctr_thread_exit_fixture ENDP
+ctr_thread_exit_fixture_inner PROC
+    sub rsp, 8
+    call ctr_sysv_pthread_exit
+    add rsp, 8
+    ret
+ctr_thread_exit_fixture_inner ENDP
 PUBLIC ctr_guest_stack_fixture
 ctr_guest_stack_fixture PROC
     mov [rdi], rsp

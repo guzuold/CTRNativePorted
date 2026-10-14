@@ -35,9 +35,14 @@ struct Registration {
     const char* nid;
     const char* library;
     const void* function;
+    bool online_only;
     Registration* next;
-    Registration(const char* nid_, const char* library_, const void* function_);
+    Registration(const char* nid_, const char* library_, const void* function_,
+                 bool online_only_ = false);
 };
+// CTR_ONLINE=1 enables the online services (R8). Without it ctr_hle resolves none of the
+// online-only registrations, so the offline runtime keeps its existing bindings.
+bool online_enabled();
 // One JSON line per call: {"scope":"hle_call","library":..,"function":..,"result":..,...}
 inline void log_call(const char* library, const char* function, long long result, const char* extra = "") {
     static std::mutex mutex;
@@ -51,3 +56,7 @@ inline void log_call(const char* library, const char* function, long long result
 #define CTR_HLE_REGISTER(nid, library, function)                                                 \
     static ctr_hle::Registration registration_##function{nid, library,                          \
                                                          reinterpret_cast<const void*>(&function)}
+// Bound only when CTR_ONLINE=1 (see ctr_hle::online_enabled).
+#define CTR_HLE_REGISTER_ONLINE(nid, library, function)                                          \
+    static ctr_hle::Registration registration_online_##function{                               \
+        nid, library, reinterpret_cast<const void*>(&function), true}

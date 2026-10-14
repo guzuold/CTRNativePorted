@@ -128,6 +128,15 @@ extern "C" const void* ctr_font_select_library(int value){return ctrport::font_s
 extern "C" const void* ctr_font_select_renderer(int value){return ctrport::font_select_renderer(value);}
 extern "C" void ctr_font_callback_missing(unsigned renderer,std::uint64_t caller){std::cerr<<"NID="<<(renderer?"Xx974EW-QFY":"oM+XCzVG3oM")<<" library=libSceFontFt caller="<<caller<<" unsupported: "<<(renderer?"renderer":"library")<<" callback implementation missing\n";ExitProcess(4);}
 extern "C" int ctr_sysmodule_load(unsigned short id,std::uint64_t caller) {
+    if((id==0xb2 || id==0xa2) && ctrport::hle_library) {
+        const auto load=reinterpret_cast<int(*)(int(*)(int))>(GetProcAddress(ctrport::hle_library,id==0xb2?"ctr_hle_profile_load":"ctr_hle_invitation_load"));
+        if(load && load([](int op)->int {
+            if(op==0)return ctrport::common_dialog.ready()?1:0;
+            if(op==1)return ctrport::common_dialog.claim()?1:0;
+            if(op==2){ctrport::common_dialog.release();return 0;}
+            return -1;
+        })==0)return 0;
+    }
     try {if(id==0x96){const auto rc=ctrport::ime_text_backend.load();std::cout<<"{\"scope\":\"ime_backend_module_initialize\",\"module_id\":150,\"native_unicode_edit_ready\":true,\"guest_dialog_exports_bound\":false}\n"<<std::flush;return rc;}if(id==0x83)return ctrport::playgo_metadata.load(ctrport::kernel_files.metadata_path("/app0/sce_sys/playgo-chunk.dat"));if(id==0xb4)return ctrport::app_content.load(ctrport::kernel_files.metadata_path("/app0/sce_sys/param.sfo"));if(id==0x84 || id==0x98 || id==0x99){const auto rc=ctr_font_backend_initialize();if(rc || !ctr_font_backend_ready() || (id==0x99 && !ctr_font_backend_opentype_ready()))throw std::runtime_error("FreeType backend initialization failed");std::cout<<"{\"scope\":\"font_backend_module_initialize\",\"module_id\":"<<id<<",\"native_backend_ready\":true,\"full_font_service_support\":false}\n"<<std::flush;return 0;}if(id==0xe7)return ctr_json2_compat(7,caller);if(id==0x19)return ctr_json2_compat(10,caller);if(id==0x9d)return ctr_json2_compat(11,caller);if(id==0xad)return ctr_json2_compat(12,caller);if(id==0xd3)return ctr_json2_compat(13,caller);if(id==0x81)return ctr_json2_compat(15,caller);if(id==0x9c)return ctr_json2_compat(17,caller);if(id==0xa8)return ctr_json2_compat(18,caller);const auto result=id==0x102?ctrport::nptoolkit_module_state.load():id==0xa0?ctrport::load_save_dialog_module():ctrport::random_module_state.load(id);std::cout<<"{\"scope\":\"sysmodule_activation\",\"id\":"<<id<<",\"result\":"<<result<<",\"concrete_module_exports\":true}\n"<<std::flush;return result;}
     catch(const std::exception& error) {std::cerr<<"NID=g8cM39EUZ6o library=libSceSysmodule caller=0x"<<std::hex<<caller<<" module=0x"<<id<<" module_decimal="<<std::dec<<id<<" unsupported: "<<error.what()<<'\n';ExitProcess(4);}
 }
@@ -761,6 +770,7 @@ int main(int argc, char** argv) {
     if(argc==2 && std::string(argv[1])=="--thread-create-output-control") return ctrport::thread_create_output_control();
     if(argc==2 && std::string(argv[1])=="--thread-create-domain-control") return ctrport::thread_create_domain_control();
     if(argc==2 && std::string(argv[1])=="--guest-worker-join-detach-control") return ctrport::guest_worker_join_detach_control();
+    if(argc==2 && std::string(argv[1])=="--guest-thread-exit-control") return ctrport::guest_thread_exit_control();
     if(argc==2 && std::string(argv[1])=="--startup-worker-reaper-control") return ctrport::startup_worker_reaper_control();
     if(argc==2 && std::string(argv[1])=="--startup-worker-detach-bridge-control") return ctrport::startup_worker_detach_bridge_control();
     if(argc==2 && std::string(argv[1])=="--startup-worker-retained-lookup-control") return ctrport::startup_worker_retained_lookup_control();

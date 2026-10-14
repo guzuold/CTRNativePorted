@@ -82,7 +82,8 @@
       "public_name": "sceNetInit",
       "returned_value": 0,
       "justification": "Offline-only compatibility: network initialization has no functional network backend. Baseline net.cpp sceNetInit explicitly DUMMY returns ORBIS_OK. R8 requires real networking.",
-      "tag": "R8"
+      "tag": "R8",
+      "online_replacement": "With CTR_ONLINE=1 ctr_hle binds the real implementation instead (ctrport/hle/net_socket.cpp, net_ctl_online.cpp; reports/online/r8_phase1_2_runtime_network.md); offline this stub stays active."
     },
     {
       "nid": "gky0+oaNM4k",
@@ -91,7 +92,8 @@
       "public_name": "sceNetCtlInit",
       "returned_value": 0,
       "justification": "Declared offline compatibility: network control initialization unused by offline play; no network state query or fabricated outputs.",
-      "tag": "R8"
+      "tag": "R8",
+      "online_replacement": "With CTR_ONLINE=1 ctr_hle binds the real implementation instead (ctrport/hle/net_socket.cpp, net_ctl_online.cpp; reports/online/r8_phase1_2_runtime_network.md); offline this stub stays active."
     },
     {
       "nid": "g8cM39EUZ6o",

@@ -6,13 +6,33 @@ Runs build/CTRPort-claude/ctrport.exe until the game window is closed or the run
 stops, logs to runtime/user/logs/play_<time>.{stdout,stderr}.log, and on exit prints the
 reason the runtime stopped (missing function, unresolved access or assertion).
 """
-import datetime, os, re, shutil, subprocess, sys
+import datetime, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.lane_lock import lane_lock
 
 root = Path(__file__).resolve().parents[1]
 os.chdir(root)
+workdir = root
+instance_name = None
+for i, arg in enumerate(sys.argv):
+    if arg == '--instance':
+        if i + 1 >= len(sys.argv):
+            sys.exit('CTRPort: --instance requires a name.')
+        instance_name = sys.argv[i + 1]
+if instance_name:
+    from tools.online.instance import prepare, lock as instance_lock
+    workdir = prepare(root, instance_name)
+user_root = workdir / 'runtime/user'
+if '--seed-runtime-saves' in sys.argv:
+    if not instance_name:
+        sys.exit('CTRPort: --seed-runtime-saves requires --instance.')
+    source_saves = root / 'runtime/user/savedata'
+    target_saves = user_root / 'savedata'
+    if target_saves.exists():
+        sys.exit('CTRPort: instance saves already exist; refusing to overwrite them.')
+    shutil.copytree(source_saves, target_saves)
+    print('CTRPort: instance seeded from this runtime saves:', target_saves, flush=True)
 env = os.environ.copy()
 for key in ('CTR_STARTUP_WRITE_DLL_DIR', 'CTR_STARTUP_MUTEX_DLL_DIR', 'CTR_PARK_MISSING_NID', 'CTR_PARK_MISSING_SERVICE', 'CTR_TILING_TIMING'):
     env.pop(key, None)
@@ -40,6 +60,52 @@ use_unlock_all = '--unlock-all' in sys.argv or os.environ.get('CTR_UNLOCK_ALL') 
 env.pop('CTR_UNLOCK_ALL', None)
 if use_unlock_all:
     env['CTR_UNLOCK_ALL'] = '1'
+# Online (R8): network and NP services in ctr_hle; every *.demonware.net name resolves to the
+# project server (tools/online/ctr_online_server.py), Sony and Activision hosts are never
+# contacted (ctrport/hle/online_config.h).
+use_online = '--online' in sys.argv or os.environ.get('CTR_ONLINE') == '1'
+env.pop('CTR_ONLINE', None)
+if use_online:
+    env['CTR_ONLINE'] = '1'
+    for i, arg in enumerate(sys.argv):
+        if arg == '--online-server' and i + 1 < len(sys.argv):
+            env['CTR_ONLINE_SERVER'] = sys.argv[i + 1]
+        elif arg == '--online-id' and i + 1 < len(sys.argv):
+            env['CTR_ONLINE_ID'] = sys.argv[i + 1]
+        elif arg == '--online-port-offset' and i + 1 < len(sys.argv):
+            offset = int(sys.argv[i + 1])
+            if not 0 <= offset <= 65535 - 3074:
+                sys.exit('CTRPort: online port offset outside 0..62461.')
+            env['CTR_ONLINE_PORT_OFFSET'] = str(offset)
+    sys.path.insert(0, str(root / 'tools/online'))
+    import room
+    password = env.pop('CTR_ONLINE_PASSWORD', '')
+    if '--online-password' in sys.argv:
+        index = sys.argv.index('--online-password')
+        if index + 1 >= len(sys.argv):
+            sys.exit('CTRPort: --online-password requires a value.')
+        password = sys.argv[index + 1]
+    if password:
+        try:
+            env['CTR_ONLINE_ROOM_TOKEN'] = room.token(password)
+        except ValueError as error:
+            sys.exit('CTRPort: ' + str(error))
+    if not room.valid_token(env.get('CTR_ONLINE_ROOM_TOKEN', '')):
+        sys.exit('CTRPort: online play requires a room password (--online-password or CTR_ONLINE_PASSWORD).')
+    # The project server's public key replaces the auth3 traffic key in the eboot
+    # (ctrport/online_traffic_key.hpp); fetch it from the server this run will use.
+    import urllib.request
+    server = env.get('CTR_ONLINE_SERVER', '127.0.0.1')
+    port = env.get('CTR_ONLINE_HTTP_PORT', '8780')
+    key_path = user_root / 'online' / ('traffic_key_%s_%s.der' % (server, port))
+    try:
+        with urllib.request.urlopen('http://%s:%s/ctr/v1/traffic-key' % (server, port), timeout=5) as reply:
+            key = reply.read()
+    except OSError as error:
+        sys.exit('CTRPort: project server %s:%s unreachable (%s); start tools/online/ctr_online_server.py' % (server, port, error))
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.write_bytes(key)
+    env['CTR_ONLINE_TRAFFIC_KEY'] = str(key_path)
 fullscreen = '--fullscreen' in sys.argv or os.environ.get('CTR_GPU_FULLSCREEN') == '1'
 if fullscreen:
     env['CTR_GPU_FULLSCREEN'] = '1'
@@ -71,23 +137,35 @@ for i, arg in enumerate(sys.argv):
 if use_121 and not (patch / 'eboot.bin').exists():
     sys.exit(f'CTRPort: v01.21 requested but {patch / "eboot.bin"} is missing (use --patch-dir).')
 eboot = (patch / 'eboot.bin') if use_121 else (game / 'eboot.bin')
+game, patch, eboot = game.resolve(), patch.resolve(), eboot.resolve()
 env.pop('CTR_PATCH_DIR', None)
 if use_121:
     env['CTR_BASE_DIR'] = str(game)
     env['CTR_PATCH_DIR'] = str(patch)
-log = root / 'runtime/user/logs' / ('play_' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+log = user_root / 'logs' / ('play_' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
 command = [str(root / 'build/CTRPort-claude/ctrport.exe'), '--entry-after-libc-init-images', str(eboot)] + \
           [str(p) for p in sorted((game / 'sce_module').glob('*.prx'))]
 res_info = 'fullscreen' if fullscreen else f'{width or 1280}x{height or 720}'
 # The game keeps saving during an unlock-all run; keep a copy of the saves made before it.
-saves = root / 'runtime/user/savedata'
+saves = user_root / 'savedata'
 if use_unlock_all and saves.exists():
-    backup = root / 'runtime/user/savedata_backups' / ('before_unlock_all_' + log.name.removeprefix('play_'))
+    backup = user_root / 'savedata_backups' / ('before_unlock_all_' + log.name.removeprefix('play_'))
     shutil.copytree(saves, backup)
     print('CTRPort: saves copied to', backup, flush=True)
-print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, 60fps={use_60fps}, unlock_all={use_unlock_all}, display={res_info}): close window to quit. Logs:', log, flush=True)
-with lane_lock('shared', 'claude', timeout=600), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
-    code = subprocess.run(command, env=env, stdout=out, stderr=err).returncode
+print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, display={res_info}): close window to quit. Logs:', log, flush=True)
+with (instance_lock(workdir) if instance_name else lane_lock('shared', 'claude', timeout=600)), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
+    child = subprocess.Popen(command, cwd=workdir, env=env, stdout=out, stderr=err)
+    log.with_suffix('.run.json').write_text(json.dumps({'pid': child.pid, 'cwd': str(workdir),
+        'instance': instance_name, 'online_id': env.get('CTR_ONLINE_ID'),
+        'room_selector': env.get('CTR_ONLINE_ROOM_TOKEN'),
+        'online_port_offset': env.get('CTR_ONLINE_PORT_OFFSET', '0')}, indent=2))
+    print('CTRPort PID:', child.pid, flush=True)
+    try:
+        code = child.wait()
+    finally:
+        if child.poll() is None:
+            child.terminate()
+            child.wait(timeout=10)
 print('exit code', code)
 reasons = []
 for name in ('.stdout.log', '.stderr.log'):

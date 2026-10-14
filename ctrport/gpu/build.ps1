@@ -19,6 +19,6 @@ if (-not (Test-Path (Join-Path $build 'build.ninja')) -or $Reconfigure) {
         -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_LINKER=lld-link
     if ($LASTEXITCODE -ne 0) { throw 'ctr_gpu configure failed' }
 }
-cmake --build $build --target ctr_gpu ctr_hle -j $Jobs -- -k 0
+cmake --build $build --target ctr_gpu ctr_hle ctr_hle_online_test -j $Jobs -- -k 0
 if ($LASTEXITCODE -ne 0) { throw 'ctr_gpu build failed' }
 Write-Output "ctr_gpu build ok: $build/ctr_gpu.dll"

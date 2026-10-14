@@ -1,0 +1,57 @@
+{
+  "author": "Julio Cacko",
+  "license": "CC0-1.0",
+  "source_url": "https://juliocacko.itch.io/free-input-prompts",
+  "user_confirmed_origin": "2026-10-14",
+  "archive_sha256": "f6c75921b9d6ab2cb2b5249f547c7b7ba19e22da9f4f3b45693cf0912f25ded0",
+  "files": [
+    {
+      "file": "T_X_A_Color.png",
+      "sha256": "a836d9d1023afd67ab37a8a8ac8bf7fb9c175731994c26abbcd0a5576fdc755c"
+    },
+    {
+      "file": "T_X_B_Color.png",
+      "sha256": "1627a5eac2c88b74a0ec3cba33f0f66783d09c01d85ff20a38a2c7f392a9c8fc"
+    },
+    {
+      "file": "T_X_X_Color.png",
+      "sha256": "cfd4380316fe89ec32a22ff05bc58612945d44abf76f8c94666b6fc9506157b6"
+    },
+    {
+      "file": "T_X_Y_Color.png",
+      "sha256": "ce09f539616a780dde94619edbefe7e605d1b0429ba3c9182c12fdf9f6f965d2"
+    },
+    {
+      "file": "T_X_LB.png",
+      "sha256": "28bfd55655e3c5588c2664868ab2b96f0543f2ae0de197a95cad0e4d2eb95196"
+    },
+    {
+      "file": "T_X_RB.png",
+      "sha256": "5973c04be16302f5bf56837f7df35255474efa0e6f29d3a7ad7f7e492be355b8"
+    },
+    {
+      "file": "T_X_LT.png",
+      "sha256": "dd7f7b711df2a980451d4a49ee924306608d03b74620701f67244f4d3e2e8d13"
+    },
+    {
+      "file": "T_X_RT.png",
+      "sha256": "4143142ccac6d6002d69f0b3cf23c9a8efd15ee5684ddc222732af82d20292e8"
+    },
+    {
+      "file": "T_X_L.png",
+      "sha256": "cf1d0eba059f252874f37815be7bf8839c711b6ebf13edccec7f846534c071ca"
+    },
+    {
+      "file": "T_X_R.png",
+      "sha256": "65f59627a4182fa68707569b5e3fe132a02eb111996afe4837df2dc0691db0fd"
+    },
+    {
+      "file": "T_X_Share.png",
+      "sha256": "0e70716f6c46c898d22e04a6802f39cf0ad0b46e1cb53033d386afeabddb1b82"
+    },
+    {
+      "file": "T_X_Share-1.png",
+      "sha256": "6935efb1968bc09c76407f00c3c159e288d307361149b354437501ff35190eb7"
+    }
+  ]
+}

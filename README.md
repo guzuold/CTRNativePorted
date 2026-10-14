@@ -112,6 +112,25 @@ python -B ctrport/play_gpu.py --base-dir <CUSA14876 folder> [--1.21 --patch-dir 
 
 Logs, saves and caches go to `runtime/user/`. The game folders are only read.
 
+## Multiplayer (Matchmaking with password)
+
+CTRNativePorted includes an offline/local server implementation (`tools/online/ctr_online_server.py`) replacing PSN and Demonware services:
+
+1. Start the server:
+   ```powershell
+   python tools/online/ctr_online_server.py
+   ```
+2. In the launcher (`SETTINGS` tab), check **Multiplayer Online**, enter your player name and server IP (default `127.0.0.1`), and type a **Room Password**.
+3. Launch the game and select **ONLINE > Matchmaking > Go to Lobby**.
+4. Players entering the **same password** are automatically matched together in a shared lobby and race. Different passwords never match.
+
+## Additional features
+
+- **Xbox Controller Prompts**: check *Icone Xbox colorate* in launcher Settings to use colored A/B/X/Y prompts (CC0-1.0 by Julio Cacko, see [`ctrport/XBOX_PROMPTS.md`](ctrport/XBOX_PROMPTS.md)).
+- **Quick Controller Exit**: hold **View + Menu** for 1.2 seconds on your controller, then press **A** to confirm exit or **B** to cancel.
+- **Rendering Modes**: choose between standard 1080p, PS4 Pro 1440p, or **Native 4K** internal resolution buffers, with 60 FPS unlocked on v01.21.
+
+
 ## Credits and licenses
 
 - Project code: **GPL-2.0** ([`LICENSE`](LICENSE)).

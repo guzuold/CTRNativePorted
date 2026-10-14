@@ -41,7 +41,7 @@ class GuestWorkerControl {
                 current_guest_priority=s.guest_priority;
                 std::uint64_t result=0;
                 {TlsThreadLifetime lifetime(*s.tls);TlsContextScope context(*s.tls);
-                 result=ctr_guest_stack_call(s.target,s.argument,s.stack.top(),s.stack.bottom());}
+                 result=ctr_guest_thread_call(s.target,s.argument,s.stack.top(),s.stack.bottom(),&guest_thread_exit_frame);}
                 s.completion.complete(result);
                 observed_worker_argument=nullptr;observed_worker_target=nullptr;
             }
@@ -117,6 +117,20 @@ public:
 struct WorkerJoinDetachGate {std::promise<void> ready;std::shared_future<void> release;};
 extern "C" std::uint64_t ctr_worker_join_detach_gate(WorkerJoinDetachGate* gate) {gate->ready.set_value();gate->release.wait();return 17;}
 extern "C" void ctr_worker_join_detach_fixture();
+extern "C" void ctr_thread_exit_fixture();
+// scePthreadExit control: two workers exit from a nested guest call with every callee-saved
+// register overwritten; join must return each exit value and the host threads must finish
+// normally. The main thread has no exit frame (the unsupported path fails loudly).
+inline int guest_thread_exit_control() {
+    if(guest_thread_exit_frame)return 1;
+    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);
+    for(const std::uint64_t value:{0x5151ull,0xfeedfacecafebeefull}){
+        GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_thread_exit_fixture),reinterpret_cast<void*>(value));
+        worker.publish_and_start();const auto result=worker.join();release_thread_identity();
+        if(result!=value || !worker.completion_collected())return 2;
+    }
+    std::cout<<"{\"scope\":\"guest_thread_exit_control\",\"workers\":2,\"nested_exit\":true,\"callee_saved_clobbered\":true,\"join_values\":true,\"passed\":true}\n";return 0;
+}
 inline int guest_worker_join_detach_control() {
     auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);
     std::promise<void> release;WorkerJoinDetachGate gate;gate.release=release.get_future().share();auto entered=gate.ready.get_future();

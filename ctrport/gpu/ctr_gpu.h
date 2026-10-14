@@ -45,6 +45,7 @@ CTR_GPU_API void ctr_gpu_invalidate_memory(uint64_t address, uint64_t size);
 CTR_GPU_API unsigned ctr_gpu_symbol_count(void);
 CTR_GPU_API uint64_t ctr_gpu_flip_count(void);
 CTR_GPU_API uint64_t ctr_gpu_submit_count(void);
+CTR_GPU_API int ctr_gpu_input_captured(void);
 
 #ifdef __cplusplus
 }

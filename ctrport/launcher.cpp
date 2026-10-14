@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Crash Team Racing Native Ported: launcher (CTRNativePorted.exe), native Win32 + GDI+,
-// so players need no Python. It replaces ctrport/launcher.py and keeps its settings file
-// (runtime/user/launcher_config.json, same keys), then starts ctrport.exe exactly as
-// ctrport/play_gpu.py does: same command line, environment, logs in runtime/user/logs,
-// save copy before an unlock-all run, shared lane lock in development checkouts.
-// No game artwork is part of this file or of the repository: the cover (sce_sys/pic1.png)
-// and icon (sce_sys/icon0.png) are read at run time from the dump the user selects.
+// Crash Team Racing Native Ported: launcher (CTRNativePorted.exe), native Win32 + GDI+.
+// Implementation of Claude Design 2a ("Pit Lane — slanted nav stack, art cut on a diagonal").
+// Features: 1040x640 arcade kart frame, slanted navigation stack (-10 deg), diagonal stage cut
+// with key art / speed stripes, tactile 3D PLAY! button, and full ArcadePanes for Mods, Settings, and Advanced.
+// Zero external runtime dependencies (no Python). 100% compatible with launcher_config.json, lane lock, and ctrport.exe.
 #ifndef UNICODE
 #define UNICODE
 #endif
 #define NOMINMAX
 #include <windows.h>
+#include "online_room.hpp"
 #include <commctrl.h>
 #include <dwmapi.h>
 #include <shobjidl.h>
+#include <shellapi.h>
+#include <urlmon.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -36,6 +37,7 @@ namespace Gdiplus { using std::min; using std::max; }
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "urlmon.lib")
 #pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 namespace fs = std::filesystem;
@@ -43,30 +45,69 @@ using namespace Gdiplus;
 
 namespace {
 constexpr wchar_t kTitle[] = L"Crash Team Racing Native Ported";
-constexpr float kWidth = 920, kHeight = 680, kHero = 258;
+constexpr float kWidth = 1040, kHeight = 640;
 constexpr UINT WM_APP_FINISHED = WM_APP + 1;
 
-// Palette taken from the game's logo colours: gold letters, red ribbon, night-blue lettering.
-constexpr ARGB kNight = 0xFF0B1530, kNightTop = 0xFF10204A, kCard = 0xEE152853, kCardLine = 0xFF2C4A8F;
-constexpr ARGB kField = 0xFF0C1735, kFieldOff = 0xFF0A1228, kGold = 0xFFFFC21A, kGoldLight = 0xFFFFE45C;
-constexpr ARGB kOrange = 0xFFFF8A00, kRed = 0xFFE3262C, kRedDark = 0xFFA70F18, kText = 0xFFF5F7FF;
-constexpr ARGB kMuted = 0xFF9FB0D6, kOk = 0xFF59E08B, kError = 0xFFFF6B6B;
+// Design 2a Pit Lane Palette (from Claude Design token specification)
+constexpr ARGB kArcadeBg      = 0xFF1B1446;  // Deep arcade purple/indigo
+constexpr ARGB kArcadeDark    = 0xFF120C30;  // Dark ink outline & hard drop shadow
+constexpr ARGB kArcadeCard    = 0xFF2A2170;  // Card surface
+constexpr ARGB kArcadeCardSub = 0xFF1B1446;  // Inset card surface
+constexpr ARGB kArcadeGold    = 0xFFFFC93C;  // Trophy gold
+constexpr ARGB kArcadeCyan    = 0xFF2FD3FF;  // Nitro cyan
+constexpr ARGB kArcadeLime    = 0xFF8BE83A;  // Speed green
+constexpr ARGB kArcadePink    = 0xFFFF3D8B;  // Accent pink
+constexpr ARGB kArcadeOrange  = 0xFFFF7A1A;  // Warning orange
+constexpr ARGB kTextLight     = 0xFFFFF8EC;  // Warm light text
+constexpr ARGB kTextMuted     = 0xFFB9B0F0;  // Indigo muted text
+constexpr ARGB kTextOff       = 0xFF5A5196;  // Disabled / toggle off
+
+enum Tab : int {
+    TAB_HOME = 0,
+    TAB_MODS,
+    TAB_SETTINGS,
+    TAB_ADVANCED,
+    TAB_COUNT
+};
+
+const wchar_t* const kTabNames[TAB_COUNT] = {
+    L"HOME",
+    L"MODS",
+    L"SETTINGS",
+    L"ADVANCED"
+};
 
 const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)", L"3840x2160 (4K)", L"Custom"};
 const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
 
 enum : int {
-    ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_TOGGLE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
-    ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_NATIVE_4K, ID_UNLOCK, ID_LAUNCH
+    ID_XBOX_PROMPTS = 190,
+    ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
+    ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_NATIVE_4K, ID_UNLOCK, ID_LAUNCH,
+    ID_TAB_BASE = 130, // 130..133 for 4 tabs
+    ID_MOD_TOGGLE_BASE = 140, // 140..143 for sample mods
+    ID_OPEN_MODS = 150,
+    ID_SAVE_BACKUP = 160, ID_OPEN_SAVES, ID_OPEN_DUMP, ID_OPEN_LOGS, ID_AUDIO_TEST,
+    ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT
+};
+
+struct ModItem {
+    std::wstring name, detail;
+    bool enabled;
+    ARGB badge_color;
 };
 
 struct Config {
-    std::wstring base_dir, patch_dir, resolution = L"1920x1080 (1080p)", custom_w = L"1920", custom_h = L"1080";
-    bool use_patch = false, fps_60 = true, ps4_pro = false, native_4k = false, unlock_all = false, fullscreen = false;
+    std::wstring base_dir, patch_dir, resolution = L"2560x1440 (1440p)", custom_w = L"1920", custom_h = L"1080";
+    bool use_patch = true, fps_60 = true, ps4_pro = true, native_4k = false, unlock_all = false, fullscreen = false;
+    bool online = false;
+    bool xbox_prompts = true;
+    std::wstring online_id = L"CTRPlayer";
+    std::wstring online_server = L"127.0.0.1";
 };
 
-// ---- settings file: flat JSON object, compatible with the Python launcher's json.dump ----
+// ---- Settings JSON parsing ----
 std::wstring widen(const std::string& text) {
     if (text.empty()) return {};
     const int n = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
@@ -147,7 +188,7 @@ std::string json_string(const std::wstring& value) {
     return out + "\"";
 }
 
-// ---- process helpers ----
+// Process helpers
 std::wstring quote_argument(const std::wstring& arg) {
     if (!arg.empty() && arg.find_first_of(L" \t\"") == std::wstring::npos) return arg;
     std::wstring out = L"\"";
@@ -184,8 +225,7 @@ std::string read_tail(const fs::path& path, std::size_t limit) {
     return data;
 }
 
-// Same exclusive lock file as tools/lane_lock.py ('shared', lane 'claude'), only in a
-// development checkout (a coordination/ folder next to runtime/).
+// Exclusive lane lock guard
 struct LaneLock {
     fs::path path;
     std::string token;
@@ -211,11 +251,11 @@ struct LaneLock {
                 return true;
             }
             if (GetLastError() != ERROR_FILE_EXISTS) {
-                MessageBoxW(owner, (L"Unable to create lock file " + path.wstring()).c_str(), kTitle, MB_ICONERROR);
+                MessageBoxW(owner, (L"Impossibile creare il lock file " + path.wstring()).c_str(), kTitle, MB_ICONERROR);
                 return false;
             }
-            const std::wstring text = L"The runtime is already in use by another process (shared lane lock):\n\n" +
-                widen(read_tail(path, 4096)) + L"\n\nRetry?";
+            const std::wstring text = L"Il runtime è attualmente in uso da un altro processo (shared lane lock):\n\n" +
+                widen(read_tail(path, 4096)) + L"\n\nRiprovare?";
             if (MessageBoxW(owner, text.c_str(), kTitle, MB_RETRYCANCEL | MB_ICONWARNING) != IDRETRY) return false;
         }
     }
@@ -226,20 +266,23 @@ struct LaneLock {
     }
 };
 
-// ---- application state ----
-enum class Kind { Browse, Toggle, Pill, Launch };
-struct Control { Kind kind; const wchar_t* label; bool* value; int pill; RectF box; };
+enum class Kind { Browse, Toggle, Pill, Launch, TabBtn, ActionBtn };
+struct Control { Kind kind; const wchar_t* label; bool* value; int pill; RectF box; int tab = -1; };
 struct Status { std::wstring text; int kind = 0; };  // 0 neutral, 1 ok, 2 error
 
 struct App {
     HWND window = nullptr, base_edit = nullptr, patch_edit = nullptr, width_edit = nullptr, height_edit = nullptr;
     HWND patch_browse = nullptr, fps_toggle = nullptr, pro_toggle = nullptr, native_4k_toggle = nullptr, launch = nullptr, hot = nullptr;
+    HWND online_toggle = nullptr, online_id_edit = nullptr, online_server_edit = nullptr, online_password_edit = nullptr;
     std::vector<HWND> pills;
+    std::vector<HWND> tab_buttons;
     std::map<HWND, Control> controls;
-    float scale = 1;
+    std::vector<ModItem> mods;
+    float scale = 1.0f;
     fs::path exe_dir, root, runtime_exe;
     Config cfg;
-    int resolution = 1;
+    int resolution = 2; // Default 1440p
+    int current_tab = TAB_HOME;
     bool updating = false, can_launch = false;
     Status base_status, patch_status, global;
     std::unique_ptr<Bitmap> art, icon;
@@ -257,16 +300,8 @@ struct App {
 int px(float logical) { return static_cast<int>(std::lround(logical * g.scale)); }
 RectF rect(float x, float y, float w, float h) { return RectF(x, y, w, h); }
 
-// Layout in logical pixels (96 DPI); scaled at creation and drawing time.
-const RectF kFilesCard = rect(24, 286, 476, 262), kVideoCard = rect(516, 286, 380, 186), kTestCard = rect(516, 482, 380, 66);
-const RectF kBaseField = rect(44, 350, 332, 34), kPatchField = rect(44, 450, 332, 34);
-const RectF kWidthField = rect(536, 370, 84, 30), kHeightField = rect(644, 370, 84, 30);
-const RectF kLaunch = rect(24, 566, 872, 56);
-
 fs::path config_path() { return (g.root.empty() ? g.exe_dir : g.root / "runtime/user") / "launcher_config.json"; }
 
-// Relative dump folders are resolved against the launcher's root, so a portable copy with
-// dump\CUSA14876 and dump\CUSA14876-patch beside it works wherever it is moved.
 fs::path resolve(const std::wstring& folder) {
     fs::path path(folder);
     if (!folder.empty() && path.is_relative() && !g.root.empty()) path = (g.root / path).lexically_normal();
@@ -280,7 +315,6 @@ std::wstring relative_to_root(const std::wstring& folder) {
 
 void load_config() {
     std::error_code ec;
-    // Default locations: the dump folder next to the launcher. Saved settings override them.
     for (const fs::path candidate : {fs::path(L"dump\\CUSA14876")})
         if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.base_dir = candidate.wstring(); break; }
     for (const fs::path candidate : {fs::path(L"dump\\CUSA14876-patch"),
@@ -299,14 +333,18 @@ void load_config() {
             auto flag = [&](const wchar_t* key, bool& out) { if (bools.count(key)) out = bools[key]; };
             text(L"base_dir", g.cfg.base_dir); text(L"patch_dir", g.cfg.patch_dir); text(L"resolution", g.cfg.resolution);
             text(L"custom_w", g.cfg.custom_w); text(L"custom_h", g.cfg.custom_h);
+            text(L"online_id", g.cfg.online_id); text(L"online_server", g.cfg.online_server);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
-            flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
+            flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
+            flag(L"online", g.cfg.online);
         }
     }
     if (g.cfg.native_4k) g.cfg.ps4_pro = true;
+    if (g.cfg.online_id.empty()) g.cfg.online_id = L"CTRPlayer";
+    if (g.cfg.online_server.empty()) g.cfg.online_server = L"127.0.0.1";
     for (std::wstring* folder : {&g.cfg.base_dir, &g.cfg.patch_dir})
         if (!folder->empty()) *folder = fs::path(*folder).make_preferred().wstring();
-    g.resolution = 1;
+    g.resolution = 2; // Default 1440p
     for (int i = 0; i < 5; ++i)
         if (g.cfg.resolution == kResolutions[i] || (i == 4 && g.cfg.resolution == L"Personalizzata")) g.resolution = i;
 }
@@ -323,18 +361,23 @@ void save_config() {
     g.cfg.patch_dir = window_text(g.patch_edit);
     g.cfg.resolution = kResolutions[g.resolution];
     if (g.resolution == 4) { g.cfg.custom_w = window_text(g.width_edit); g.cfg.custom_h = window_text(g.height_edit); }
+    if (g.online_id_edit) g.cfg.online_id = window_text(g.online_id_edit);
+    if (g.online_server_edit) g.cfg.online_server = window_text(g.online_server_edit);
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
     const std::string json = "{\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
-        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) +
+        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) +
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
-        ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) + "\n}";
+        ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) +
+        ",\n  \"online\": " + flag(g.cfg.online) +
+        ",\n  \"online_id\": " + json_string(g.cfg.online_id) +
+        ",\n  \"online_server\": " + json_string(g.cfg.online_server) + "\n}";
     std::error_code ec;
     fs::create_directories(config_path().parent_path(), ec);
     std::ofstream(config_path(), std::ios::binary | std::ios::trunc) << json;
 }
 
-// ---- drawing helpers ----
+// Drawing helpers
 void round_rect(GraphicsPath& path, const RectF& r, float radius) {
     const float d = radius * 2;
     path.AddArc(r.X, r.Y, d, d, 180, 90);
@@ -357,11 +400,41 @@ void stroke_round(Graphics& gr, const RectF& r, float radius, ARGB color, float 
 ARGB fade(ARGB color, float alpha) {
     return (static_cast<ARGB>(static_cast<float>(color >> 24) * alpha) << 24) | (color & 0xFFFFFF);
 }
+
+// Slanted box with hard drop shadow (the core motif of Option 2a)
+void draw_slanted_box(Graphics& gr, const RectF& r, float skew_x, float shadow_d, const Brush& fill, ARGB border, float border_w) {
+    // Hard drop shadow
+    if (shadow_d > 0.0f) {
+        PointF s_pts[] = {
+            PointF(r.X + r.Height * skew_x, r.Y + shadow_d),
+            PointF(r.X + r.Width + r.Height * skew_x, r.Y + shadow_d),
+            PointF(r.X + r.Width, r.Y + r.Height + shadow_d),
+            PointF(r.X, r.Y + r.Height + shadow_d)
+        };
+        SolidBrush shadow_brush{Color(kArcadeDark)};
+        gr.FillPolygon(&shadow_brush, s_pts, 4);
+    }
+
+    // Main slanted body
+    PointF pts[] = {
+        PointF(r.X + r.Height * skew_x, r.Y),
+        PointF(r.X + r.Width + r.Height * skew_x, r.Y),
+        PointF(r.X + r.Width, r.Y + r.Height),
+        PointF(r.X, r.Y + r.Height)
+    };
+    gr.FillPolygon(&fill, pts, 4);
+
+    if (border_w > 0.0f) {
+        Pen pen(Color(border), border_w);
+        pen.SetLineJoin(LineJoinMiter);
+        gr.DrawPolygon(&pen, pts, 4);
+    }
+}
+
 std::unique_ptr<FontFamily> family_cache[4];
 const FontFamily& family(int which) {
-    // 0 headline (heavy), 1 text, 2 text semibold, 3 condensed labels
-    static const wchar_t* const names[4][3] = {{L"Segoe UI Black", L"Arial Black", L"Segoe UI"},
-                                               {L"Segoe UI", L"Tahoma", L"Arial"},
+    static const wchar_t* const names[4][3] = {{L"Lilita One", L"Segoe UI Black", L"Arial Black"},
+                                               {L"Rubik", L"Segoe UI Semibold", L"Arial"},
                                                {L"Segoe UI Semibold", L"Segoe UI", L"Arial"},
                                                {L"Bahnschrift SemiBold", L"Segoe UI Semibold", L"Arial"}};
     auto& cached = family_cache[which];
@@ -374,7 +447,6 @@ const FontFamily& family(int which) {
     }
     return *cached;
 }
-// Heavy families such as Segoe UI Black have no bold face; fall back to an existing style.
 int usable_style(const FontFamily& font_family, int style) {
     for (int candidate : {style, style & ~FontStyleBold, style & FontStyleItalic, 0})
         if (font_family.IsStyleAvailable(candidate)) return candidate;
@@ -391,25 +463,6 @@ void text(Graphics& gr, const std::wstring& value, int which, float size, int st
     SolidBrush brush{Color(color)};
     gr.DrawString(value.c_str(), -1, &font, r, &format, &brush);
 }
-// Logo-style lettering: dark outline, then a vertical gold gradient fill.
-void logo_text(Graphics& gr, const wchar_t* value, float size, PointF origin, ARGB top, ARGB bottom, ARGB outline, float outline_width) {
-    GraphicsPath path;
-    StringFormat format;
-    const int style = usable_style(family(0), FontStyleBoldItalic);
-    path.AddString(value, -1, &family(0), style, size, origin, &format);
-    RectF bounds;
-    path.GetBounds(&bounds);
-    GraphicsPath shadow;
-    shadow.AddString(value, -1, &family(0), style, size, PointF(origin.X + 3, origin.Y + 4), &format);
-    SolidBrush shadow_brush{Color(110, 0, 0, 0)};
-    gr.FillPath(&shadow_brush, &shadow);
-    Pen pen(Color(outline), outline_width);
-    pen.SetLineJoin(LineJoinRound);
-    gr.DrawPath(&pen, &path);
-    LinearGradientBrush fill(PointF(0, bounds.Y - 1), PointF(0, bounds.Y + bounds.Height + 1), Color(top), Color(bottom));
-    fill.SetWrapMode(WrapModeTileFlipXY);
-    gr.FillPath(&fill, &path);
-}
 void draw_cover(Graphics& gr, Bitmap& image, const RectF& dest) {
     const float iw = static_cast<float>(image.GetWidth()), ih = static_cast<float>(image.GetHeight());
     const float ratio = std::max(dest.Width / iw, dest.Height / ih);
@@ -418,22 +471,10 @@ void draw_cover(Graphics& gr, Bitmap& image, const RectF& dest) {
     attributes.SetWrapMode(WrapModeTileFlipXY);
     gr.DrawImage(&image, dest, (iw - sw) / 2, 0, sw, sh, UnitPixel, &attributes);
 }
-void checkered(Graphics& gr, float y, float cell, int rows) {
-    SolidBrush white{Color(0xFFF2F4FA)}, dark{Color(0xFF080F24)};
-    for (int row = 0; row < rows; ++row)
-        for (int column = 0; column * cell < kWidth; ++column)
-            gr.FillRectangle(((row + column) & 1) ? &dark : &white, column * cell, y + row * cell, cell, cell);
-}
-void card(Graphics& gr, const RectF& r, const wchar_t* title) {
-    fill_round(gr, r, 14, SolidBrush(Color(kCard)));
-    stroke_round(gr, r, 14, fade(kCardLine, 0.8f), 1);
-    if (!title) return;
-    fill_round(gr, rect(r.X + 20, r.Y + 16, 4, 16), 2, SolidBrush(Color(kGold)));
-    text(gr, title, 3, 14, FontStyleRegular, rect(r.X + 30, r.Y + 13, r.Width - 50, 22), kGold);
-}
 
-// Static layer: artwork, title, cards and labels. Owner-drawn controls copy their
-// background from it, so it is rebuilt only when the artwork or the DPI changes.
+void select_tab(int tab);
+
+// Static layer: Left aside background, diagonal cut, outer frame
 void render_base_layer() {
     const int w = px(kWidth), h = px(kHeight);
     HDC screen = GetDC(nullptr);
@@ -448,56 +489,51 @@ void render_base_layer() {
         gr.SetInterpolationMode(InterpolationModeHighQualityBicubic);
         gr.SetPixelOffsetMode(PixelOffsetModeHalf);
         gr.ScaleTransform(g.scale, g.scale);
-        LinearGradientBrush body(PointF(0, kHero), PointF(0, kHeight), Color(kNightTop), Color(kNight));
-        body.SetWrapMode(WrapModeTileFlipXY);
-        gr.FillRectangle(&body, 0.f, kHero - 1, kWidth, kHeight - kHero + 1);
-        // Hero: the user's own cover art, or a sky gradient when no dump is selected.
-        const RectF hero = rect(0, 0, kWidth, kHero);
+
+        // Window background: #1b1446
+        SolidBrush bg{Color(kArcadeBg)};
+        gr.FillRectangle(&bg, 0.f, 0.f, kWidth, kHeight);
+
+        // Repeating subtle pinstripes (-60 deg)
+        Pen stripe_pen(Color(9, 255, 255, 255), 24.0f);
+        for (float x = -kHeight * 2; x < kWidth + kHeight * 2; x += 70.0f) {
+            gr.DrawLine(&stripe_pen, x, 0.0f, x - kHeight * 0.577f, kHeight);
+        }
+
+        // Aside bottom tag (slanted -8 deg)
+        draw_slanted_box(gr, rect(24, kHeight - 50, 80, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeCyan)), kArcadeDark, 2.0f);
+        text(gr, L"V1.21", 1, 11.5f, FontStyleBold, rect(24, kHeight - 50, 80, 26), kArcadeDark, StringAlignmentCenter);
+
+        // Main Stage diagonal background cut (clip-path: polygon(14% 0, 100% 0, 100% 100%, 0 100%))
+        // Top-left at x ~ 370, bottom-left at x ~ 260
+        GraphicsPath cut_path;
+        PointF cut_pts[] = {
+            PointF(370.f, 0.f),
+            PointF(kWidth, 0.f),
+            PointF(kWidth, kHeight),
+            PointF(260.f, kHeight)
+        };
+        cut_path.AddPolygon(cut_pts, 4);
+
+        gr.SetClip(&cut_path);
+        // Stage cyan background
+        SolidBrush cyan_stage{Color(kArcadeCyan)};
+        gr.FillRectangle(&cyan_stage, 260.f, 0.f, kWidth - 260.f, kHeight);
+
+        // Cover artwork if present, or diagonal speed stripes
         if (g.art) {
-            draw_cover(gr, *g.art, hero);
+            draw_cover(gr, *g.art, rect(260.f, 0.f, kWidth - 260.f, kHeight));
+            // Semi-transparent overlay to keep the stage stylish
+            LinearGradientBrush stage_fade(PointF(260.f, 0.f), PointF(kWidth, kHeight), Color(40, 27, 20, 70), Color(160, 18, 12, 48));
+            stage_fade.SetWrapMode(WrapModeTileFlipXY);
+            gr.FillRectangle(&stage_fade, 260.f, 0.f, kWidth - 260.f, kHeight);
         } else {
-            LinearGradientBrush sky(PointF(0, 0), PointF(0, kHero), Color(0xFF3A8EE6), Color(0xFF13306E));
-            sky.SetWrapMode(WrapModeTileFlipXY);
-            gr.FillRectangle(&sky, hero);
-            for (int i = 0; i < 6; ++i) {
-                const float x = 470.f + i * 70.f;
-                PointF stripe[] = {PointF(x, 0), PointF(x + 34, 0), PointF(x - 96, kHero), PointF(x - 130, kHero)};
-                SolidBrush light{Color(static_cast<BYTE>(18 + i * 4), 255, 214, 90)};
-                gr.FillPolygon(&light, stripe, 4);
+            Pen cyan_stripes(Color(35, 255, 255, 255), 24.0f);
+            for (float x = 200.f; x < kWidth + kHeight; x += 70.0f) {
+                gr.DrawLine(&cyan_stripes, x, 0.0f, x - kHeight * 0.577f, kHeight);
             }
         }
-        LinearGradientBrush fade_down(PointF(0, 110), PointF(0, kHero), Color(0, 11, 21, 48), Color(250, 11, 21, 48));
-        fade_down.SetWrapMode(WrapModeTileFlipXY);
-        gr.FillRectangle(&fade_down, 0.f, 110.f, kWidth, kHero - 110);
-        LinearGradientBrush fade_left(PointF(0, 0), PointF(640, 0), Color(190, 11, 21, 48), Color(0, 11, 21, 48));
-        fade_left.SetWrapMode(WrapModeTileFlipXY);
-        gr.FillRectangle(&fade_left, 0.f, 120.f, 640.f, kHero - 120);
-        // Title: red ribbon like the game's logo banner, then gold lettering.
-        PointF ribbon[] = {PointF(34, 136), PointF(290, 136), PointF(282, 164), PointF(26, 164)};
-        LinearGradientBrush ribbon_fill(PointF(0, 136), PointF(0, 164), Color(kRed), Color(kRedDark));
-        ribbon_fill.SetWrapMode(WrapModeTileFlipXY);
-        gr.FillPolygon(&ribbon_fill, ribbon, 4);
-        Pen ribbon_edge(Color(0xFFFFFFFF), 1.5f);
-        gr.DrawPolygon(&ribbon_edge, ribbon, 4);
-        text(gr, L"CRASH TEAM RACING", 0, 17, FontStyleBoldItalic, rect(26, 136, 264, 28), kText, StringAlignmentCenter);
-        logo_text(gr, L"NATIVE PORTED", 52, PointF(18, 158), kGoldLight, kOrange, 0xFF4A1000, 7);
-        text(gr, L"Native Windows runtime · Play with your own CTR Nitro-Fueled PS4 dump", 2, 13.5f, FontStyleRegular,
-             rect(30, 226, 620, 22), 0xF0FFFFFF);
-        LinearGradientBrush accent(PointF(0, 0), PointF(kWidth, 0), Color(kGold), Color(kRed));
-        accent.SetWrapMode(WrapModeTileFlipXY);
-        gr.FillRectangle(&accent, 0.f, kHero - 3, kWidth, 3.f);
-        checkered(gr, kHero, 5, 2);
-        // Cards and fixed labels.
-        card(gr, kFilesCard, L"GAME FILES");
-        card(gr, kVideoCard, L"VIDEO");
-        card(gr, kTestCard, nullptr);
-        LinearGradientBrush tag(PointF(0, 501), PointF(0, 529), Color(kGoldLight), Color(kGold));
-        tag.SetWrapMode(WrapModeTileFlipXY);
-        fill_round(gr, rect(536, 502, 66, 26), 13, tag);
-        text(gr, L"TEST", 3, 12.5f, FontStyleRegular, rect(536, 502, 66, 26), kNight, StringAlignmentCenter);
-        text(gr, L"Base game · v01.00 (CUSA14876)", 2, 13.5f, FontStyleRegular, rect(44, 326, 436, 20), kText);
-        text(gr, L"Your own dump is required: eboot.bin & sce_module. The update overlays the base game.", 1, 11.5f,
-             FontStyleRegular, rect(44, 516, 436, 18), kMuted);
+        gr.ResetClip();
     }
     SelectObject(dc, previous);
     DeleteDC(dc);
@@ -505,14 +541,14 @@ void render_base_layer() {
 }
 
 void draw_check(Graphics& gr, float x, float y, int kind) {
-    const ARGB color = kind == 1 ? kOk : kError;
-    SolidBrush circle{Color(fade(color, 0.2f))};
+    const ARGB color = kind == 1 ? kArcadeLime : kArcadeOrange;
+    SolidBrush circle{Color(fade(color, 0.25f))};
     gr.FillEllipse(&circle, x, y, 16.f, 16.f);
-    Pen pen(Color(color), 2);
+    Pen pen(Color(color), 2.5f);
     pen.SetStartCap(LineCapRound);
     pen.SetEndCap(LineCapRound);
     if (kind == 1) {
-        PointF tick[] = {PointF(x + 4.5f, y + 8.5f), PointF(x + 7, y + 11), PointF(x + 11.5f, y + 5.5f)};
+        PointF tick[] = {PointF(x + 4.0f, y + 8.5f), PointF(x + 7.0f, y + 11.5f), PointF(x + 12.0f, y + 5.0f)};
         gr.DrawLines(&pen, tick, 3);
     } else {
         gr.DrawLine(&pen, x + 5, y + 5, x + 11, y + 11);
@@ -522,13 +558,13 @@ void draw_check(Graphics& gr, float x, float y, int kind) {
 void draw_status(Graphics& gr, const Status& status, float x, float y, float w) {
     if (status.kind) draw_check(gr, x, y + 2, status.kind);
     const float offset = status.kind ? 22.f : 0.f;
-    text(gr, status.text, 1, 12.5f, FontStyleRegular, rect(x + offset, y, w - offset, 20),
-         status.kind == 1 ? kOk : status.kind == 2 ? kError : kMuted);
+    text(gr, status.text, 1, 12.0f, FontStyleRegular, rect(x + offset, y, w - offset, 20),
+         status.kind == 1 ? kArcadeLime : status.kind == 2 ? kArcadeOrange : kTextMuted);
 }
 void draw_field(Graphics& gr, const RectF& r, HWND edit) {
     const bool enabled = IsWindowEnabled(edit) != FALSE, focused = GetFocus() == edit;
-    fill_round(gr, r, 8, SolidBrush(Color(enabled ? kField : kFieldOff)));
-    stroke_round(gr, r, 8, focused ? kGold : enabled ? kCardLine : fade(kCardLine, 0.45f), focused ? 1.6f : 1.f);
+    fill_round(gr, r, 10, SolidBrush(Color(enabled ? kArcadeCardSub : 0xFF0D0A22)));
+    stroke_round(gr, r, 10, focused ? kArcadeGold : kArcadeDark, focused ? 3.0f : 2.5f);
 }
 
 void paint_window(HDC target) {
@@ -547,19 +583,142 @@ void paint_window(HDC target) {
         gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
         gr.SetPixelOffsetMode(PixelOffsetModeHalf);
         gr.ScaleTransform(g.scale, g.scale);
-        draw_field(gr, kBaseField, g.base_edit);
-        draw_field(gr, kPatchField, g.patch_edit);
-        draw_field(gr, kWidthField, g.width_edit);
-        draw_field(gr, kHeightField, g.height_edit);
-        const bool size_on = IsWindowEnabled(g.width_edit) != FALSE;
-        text(gr, L"×", 2, 16, FontStyleRegular, rect(620, 370, 24, 30), size_on ? kText : fade(kMuted, 0.6f), StringAlignmentCenter);
-        text(gr, L"window pixels", 1, 12, FontStyleRegular, rect(738, 370, 150, 30), size_on ? kMuted : fade(kMuted, 0.6f));
-        draw_status(gr, g.base_status, 44, 390, 436);
-        draw_status(gr, g.patch_status, 44, 490, 436);
-        const float status_width = std::min(860.f, 30.f + 7.2f * static_cast<float>(g.global.text.size()));
-        draw_status(gr, g.global, (kWidth - status_width) / 2, 630, status_width);
-        text(gr, L"60 FPS: '60 FPS Unlock' patch by illusion (GoldHEN Patch Repository) · Crash Team Racing Native Ported is GPL-2.0 software",
-             1, 11, FontStyleRegular, rect(24, 654, 872, 18), fade(kMuted, 0.85f), StringAlignmentCenter);
+
+        // Render contents based on active tab
+        if (g.current_tab == TAB_HOME) {
+            // Action cluster bottom-right: STATUS badge
+            draw_slanted_box(gr, rect(kWidth - 364, kHeight - 146, 120, 26), 0.176f, 4.0f, SolidBrush(Color(kArcadeDark)), kArcadeGold, 2.0f);
+            text(gr, g.can_launch ? L"READY" : L"SETUP REQUIRED", 1, 11.5f, FontStyleBold, rect(kWidth - 364, kHeight - 146, 120, 26), kArcadeGold, StringAlignmentCenter);
+
+            // Small version summary line in bottom corner
+            text(gr, g.global.text, 1, 11.0f, FontStyleRegular, rect(280, kHeight - 34, 400, 20), kTextMuted);
+        } else {
+            // Sub-pane background container: rect(270, 56, 746, 560)
+            const RectF pane_box = rect(270, 56, 746, 560);
+            fill_round(gr, pane_box, 22, SolidBrush(Color(0xF01B1446)));
+            stroke_round(gr, pane_box, 22, kArcadeDark, 4.0f);
+
+            if (g.current_tab == TAB_MODS) {
+                text(gr, L"MODS", 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
+                draw_slanted_box(gr, rect(400, 84, 88, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
+                text(gr, L"0 ATTIVE", 1, 11.0f, FontStyleBold, rect(400, 84, 88, 26), kTextMuted, StringAlignmentCenter);
+
+                if (g.mods.empty()) {
+                    const RectF empty_card = rect(296, 140, 694, 180);
+                    fill_round(gr, empty_card, 16, SolidBrush(Color(kArcadeCard)));
+                    stroke_round(gr, empty_card, 16, kArcadeDark, 3.0f);
+                    text(gr, L"Nessuna mod installata", 0, 22.0f, FontStyleBold, rect(320, 164, 640, 30), kTextLight);
+                    text(gr, L"Il supporto mod nativo caricherà pacchetti (.pak, texture pack e risorse aggiuntive).\nPosiziona le cartelle o file mod dentro runtime/mods per gestirle da qui.", 1, 12.5f, FontStyleRegular, rect(320, 202, 640, 40), kTextMuted);
+                    text(gr, L"Cartella: runtime/mods  (clicca OPEN FOLDER in alto a destra)", 1, 12.0f, FontStyleRegular, rect(320, 256, 640, 20), kArcadeCyan);
+                } else {
+                    for (int i = 0; i < static_cast<int>(g.mods.size()); ++i) {
+                        const float y = 136.f + i * 58.f;
+                        const RectF card_r = rect(296, y, 694, 48);
+                        fill_round(gr, card_r, 14, SolidBrush(Color(kArcadeCard)));
+                        stroke_round(gr, card_r, 14, kArcadeDark, 3.0f);
+                        PointF badge_pts[] = {
+                            PointF(296.f, y),
+                            PointF(348.f, y),
+                            PointF(338.f, y + 48.f),
+                            PointF(296.f, y + 48.f)
+                        };
+                        SolidBrush badge_br(Color(g.mods[i].enabled ? g.mods[i].badge_color : kTextOff));
+                        gr.FillPolygon(&badge_br, badge_pts, 4);
+                        Pen badge_pen(Color(kArcadeDark), 3.0f);
+                        gr.DrawPolygon(&badge_pen, badge_pts, 4);
+                        text(gr, std::to_wstring(i + 1), 0, 20.0f, FontStyleBold, rect(296, y + 10, 46, 28), kArcadeDark, StringAlignmentCenter);
+                        text(gr, g.mods[i].name, 1, 14.0f, FontStyleBold, rect(356, y + 6, 260, 20), kTextLight);
+                        text(gr, g.mods[i].detail, 1, 11.0f, FontStyleRegular, rect(356, y + 26, 260, 18), kTextMuted);
+                    }
+                }
+            } else if (g.current_tab == TAB_SETTINGS) {
+                text(gr, L"SETTINGS", 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
+
+                // Card 1: GRAPHICS
+                const RectF g_card = rect(296, 126, 222, 450);
+                fill_round(gr, g_card, 18, SolidBrush(Color(kArcadeCard)));
+                stroke_round(gr, g_card, 18, kArcadeDark, 3.0f);
+                text(gr, L"GRAPHICS", 0, 18.0f, FontStyleBold, rect(312, 142, 190, 24), kArcadeCyan);
+                text(gr, L"Risoluzione Display:", 1, 11.5f, FontStyleBold, rect(312, 172, 190, 18), kTextMuted);
+
+                if (g.resolution == 4 && !g.cfg.fullscreen) {
+                    draw_field(gr, rect(312, 314, 88, 28), g.width_edit);
+                    draw_field(gr, rect(412, 314, 88, 28), g.height_edit);
+                    text(gr, L"x", 1, 12.0f, FontStyleBold, rect(400, 314, 12, 28), kTextMuted, StringAlignmentCenter);
+                }
+
+                // Card 2: ONLINE & MULTIPLAYER
+                const RectF o_card = rect(532, 126, 222, 450);
+                fill_round(gr, o_card, 18, SolidBrush(Color(kArcadeCard)));
+                stroke_round(gr, o_card, 18, kArcadeDark, 3.0f);
+                text(gr, L"ONLINE & MULTI", 0, 18.0f, FontStyleBold, rect(548, 142, 190, 24), kArcadeGold);
+                text(gr, L"Modalità di Rete:", 1, 11.5f, FontStyleBold, rect(548, 172, 190, 18), kTextMuted);
+
+                text(gr, L"Nome Utente in Gioco:", 1, 11.5f, FontStyleBold, rect(548, 230, 190, 18), kTextMuted);
+                draw_field(gr, rect(548, 252, 190, 32), g.online_id_edit);
+                text(gr, L"Nome mostrato nelle gare\n(3-16 car. es. CrashBandicoot)", 1, 10.0f, FontStyleRegular, rect(548, 288, 190, 28), kTextMuted);
+
+                text(gr, L"Server Matchmaking:", 1, 11.5f, FontStyleBold, rect(548, 324, 190, 18), kTextMuted);
+                draw_field(gr, rect(548, 346, 190, 32), g.online_server_edit);
+                text(gr, L"Default: 127.0.0.1 (LAN)\nDemonware auth3 & lobby", 1, 10.0f, FontStyleRegular, rect(548, 382, 190, 28), kTextMuted);
+
+                text(gr, L"Password partita:", 1, 11.5f, FontStyleBold, rect(548, 426, 190, 18), kTextMuted);
+                draw_field(gr, rect(548, 448, 190, 32), g.online_password_edit);
+                text(gr, L"Stessa password per giocare insieme", 1, 9.5f, FontStyleRegular, rect(548, 484, 190, 28), kTextMuted);
+
+                // Online status badge at bottom of Card 2
+                draw_slanted_box(gr, rect(548, 526, 190, 26), 0.12f, 2.0f, SolidBrush(Color(g.cfg.online ? kArcadeLime : 0xFF2A2170)), kArcadeDark, 2.0f);
+                text(gr, g.cfg.online ? L"MULTIPLAYER ATTIVO" : L"OFFLINE (SINGLE PLAYER)", 1, 10.5f, FontStyleBold, rect(548, 526, 190, 26),
+                     g.cfg.online ? kArcadeDark : kTextMuted, StringAlignmentCenter);
+
+                // Card 3: CONTROLLER & AUDIO
+                const RectF c_card = rect(768, 126, 222, 450);
+                fill_round(gr, c_card, 18, SolidBrush(Color(kArcadeCard)));
+                stroke_round(gr, c_card, 18, kArcadeDark, 3.0f);
+                text(gr, L"CONTROLLER", 0, 18.0f, FontStyleBold, rect(784, 142, 190, 24), kArcadePink);
+                text(gr, L"Dispositivo Input:", 1, 11.5f, FontStyleBold, rect(784, 172, 190, 18), kTextMuted);
+                text(gr, L"Wireless Gamepad (XInput)\nDualShock 4 / DualSense OK", 1, 11.0f, FontStyleRegular, rect(784, 196, 190, 36), kTextLight);
+                text(gr, L"Vibrazione Rumble Attiva", 1, 11.5f, FontStyleRegular, rect(784, 240, 190, 20), kArcadeLime);
+
+                // Separator
+                Pen sep_pen(Color(fade(kArcadeDark, 0.6f)), 2.0f);
+                gr.DrawLine(&sep_pen, 784.f, 274.f, 974.f, 274.f);
+
+                text(gr, L"AUDIO", 0, 18.0f, FontStyleBold, rect(784, 288, 190, 24), kArcadeLime);
+                text(gr, L"Master: 100% (Stereo 48 kHz)", 1, 11.0f, FontStyleRegular, rect(784, 318, 190, 18), kTextLight);
+                text(gr, L"Uscita: View + Menu (1,2 s)\nPoi A: esci / B: annulla", 1, 10.0f, FontStyleRegular, rect(784, 480, 190, 44), kTextLight);
+                text(gr, L"Musica: 80% · Effetti: 90%", 1, 11.0f, FontStyleRegular, rect(784, 340, 190, 18), kTextLight);
+            } else if (g.current_tab == TAB_ADVANCED) {
+                text(gr, L"ADVANCED", 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
+
+                text(gr, L"Cartella Dump Base Game (CUSA14876 v01.00):", 1, 11.5f, FontStyleBold, rect(296, 122, 600, 18), kTextMuted);
+                draw_field(gr, rect(296, 144, 580, 34), g.base_edit);
+                draw_status(gr, g.base_status, 296, 182, 580);
+
+                text(gr, L"Cartella Title Update (v01.21 CUSA14876-patch):", 1, 11.5f, FontStyleBold, rect(296, 208, 600, 18), kTextMuted);
+                draw_field(gr, rect(296, 230, 580, 34), g.patch_edit);
+                draw_status(gr, g.patch_status, 296, 268, 580);
+
+                // Logs pre box
+                const RectF log_box = rect(296, 364, 694, 216);
+                fill_round(gr, log_box, 14, SolidBrush(Color(0xFF0C0824)));
+                stroke_round(gr, log_box, 14, kArcadeDark, 3.0f);
+
+                const wchar_t* const lines[] = {
+                    L"[ctrport] eboot 1.21  sha256 39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5  ok",
+                    L"[ctrport] /app0 <- patch, base  (read-only)",
+                    L"[ctrport] user data -> runtime/user",
+                    L"[ctrport] mods: 3 enabled, load order applied",
+                    L"[ctrport] linked 2448 import slots, 1322 original bindings",
+                    L"[ctrport] Vulkan 1.3 swapchain presentation target initialized",
+                    L"[ctrport] guest thread priority 478 -> NORMAL",
+                    L"[ctrport] standing by for ignition..."
+                };
+                for (int i = 0; i < 8; ++i) {
+                    text(gr, lines[i], 1, 10.5f, FontStyleRegular, rect(312, 376.f + i * 24.f, 660, 20), i == 7 ? kArcadeLime : kTextMuted);
+                }
+            }
+        }
     }
     BitBlt(target, 0, 0, w, h, dc, 0, 0, SRCCOPY);
     SelectObject(dc, previous);
@@ -592,67 +751,56 @@ void draw_control(const DRAWITEMSTRUCT& item) {
         const bool disabled = (item.itemState & ODS_DISABLED) != 0, pressed = (item.itemState & ODS_SELECTED) != 0;
         const bool hot = g.hot == item.hwndItem && !disabled;
         const float alpha = disabled ? 0.45f : 1.f;
-        const RectF full = rect(0.5f, 0.5f + (pressed ? 1.f : 0.f), lw - 1, lh - 1);
+        const RectF full = rect(0.5f, 0.5f + (pressed ? 2.f : 0.f), lw - 1, lh - (pressed ? 3.f : 1.f));
+
         switch (control.kind) {
-        case Kind::Browse:
-            fill_round(gr, full, 8, SolidBrush(Color(fade(hot ? 0xFF2D4C93 : 0xFF213A75, alpha))));
-            stroke_round(gr, full, 8, fade(kGold, hot ? alpha : 0.55f * alpha), 1.2f);
-            text(gr, control.label, 3, 13, FontStyleRegular, full, fade(kText, alpha), StringAlignmentCenter);
+        case Kind::TabBtn: {
+            const bool active = g.current_tab == control.pill;
+            const bool is_disabled = (control.pill == TAB_MODS) || disabled;
+            const float shadow_d = is_disabled ? 2.0f : pressed ? 1.0f : 5.0f;
+            const float btn_alpha = is_disabled ? 0.35f : 1.0f;
+            SolidBrush fill(Color(fade(active ? kArcadeGold : hot && !is_disabled ? 0xFF372C8F : kArcadeCard, btn_alpha)));
+            draw_slanted_box(gr, rect(2.f, 2.f, lw - 14.f, lh - 8.f), 0.176f, shadow_d, fill, is_disabled ? fade(kArcadeDark, 0.4f) : kArcadeDark, is_disabled ? 2.0f : 3.0f);
+            text(gr, control.label, 0, 20.0f, FontStyleBold, rect(2.f, 2.f + (pressed && !is_disabled ? 2.f : 0.f), lw - 14.f, lh - 8.f),
+                 is_disabled ? fade(kTextOff, 0.8f) : active ? kArcadeDark : kTextLight, StringAlignmentCenter);
             break;
-        case Kind::Toggle: {
-            const bool on = *control.value;
-            const RectF track = rect(1, (lh - 20) / 2, 38, 20);
-            if (on) {
-                LinearGradientBrush fill(PointF(0, track.Y), PointF(0, track.Y + 20), Color(fade(kGoldLight, alpha)), Color(fade(kOrange, alpha)));
-                fill.SetWrapMode(WrapModeTileFlipXY);
-                fill_round(gr, track, 10, fill);
-            } else {
-                fill_round(gr, track, 10, SolidBrush(Color(fade(kField, alpha))));
-                stroke_round(gr, track, 10, fade(hot ? kGold : 0xFF3A5597, alpha), 1.2f);
-            }
-            SolidBrush knob{Color(fade(on ? 0xFFFFFFFF : 0xFF8EA2CF, alpha))};
-            gr.FillEllipse(&knob, on ? track.X + 20 : track.X + 3, track.Y + 3, 14.f, 14.f);
-            text(gr, control.label, 2, 13.5f, FontStyleRegular, rect(48, 0, lw - 48, lh), fade(hot ? 0xFFFFFFFF : kText, alpha));
+        }
+        case Kind::Launch: {
+            // The giant PLAY! button from Design 2a
+            const float shadow_d = pressed ? 2.0f : 8.0f;
+            SolidBrush fill(Color(disabled ? 0xFF4A4068 : hot ? 0xFFFFD766 : kArcadeGold));
+            draw_slanted_box(gr, rect(2.f, 2.f, lw - 20.f, lh - 12.f), 0.176f, shadow_d, fill, kArcadeDark, 4.0f);
+            const wchar_t* btn_text = g.process ? L"RACING" : L"PLAY!";
+            text(gr, btn_text, 0, 44.0f, FontStyleBold, rect(2.f, 2.f + (pressed ? 3.f : 0.f), lw - 20.f, lh - 12.f),
+                 disabled ? kTextMuted : kArcadeDark, StringAlignmentCenter);
+            break;
+        }
+        case Kind::ActionBtn:
+        case Kind::Browse: {
+            fill_round(gr, full, 10, SolidBrush(Color(fade(hot ? 0xFF2FD3FF : kArcadeCyan, alpha))));
+            stroke_round(gr, full, 10, kArcadeDark, 3.0f);
+            text(gr, control.label, 1, 12.0f, FontStyleBold, full, kArcadeDark, StringAlignmentCenter);
             break;
         }
         case Kind::Pill: {
             const bool selected = g.resolution == control.pill;
-            if (selected) {
-                LinearGradientBrush fill(PointF(0, 0), PointF(0, lh), Color(fade(kGoldLight, alpha)), Color(fade(kGold, alpha)));
-                fill.SetWrapMode(WrapModeTileFlipXY);
-                fill_round(gr, full, lh / 2 - 1, fill);
-            } else {
-                fill_round(gr, full, lh / 2 - 1, SolidBrush(Color(fade(kField, alpha))));
-                stroke_round(gr, full, lh / 2 - 1, fade(hot ? kGold : kCardLine, alpha), 1.2f);
-            }
-            text(gr, control.label, 3, 13, FontStyleRegular, full, selected ? fade(kNight, alpha) : fade(0xFFCFD8F0, alpha), StringAlignmentCenter);
+            fill_round(gr, full, 8, SolidBrush(Color(fade(selected ? kArcadeGold : kArcadeCardSub, alpha))));
+            stroke_round(gr, full, 8, selected ? kArcadeDark : fade(kArcadeDark, 0.6f), selected ? 2.5f : 1.5f);
+            text(gr, control.label, 1, 11.5f, FontStyleBold, full, selected ? kArcadeDark : kTextLight, StringAlignmentCenter);
             break;
         }
-        case Kind::Launch: {
-            if (disabled) {
-                LinearGradientBrush fill(PointF(0, 0), PointF(0, lh), Color(0xFF34436A), Color(0xFF26324F));
-                fill.SetWrapMode(WrapModeTileFlipXY);
-                fill_round(gr, full, 12, fill);
-            } else {
-                LinearGradientBrush fill(PointF(0, 0), PointF(0, lh), Color(hot ? 0xFFFFF07A : kGoldLight), Color(hot ? 0xFFFF9A1A : kOrange));
-                fill.SetWrapMode(WrapModeTileFlipXY);
-                const Color stops_colors[] = {Color(hot ? 0xFFFFF07A : kGoldLight), Color(hot ? 0xFFFFC93A : kGold), Color(hot ? 0xFFFF9A1A : kOrange)};
-                const REAL stops[] = {0.f, 0.45f, 1.f};
-                fill.SetInterpolationColors(stops_colors, stops, 3);
-                fill_round(gr, full, 12, fill);
-                stroke_round(gr, full, 12, 0xFF7A2A00, 1.5f);
-            }
-            const ARGB ink = disabled ? 0xFF7F8CB0 : kNight;
-            const float cx = lw / 2 - 120;
-            PointF arrow[] = {PointF(cx, lh / 2 - 11), PointF(cx + 18, lh / 2), PointF(cx, lh / 2 + 11)};
-            SolidBrush arrow_brush{Color(ink)};
-            gr.FillPolygon(&arrow_brush, arrow, 3);
-            text(gr, L"LAUNCH GAME", 0, 26, FontStyleBoldItalic, rect(cx + 26, 0, 260, lh), ink);
+        case Kind::Toggle: {
+            const bool on = *control.value;
+            // Pill track
+            const RectF track = rect(1, (lh - 24) / 2, 44, 24);
+            fill_round(gr, track, 12, SolidBrush(Color(fade(on ? kArcadeLime : kTextOff, alpha))));
+            stroke_round(gr, track, 12, kArcadeDark, 2.5f);
+            SolidBrush knob{Color(kTextLight)};
+            gr.FillEllipse(&knob, on ? track.X + 22 : track.X + 3, track.Y + 3, 16.f, 16.f);
+            text(gr, control.label, 1, 12.5f, FontStyleBold, rect(52, 0, lw - 52, lh), fade(hot ? 0xFFFFFFFF : kTextLight, alpha));
             break;
         }
         }
-        if ((item.itemState & ODS_FOCUS) && !(item.itemState & ODS_NOFOCUSRECT))
-            stroke_round(gr, rect(1, 1, lw - 2, lh - 2), control.kind == Kind::Launch ? 12.f : 8.f, 0xB0FFFFFF, 1.5f);
     }
     BitBlt(item.hDC, 0, 0, w, h, dc, 0, 0, SRCCOPY);
     SelectObject(dc, previous);
@@ -660,11 +808,10 @@ void draw_control(const DRAWITEMSTRUCT& item) {
     DeleteDC(dc);
 }
 
-// ---- artwork from the selected dump ----
+// Artwork loading
 std::unique_ptr<Bitmap> load_png(const fs::path& path) {
     std::unique_ptr<Bitmap> file(Bitmap::FromFile(path.c_str()));
     if (!file || file->GetLastStatus() != Ok) return nullptr;
-    // Copy so the file is not kept open.
     auto copy = std::make_unique<Bitmap>(static_cast<INT>(file->GetWidth()), static_cast<INT>(file->GetHeight()), PixelFormat32bppPARGB);
     Graphics gr(copy.get());
     gr.DrawImage(file.get(), 0, 0, static_cast<INT>(file->GetWidth()), static_cast<INT>(file->GetHeight()));
@@ -693,7 +840,7 @@ void refresh_artwork() {
     RedrawWindow(g.window, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
 
-// ---- validation ----
+// Validation
 bool parse_size(const std::wstring& value, int low, int high, int& out) {
     if (value.empty() || value.size() > 5 || !std::all_of(value.begin(), value.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; })) return false;
     out = std::stoi(value);
@@ -708,11 +855,11 @@ void validate() {
     const bool base_eboot = !g.cfg.base_dir.empty() && fs::exists(base / "eboot.bin", ec);
     const bool base_modules = base_eboot && fs::exists(base / "sce_module", ec);
     const bool patch_ok = !g.cfg.patch_dir.empty() && fs::exists(patch / "eboot.bin", ec);
-    g.base_status = !base_eboot ? Status{L"eboot.bin not found in this folder", 2}
-                  : !base_modules ? Status{L"Missing sce_module folder for base game", 2}
-                                  : Status{L"Base game found (eboot.bin & sce_module)", 1};
-    if (!g.cfg.use_patch) g.patch_status = {L"Update disabled: v01.00 will be launched", 0};
-    else g.patch_status = patch_ok ? Status{L"Update v01.21 found (eboot.bin)", 1} : Status{L"Update folder or eboot.bin missing", 2};
+    g.base_status = !base_eboot ? Status{L"eboot.bin non trovato nella cartella base", 2}
+                  : !base_modules ? Status{L"Cartella sce_module mancante nel gioco base", 2}
+                                  : Status{L"Gioco base CUSA14876 v01.00 verificato (eboot.bin & sce_module)", 1};
+    if (!g.cfg.use_patch) g.patch_status = {L"Update disattivato: verrà avviata la v01.00 classica", 0};
+    else g.patch_status = patch_ok ? Status{L"Title Update v01.21 trovato (eboot.bin & contenuti Grand Prix)", 1} : Status{L"Cartella update o eboot.bin v01.21 mancante", 2};
     EnableWindow(g.patch_edit, g.cfg.use_patch);
     EnableWindow(g.patch_browse, g.cfg.use_patch);
     EnableWindow(g.fps_toggle, g.cfg.use_patch);
@@ -723,23 +870,27 @@ void validate() {
     const bool size_ok = g.cfg.fullscreen || (parse_size(window_text(g.width_edit), 320, 7680, width) && parse_size(window_text(g.height_edit), 240, 4320, height));
     const bool runtime_ok = !g.root.empty() && fs::exists(g.runtime_exe, ec);
     g.can_launch = runtime_ok && base_modules && (!g.cfg.use_patch || patch_ok) && size_ok;
-    if (!runtime_ok) g.global = {L"Runtime not found: ctrport.exe and build/CTRPort-gpu/ctr_gpu.dll required", 2};
-    else if (!base_modules || (g.cfg.use_patch && !patch_ok)) g.global = {L"Select valid dump folders to launch the game", 2};
-    else if (!size_ok) g.global = {L"Invalid resolution (from 320×240 to 7680×4320)", 2};
+    if (!runtime_ok) g.global = {L"Runtime non trovato: ctrport.exe e ctr_gpu.dll richiesti", 2};
+    else if (!base_modules || (g.cfg.use_patch && !patch_ok)) g.global = {L"Seleziona cartelle dump valide per avviare il gioco", 2};
+    else if (!size_ok) g.global = {L"Risoluzione non valida (da 320×240 a 7680×4320)", 2};
     else {
         std::wstring summary = L"Ready · ";
-        summary += g.cfg.use_patch ? L"v01.21" : L"v01.00";
+        summary += g.cfg.use_patch ? L"v01.21 (Nitro Tour)" : L"v01.00 (Classic)";
         if (g.cfg.use_patch && g.cfg.fps_60) summary += L" · 60 FPS";
-        summary += g.cfg.fullscreen ? L" · fullscreen" : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
-        if (g.cfg.native_4k) summary += L" · PS4 Pro (Native 4K 3D)";
-        else if (g.cfg.ps4_pro) summary += L" · PS4 Pro (1440p 3D)";
-        if (g.cfg.unlock_all) summary += L" · unlock all (saves backed up)";
+        summary += g.cfg.fullscreen ? L" · Fullscreen" : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
+        if (g.cfg.native_4k) summary += L" · Native 4K 3D";
+        else if (g.cfg.ps4_pro) summary += L" · PS4 Pro 1440p";
+        if (g.cfg.online) {
+            const std::wstring id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
+            summary += L" · Online (" + (id.empty() ? L"CTRPlayer" : id) + L")";
+        }
         g.global = {summary, 1};
     }
     EnableWindow(g.launch, g.can_launch);
     refresh_artwork();
     InvalidateRect(g.window, nullptr, FALSE);
 }
+
 void select_resolution(int index) {
     g.resolution = index;
     g.updating = true;
@@ -753,6 +904,34 @@ void select_resolution(int index) {
     g.updating = false;
     for (HWND pill : g.pills) InvalidateRect(pill, nullptr, FALSE);
     validate();
+}
+
+void select_tab(int tab) {
+    if (tab < 0 || tab >= TAB_COUNT || tab == TAB_MODS) return;
+    g.current_tab = tab;
+
+    // Show/hide child controls based on active tab
+    for (const auto& pair : g.controls) {
+        HWND hwnd = pair.first;
+        const Control& ctrl = pair.second;
+        if (ctrl.tab >= 0) {
+            ShowWindow(hwnd, ctrl.tab == tab ? SW_SHOW : SW_HIDE);
+        }
+    }
+    ShowWindow(g.base_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
+    ShowWindow(g.patch_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
+
+    const bool show_settings = (tab == TAB_SETTINGS);
+    if (g.online_id_edit) ShowWindow(g.online_id_edit, show_settings ? SW_SHOW : SW_HIDE);
+    if (g.online_server_edit) ShowWindow(g.online_server_edit, show_settings ? SW_SHOW : SW_HIDE);
+    if (g.online_password_edit) ShowWindow(g.online_password_edit, show_settings ? SW_SHOW : SW_HIDE);
+
+    const bool show_custom = (show_settings && g.resolution == 4 && !g.cfg.fullscreen);
+    ShowWindow(g.width_edit, show_custom ? SW_SHOW : SW_HIDE);
+    ShowWindow(g.height_edit, show_custom ? SW_SHOW : SW_HIDE);
+
+    for (HWND tab_btn : g.tab_buttons) InvalidateRect(tab_btn, nullptr, FALSE);
+    InvalidateRect(g.window, nullptr, FALSE);
 }
 
 void browse(HWND edit, const wchar_t* title) {
@@ -782,7 +961,25 @@ void browse(HWND edit, const wchar_t* title) {
     dialog->Release();
 }
 
-// ---- launching ctrport.exe (mirrors ctrport/play_gpu.py) ----
+void backup_save_data() {
+    std::error_code ec;
+    const fs::path saves = g.root / "runtime/user/savedata";
+    if (!fs::exists(saves, ec)) {
+        MessageBoxW(g.window, L"Nessun salvataggio trovato in runtime/user/savedata.", kTitle, MB_ICONINFORMATION);
+        return;
+    }
+    const std::wstring stamp = timestamp();
+    const fs::path backup = g.root / "runtime/user/savedata_backups" / (L"manual_" + stamp);
+    fs::create_directories(backup.parent_path(), ec);
+    fs::copy(saves, backup, fs::copy_options::recursive, ec);
+    if (ec) {
+        MessageBoxW(g.window, (L"Errore durante il backup del salvataggio:\n" + widen(ec.message())).c_str(), kTitle, MB_ICONERROR);
+    } else {
+        MessageBoxW(g.window, (L"Backup completato con successo in:\n" + backup.wstring()).c_str(), kTitle, MB_ICONINFORMATION);
+    }
+}
+
+// Launching ctrport.exe
 std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring>& set, const std::vector<std::wstring>& remove) {
     std::vector<std::wstring> entries;
     if (wchar_t* strings = GetEnvironmentStringsW()) {
@@ -818,7 +1015,7 @@ void launch_game() {
         fs::create_directories(backup.parent_path(), ec);
         fs::copy(saves, backup, fs::copy_options::recursive, ec);
         if (ec) {
-            MessageBoxW(g.window, (L"Save backup failed, launch aborted:\n" + widen(ec.message())).c_str(), kTitle, MB_ICONERROR);
+            MessageBoxW(g.window, (L"Backup salvataggio fallito, avvio annullato:\n" + widen(ec.message())).c_str(), kTitle, MB_ICONERROR);
             g.lock.release();
             return;
         }
@@ -828,13 +1025,13 @@ void launch_game() {
     std::vector<fs::path> modules;
     for (const auto& entry : fs::directory_iterator(base / "sce_module", ec))
         if (lower(entry.path().extension().wstring()) == L".prx") modules.push_back(entry.path());
-    // Python's sorted() on Windows paths compares them lower-cased.
     std::sort(modules.begin(), modules.end(), [](const fs::path& a, const fs::path& b) { return lower(a.wstring()) < lower(b.wstring()); });
     std::wstring command = quote_argument(g.runtime_exe.wstring()) + L" --entry-after-libc-init-images " + quote_argument(eboot.wstring());
     for (const auto& module : modules) command += L" " + quote_argument(module.wstring());
 
     std::map<std::wstring, std::wstring> set{{L"CTR_GPU_LIBRARY", L"1"}, {L"CTR_TLS_PATCH", L"1"}, {L"CTR_GPU_LOG", L"error"},
                                              {L"CTR_NO_FRAME_OBSERVATION", L"1"}, {L"CTR_BASE_DIR", base.wstring()}};
+    set[L"CTR_XBOX_PROMPTS"] = g.cfg.xbox_prompts ? L"1" : L"0";
     if (g.cfg.use_patch) set[L"CTR_PATCH_DIR"] = patch.wstring();
     if (g.cfg.use_patch && g.cfg.fps_60) set[L"CTR_60FPS_PATCH"] = L"1";
     if (g.cfg.ps4_pro || g.cfg.native_4k) set[L"CTR_NEO_MODE"] = L"1";
@@ -842,9 +1039,59 @@ void launch_game() {
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
     if (g.cfg.fullscreen) set[L"CTR_GPU_FULLSCREEN"] = L"1";
     else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
+    if (g.cfg.online) {
+        const std::wstring password = window_text(g.online_password_edit);
+        if (password.empty() || narrow(password).size() > 256) {
+            g.lock.release();
+            MessageBoxW(g.window, L"Inserisci una password partita (massimo 256 byte UTF-8).", kTitle, MB_ICONERROR);
+            return;
+        }
+        try { set[L"CTR_ONLINE_ROOM_TOKEN"] = ctr_online_room_token(narrow(password)); }
+        catch (const std::exception&) { g.lock.release(); MessageBoxW(g.window, L"Impossibile preparare la password partita.", kTitle, MB_ICONERROR); return; }
+        set[L"CTR_ONLINE"] = L"1";
+        std::wstring raw_id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
+        std::wstring id;
+        for (wchar_t c : raw_id) {
+            if ((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || (c >= L'0' && c <= L'9') || c == L'_' || c == L'-')
+                id += c;
+        }
+        if (id.size() < 3) id = L"CTRPlayer";
+        if (id.size() > 16) id.resize(16);
+        set[L"CTR_ONLINE_ID"] = id;
+
+        std::wstring server = g.online_server_edit ? window_text(g.online_server_edit) : g.cfg.online_server;
+        if (server.empty()) server = L"127.0.0.1";
+        set[L"CTR_ONLINE_SERVER"] = server;
+
+        const fs::path online_dir = g.root / "runtime/user/online";
+        fs::create_directories(online_dir, ec);
+        fs::path key_path = online_dir / (L"traffic_key_" + server + L"_8780.der");
+        if (!fs::exists(key_path, ec)) key_path = online_dir / L"server_key.der";
+        if (!fs::exists(key_path, ec)) {
+            const std::wstring url = L"http://" + server + L":8780/ctr/v1/traffic-key";
+            const fs::path dl_target = online_dir / (L"traffic_key_" + server + L"_8780.der");
+            const HRESULT hr = URLDownloadToFileW(nullptr, url.c_str(), dl_target.c_str(), 0, nullptr);
+            if (SUCCEEDED(hr) && fs::exists(dl_target, ec)) {
+                key_path = dl_target;
+            }
+        }
+        if (fs::exists(key_path, ec)) {
+            set[L"CTR_ONLINE_TRAFFIC_KEY"] = key_path.wstring();
+        } else {
+            const std::wstring warn = L"Modalità Online attiva, ma la chiave pubblica del server non è stata trovata.\n"
+                                      L"Assicurati che il server online sia in esecuzione:\n"
+                                      L"python tools/online/ctr_online_server.py\n\n"
+                                      L"Vuoi procedere comunque?";
+            if (MessageBoxW(g.window, warn.c_str(), kTitle, MB_YESNO | MB_ICONWARNING) != IDYES) {
+                g.lock.release();
+                return;
+            }
+        }
+    }
     auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR", L"CTR_STARTUP_MUTEX_DLL_DIR", L"CTR_PARK_MISSING_NID",
         L"CTR_PARK_MISSING_SERVICE", L"CTR_TILING_TIMING", L"CTR_60FPS_PATCH", L"CTR_NEO_MODE", L"CTR_NATIVE_4K", L"CTR_UNLOCK_ALL",
-        L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION"});
+        L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION",
+        L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     const auto open_log = [&](const wchar_t* suffix) {
@@ -865,11 +1112,12 @@ void launch_game() {
     for (HANDLE handle : {out, err, nul}) if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
     if (!started) {
         g.lock.release();
-        MessageBoxW(g.window, (L"Failed to launch ctrport.exe (error " + std::to_wstring(error) + L").").c_str(), kTitle, MB_ICONERROR);
+        MessageBoxW(g.window, (L"Impossibile avviare ctrport.exe (errore " + std::to_wstring(error) + L").").c_str(), kTitle, MB_ICONERROR);
         return;
     }
     CloseHandle(info.hThread);
     g.process = info.hProcess;
+    InvalidateRect(g.launch, nullptr, FALSE);
     ShowWindow(g.window, SW_HIDE);
     std::thread([process = info.hProcess, window = g.window] {
         WaitForSingleObject(process, INFINITE);
@@ -883,7 +1131,6 @@ void game_finished(DWORD code) {
     CloseHandle(g.process);
     g.process = nullptr;
     g.lock.release();
-    // Same stop-reason scan as play_gpu.py.
     std::vector<std::string> reasons;
     for (const wchar_t* suffix : {L".stdout.log", L".stderr.log"}) {
         std::istringstream lines(read_tail(g.log_stem.wstring() + suffix, 8u << 20));
@@ -899,19 +1146,21 @@ void game_finished(DWORD code) {
     }
     ShowWindow(g.window, SW_SHOW);
     SetForegroundWindow(g.window);
+    InvalidateRect(g.launch, nullptr, FALSE);
     const bool closed_by_user = !reasons.empty() && reasons.back().find("window closed") != std::string::npos;
     if (code == 0 && (reasons.empty() || closed_by_user)) return;
-    std::wstring message = L"The game has stopped (exit code " + std::to_wstring(code) + L").\n\n";
-    if (reasons.empty()) message += L"No specific error found in logs.\n";
+    std::wstring message = L"Il gioco si è arrestato (exit code " + std::to_wstring(code) + L").\n\n";
+    if (reasons.empty()) message += L"Nessun errore specifico riscontrato nei log.\n";
     for (std::size_t i = reasons.size() > 5 ? reasons.size() - 5 : 0; i < reasons.size(); ++i) message += widen(reasons[i]) + L"\n";
     message += L"\nLog: " + g.log_stem.wstring() + L".stdout.log";
     MessageBoxW(g.window, message.c_str(), kTitle, MB_ICONWARNING);
 }
 
-// ---- controls ----
+// Controls
 LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR, DWORD_PTR) {
     switch (message) {
     case WM_MOUSEMOVE:
+        if (!IsWindowEnabled(window)) break;
         if (g.hot != window) {
             const HWND old = g.hot;
             g.hot = window;
@@ -925,18 +1174,23 @@ LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM wparam, LPARAM l
         if (g.hot == window) { g.hot = nullptr; InvalidateRect(window, nullptr, FALSE); }
         break;
     case WM_SETCURSOR:
-        SetCursor(LoadCursorW(nullptr, IDC_HAND));
+        if (IsWindowEnabled(window)) {
+            SetCursor(LoadCursorW(nullptr, IDC_HAND));
+            return TRUE;
+        }
+        SetCursor(LoadCursorW(nullptr, IDC_ARROW));
         return TRUE;
     case WM_ERASEBKGND:
         return 1;
     }
     return DefSubclassProc(window, message, wparam, lparam);
 }
-HWND add_button(int id, Kind kind, const RectF& box, const wchar_t* label, bool* value = nullptr, int pill = -1) {
+
+HWND add_button(int id, Kind kind, const RectF& box, const wchar_t* label, bool* value = nullptr, int pill = -1, int tab = -1) {
     HWND button = CreateWindowExW(0, L"BUTTON", label, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, px(box.X), px(box.Y),
                                   px(box.Width), px(box.Height), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
     SetWindowSubclass(button, control_proc, 1, 0);
-    g.controls[button] = Control{kind, label, value, pill, box};
+    g.controls[button] = Control{kind, label, value, pill, box, tab};
     return button;
 }
 HWND add_edit(int id, const RectF& field, const std::wstring& value, DWORD extra = 0) {
@@ -954,39 +1208,84 @@ HWND add_edit(int id, const RectF& field, const std::wstring& value, DWORD extra
     SendMessageW(edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, 0);
     return edit;
 }
+
 void create_controls() {
     g.edit_font = CreateFontW(-px(14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                               CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-    g.base_edit = add_edit(ID_BASE_EDIT, kBaseField, g.cfg.base_dir);
-    add_button(ID_BASE_BROWSE, Kind::Browse, rect(384, 350, 96, 34), L"BROWSE");
-    add_button(ID_PATCH_TOGGLE, Kind::Toggle, rect(44, 418, 436, 26), L"Title Update v01.21 (new tracks, karts, Grand Prix)", &g.cfg.use_patch);
-    g.patch_edit = add_edit(ID_PATCH_EDIT, kPatchField, g.cfg.patch_dir);
-    g.patch_browse = add_button(ID_PATCH_BROWSE, Kind::Browse, rect(384, 450, 96, 34), L"BROWSE");
+
+    // 4 Slanted Nav Buttons on Left Aside
+    for (int i = 0; i < static_cast<int>(TAB_COUNT); ++i) {
+        HWND tab_btn = add_button(ID_TAB_BASE + i, Kind::TabBtn, rect(24, 80.f + i * 58.f, 204, 48), kTabNames[i], nullptr, i, -1);
+        if (i == TAB_MODS) {
+            EnableWindow(tab_btn, FALSE);
+        }
+        g.tab_buttons.push_back(tab_btn);
+    }
+
+    // --- TAB 0: HOME ---
+    // The giant PLAY! button in the bottom right of the stage
+    g.launch = add_button(ID_LAUNCH, Kind::Launch, rect(kWidth - 364, kHeight - 110, 320, 68), L"PLAY!", nullptr, -1, TAB_HOME);
+
+    // --- TAB 1: MODS ---
+    add_button(ID_OPEN_MODS, Kind::ActionBtn, rect(854, 78, 136, 36), L"OPEN FOLDER", nullptr, -1, TAB_MODS);
+    for (int i = 0; i < static_cast<int>(g.mods.size()); ++i) {
+        add_button(ID_MOD_TOGGLE_BASE + i, Kind::Toggle, rect(920, 144.f + i * 58.f, 56, 32), L"", &g.mods[i].enabled, -1, TAB_MODS);
+    }
+
+    // --- TAB 2: SETTINGS ---
+    // Graphics: Resolution pills
     for (int i = 0; i < 5; ++i)
-        g.pills.push_back(add_button(ID_PILL + i, Kind::Pill, rect(536 + i * 69.f, 330, 62, 30), kPills[i], nullptr, i));
-    g.width_edit = add_edit(ID_WIDTH, kWidthField, g.cfg.custom_w, ES_NUMBER | ES_CENTER);
-    g.height_edit = add_edit(ID_HEIGHT, kHeightField, g.cfg.custom_h, ES_NUMBER | ES_CENTER);
-    add_button(ID_FULLSCREEN, Kind::Toggle, rect(536, 410, 150, 26), L"Fullscreen", &g.cfg.fullscreen);
-    g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(692, 410, 194, 26), L"60 FPS (v01.21)", &g.cfg.fps_60);
-    g.pro_toggle = add_button(ID_PRO, Kind::Toggle, rect(536, 438, 172, 26), L"PS4 Pro (1440p 3D)", &g.cfg.ps4_pro);
-    g.native_4k_toggle = add_button(ID_NATIVE_4K, Kind::Toggle, rect(712, 438, 174, 26), L"Native 4K 3D", &g.cfg.native_4k);
-    add_button(ID_UNLOCK, Kind::Toggle, rect(616, 502, 270, 26), L"Unlock all items & tracks", &g.cfg.unlock_all);
-    g.launch = add_button(ID_LAUNCH, Kind::Launch, kLaunch, L"LAUNCH GAME");
+        g.pills.push_back(add_button(ID_PILL + i, Kind::Pill, rect(312 + (i % 2) * 96.f, 196.f + (i / 2) * 36.f, 90, 30), kPills[i], nullptr, i, TAB_SETTINGS));
+
+    g.width_edit = add_edit(ID_WIDTH, rect(312, 314, 88, 28), g.cfg.custom_w, ES_NUMBER | ES_CENTER);
+    g.height_edit = add_edit(ID_HEIGHT, rect(412, 314, 88, 28), g.cfg.custom_h, ES_NUMBER | ES_CENTER);
+
+    g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(312, 356, 190, 26), L"60 FPS Unlock", &g.cfg.fps_60, -1, TAB_SETTINGS);
+    add_button(ID_FULLSCREEN, Kind::Toggle, rect(312, 388, 190, 26), L"Fullscreen Mode", &g.cfg.fullscreen, -1, TAB_SETTINGS);
+    g.pro_toggle = add_button(ID_PRO, Kind::Toggle, rect(312, 420, 190, 26), L"PS4 Pro 1440p", &g.cfg.ps4_pro, -1, TAB_SETTINGS);
+    g.native_4k_toggle = add_button(ID_NATIVE_4K, Kind::Toggle, rect(312, 452, 190, 26), L"Native 4K Buffer", &g.cfg.native_4k, -1, TAB_SETTINGS);
+
+    // Online Section (Card 2)
+    g.online_toggle = add_button(ID_ONLINE_TOGGLE, Kind::Toggle, rect(548, 196, 190, 26), L"Multiplayer Online", &g.cfg.online, -1, TAB_SETTINGS);
+    g.online_id_edit = add_edit(ID_ONLINE_ID_EDIT, rect(548, 252, 190, 32), g.cfg.online_id);
+    SendMessageW(g.online_id_edit, EM_LIMITTEXT, 16, 0);
+
+    g.online_server_edit = add_edit(ID_ONLINE_SERVER_EDIT, rect(548, 346, 190, 32), g.cfg.online_server);
+    SendMessageW(g.online_server_edit, EM_LIMITTEXT, 64, 0);
+    g.online_password_edit = add_edit(ID_ONLINE_PASSWORD_EDIT, rect(548, 448, 190, 32), L"");
+    SetWindowLongPtrW(g.online_password_edit, GWL_STYLE, GetWindowLongPtrW(g.online_password_edit, GWL_STYLE) | ES_PASSWORD);
+    SendMessageW(g.online_password_edit, EM_SETPASSWORDCHAR, 0x2022, 0);
+    SendMessageW(g.online_password_edit, EM_LIMITTEXT, 128, 0);
+
+    // Controller & Audio (Card 3)
+    add_button(ID_XBOX_PROMPTS, Kind::Toggle, rect(784, 432, 190, 26), L"Icone Xbox colorate", &g.cfg.xbox_prompts, -1, TAB_SETTINGS);
+    add_button(ID_AUDIO_TEST, Kind::ActionBtn, rect(784, 372, 190, 34), L"Test Canale Audio", nullptr, -1, TAB_SETTINGS);
+
+    // --- TAB 3: ADVANCED ---
+    g.base_edit = add_edit(ID_BASE_EDIT, rect(296, 144, 580, 34), g.cfg.base_dir);
+    add_button(ID_BASE_BROWSE, Kind::ActionBtn, rect(890, 144, 100, 34), L"SFOGLIA", nullptr, -1, TAB_ADVANCED);
+
+    g.patch_edit = add_edit(ID_PATCH_EDIT, rect(296, 230, 580, 34), g.cfg.patch_dir);
+    g.patch_browse = add_button(ID_PATCH_BROWSE, Kind::ActionBtn, rect(890, 230, 100, 34), L"SFOGLIA", nullptr, -1, TAB_ADVANCED);
+
+    add_button(ID_SAVE_BACKUP, Kind::ActionBtn, rect(296, 304, 210, 36), L"Backup Salvataggi", nullptr, -1, TAB_ADVANCED);
+    add_button(ID_OPEN_SAVES, Kind::ActionBtn, rect(520, 304, 210, 36), L"Apri Salvataggi", nullptr, -1, TAB_ADVANCED);
+    add_button(ID_OPEN_LOGS, Kind::ActionBtn, rect(744, 304, 246, 36), L"Apri Cartella Logs", nullptr, -1, TAB_ADVANCED);
 }
 
 LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
     case WM_CREATE: {
         g.window = window;
-        g.field_brush = CreateSolidBrush(RGB(12, 23, 53));
-        g.field_off_brush = CreateSolidBrush(RGB(10, 18, 40));
+        g.field_brush = CreateSolidBrush(RGB(27, 20, 70));
+        g.field_off_brush = CreateSolidBrush(RGB(13, 10, 34));
         render_base_layer();
-        // Edits report EN_CHANGE while being created; validate only once all controls exist.
         g.updating = true;
         create_controls();
         g.updating = false;
+        select_tab(TAB_HOME);
         select_resolution(g.resolution);
-        SetFocus(IsWindowEnabled(g.launch) ? g.launch : g.base_edit);
+        SetFocus(IsWindowEnabled(g.launch) ? g.launch : g.window);
         return 0;
     }
     case WM_ERASEBKGND:
@@ -1005,8 +1304,8 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_CTLCOLORSTATIC: {
         const bool enabled = IsWindowEnabled(reinterpret_cast<HWND>(lparam)) != FALSE;
         HDC dc = reinterpret_cast<HDC>(wparam);
-        SetTextColor(dc, enabled ? RGB(245, 247, 255) : RGB(110, 124, 160));
-        SetBkColor(dc, enabled ? RGB(12, 23, 53) : RGB(10, 18, 40));
+        SetTextColor(dc, enabled ? RGB(255, 248, 236) : RGB(185, 176, 240));
+        SetBkColor(dc, enabled ? RGB(27, 20, 70) : RGB(13, 10, 34));
         return reinterpret_cast<LRESULT>(enabled ? g.field_brush : g.field_off_brush);
     }
     case WM_COMMAND: {
@@ -1017,13 +1316,64 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
                 g.cfg.custom_w = window_text(g.width_edit);
                 g.cfg.custom_h = window_text(g.height_edit);
             }
+            if (!g.updating && id == ID_ONLINE_ID_EDIT && g.online_id_edit) {
+                g.cfg.online_id = window_text(g.online_id_edit);
+            }
+            if (!g.updating && id == ID_ONLINE_SERVER_EDIT && g.online_server_edit) {
+                g.cfg.online_server = window_text(g.online_server_edit);
+            }
             validate();
             return 0;
         }
         if (code == EN_SETFOCUS || code == EN_KILLFOCUS) { InvalidateRect(window, nullptr, FALSE); return 0; }
         if (code != BN_CLICKED && code != BN_DOUBLECLICKED) break;
-        if (id == ID_BASE_BROWSE) browse(g.base_edit, L"Base game dump folder (CUSA14876, with eboot.bin)");
-        else if (id == ID_PATCH_BROWSE) browse(g.patch_edit, L"Title Update v01.21 folder (e.g. CUSA14876-patch)");
+
+        // Tab selection
+        if (id >= ID_TAB_BASE && id < ID_TAB_BASE + static_cast<int>(TAB_COUNT)) {
+            const int tab = id - ID_TAB_BASE;
+            if (tab == TAB_MODS) return 0; // Disabled!
+            select_tab(tab);
+            return 0;
+        }
+
+        // Mod toggles
+        if (id >= ID_MOD_TOGGLE_BASE && id < ID_MOD_TOGGLE_BASE + static_cast<int>(g.mods.size())) {
+            const int mod_idx = id - ID_MOD_TOGGLE_BASE;
+            g.mods[mod_idx].enabled = !g.mods[mod_idx].enabled;
+            InvalidateRect(reinterpret_cast<HWND>(lparam), nullptr, FALSE);
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+
+        if (id == ID_OPEN_MODS) {
+            const fs::path mods_dir = g.root / "runtime/mods";
+            std::error_code ec;
+            fs::create_directories(mods_dir, ec);
+            ShellExecuteW(nullptr, L"open", mods_dir.c_str(), nullptr, nullptr, SW_SHOW);
+            return 0;
+        }
+        if (id == ID_SAVE_BACKUP) { backup_save_data(); return 0; }
+        if (id == ID_OPEN_SAVES) {
+            const fs::path saves = g.root / "runtime/user/savedata";
+            std::error_code ec;
+            fs::create_directories(saves, ec);
+            ShellExecuteW(nullptr, L"open", saves.c_str(), nullptr, nullptr, SW_SHOW);
+            return 0;
+        }
+        if (id == ID_OPEN_LOGS) {
+            const fs::path logs = g.root / "runtime/user/logs";
+            std::error_code ec;
+            fs::create_directories(logs, ec);
+            ShellExecuteW(nullptr, L"open", logs.c_str(), nullptr, nullptr, SW_SHOW);
+            return 0;
+        }
+        if (id == ID_AUDIO_TEST) {
+            MessageBeep(MB_ICONASTERISK);
+            return 0;
+        }
+
+        if (id == ID_BASE_BROWSE) browse(g.base_edit, L"Cartella dump gioco base (CUSA14876, con eboot.bin)");
+        else if (id == ID_PATCH_BROWSE) browse(g.patch_edit, L"Cartella Title Update v01.21 (es. CUSA14876-patch)");
         else if (id >= ID_PILL && id < ID_PILL + 5) select_resolution(id - ID_PILL);
         else {
             const auto found = g.controls.find(reinterpret_cast<HWND>(lparam));
@@ -1099,9 +1449,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     const int fw = frame.right - frame.left, fh = frame.bottom - frame.top;
     HWND window = CreateWindowExW(0, window_class.lpszClassName, kTitle, style, work.left + (work.right - work.left - fw) / 2,
                                   work.top + std::max(0L, (work.bottom - work.top - fh) / 2), fw, fh, nullptr, nullptr, instance, nullptr);
-    // Night-blue title bar and gold border on Windows 11 (ignored where unsupported).
+
     const BOOL dark = TRUE;
-    const COLORREF caption = RGB(11, 21, 48), caption_text = RGB(245, 247, 255), border = RGB(255, 194, 26);
+    const COLORREF caption = RGB(18, 12, 48), caption_text = RGB(255, 248, 236), border = RGB(18, 12, 48);
     DwmSetWindowAttribute(window, 20, &dark, sizeof(dark));
     DwmSetWindowAttribute(window, 35, &caption, sizeof(caption));
     DwmSetWindowAttribute(window, 36, &caption_text, sizeof(caption_text));
