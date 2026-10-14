@@ -1410,7 +1410,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
 fs::path find_root(const fs::path& start) {
     std::error_code ec;
     for (fs::path folder = start; !folder.empty(); folder = folder.parent_path()) {
-        if (fs::exists(folder / "build/CTRPort-gpu/ctr_gpu.dll", ec)) return folder;
+        if (fs::exists(folder / "ctr_gpu.dll", ec) || fs::exists(folder / "build/CTRPort-gpu/ctr_gpu.dll", ec)) return folder;
         if (folder == folder.parent_path()) break;
     }
     return {};
@@ -1431,7 +1431,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     g.exe_dir = fs::path(module).parent_path();
     g.root = find_root(g.exe_dir);
     std::error_code ec;
-    g.runtime_exe = fs::exists(g.exe_dir / "ctrport.exe", ec) ? g.exe_dir / "ctrport.exe" : g.root / "build/CTRPort-dev/ctrport.exe";
+    if (fs::exists(g.exe_dir / "ctrport.exe", ec)) {
+        g.runtime_exe = g.exe_dir / "ctrport.exe";
+    } else if (fs::exists(g.root / "build/CTRPort-gpu/ctrport.exe", ec)) {
+        g.runtime_exe = g.root / "build/CTRPort-gpu/ctrport.exe";
+    } else {
+        g.runtime_exe = g.root / "build/CTRPort-dev/ctrport.exe";
+    }
     g.scale = static_cast<float>(GetDpiForSystem()) / 96.f;
     load_config();
 
