@@ -49,9 +49,13 @@ inline void gpu_invalidate_guest(const void* address,std::uint64_t bytes){
 inline void gpu_map_guest(std::uint64_t address,std::uint64_t bytes){
     if(gpu_library.map_memory && bytes)gpu_library.map_memory(address,bytes);
 }
+inline std::wstring gpu_library_path;
 inline void load_gpu_library(std::uint32_t sdk_version){
-    gpu_library.module=LoadLibraryW(L"build/CTRPort-gpu/ctr_gpu.dll");
-    if(!gpu_library.module)throw std::runtime_error("CTR_GPU_LIBRARY=1 but build/CTRPort-gpu/ctr_gpu.dll did not load");
+    for (const wchar_t* candidate : {L"ctr_gpu.dll", L"build/CTRPort-gpu/ctr_gpu.dll"}) {
+        gpu_library.module = LoadLibraryW(candidate);
+        if (gpu_library.module) { gpu_library_path = candidate; break; }
+    }
+    if(!gpu_library.module)throw std::runtime_error("CTR_GPU_LIBRARY=1 but ctr_gpu.dll did not load (searched . and build/CTRPort-gpu/)");
     auto get=[&](const char* name){auto* p=GetProcAddress(gpu_library.module,name);if(!p)throw std::runtime_error(std::string("ctr_gpu export missing: ")+name);return p;};
     gpu_library.init=reinterpret_cast<int(*)(const CtrGpuConfigV1*)>(get("ctr_gpu_init"));
     gpu_library.resolve=reinterpret_cast<std::uintptr_t(*)(const char*,const char*)>(get("ctr_gpu_resolve"));
@@ -77,7 +81,7 @@ inline void load_gpu_library(std::uint32_t sdk_version){
     CreateDirectoryW(L"runtime/user/gpu",nullptr);
     const int status=gpu_library.init(&config);
     if(status)throw std::runtime_error("ctr_gpu_init failed with "+std::to_string(status));
-    std::printf("{\"scope\":\"gpu_library_loaded\",\"library\":\"build/CTRPort-gpu/ctr_gpu.dll\",\"sdk_version\":%u,\"registered_symbols\":%u}\n",sdk_version,gpu_library.symbol_count());std::fflush(stdout);
+    std::printf("{\"scope\":\"gpu_library_loaded\",\"library\":\"%ls\",\"sdk_version\":%u,\"registered_symbols\":%u}\n",gpu_library_path.c_str(),sdk_version,gpu_library.symbol_count());std::fflush(stdout);
 }
 // Rebinds the guest imports that the library provides. Every rebinding is reported.
 inline void route_gpu_imports(const std::vector<ImageMetadata>& metadata,std::vector<ObjectBinding>& services){
@@ -102,9 +106,13 @@ inline void route_gpu_imports(const std::vector<ImageMetadata>& metadata,std::ve
 // ctr_hle.dll (ctrport/hle): system library functions written in the guest SysV ABI.
 // Loaded together with the GPU library; every import it provides is bound to it.
 inline HMODULE hle_library=nullptr;
+inline std::wstring hle_library_path;
 inline void route_hle_imports(const std::vector<ImageMetadata>& metadata,std::vector<ObjectBinding>& services){
-    hle_library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
-    if(!hle_library)throw std::runtime_error("build/CTRPort-gpu/ctr_hle.dll did not load");
+    for (const wchar_t* candidate : {L"ctr_hle.dll", L"build/CTRPort-gpu/ctr_hle.dll"}) {
+        hle_library = LoadLibraryW(candidate);
+        if (hle_library) { hle_library_path = candidate; break; }
+    }
+    if(!hle_library)throw std::runtime_error("ctr_hle.dll did not load (searched . and build/CTRPort-gpu/)");
     const auto resolve=reinterpret_cast<std::uintptr_t(*)(const char*,const char*)>(GetProcAddress(hle_library,"ctr_hle_resolve"));
     const auto count=reinterpret_cast<unsigned(*)()>(GetProcAddress(hle_library,"ctr_hle_count"));
     if(!resolve || !count)throw std::runtime_error("ctr_hle exports missing");
