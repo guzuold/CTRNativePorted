@@ -21,7 +21,7 @@ is switched on in the runtime yet.
 ## How it works
 
 - `ctrport/` — the runtime (`ctrport.exe`, MSVC) and native Win32/GDI+ launcher
-  (`ctrport/launcher.cpp` → `CTRNativePorted.exe`, no Python required). The runtime maps
+  (`ctrport/launcher.cpp` → `launcher.exe`, no Python required). The runtime maps
   the eboot and the game's own PRX modules, resolves imports by NID, and implements
   kernel, threads, memory, files, save data, audio (XAudio2, ATRAC9), pad (XInput), user
   service and more. Every function that is not implemented fails loudly with its NID and
@@ -56,7 +56,7 @@ Then:
 2. Either select your dump folders in the launcher, or place them next to it as
    `dump\CUSA14876` (base game) and `dump\CUSA14876-patch` (v01.21 update), where they
    are found automatically.
-3. Run `CTRNativePorted.exe`, choose the options and start the game.
+3. Run `launcher.exe`, choose the options and start the game.
 
 Logs, saves and caches go to `runtime\user\`. The game folders are only read.
 
@@ -91,7 +91,7 @@ powershell -File ctrport/build_font_backend.ps1
 python -B tools/lane_lock.py --name build-data --lane data -- powershell -File ctrport/video/build.ps1     # ctr_video.lib
 powershell -File ctrport/build.ps1              # build/CTRPort-infra
 powershell -File ctrport/build_profile.ps1      # build/CTRPort-claude/ctrport.exe
-powershell -File ctrport/build_launcher.ps1     # build/CTRPort-claude/CTRNativePorted.exe
+powershell -File ctrport/build_launcher.ps1     # build/CTRPort-claude/launcher.exe
 python -B tools/lane_lock.py --name build-claude --lane claude -- powershell -File ctrport/gpu/build.ps1  # ctr_gpu.dll, ctr_hle.dll
 ```
 
@@ -103,7 +103,7 @@ hence `tools/lane_lock.py`.
 > repository. Until that step is separated from the local evidence, `ctr_video.lib`
 > cannot be built from a fresh clone.
 
-Start the native launcher (`build/CTRPort-claude/CTRNativePorted.exe`), or run from the
+Start the native launcher (`build/CTRPort-claude/launcher.exe`), or run from the
 command line:
 
 ```powershell
