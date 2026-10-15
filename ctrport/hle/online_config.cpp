@@ -2,10 +2,16 @@
 // Online configuration and network policy (see online_config.h).
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <atomic>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <mutex>
+#include "ctr_hle.h"
 #include "online_config.h"
+#include "online_http.h"
 #pragma comment(lib, "ws2_32.lib")
 
 namespace ctr_hle::online {
@@ -90,16 +96,23 @@ std::uint32_t local_address() {
         // Route lookup only: a UDP connect sends nothing.
         const SOCKET probe = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (probe != INVALID_SOCKET) {
-            sockaddr_in target{};
-            target.sin_family = AF_INET;
-            target.sin_port = htons(9);
-            target.sin_addr.s_addr = server_address();
-            sockaddr_in local{};
-            int length = sizeof(local);
-            if (connect(probe, reinterpret_cast<sockaddr*>(&target), sizeof(target)) == 0 &&
-                getsockname(probe, reinterpret_cast<sockaddr*>(&local), &length) == 0 &&
-                local.sin_addr.s_addr != 0) {
-                result = local.sin_addr.s_addr;
+            for (const std::uint32_t destination :
+                 {server_address(), static_cast<std::uint32_t>(htonl(0xC6336401u))}) {
+                // 198.51.100.1 (TEST-NET-2) only selects the default route; nothing is sent.
+                sockaddr_in target{};
+                target.sin_family = AF_INET;
+                target.sin_port = htons(9);
+                target.sin_addr.s_addr = destination;
+                sockaddr_in local{};
+                int length = sizeof(local);
+                if (connect(probe, reinterpret_cast<sockaddr*>(&target), sizeof(target)) == 0 &&
+                    getsockname(probe, reinterpret_cast<sockaddr*>(&local), &length) == 0 &&
+                    local.sin_addr.s_addr != 0) {
+                    result = local.sin_addr.s_addr;
+                    if ((ntohl(result) >> 24) != 127) {
+                        break;
+                    }
+                }
             }
             closesocket(probe);
         }
@@ -137,8 +150,96 @@ bool resolve(const char* hostname, std::uint32_t* address, const char** reason) 
     return false;
 }
 
+namespace {
+bool strict_peers() {
+    static const bool value = [] {
+        const char* configured = std::getenv("CTR_ONLINE_STRICT_PEERS");
+        return configured && !std::strcmp(configured, "1");
+    }();
+    return value;
+}
+
+// Public peers: asked to the project server once, then cached (allowed 10 min, refused 5 s
+// so that a player who joins the room later becomes reachable).
+bool peer_allowed(std::uint32_t address) {
+    using clock = std::chrono::steady_clock;
+    static std::mutex mutex;
+    static std::map<std::uint32_t, std::pair<bool, clock::time_point>> cache;
+    {
+        std::scoped_lock lock{mutex};
+        const auto it = cache.find(address);
+        if (it != cache.end() && clock::now() < it->second.second) {
+            return it->second.first;
+        }
+    }
+    HttpResponse response;
+    const bool reached = http_exchange("GET", "/ctr/v1/peer-allowed?ip=" + format_address(address),
+                                       {}, "", &response);
+    const bool allowed = reached && response.status == 200;
+    {
+        std::scoped_lock lock{mutex};
+        cache[address] = {allowed, clock::now() + std::chrono::seconds(allowed ? 600 : 5)};
+    }
+    ctr_hle::log_call("ctr_online", "peer_allowed", allowed ? 1 : 0,
+                      (",\"address\":\"" + format_address(address) + "\",\"server_status\":" +
+                       std::to_string(reached ? response.status : 0))
+                          .c_str());
+    return allowed;
+}
+
+std::atomic<int> fetched_discovery_port{0};
+std::atomic<std::uint32_t> fetched_public_address{0};
+} // namespace
+
 bool destination_allowed(std::uint32_t address) {
-    return address == server_address() || private_or_local(address);
+    if (address == server_address()) {
+        return true;
+    }
+    const std::uint32_t a = ntohl(address);
+    if ((a >> 24) == 127 || (a >> 28) == 0xE || a == 0xFFFFFFFFu || a == 0) {
+        return true; // loopback, multicast, broadcast, any
+    }
+    if (!strict_peers() && private_or_local(address)) {
+        return true;
+    }
+    return peer_allowed(address);
+}
+
+std::uint32_t server_public_address() {
+    return fetched_public_address.load();
+}
+
+std::uint16_t known_discovery_port() {
+    const int port = fetched_discovery_port.load();
+    return static_cast<std::uint16_t>(port > 0 ? port : 3074);
+}
+
+std::uint16_t discovery_port() {
+    if (fetched_discovery_port.load() == 0) {
+        int port = 3074;
+        HttpResponse response;
+        if (http_exchange("GET", "/ctr/v1/config", {}, "", &response) && response.status == 200) {
+            const auto key = response.body.find("\"discovery_port\"");
+            const auto colon = key == std::string::npos ? key : response.body.find(':', key);
+            const int value = colon == std::string::npos ? 0 : std::atoi(response.body.c_str() + colon + 1);
+            if (value > 0 && value < 65536) {
+                port = value;
+            }
+            const auto public_key = response.body.find("\"public_host\"");
+            const auto quote = public_key == std::string::npos ? public_key
+                                                                : response.body.find('"', response.body.find(':', public_key));
+            const auto end = quote == std::string::npos ? quote : response.body.find('"', quote + 1);
+            in_addr parsed{};
+            if (end != std::string::npos &&
+                InetPtonA(AF_INET, response.body.substr(quote + 1, end - quote - 1).c_str(), &parsed) == 1) {
+                fetched_public_address.store(parsed.s_addr);
+            }
+        }
+        int expected = 0;
+        fetched_discovery_port.compare_exchange_strong(expected, port);
+        ctr_hle::log_call("ctr_online", "discovery_port", known_discovery_port());
+    }
+    return known_discovery_port();
 }
 
 std::string format_address(std::uint32_t address) {

@@ -114,15 +114,32 @@ Logs, saves and caches go to `runtime/user/`. The game folders are only read.
 
 ## Multiplayer (Matchmaking with password)
 
-CTRNativePorted includes an offline/local server implementation (`tools/online/ctr_online_server.py`) replacing PSN and Demonware services:
+Online play uses the project's own server in place of PSN and Demonware; Sony and Activision
+servers are never contacted. Only the player who hosts runs the server: it is built into the
+launcher (C++, no Python needed).
 
-1. Start the server:
-   ```powershell
-   python tools/online/ctr_online_server.py
-   ```
-2. In the launcher (`SETTINGS` tab), check **Multiplayer Online**, enter your player name and server IP (default `127.0.0.1`), and type a **Room Password**.
-3. Launch the game and select **ONLINE > Matchmaking > Go to Lobby**.
-4. Players entering the **same password** are automatically matched together in a shared lobby and race. Different passwords never match.
+1. **Host**: in the launcher `SETTINGS` tab turn on **Multiplayer Online** and **Ospita server
+   qui** (host server here). The launcher starts the server, asks the router to open the ports
+   with UPnP and shows the address to give the other players (also copied to the clipboard). If
+   the router has UPnP port forwarding disabled, forward TCP 8780, TCP 3074, UDP 3078-3082 and
+   UDP 3174 (the host's own game) to the host PC by hand and type the public IP in the field
+   above the switch.
+2. **Other players**: turn on **Multiplayer Online** and type the host's address as server (a
+   name such as a dynamic DNS host works too). They do not run any server.
+3. Everyone types the same **Password partita** (room password), launches the game and selects
+   **ONLINE > Matchmaking > Go to Lobby**. Same password: same lobby and race; different
+   passwords never match.
+
+**Relay (NAT / CGNAT)** (experimental): players whose connection cannot receive traffic from
+the internet (mobile hotspots, carrier-grade NAT, strict routers) can turn this switch on; the
+race traffic then goes through the server instead of directly between players (about 2 KB/s
+per player and direction). It helps only when the server itself is reachable from the internet:
+a host behind CGNAT cannot host the server for players outside its network, relay or not.
+Tested so far on one PC with the direct path blocked on purpose, not yet between real networks.
+
+The server also exists as a standalone program, `ctr_online_server.exe --auto-public --upnp`
+(built by `ctrport/online_server/build_online_server.ps1`), and the original Python reference,
+`tools/online/ctr_online_server.py`, is kept for comparison.
 
 ## Additional features
 

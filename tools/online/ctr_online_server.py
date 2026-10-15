@@ -19,10 +19,18 @@ Served so far:
   other Web API routes receive 404.
 Other UDP (including QoS) is recorded; other HTTP receives an explicit 404.
 
+Internet play (--public-host <public IPv4>): discovery runs on one address with four ports
+(--discovery-port, +1, +2, +3 by default 3078..3081), announced to the runtime with
+GET /ctr/v1/config; a game on this same PC (loopback) is reported with the public address;
+GET /ctr/v1/peer-allowed?ip=X tells a runtime whether X belongs to a player connected in its
+room (same password), the only public addresses the runtime will send to. Ports to forward to
+this PC: TCP 8780 and 3074, UDP 3078-3081, and UDP 3074 for the game itself.
+
 Usage (from the project root):
     python -B tools/online/ctr_online_server.py [--host 0.0.0.0] [--http 8780] [--peer-host 127.0.0.2]
-On the same PC as the game, the server's UDP 3074 needs its own loopback address: start the
-game with --online-server 127.0.0.2. State: runtime/user/online/ (server key). Log:
+    python -B tools/online/ctr_online_server.py --public-host 203.0.113.7   (internet)
+On the same PC as the game without --public-host, the server's UDP 3074 needs its own loopback
+address: start the game with --online-server 127.0.0.2. State: runtime/user/online/ (server key). Log:
 runtime/user/logs/online_server_<time>.jsonl, one JSON object per event.
 """
 import argparse, asyncio, base64, datetime, json, re, secrets, socket, struct, sys, time
@@ -114,10 +122,54 @@ def load_key():
 WEBAPI_ROUTES = {}
 
 
+# Internet settings, filled by main(): public address and announced discovery port.
+internet = {'public_host': None, 'discovery_port': 3074}
+
+
+def reachable_address(ip):
+    """Address other players use for a client seen from `ip` (loopback -> public address)."""
+    if internet['public_host'] and ip.startswith('127.'):
+        return internet['public_host']
+    return ip
+
+
+def room_addresses(room_token):
+    """Addresses of the players connected to the lobby in a room: their lobby connection
+    source and the public address in their own advertisement (bytes 60..63 of the address
+    block, the endpoint the discovery service observed)."""
+    found = set()
+    for account, client in live_clients.items():
+        if client['user'].get('room_token') != room_token:
+            continue
+        if client.get('ip'):
+            found.add(client['ip'])
+        row = demonware_tasks.matchmaking_store.database.execute(
+            'SELECT document FROM player_info WHERE account=?', (str(account),)).fetchone()
+        if row:
+            try:
+                block = base64.b64decode(json.loads(row[0])['listen_server']['local_address'])
+                found.add('%d.%d.%d.%d' % tuple(block[60:64]))
+            except (ValueError, KeyError, IndexError, TypeError):
+                pass
+    return found
+
+
 def http_answer(method, target, headers, body):
     """Returns (status, extra headers, body bytes, event name, extra event fields)."""
     host = headers.get('host', '').split(':')[0].lower()
     online_id = headers.get('x-ctr-online-id', '')
+    if method == 'GET' and target == '/ctr/v1/config':
+        payload = {'discovery_port': internet['discovery_port'], 'public_host': internet['public_host']}
+        return 200, {'Content-Type': 'application/json'}, json.dumps(payload).encode(), 'config', {}
+    if method == 'GET' and target.startswith('/ctr/v1/peer-allowed?'):
+        ip = parse_qs(target.partition('?')[2]).get('ip', [''])[0]
+        room_token = headers.get('x-ctr-room-token', '')
+        requester = live_clients.get(demonware_auth3.user_id(online_id)) if online_id else None
+        allowed = bool(requester and room.valid_token(room_token) and
+                       requester['user'].get('room_token') == room_token and
+                       ip in room_addresses(room_token))
+        return (200 if allowed else 403), {'Content-Type': 'application/json'}, \
+            json.dumps({'allowed': allowed}).encode(), 'peer_allowed', {'ip': ip, 'allowed': allowed}
     if method == 'GET' and target == '/ctr/v1/traffic-key':
         return 200, {'Content-Type': 'application/octet-stream'}, \
             rsa_pss.spki_der(server_key['n'], server_key['e']), 'traffic_key', {}
@@ -263,7 +315,8 @@ async def handle_lobby(reader, writer):
                connection_id=handshake.connection_id)
         writer.write(done)
         await writer.drain()
-        client={'writer':writer,'crypto':session,'user':user,'send_lock':asyncio.Lock()}
+        client={'writer':writer,'crypto':session,'user':user,'send_lock':asyncio.Lock(),
+                'ip':reachable_address(writer.get_extra_info('peername')[0])}
         live_clients[user['user_id']]=client
         while True:
             size = struct.unpack('<I', await reader.readexactly(4))[0]
@@ -329,7 +382,16 @@ async def main():
                         help='address for UDP 3074 (Demonware STUN/QoS); empty to skip')
     parser.add_argument('--stun-secondary-host', default='127.0.0.3')
     parser.add_argument('--stun-alternate-port', type=int, default=3076)
+    parser.add_argument('--public-host', default='',
+                        help='public IPv4 for internet play: one-address discovery, loopback games '
+                             'reported with this address, peer authorization for runtimes')
+    parser.add_argument('--discovery-port', type=int, default=0,
+                        help='first of four UDP discovery ports with --public-host (default 3078)')
     args = parser.parse_args()
+    if args.public_host:
+        socket.inet_aton(args.public_host)
+        internet['public_host'] = args.public_host
+        internet['discovery_port'] = args.discovery_port or 3078
     server_key = load_key()
     demonware_tasks.statistics_store = local_stats.Store(state / 'stats.sqlite3')
     demonware_tasks.matchmaking_store = local_matchmaking.Store(state / 'matchmaking.sqlite3')
@@ -352,7 +414,17 @@ async def main():
     for port in [int(p) for p in args.tcp.split(',') if p]:
         await listen('tcp/%d' % port, lambda port=port: asyncio.start_server(
             lambda r, w: handle_tcp(r, w, port), args.host, port))
-    if args.peer_host:
+    if args.public_host:
+        base = internet['discovery_port']
+        service = discovery.Service((args.public_host, base), (args.public_host, base + 2),
+                                    base + 1, record, secondary_alternate_port=base + 3,
+                                    public_host=args.public_host)
+        for advertised in service.endpoints():
+            bound = (args.host, advertised[1])
+            await listen('discovery/%s:%d' % bound,
+                         lambda advertised=advertised, bound=bound: loop.create_datagram_endpoint(
+                             lambda: service.protocol(advertised), local_addr=bound))
+    elif args.peer_host:
         service = discovery.Service((args.peer_host, 3074), (args.stun_secondary_host, 3074),
                                     args.stun_alternate_port, record)
         for host in (args.peer_host, args.stun_secondary_host):
@@ -365,7 +437,8 @@ async def main():
         await listen('udp/%d' % port, lambda port=port: loop.create_datagram_endpoint(
             lambda: UdpRecorder(port), local_addr=(args.host, port)))
     record(event='listening', host=args.host, ports=listening, log=str(log_path),
-           traffic_key=str(state / 'server_key.der'))
+           traffic_key=str(state / 'server_key.der'), public_host=internet['public_host'],
+           discovery_port=internet['discovery_port'])
     await asyncio.Event().wait()
 
 

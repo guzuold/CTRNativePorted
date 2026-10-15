@@ -38,5 +38,33 @@ class RoomSearchTests(unittest.TestCase):
             self.assertEqual(store.match_ready(available),[])
             store.close()
 
+    def test_min_players_override(self):
+        import os
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2]/'runtime/user') as directory:
+            store=Store(Path(directory)/'matchmaking.sqlite3')
+            tok=room.token('minplayertest')
+            info={'listen_server':{'local_address':base64.b64encode(bytes(67)).decode(),
+                  'security_id':base64.b64encode(bytes(8)).decode(),'security_key':base64.b64encode(bytes(16)).decode(),'nat':1},'dedicated_server':{'build_name':'synthetic'}}
+            searches={}
+            for account in [101,102,103]:
+                store.advertise([[16,json.dumps(info)]],account,tok)
+                doc={'members':[account],'tokens':[store.player_token(account)],'lobby_slots':{'min':2,'max':8},
+                     'dedicated_server':{'request_level':'not_needed'},'team_balance':{'num_teams':0},
+                     'ruleset_payload':{'filter':{'matchmaking_version':200,'playlist_id':0}},
+                     'player_id_to_slots':{str(account):0},'performance':{'game_type':1}}
+                searches[account]=[[16,json.dumps(doc)]]
+            os.environ['CTR_ONLINE_MIN_PLAYERS']='3'
+            try:
+                store.start_search(searches[101],101,tok)
+                store.start_search(searches[102],102,tok)
+                self.assertEqual(store.match_ready({101:tok,102:tok}),[])
+                store.start_search(searches[103],103,tok)
+                plans=store.match_ready({101:tok,102:tok,103:tok})
+                self.assertEqual(len(plans),1)
+                self.assertEqual([p['account'] for p in plans[0]['players']],[101,102,103])
+            finally:
+                os.environ.pop('CTR_ONLINE_MIN_PLAYERS',None)
+            store.close()
+
 
 if __name__ == '__main__':unittest.main()

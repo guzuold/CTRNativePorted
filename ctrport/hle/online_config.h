@@ -30,7 +30,19 @@ std::uint32_t server_address();
 std::uint32_t local_address();
 // Resolver policy: returns true and the address (network order) for allowed names.
 bool resolve(const char* hostname, std::uint32_t* address, const char** reason);
-// Destination policy for connect/sendto (address in network order).
+// Destination policy for connect/sendto (address in network order): the project server,
+// loopback, private/LAN ranges (unless CTR_ONLINE_STRICT_PEERS=1) and public addresses the
+// project server confirms as players of the same room (GET /ctr/v1/peer-allowed, cached).
 bool destination_allowed(std::uint32_t address);
+// UDP port of the project server's discovery service. The game sends discovery to the
+// server on the fixed port 3074; when the server runs next to a game on the same PC that port
+// belongs to the game, so the server announces another one (GET /ctr/v1/config, fetched once).
+// discovery_port() fetches it on first use; known_discovery_port() never blocks.
+std::uint16_t discovery_port();
+std::uint16_t known_discovery_port();
+// The project server's public IPv4 (network order) from the same /ctr/v1/config answer, or 0:
+// a game on the server's own PC reaches the server on loopback but is told to probe the
+// public address during discovery.
+std::uint32_t server_public_address();
 std::string format_address(std::uint32_t address);
 } // namespace ctr_hle::online

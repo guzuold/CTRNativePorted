@@ -6,6 +6,7 @@ remain separate operations; registering an advertisement does not create a lobby
 """
 import base64
 import json
+import os
 import secrets
 import sqlite3
 import room
@@ -185,7 +186,14 @@ class Store:
         with self.database:
             for (selector,_),players in groups.items():
                 slots=json.loads(players[0][4])['lobby_slots']
-                if len(players) < slots['min']:
+                min_players = slots['min']
+                env_min = os.environ.get('CTR_ONLINE_MIN_PLAYERS')
+                if env_min:
+                    try:
+                        min_players = max(min_players, int(env_min))
+                    except ValueError:
+                        pass
+                if len(players) < min_players:
                     continue
                 players=players[:slots['max']]
                 while True:
