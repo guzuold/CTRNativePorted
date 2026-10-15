@@ -143,7 +143,7 @@ The server also exists as a standalone program, `ctr_online_server.exe --auto-pu
 
 ## Additional features
 
-- **Xbox Controller Prompts**: check *Icone Xbox colorate* in launcher Settings to use colored A/B/X/Y prompts (CC0-1.0 by Julio Cacko, see [`ctrport/XBOX_PROMPTS.md`](ctrport/XBOX_PROMPTS.md)).
+- **Xbox Controller Prompts**: check *Icone Xbox colorate* in launcher Settings to use colored A/B/X/Y prompts (CC0-1.0 by Julio Cacko, see [`ctrport/XBOX_PROMPTS.md`](ctrport/XBOX_PROMPTS.md)). The launcher builds the prompt archives from your own dump on the first launch (about 10 s, no Python); the release folder must contain `assets/xbox-default/`.
 - **Quick Controller Exit**: hold **View + Menu** for 1.2 seconds on your controller, then press **A** to confirm exit or **B** to cancel.
 - **Rendering Modes**: choose between standard 1080p, PS4 Pro 1440p, or **Native 4K** internal resolution buffers, with 60 FPS unlocked on v01.21.
 

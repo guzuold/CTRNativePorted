@@ -32,6 +32,7 @@
 #include <vector>
 namespace Gdiplus { using std::min; using std::max; }
 #include <gdiplus.h>
+#include "xbox_prepare.hpp"
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "gdiplus.lib")
@@ -50,6 +51,7 @@ constexpr wchar_t kTitle[] = L"Crash Team Racing Native Ported";
 constexpr float kWidth = 1040, kHeight = 640;
 constexpr UINT WM_APP_FINISHED = WM_APP + 1;
 constexpr UINT WM_APP_HOST_READY = WM_APP + 2;
+constexpr UINT WM_APP_XBOX_READY = WM_APP + 3;
 
 // Design 2a Pit Lane Palette (from Claude Design token specification)
 constexpr ARGB kArcadeBg      = 0xFF1B1446;  // Deep arcade purple/indigo
@@ -287,6 +289,8 @@ struct App {
     HWND online_host_toggle = nullptr;
     ctr_online::Host host;
     bool host_busy = false;           // server starting or stopping in the background
+    bool xbox_busy = false;           // Xbox prompt archives being prepared in the background
+    bool xbox_ready = false;          // prepared for the launch that requested them
     ctr_online::HostStatus host_status;
     std::vector<HWND> pills;
     std::vector<HWND> tab_buttons;
@@ -794,7 +798,7 @@ void draw_control(const DRAWITEMSTRUCT& item) {
             const float shadow_d = pressed ? 2.0f : 8.0f;
             SolidBrush fill(Color(disabled ? 0xFF4A4068 : hot ? 0xFFFFD766 : kArcadeGold));
             draw_slanted_box(gr, rect(2.f, 2.f, lw - 20.f, lh - 12.f), 0.176f, shadow_d, fill, kArcadeDark, 4.0f);
-            const wchar_t* btn_text = g.process ? L"RACING" : L"PLAY!";
+            const wchar_t* btn_text = g.process ? L"RACING" : g.xbox_busy ? L"ATTENDI" : L"PLAY!";
             text(gr, btn_text, 0, 44.0f, FontStyleBold, rect(2.f, 2.f + (pressed ? 3.f : 0.f), lw - 20.f, lh - 12.f),
                  disabled ? kTextMuted : kArcadeDark, StringAlignmentCenter);
             break;
@@ -1100,9 +1104,60 @@ std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring
     return block;
 }
 
+void launch_game();
+
+// The archives the runtime reads through app0_read_path: patch first, then base.
+std::vector<fs::path> xbox_prompt_sources() {
+    std::error_code ec;
+    std::vector<fs::path> sources;
+    const fs::path base = resolve(g.cfg.base_dir), patch = resolve(g.cfg.patch_dir);
+    for (const wchar_t* name : {L"permanent.pak", L"languagestartup.pak", L"update.pak"}) {
+        const fs::path relative = fs::path(L"archives") / name;
+        if (g.cfg.use_patch && fs::is_regular_file(patch / relative, ec)) sources.push_back(patch / relative);
+        else if (fs::is_regular_file(base / relative, ec)) sources.push_back(base / relative);
+    }
+    return sources;
+}
+
+// Builds the Xbox prompt archives from the user's dump without Python (first launch only),
+// then resumes the launch. Releases ship the CC0 PNGs in assets/xbox-default.
+void prepare_xbox_prompts() {
+    std::error_code ec;
+    fs::path assets = g.exe_dir / "assets/xbox-default";
+    if (!fs::exists(assets / "T_X_A_Color.png", ec)) assets = g.root / "ctrport/assets/xbox-default";
+    g.xbox_busy = true;
+    InvalidateRect(g.launch, nullptr, FALSE);
+    std::thread([sources = xbox_prompt_sources(), user = g.root / "runtime/user", assets, window = g.window] {
+        auto* error = new std::wstring;
+        try {
+            fs::create_directories(user / "mods/xbox-default");
+            for (const auto& source : sources) ctrport::xbox_prepare::prepare_cached(source, user, assets);
+        } catch (const std::exception& e) {
+            *error = widen(e.what());
+        }
+        PostMessageW(window, WM_APP_XBOX_READY, 0, reinterpret_cast<LPARAM>(error));
+    }).detach();
+}
+
+void xbox_prompts_ready(std::wstring* raw_error) {
+    const std::unique_ptr<std::wstring> error(raw_error);
+    g.xbox_busy = false;
+    InvalidateRect(g.launch, nullptr, FALSE);
+    if (!error->empty()) {
+        MessageBoxW(g.window, (L"Preparazione delle icone Xbox non riuscita:\n" + *error +
+                               L"\n\nDisattiva \"Icone Xbox colorate\" nelle impostazioni per giocare con i simboli PS4.").c_str(),
+                    kTitle, MB_ICONERROR);
+        return;
+    }
+    g.xbox_ready = true;
+    launch_game();
+}
+
 void launch_game() {
     validate();
-    if (!g.can_launch || g.process) return;
+    if (!g.can_launch || g.process || g.xbox_busy) return;
+    if (g.cfg.xbox_prompts && !g.xbox_ready) { prepare_xbox_prompts(); return; }
+    g.xbox_ready = false;
     save_config();
     if (!g.lock.acquire(g.root, g.window)) return;
     std::error_code ec;
@@ -1530,8 +1585,11 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_APP_HOST_READY:
         host_ready(wparam != 0);
         return 0;
+    case WM_APP_XBOX_READY:
+        xbox_prompts_ready(reinterpret_cast<std::wstring*>(lparam));
+        return 0;
     case WM_CLOSE:
-        if (g.process || g.host_busy) return 0;
+        if (g.process || g.host_busy || g.xbox_busy) return 0;
         save_config();
         g.host.stop(); // closes the router ports opened for hosting
         DestroyWindow(window);
