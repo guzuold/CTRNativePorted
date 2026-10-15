@@ -23,7 +23,7 @@ is switched on in the runtime yet.
 - `ctrport/` — the runtime (`ctrport.exe`, MSVC) and native Win32/GDI+ launcher
   (`ctrport/launcher.cpp` → `launcher.exe`, no Python required). The runtime maps
   the eboot and the game's own PRX modules, resolves imports by NID, and implements
-  kernel, threads, memory, files, save data, audio (XAudio2, ATRAC9), pad (XInput), user
+  kernel, threads, memory, files, save data, audio (XAudio2, ATRAC9), pad (XInput and PlayStation controllers), user
   service and more. Every function that is not implemented fails loudly with its NID and
   caller; the only success stubs are online/social services listed in
   [`ctrport/compat_stubs.json`](ctrport/compat_stubs.json).
@@ -45,7 +45,8 @@ else needs to be installed.
 
 You need:
 
-- Windows 10/11 x64, a GPU with Vulkan 1.3, an XInput controller.
+- Windows 10/11 x64, a GPU with Vulkan 1.3, an XInput controller or a PlayStation controller
+  (DualShock 4 or DualSense, USB or Bluetooth; no DS4Windows needed).
 - Your own dump of CUSA14876 v01.00 (eboot SHA256 `ca9c9441…`), optionally with the
   v01.21 update (eboot SHA256 `39d716b7…`, required for 60 FPS). Other versions are
   rejected.
@@ -152,7 +153,10 @@ The server also exists as a standalone program, `ctr_online_server.exe --auto-pu
 - **Xbox Controller Prompts**: check *Icone Xbox colorate* in launcher Settings to use colored A/B/X/Y prompts (CC0-1.0 by Julio Cacko, see [`ctrport/XBOX_PROMPTS.md`](ctrport/XBOX_PROMPTS.md)). The launcher builds the prompt archives from your own dump on the first launch (about 10 s, no Python); the release folder must contain `assets/xbox-default/`.
 - **Any XInput slot**: every connected XInput controller drives player 1, so a pad that Windows
   puts on slot 2–4 (for example next to a virtual pad from Steam or a controller emulator) works.
-- **Quick Controller Exit**: hold **View + Menu** for 1.2 seconds on your controller, then press **A** to confirm exit or **B** to cancel.
+- **PlayStation controllers**: DualShock 4 and DualSense work directly (read through SDL's
+  HID drivers in `ctr_gpu.dll`), with vibration; the touch pad click and Share act as the
+  touch pad button. Motion sensors and touch position are not passed to the game.
+- **Quick Controller Exit**: hold **View + Menu** (PlayStation: **Share + Options**) for 1.2 seconds on your controller, then press **A** (Cross) to confirm exit or **B** (Circle) to cancel.
 - **Rendering Modes**: choose between standard 1080p, PS4 Pro 1440p, or **Native 4K** internal resolution buffers, with 60 FPS unlocked on v01.21.
 
 

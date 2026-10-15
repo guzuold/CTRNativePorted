@@ -61,7 +61,19 @@ class PadBackend {
    if(result!=ERROR_SUCCESS && result!=ERROR_DEVICE_NOT_CONNECTED)throw std::runtime_error(std::string(failure)+" status="+std::to_string(result));
    status[i]=result;snapshots[i]=state;
   }
-  return merge_xinput(status,snapshots,merged);
+  XINPUT_GAMEPAD xinput{};const DWORD xinput_result=merge_xinput(status,snapshots,xinput);
+  // PlayStation controllers (DualShock 4, DualSense) come from ctr_gpu.dll, which reads them
+  // through SDL's HID drivers in the XINPUT_GAMEPAD layout (ctrport/gpu/ctr_gpu.h).
+  std::array<DWORD,4> sources{xinput_result,ERROR_DEVICE_NOT_CONNECTED,ERROR_DEVICE_NOT_CONNECTED,ERROR_DEVICE_NOT_CONNECTED};
+  std::array<XINPUT_STATE,4> states{};states[0].Gamepad=xinput;
+  if(const auto query=playstation_query();query && query(&states[1].Gamepad)>0)sources[1]=ERROR_SUCCESS;
+  return merge_xinput(sources,states,merged);
+ }
+ using PlayStationQuery=int(*)(XINPUT_GAMEPAD*);
+ static PlayStationQuery playstation_query(){
+  static PlayStationQuery query=nullptr;
+  if(!query)if(auto library=GetModuleHandleW(L"ctr_gpu.dll"))query=reinterpret_cast<PlayStationQuery>(GetProcAddress(library,"ctr_gpu_gamepad_state"));
+  return query;
  }
 public:
  PadBackend()=default;PadBackend(const PadBackend&)=delete;
@@ -128,6 +140,10 @@ public:
    XINPUT_VIBRATION vibration{static_cast<WORD>(motors[0]*257),static_cast<WORD>(motors[1]*257)};
    for(DWORD i=0;i<4;++i)if(status[i]==ERROR_SUCCESS)set_state(i,&vibration);
   }
+  using Rumble=void(*)(std::uint16_t,std::uint16_t);
+  static Rumble rumble=nullptr;
+  if(!rumble)if(auto library=GetModuleHandleW(L"ctr_gpu.dll"))rumble=reinterpret_cast<Rumble>(GetProcAddress(library,"ctr_gpu_gamepad_rumble"));
+  if(rumble && port->connected)rumble(static_cast<std::uint16_t>(motors[0]*257),static_cast<std::uint16_t>(motors[1]*257));
   return 0;
  }
  // Public 28-byte controller information, backed by the actual XInput port.

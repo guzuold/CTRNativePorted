@@ -46,6 +46,17 @@ CTR_GPU_API unsigned ctr_gpu_symbol_count(void);
 CTR_GPU_API uint64_t ctr_gpu_flip_count(void);
 CTR_GPU_API uint64_t ctr_gpu_submit_count(void);
 CTR_GPU_API int ctr_gpu_input_captured(void);
+/* PlayStation controllers (DualShock 4, DualSense) read through SDL's HID drivers, as an
+ * XINPUT_GAMEPAD-layout snapshot (buttons, triggers 0..255, sticks with Y up). Returns the
+ * number of connected PlayStation controllers; their inputs are merged. */
+typedef struct CtrGpuGamepad {
+    uint16_t buttons;
+    uint8_t left_trigger, right_trigger;
+    int16_t left_x, left_y, right_x, right_y;
+} CtrGpuGamepad;
+CTR_GPU_API int ctr_gpu_gamepad_state(CtrGpuGamepad* out);
+/* Rumble on every connected PlayStation controller (0 stops it). */
+CTR_GPU_API void ctr_gpu_gamepad_rumble(uint16_t low_frequency, uint16_t high_frequency);
 
 #ifdef __cplusplus
 }
