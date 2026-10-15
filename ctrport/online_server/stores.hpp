@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Project-server state, ported from tools/online local_matchmaking.py, local_stats.py,
-// local_friends.py, local_sessions.py and lobby_documents.py. Only the observed retail
+// local_friends.py, local_sessions.py, local_marketplace.py, local_achievements.py and
+// lobby_documents.py. Only the observed retail
 // schemas are accepted; every other input throws (the reference server's ValueError) before
 // any state changes. Matchmaking, lobbies and sessions live in memory for the life of the
 // server (a restart drops them, as every connected game has to log in again anyway);
@@ -28,6 +29,52 @@ private:
     std::filesystem::path path_;
     std::map<std::pair<std::uint32_t, std::string>, std::int64_t> ratings_;
 };
+
+// Pit Stop state (local_marketplace.py): Wumpa currency balances and inventory per account.
+// Retail v01.21 requests: service 80 task 165 typed [STRING "octane_psn", UINT32 1, UINT32 856]
+// (inventory page) and task 245 struct {1: "octane_psn", 2: max results} (balances). Only empty
+// inventory pages are served until the retail item record layout is validated. Stored as text
+// lines "balance <account> <currency> <amount>" / "inventory <account> <item> <quantity>"
+// (the rows of the reference's two SQLite tables). The file is read again when it changes on
+// disk, so balances set with ctr_online_server.exe --set-balance reach a running server.
+class MarketplaceStore {
+public:
+    explicit MarketplaceStore(std::filesystem::path path);
+    // Task 165: throws on an unexpected request or a nonempty inventory.
+    void inventory_page(const std::vector<Param>& params, std::uint64_t account);
+    // Task 245: struct reply message, repeated field 1 {1: currency, 2: zigzag amount}.
+    Bytes balances_message(const std::vector<Param>& params, std::uint64_t account);
+    // The client reads a currency ID as one byte (it fails the whole reply above 255) and
+    // matches it against its local currency list: in retail v01.21 10 is "Wumpa Coins",
+    // 11 "Nitro Boost", 12 "Free Nitro Boost". Amount 0 removes the balance.
+    void set_balance(std::uint64_t account, std::uint64_t currency, std::int64_t amount);
+    void set_inventory(std::uint64_t account, std::uint64_t item, std::int64_t quantity);
+private:
+    void load();
+    void save();
+    std::filesystem::path path_;
+    std::filesystem::file_time_type loaded_{};
+    std::map<std::pair<std::string, std::uint64_t>, std::int64_t> balances_, inventory_;
+};
+
+// Wumpa Challenge state (local_achievements.py), achievement engine service 125, struct
+// requests in the "octane_psn" context: task 1 event reports (recorded, acknowledged) and
+// task 3 achievement states of one kind 0..7 (always empty: no challenge schedule yet).
+// Events are appended as JSON lines {"account", "received", "event"}, the columns of the
+// reference's events table; "event" holds the same json.dumps text.
+class AchievementStore {
+public:
+    explicit AchievementStore(std::filesystem::path path);
+    Json report_events(const std::vector<Param>& params, std::uint64_t account); // the stored events
+    Bytes states_message(const std::vector<Param>& params, std::uint64_t account) const;
+private:
+    std::filesystem::path path_;
+};
+
+// Replies of the Pit Stop and Wumpa Challenge tasks (80/165, 80/245, 125/1, 125/3), as
+// demonware_tasks.handle; nullopt for other tasks. Rejected requests get UNSERVED_ERROR.
+std::optional<Bytes> pitstop_task(const TaskRequest& request, std::uint64_t account,
+                                  MarketplaceStore& marketplace, AchievementStore& achievements);
 
 // Project friend graph: always empty (no social service). Nonempty pages are not served.
 Json friend_page(std::int64_t offset, std::int64_t limit);

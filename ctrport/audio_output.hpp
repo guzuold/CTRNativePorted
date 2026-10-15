@@ -45,6 +45,10 @@ public:
    HRESULT hr=com;
    if(SUCCEEDED(hr))hr=XAudio2Create(&engine,0,XAUDIO2_DEFAULT_PROCESSOR);
    if(SUCCEEDED(hr))hr=engine->CreateMasteringVoice(&master);
+   // CTR_AUDIO_MUTE=1 (test runs): zero endpoint gain only. Voices still consume every
+   // block at the real rate, so AudioOutOutput pacing is unchanged.
+   char mute[2]{};
+   if(SUCCEEDED(hr) && GetEnvironmentVariableA("CTR_AUDIO_MUTE",mute,sizeof mute)==1 && mute[0]=='1'){hr=master->SetVolume(0.0f);std::printf("{\"scope\":\"audio_endpoint_muted\",\"result\":%ld}\n",static_cast<long>(hr));}
    if(SUCCEEDED(hr)){XAUDIO2_VOICE_DETAILS details{};master->GetVoiceDetails(&details);channels=details.InputChannels;sample_rate=details.InputSampleRate;active_engine=engine;}
    promise.set_value(hr);
    if(SUCCEEDED(hr)){

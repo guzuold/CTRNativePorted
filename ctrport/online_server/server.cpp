@@ -82,6 +82,20 @@ std::string query_value(const std::string& query, const std::string& name, const
     }
     return fallback;
 }
+// urllib.parse.parse_qs(...).get(name, []): every nonblank value of a name.
+std::vector<std::string> query_values(const std::string& query, const std::string& name) {
+    std::vector<std::string> out;
+    std::size_t start = 0;
+    while (start <= query.size()) {
+        const std::size_t end = std::min(query.find('&', start), query.size());
+        const std::string item = query.substr(start, end - start);
+        const std::size_t eq = item.find('=');
+        if (eq != std::string::npos && eq + 1 < item.size() && percent_decode(item.substr(0, eq)) == name)
+            out.push_back(percent_decode(item.substr(eq + 1)));
+        start = end + 1;
+    }
+    return out;
+}
 // Python int(text) within 64 bits.
 std::optional<std::int64_t> python_int(const std::string& raw) {
     const std::string text = trim(raw);
@@ -191,6 +205,8 @@ struct Server::Impl {
     std::map<std::uint64_t, std::shared_ptr<Client>> live_clients;
     std::map<std::uint64_t, LobbyPlan> pending_lobbies;
     std::unique_ptr<StatsStore> stats;
+    std::unique_ptr<MarketplaceStore> marketplace;
+    std::unique_ptr<AchievementStore> achievements;
     SessionStore session_store;
     MatchmakingStore matchmaking;
     DiscoveryLayout discovery;
@@ -446,6 +462,16 @@ struct Server::Impl {
         }
         if (starts_with(target, "/webapi/")) {
             const std::string path = target.substr(8);
+            if (method == "GET" && path.substr(0, path.find('?')) == "sdk:entitlement/v1/users/me/entitlements") {
+                // Service entitlements bought on the PS Store: the project sells nothing, so the
+                // list is empty. Field names from the retail libSceNpToolkit2.prx parser strings.
+                if (online_id.empty()) return json_answer(403, R"({"error":{"message":"project identity required"}})", "webapi_entitlements", false);
+                const std::optional<Json> payload = entitlement_page(path.find('?') == std::string::npos ? "" : path.substr(path.find('?') + 1));
+                if (!payload) return json_answer(400, R"({"error":{"message":"invalid entitlement request"}})", "webapi_entitlements", false);
+                HttpAnswer a = json_answer(200, dump_json_spaced(*payload), "webapi_entitlements");
+                a.fields.set("reply", *payload);
+                return a;
+            }
             if (method == "POST" && path == "sdk:sessionInvitation/v1/sessions") {
                 if (online_id.empty()) return json_answer(403, R"({"error":{"message":"project identity required"}})", "webapi_session_create", false);
                 const std::uint64_t account = user_id(online_id);
@@ -639,6 +665,7 @@ struct Server::Impl {
             w.u32(1).u32(1).u32(static_cast<std::uint32_t>(std::time(nullptr)));
             return task_reply(task, &w);
         }
+        if (auto answer = pitstop_task(request, user.user_id, *marketplace, *achievements)) return *answer;
         if (service == 4 && task == 1) return guarded([&] { stats->write(params, user.user_id); return task_reply(task); });
         if (service == 145 && task == 2)
             return guarded([&] { matchmaking.advertise(params, user.user_id, user.room_token); return task_reply(task); });
@@ -930,6 +957,8 @@ struct Server::Impl {
         std::ofstream(config.state_dir / "server_key.der", std::ios::binary)
             .write(reinterpret_cast<const char*>(key->spki().data()), static_cast<std::streamsize>(key->spki().size()));
         stats = std::make_unique<StatsStore>(config.state_dir / "stats.txt");
+        marketplace = std::make_unique<MarketplaceStore>(config.state_dir / "marketplace.txt");
+        achievements = std::make_unique<AchievementStore>(config.state_dir / "achievement_events.jsonl");
 
         SOCKET s;
         if (open("http/" + std::to_string(config.http_port), SOCK_STREAM, config.host, config.http_port, s))
@@ -1017,6 +1046,21 @@ fs::path Server::traffic_key_path() const { return impl_->config.state_dir / "se
 std::size_t Server::connected_players() const {
     std::lock_guard<std::mutex> lock(impl_->state);
     return impl_->live_clients.size();
+}
+
+std::optional<Json> entitlement_page(const std::string& query) {
+    const auto first = [&](const char* name) -> std::optional<std::int64_t> {
+        const std::vector<std::string> values = query_values(query, name);
+        return values.empty() ? std::nullopt : python_int(values[0]);
+    };
+    const auto start = first("start"), size = first("size"), label = first("service_label");
+    if (!start || !size || !label || query_values(query, "entitlement_type") != std::vector<std::string>{"service"} ||
+        *start < 0 || *size <= 0 || *size > 1000)
+        return std::nullopt;
+    Json page = Json::object();
+    page.set("total_results", Json::of(0));
+    page.set("entitlements", Json::array());
+    return page;
 }
 
 fs::path find_project_root(const fs::path& exe_dir) {

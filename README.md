@@ -137,6 +137,12 @@ per player and direction). It helps only when the server itself is reachable fro
 a host behind CGNAT cannot host the server for players outside its network, relay or not.
 Tested so far on one PC with the direct path blocked on purpose, not yet between real networks.
 
+**Pit Stop and Wumpa Challenges** open online with v01.21: the server keeps each player's
+Wumpa Coin balance and challenge events (catalogue, prices and challenges come from the game's
+own data). Buying items and earning coins from races are not implemented yet, so the balance
+starts at 0; for testing, `ctr_online_server.exe --set-balance <online ID> 10 <amount>` sets an
+account's Wumpa Coins (currency 10), picked up at the game's next login.
+
 The server also exists as a standalone program, `ctr_online_server.exe --auto-public --upnp`
 (built by `ctrport/online_server/build_online_server.ps1`), and the original Python reference,
 `tools/online/ctr_online_server.py`, is kept for comparison.
@@ -144,6 +150,8 @@ The server also exists as a standalone program, `ctr_online_server.exe --auto-pu
 ## Additional features
 
 - **Xbox Controller Prompts**: check *Icone Xbox colorate* in launcher Settings to use colored A/B/X/Y prompts (CC0-1.0 by Julio Cacko, see [`ctrport/XBOX_PROMPTS.md`](ctrport/XBOX_PROMPTS.md)). The launcher builds the prompt archives from your own dump on the first launch (about 10 s, no Python); the release folder must contain `assets/xbox-default/`.
+- **Any XInput slot**: every connected XInput controller drives player 1, so a pad that Windows
+  puts on slot 2–4 (for example next to a virtual pad from Steam or a controller emulator) works.
 - **Quick Controller Exit**: hold **View + Menu** for 1.2 seconds on your controller, then press **A** to confirm exit or **B** to cancel.
 - **Rendering Modes**: choose between standard 1080p, PS4 Pro 1440p, or **Native 4K** internal resolution buffers, with 60 FPS unlocked on v01.21.
 

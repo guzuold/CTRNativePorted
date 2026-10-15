@@ -3,18 +3,22 @@
 // Port of tools/online/ctr_online_server.py (the reference implementation, kept for
 // comparison); the served routes, ports and log events are the same:
 // - HTTP (default 8780): /ctr/v1/traffic-key, /ctr/v1/config, /ctr/v1/peer-allowed, auth3,
-//   Umbrella, PSN Web API friend list and session creation; everything else an explicit 404;
-// - TCP 3074: Demonware lobby protocol 210 with tasks, matchmaking and lobby documents;
+//   Umbrella, PSN Web API friend list, session creation and service entitlements;
+//   everything else an explicit 404;
+// - TCP 3074: Demonware lobby protocol 210 with tasks, matchmaking, lobby documents and the
+//   Pit Stop / Wumpa Challenge state (stores.hpp);
 // - UDP discovery: one public address with four ports (internet), or two loopback addresses;
 // - UDP 3082: relay of game datagrams between players of the same room (relay.hpp), with its
 //   token from POST /ctr/v1/relay-session (C++ only: not in the Python reference);
 // - recorders for other TCP/UDP ports.
 // It never connects anywhere itself.
 #pragma once
+#include "json.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -59,6 +63,11 @@ private:
 
 // Project root (the directory holding runtime/) from an executable path: the first ancestor
 // with a runtime/ or ctrport/ folder; falls back to the executable's directory.
+// GET sdk:entitlement/v1/users/me/entitlements?<query>: the empty service entitlement list,
+// or nullopt for a request other than start>=0, 0<size<=1000, integer service_label and
+// entitlement_type=service (the reference server's 400).
+std::optional<Json> entitlement_page(const std::string& query);
+
 std::filesystem::path find_project_root(const std::filesystem::path& exe_dir);
 std::filesystem::path default_log_path(const std::filesystem::path& root);
 } // namespace ctr_online

@@ -14,6 +14,12 @@ in the mapped image, and checks the original bytes first.
 | `CTR_UNLOCK_ALL=1` | v01.00 and v01.21 | data, not code: byte `+0x81` of the current build record | `00` | `01` | ctrport (`unlock_all.hpp`), test only |
 | `CTR_ONLINE=1` | v01.00 (`ca9c9441...`) and v01.21 (`39d716b7...`) | data: v01.00 `0x1ade440`, v01.21 `0x1becf40`, 0x126 bytes | Demonware auth3 traffic key (SHA-256 `356c4bc3...`) | project server public key (`CTR_ONLINE_TRAFFIC_KEY`) | ctrport (`online_traffic_key.hpp`), see below |
 
+The offsets of every supported eboot are in `retail_profiles.hpp`. The US CUSA13795 eboots
+(v01.00 `23ddf390...`, v01.21 `e3b7a068...`) have the same patches at shifted offsets (60 FPS
+v01.21 `0x13a9d90`; native 4K v01.00 `0x12e74b2`, `0x1aacfbb`, v01.21 `0x13aa662`, `0x1bbb938`;
+online key v01.21 `0x1becf80`, v01.00 as EU), derived from the user's dump by comparing the
+original bytes; not yet run in this runtime.
+
 ## CTR_TLS_PATCH
 
 Written for ctrport. After the exception handler has emulated a guest `mov rax, fs:[0]`,

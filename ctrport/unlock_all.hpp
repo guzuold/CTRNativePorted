@@ -22,6 +22,9 @@ struct UnlockAllBinding {const char* sha256;std::uint64_t getter,global,reader;u
 inline constexpr UnlockAllBinding unlock_all_bindings[]={
     {"ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1",0x9de850,0x26b1320,0xf3cba8,10},
     {"39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5",0x9f0cf0,0x2ab1bd0,0xe6b342,25},
+    // US CUSA13795, derived from the user's dump (retail_profiles.hpp); reader counts as EU.
+    {"23ddf3909d87a42a4c74be395865b130e4128b892de59d71082d8620cd8cd858",0x9de850,0x26b1320,0xf3cb98,10},
+    {"e3b7a068b5e7be0f976102aa223a74425e7817c67e26e21416163291750c1b83",0x9f0cf0,0x2ab1bd0,0xe6b342,25},
 };
 inline bool unlock_all_read(std::uint64_t address,void* out,std::size_t size){
     SIZE_T got=0;

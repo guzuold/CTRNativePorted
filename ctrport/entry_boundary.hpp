@@ -16,6 +16,7 @@
 #include "sysmodule_service.hpp"
 #include "direct_memory.hpp"
 #include "online_traffic_key.hpp"
+#include "retail_profiles.hpp"
 #include "gnm_init_dispatch.hpp"
 #include "gnm_submission_snapshot.hpp"
 #include "gnm_command_cursor.hpp"
@@ -2249,10 +2250,10 @@ inline LONG CALLBACK entry_dependency_exception(EXCEPTION_POINTERS* exception) {
             for(std::size_t image=0;image<entry_images->size();++image) {
                 const auto base=reinterpret_cast<std::uint64_t>((*entry_images)[image].get());
                 const auto& cur_sha=(*entry_metadata)[image].sha256;
-                const auto target_off=(cur_sha=="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5")?0x14cfb10ULL:0x1409af0ULL;
-                if((cur_sha!="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1" && cur_sha!="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5") || exception->ContextRecord->Rdx!=base+target_off)continue;
+                const auto* profile=retail_profile(cur_sha);
+                if(!profile || exception->ContextRecord->Rdx!=base+profile->worker)continue;
                 std::uint32_t key=0;SIZE_T got=0;
-                const auto tsd_offset=(cur_sha=="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5")?0x2a0cb50ULL:0x260cb50ULL;
+                const auto tsd_offset=profile->tsd;
                 const bool valid=ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(base+tsd_offset),&key,4,&got) && got==4;
                 char line[256];const auto key_length=snprintf(line,sizeof(line),"{\"scope\":\"original_worker_tsd_key\",\"global_offset\":%llu,\"readable\":%s,\"key\":%u,\"runtime_owned\":%s}\n",static_cast<unsigned long long>(tsd_offset),valid?"true":"false",key,valid&&thread_keys.owns(key)?"true":"false");
                 DWORD sent=0;if(key_length>0)WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),line,static_cast<DWORD>(key_length),&sent,nullptr);
@@ -2407,8 +2408,8 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     auto& images=startup_images?*startup_images:input_images;
     if(metadata.empty() || metadata.front().executable_spans.empty()) throw std::runtime_error("Entry image missing");
     const auto pin=metadata.front().sha256;
-    if(pin!="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1" &&
-       pin!="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5") throw std::runtime_error("Entry SHA unsupported");
+    const auto* profile=retail_profile(pin);
+    if(!profile) throw std::runtime_error("Entry SHA unsupported");
     const auto first=std::find_if(metadata.front().imports.begin(),metadata.front().imports.end(),[](const auto& symbol){return symbol.nid=="bzQExy189ZI" && symbol.library=="libc" && symbol.type==2;});
     if(first==metadata.front().imports.end()) throw std::runtime_error("Entry first libc import missing");
     std::memcpy(&boundary_target,images.front().get()+first->slot,8);boundary_source=reinterpret_cast<std::uint64_t>(images.front().get());condition_observation_base=boundary_source;
@@ -2592,7 +2593,7 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     if(initialize_libc_only) services.push_back({"WhCc1w3EhSI","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_thread_atexit_report_set)});
     if(initialize_libc_only) {
         if(!bind_memory) throw std::runtime_error("Process parameter requires validated retail profile");
-        process_parameter=images.front().get()+(pin=="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1"?0x2600000ULL:0x2a00000ULL);
+        process_parameter=images.front().get()+profile->proc;
         services.push_back({"959qrazPIrg","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_get_proc_param)});
     }
     if(initialize_libc_only) services.push_back({"upoVrzMHFeE","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_orbis_mutex_trylock)});
@@ -2657,9 +2658,7 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     if(initialize_libc_only) services.push_back({"9BcDykPmo1I","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_guest_errno)});
     if(initialize_libc_only) services.push_back({"vNe1w4diLCs","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_tls_address)});
     if(continue_after_libc_init) {
-        if(pin!="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1" &&
-           pin!="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5")throw std::runtime_error("Startup worker retail pin unsupported");
-        const uint64_t worker_target=(pin=="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5")?0x14cfb10:0x1409af0;
+        const uint64_t worker_target=profile->worker;
         validated_worker_target(images.front().get(),metadata.front(),pin,worker_target,117);
         startup_worker_images=startup_images;startup_worker_tls=tls_storage;startup_worker_metadata=metadata;
         services.push_back({"TywrFKCoLGY","libSceSaveData","libSceSaveData",reinterpret_cast<const void*>(&ctr_sysv_save_data_initialize3)});
@@ -2802,15 +2801,15 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     // Original "mov [r14+0x488],eax" stores the configuration value [r12+0x18]; the patch
     // stores edx instead, which no instruction in the function sets here (it holds what
     // the preceding call left), so the effect is observed, not derived.
-    if(pin=="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5"){
+    if(profile->fps60){
         static const bool patch_60fps=[]{char v[2]{};return GetEnvironmentVariableA("CTR_60FPS_PATCH",v,sizeof(v))==1 && v[0]=='1';}();
         if(patch_60fps){
             const unsigned char original_bytes[]={0x41,0x89,0x86,0x88,0x04,0x00,0x00};
             const unsigned char patch_bytes[]={0x41,0x89,0x96,0x88,0x04,0x00,0x00};
-            auto* site=images.front().get()+0x013a9d80;
-            if(std::memcmp(site,original_bytes,sizeof(original_bytes))!=0) throw std::runtime_error("60 FPS patch site differs from v01.21 original bytes");
+            auto* site=images.front().get()+profile->fps60;
+            if(std::memcmp(site,original_bytes,sizeof(original_bytes))!=0) throw std::runtime_error("60 FPS patch site differs from the v01.21 original bytes");
             std::memcpy(site,patch_bytes,sizeof(patch_bytes));
-            std::cout<<"{\"scope\":\"guest_60fps_patch_applied\",\"target\":20618624,\"bytes\":7,\"origin\":\"GoldHEN_Patch_Repository 60 FPS Unlock 2.0 by illusion\"}\n"<<std::flush;
+            std::cout<<"{\"scope\":\"guest_60fps_patch_applied\",\"target\":"<<profile->fps60<<",\"bytes\":7,\"origin\":\"GoldHEN_Patch_Repository 60 FPS Unlock 2.0 by illusion\"}\n"<<std::flush;
         }
     }
     // CTR_ONLINE=1: project server key in place of the auth3 traffic signing key (R8).
@@ -2827,10 +2826,8 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     //    0x1aacfcb, v01.21 0x1bbb918), raise the immediate from 0x3c000000 (960 MiB) to
     //    0x78000000 (1920 MiB, matching native_4k_direct_bytes in direct_memory.hpp).
     if(native_4k_selected()){
-        const std::uint64_t scale_offset=(pin=="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5")?0x013aa652ULL:
-                                         (pin=="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1")?0x012e74c2ULL:0ULL;
-        const std::uint64_t vram_b_offset=(pin=="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5")?0x01bbb918ULL:
-                                          (pin=="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1")?0x01aacfcbULL:0ULL;
+        const std::uint64_t scale_offset=profile->scale4k;
+        const std::uint64_t vram_b_offset=profile->vram4k;
         if(!scale_offset || !vram_b_offset) throw std::runtime_error("CTR_NATIVE_4K has no binding for this eboot");
         const unsigned char original_scale_bytes[]={0x41,0x8b,0x44,0x24,0x48,0x41,0x89,0x86,0x48,0x05,0x00,0x00};
         const unsigned char patch_scale_bytes[]={0xb8,0x00,0x00,0x00,0x40};

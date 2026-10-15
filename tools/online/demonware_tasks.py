@@ -14,6 +14,9 @@ import demonware_rest
 BOOL, INT8, UINT8, WCHAR16, INT16, UINT16, INT32, UINT32, INT64, UINT64 = range(1, 11)
 FLOAT32, FLOAT64 = 13, 14
 STRING, USTRING, MBSTRING, BLOB = 16, 17, 18, 19
+# Struct buffer (protobuf message) parameter, observed in retail requests of services 80, 125
+# and 194: type byte 23, typed u32 size, message bytes.
+STRUCT = 23
 
 # Names: "anticheat" is the project's; reportExtendedAuthInfo appears in the retail eboot.
 SERVICE_NAMES = {38: 'anticheat'}
@@ -22,6 +25,8 @@ LSG_TASK_REPLY = 1
 _transactions = itertools.count(1)
 statistics_store = None
 matchmaking_store = None
+marketplace_store = None
+achievement_store = None
 
 
 class Reader:
@@ -60,6 +65,13 @@ class Reader:
             blob = self.data[self.offset:self.offset + length]
             self.offset += length
             return kind, blob.hex()
+        if kind == STRUCT:
+            length_kind, length = self.value()
+            if length_kind != UINT32 or length > len(self.data) - self.offset:
+                raise ValueError('invalid struct buffer length')
+            message = self.data[self.offset:self.offset + length]
+            self.offset += length
+            return kind, message.hex()
         raise ValueError('unknown data type %d at %d' % (kind, self.offset - 1))
 
     def values(self):
@@ -92,6 +104,12 @@ class Writer:
         self.data += bytes([BLOB])
         self.u32(len(value))
         self.data += value
+        return self
+
+    def struct(self, message):
+        self.data += bytes([STRUCT])
+        self.u32(len(message))
+        self.data += message
         return self
 
     def string(self, value):
@@ -127,6 +145,12 @@ def reply(task, results=None, error=0):
     return bytes(writer.data)
 
 
+def struct_reply(task, message):
+    """Reply carrying a struct buffer: header, struct buffer, end marker (as the REST proxy)."""
+    writer = Writer().u64(next(_transactions)).u32(0).u8(task).struct(message)
+    return bytes(writer.data) + bytes([0])
+
+
 SERVICE_NAMES[194] = 'REST over LSG'
 # Services the project does not serve yet answer with a task error (non-zero code) rather
 # than an empty success the client would fail to parse.
@@ -150,6 +174,30 @@ def handle(service, task, params, user):
         except (ValueError, KeyError):
             return reply(task, error=UNSERVED_ERROR)
         return reply(task)
+    if service == 80 and task == 165 and marketplace_store is not None:
+        try:
+            items = marketplace_store.inventory_page(params, user['user_id'])
+        except (ValueError, KeyError, TypeError, NotImplementedError):
+            return reply(task, error=UNSERVED_ERROR)
+        return reply(task) if not items else reply(task, error=UNSERVED_ERROR)
+    if service == 80 and task == 245 and marketplace_store is not None:
+        try:
+            message = marketplace_store.balances_message(params, user['user_id'], demonware_rest.fields)
+        except (ValueError, KeyError, TypeError):
+            return reply(task, error=UNSERVED_ERROR)
+        return struct_reply(task, message)
+    if service == 125 and task == 1 and achievement_store is not None:
+        try:
+            achievement_store.report_events(params, user['user_id'])
+        except (ValueError, KeyError, TypeError, UnicodeError):
+            return reply(task, error=UNSERVED_ERROR)
+        return reply(task)
+    if service == 125 and task == 3 and achievement_store is not None:
+        try:
+            message = achievement_store.states_message(params, user['user_id'])
+        except (ValueError, KeyError, TypeError):
+            return reply(task, error=UNSERVED_ERROR)
+        return struct_reply(task, message)
     if service == 145 and task == 2 and matchmaking_store is not None:
         try:
             matchmaking_store.advertise(params, user['user_id'], user['room_token'])

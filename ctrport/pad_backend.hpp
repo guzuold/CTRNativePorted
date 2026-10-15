@@ -26,6 +26,24 @@ inline std::array<unsigned char,120> pad_connected_sample(const XINPUT_GAMEPAD& 
  out[76]=1;std::memcpy(out.data()+80,&time,8);out[104]=connections;return out;
 }
 
+// The game opens one local user (port 0). Every connected XInput slot feeds it: buttons are
+// OR-ed, triggers take the larger value, each stick the larger deflection. Observed case
+// (2026-10-16): a Steam Controller emulated as Xbox 360 by Steamless Controller showed slots 0
+// and 1 connected on one PC, with no input reaching the game while only slot 0 was read.
+inline DWORD merge_xinput(const std::array<DWORD,4>& results,const std::array<XINPUT_STATE,4>& states,XINPUT_GAMEPAD& out){
+ out={};DWORD merged=ERROR_DEVICE_NOT_CONNECTED;
+ const auto stick=[](SHORT& x,SHORT& y,SHORT nx,SHORT ny){
+  if(static_cast<long long>(nx)*nx+static_cast<long long>(ny)*ny>static_cast<long long>(x)*x+static_cast<long long>(y)*y){x=nx;y=ny;}};
+ for(std::size_t i=0;i<results.size();++i){
+  if(results[i]!=ERROR_SUCCESS)continue;
+  merged=ERROR_SUCCESS;const auto& g=states[i].Gamepad;
+  out.wButtons|=g.wButtons;
+  out.bLeftTrigger=(std::max)(out.bLeftTrigger,g.bLeftTrigger);out.bRightTrigger=(std::max)(out.bRightTrigger,g.bRightTrigger);
+  stick(out.sThumbLX,out.sThumbLY,g.sThumbLX,g.sThumbLY);stick(out.sThumbRX,out.sThumbRY,g.sThumbRX,g.sThumbRY);
+ }
+ return merged;
+}
+
 // New Windows backend, not a compatibility stub. Public PS4 Init lifecycle:
 // pinned shadPS4 pad.cpp e3ce810f3a653f43ac64ebab63023de281a4103a.
 // XInput API/types from installed Windows SDK. No fabricated connected device,
@@ -36,6 +54,15 @@ class PadBackend {
  struct Port {int user;int handle;DWORD slot;bool connected=false;unsigned char connections=0;};
  std::vector<Port> ports;int next_handle=1;
  std::array<DWORD,4> status{};std::array<XINPUT_STATE,4> snapshots{};
+ // Polls the four slots (caller holds the mutex) and merges the connected ones.
+ DWORD poll_all(XINPUT_GAMEPAD& merged,const char* failure){
+  for(DWORD i=0;i<4;++i){
+   XINPUT_STATE state{};const DWORD result=get_state(i,&state);
+   if(result!=ERROR_SUCCESS && result!=ERROR_DEVICE_NOT_CONNECTED)throw std::runtime_error(std::string(failure)+" status="+std::to_string(result));
+   status[i]=result;snapshots[i]=state;
+  }
+  return merge_xinput(status,snapshots,merged);
+ }
 public:
  PadBackend()=default;PadBackend(const PadBackend&)=delete;
  ~PadBackend(){if(module)FreeLibrary(module);}
@@ -61,9 +88,8 @@ public:
   if(type!=0 || index!=0 || params)throw std::runtime_error("PadOpen only observed standard port0/index0/null parameters implemented");
   for(const auto& port:ports)if(port.user==user)return static_cast<int>(0x80920004U);
   if(!ports.empty())throw std::runtime_error("PadOpen additional local user routing missing");
-  XINPUT_STATE state{};const DWORD native=get_state(0,&state);
-  if(native!=ERROR_SUCCESS && native!=ERROR_DEVICE_NOT_CONNECTED)throw std::runtime_error("PadOpen real XInput poll failed");
-  status[0]=native;snapshots[0]=state;const int handle=next_handle++;ports.push_back({user,handle,0,native==ERROR_SUCCESS,static_cast<unsigned char>(native==ERROR_SUCCESS?1:0)});return handle;
+  XINPUT_GAMEPAD merged{};const DWORD native=poll_all(merged,"PadOpen real XInput poll failed");
+  const int handle=next_handle++;ports.push_back({user,handle,0,native==ERROR_SUCCESS,static_cast<unsigned char>(native==ERROR_SUCCESS?1:0)});return handle;
  }
  // Public disconnected sample: pinned pad.cpp ProcessStates368-374/readState467-470,
  // pad.h OrbisPadData size120, quaternion offset12/w24, connected76.
@@ -73,8 +99,7 @@ public:
   std::lock_guard<std::mutex> guard(mutex);
   const auto port=std::find_if(ports.begin(),ports.end(),[handle](const Port& p){return p.handle==handle;});
   if(port==ports.end())return static_cast<int>(0x80920003U);
-  XINPUT_STATE state{};const DWORD result=get_state(port->slot,&state);
-  if(result!=ERROR_SUCCESS && result!=ERROR_DEVICE_NOT_CONNECTED)throw std::runtime_error("XInput read failed status="+std::to_string(result));
+  XINPUT_STATE state{};const DWORD result=poll_all(state.Gamepad,"XInput read failed");
   std::array<unsigned char,120> sample{};const float identity=1.0f;std::memcpy(sample.data()+24,&identity,4);
   if(result==ERROR_SUCCESS){
    apply_pad_test_input(state.Gamepad);
@@ -85,7 +110,7 @@ public:
    if(!port->connected){if(port->connections!=255)++port->connections;}
    sample=pad_connected_sample(state.Gamepad,port->connections,ctr_kernel_process_time());
   }
-  port->connected=result==ERROR_SUCCESS;status[port->slot]=result;snapshots[port->slot]=state;
+  port->connected=result==ERROR_SUCCESS;
   require_time_output(output,sample.size());std::memcpy(output,sample.data(),sample.size());return 0;
  }
  // scePadSetVibration (shadPS4 pad.cpp651-664; OrbisPadVibrationParam {u8 largeMotor;
@@ -99,7 +124,10 @@ public:
   if(!ReadProcessMemory(GetCurrentProcess(),parameter,motors,2,&read) || read!=2)return static_cast<int>(0x80920001U);
   using SetState=DWORD (WINAPI*)(DWORD,XINPUT_VIBRATION*);
   static const SetState set_state=[this]{FARPROC symbol=module?GetProcAddress(module,"XInputSetState"):nullptr;SetState call=nullptr;std::memcpy(&call,&symbol,sizeof(call));return call;}();
-  if(set_state && port->connected){XINPUT_VIBRATION vibration{static_cast<WORD>(motors[0]*257),static_cast<WORD>(motors[1]*257)};set_state(port->slot,&vibration);}
+  if(set_state && port->connected){
+   XINPUT_VIBRATION vibration{static_cast<WORD>(motors[0]*257),static_cast<WORD>(motors[1]*257)};
+   for(DWORD i=0;i<4;++i)if(status[i]==ERROR_SUCCESS)set_state(i,&vibration);
+  }
   return 0;
  }
  // Public 28-byte controller information, backed by the actual XInput port.
@@ -109,10 +137,9 @@ public:
   std::lock_guard<std::mutex> guard(mutex);
   const auto port=std::find_if(ports.begin(),ports.end(),[handle](const Port& p){return p.handle==handle;});
   if(port==ports.end())return static_cast<int>(0x80920003U);
-  XINPUT_STATE state{};const DWORD result=get_state(port->slot,&state);
-  if(result!=ERROR_SUCCESS && result!=ERROR_DEVICE_NOT_CONNECTED)throw std::runtime_error("XInput information poll failed");
+  XINPUT_GAMEPAD merged{};const DWORD result=poll_all(merged,"XInput information poll failed");
   if(result==ERROR_SUCCESS && !port->connected && port->connections!=255)++port->connections;
-  port->connected=result==ERROR_SUCCESS;status[port->slot]=result;snapshots[port->slot]=state;
+  port->connected=result==ERROR_SUCCESS;
   std::array<unsigned char,28> info{};
   info[8]=static_cast<unsigned char>(XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE>>8);
   info[9]=static_cast<unsigned char>(XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE>>8);
@@ -168,6 +195,19 @@ inline int pad_read_state_control(){
  const auto mapped=pad_connected_sample(fixture,2,0x123456789ULL);uint32_t bits=0;uint64_t time=0;std::memcpy(&bits,mapped.data(),4);std::memcpy(&time,mapped.data()+80,8);
  if(bits!=0x4188 || mapped[4]!=0 || mapped[5]!=0 || mapped[6]!=255 || mapped[7]!=255 || mapped[8]!=31 || mapped[9]!=30 || mapped[76]!=1 || mapped[104]!=2 || time!=0x123456789ULL)return 7;
  fixture={};const auto centered=pad_connected_sample(fixture,1,1);if(centered[4]!=128 || centered[6]!=128 || centered[5]!=127 || centered[7]!=127)return 8;
+ {
+  // Two connected slots (idle slot 0, active slot 1) and a disconnected slot 2 with stale data.
+  std::array<DWORD,4> results{ERROR_SUCCESS,ERROR_SUCCESS,ERROR_DEVICE_NOT_CONNECTED,ERROR_DEVICE_NOT_CONNECTED};
+  std::array<XINPUT_STATE,4> states{};
+  states[0].Gamepad.wButtons=XINPUT_GAMEPAD_START;states[0].Gamepad.sThumbLX=1000;states[0].Gamepad.bLeftTrigger=40;
+  states[1].Gamepad.wButtons=XINPUT_GAMEPAD_A;states[1].Gamepad.sThumbLX=-32768;states[1].Gamepad.sThumbRY=20000;states[1].Gamepad.bRightTrigger=255;
+  states[2].Gamepad.wButtons=XINPUT_GAMEPAD_B;states[2].Gamepad.sThumbRX=32767;
+  XINPUT_GAMEPAD merged{};
+  if(merge_xinput(results,states,merged)!=ERROR_SUCCESS || merged.wButtons!=(XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_A) || merged.sThumbLX!=-32768 ||
+     merged.sThumbRX!=0 || merged.sThumbRY!=20000 || merged.bLeftTrigger!=40 || merged.bRightTrigger!=255)return 9;
+  results.fill(ERROR_DEVICE_NOT_CONNECTED);
+  if(merge_xinput(results,states,merged)!=ERROR_DEVICE_NOT_CONNECTED || merged.wButtons)return 10;
+ }
  if(user_service.initialize(nullptr) || pad_backend.initialize())return 1;
  const int handle=pad_backend.open(1,0,0,nullptr);if(handle<=0)return 2;
  std::array<unsigned char,122> output;output.fill(0xa5);

@@ -81,6 +81,174 @@ void StatsStore::write(const std::vector<Param>& params, std::uint64_t account) 
     save();
 }
 
+namespace {
+const std::string MARKET_CONTEXT = "octane_psn";
+std::vector<PbField> struct_request(const std::vector<Param>& params) {
+    if (params.size() != 1 || params[0].kind != typed::STRUCT || !params[0].value.is_string()) throw Rejected("expected one struct buffer");
+    return pb_fields(from_hex(params[0].value.text));
+}
+// Python `{tag: value ...}` of a message: the last field with the tag.
+const PbField* last_field(const std::vector<PbField>& values, std::uint64_t tag) {
+    const PbField* found = nullptr;
+    for (const PbField& f : values) if (f.tag == tag) found = &f;
+    return found;
+}
+bool is_context(const PbField& f) { return f.wire != 0 && std::string(f.data.begin(), f.data.end()) == MARKET_CONTEXT; }
+// [v for t, w, v in values if t == 1] == [b'octane_psn']
+void require_context(const std::vector<PbField>& values) {
+    std::size_t count = 0;
+    bool matches = false;
+    for (const PbField& f : values)
+        if (f.tag == 1) { ++count; matches = is_context(f); }
+    if (count != 1 || !matches) throw Rejected("unsupported achievement context");
+}
+void append_bytes(Bytes& out, std::initializer_list<Bytes> parts) {
+    for (const Bytes& part : parts) out.insert(out.end(), part.begin(), part.end());
+}
+} // namespace
+
+MarketplaceStore::MarketplaceStore(std::filesystem::path path) : path_(std::move(path)) { load(); }
+void MarketplaceStore::load() {
+    std::error_code error;
+    const auto written = std::filesystem::last_write_time(path_, error);
+    if (error || written == loaded_) return;
+    std::ifstream in(path_);
+    std::string table, account;
+    std::uint64_t key;
+    std::int64_t value;
+    balances_.clear();
+    inventory_.clear();
+    while (in >> table >> account >> key >> value) {
+        if (table == "balance" && key <= 255) balances_[{account, key}] = value;
+        else if (table == "inventory") inventory_[{account, key}] = value;
+    }
+    loaded_ = written;
+}
+void MarketplaceStore::save() {
+    std::filesystem::create_directories(path_.parent_path());
+    const std::filesystem::path temporary = path_.string() + ".tmp";
+    {
+        std::ofstream out(temporary, std::ios::trunc);
+        for (const auto& [key, amount] : balances_) out << "balance " << key.first << ' ' << key.second << ' ' << amount << '\n';
+        for (const auto& [key, quantity] : inventory_) out << "inventory " << key.first << ' ' << key.second << ' ' << quantity << '\n';
+    }
+    std::filesystem::rename(temporary, path_);
+    loaded_ = std::filesystem::last_write_time(path_);
+}
+void MarketplaceStore::set_balance(std::uint64_t account, std::uint64_t currency, std::int64_t amount) {
+    if (currency > 255) throw Rejected("currency ID above 255");
+    load();
+    // A zero balance reads like no balance; dropping the row keeps the client's few slots
+    // (it asks for as many balances as it has currencies) for the nonzero ones.
+    if (amount) balances_[{std::to_string(account), currency}] = amount;
+    else balances_.erase({std::to_string(account), currency});
+    save();
+}
+void MarketplaceStore::set_inventory(std::uint64_t account, std::uint64_t item, std::int64_t quantity) {
+    load();
+    inventory_[{std::to_string(account), item}] = quantity;
+    save();
+}
+void MarketplaceStore::inventory_page(const std::vector<Param>& params, std::uint64_t account) {
+    load();
+    if (kinds(params) != std::vector<int>{typed::STRING, typed::UINT32, typed::UINT32} || params[0].value.text != MARKET_CONTEXT)
+        throw Rejected("unsupported inventory request");
+    if (params[1].value.as_u64() != 1 || params[2].value.as_u64() == 0 || params[2].value.as_u64() > 4096)
+        throw Rejected("unsupported inventory page");
+    const std::string owner = std::to_string(account);
+    for (const auto& entry : inventory_)
+        if (entry.first.first == owner) throw Rejected("nonempty inventory record layout not validated");
+}
+Bytes MarketplaceStore::balances_message(const std::vector<Param>& params, std::uint64_t account) {
+    load();
+    const std::vector<PbField> request = struct_request(params);
+    const PbField* context = last_field(request, 1);
+    const PbField* limit = last_field(request, 2);
+    if (!context || !is_context(*context) || !limit || limit->wire != 0 || limit->number == 0 || limit->number > 16)
+        throw Rejected("unsupported balances request fields");
+    const std::string owner = std::to_string(account);
+    Bytes message;
+    std::uint64_t rows = 0;
+    for (const auto& [key, amount] : balances_) { // ordered by currency within an account
+        if (key.first != owner) continue;
+        if (rows++ == limit->number) break;
+        const std::uint64_t zigzag = (static_cast<std::uint64_t>(amount) << 1) ^ static_cast<std::uint64_t>(amount >> 63);
+        Bytes entry;
+        append_bytes(entry, {pb_varint(1 << 3), pb_varint(key.second), pb_varint(2 << 3), pb_varint(zigzag)});
+        append_bytes(message, {pb_varint(1 << 3 | 2), pb_varint(entry.size()), entry});
+    }
+    return message;
+}
+
+AchievementStore::AchievementStore(std::filesystem::path path) : path_(std::move(path)) {}
+Json AchievementStore::report_events(const std::vector<Param>& params, std::uint64_t account) {
+    const std::vector<PbField> values = struct_request(params);
+    require_context(values);
+    Json events = Json::array();
+    for (const PbField& f : values) {
+        if (f.tag != 2 || f.wire != 2) continue;
+        // {t: v for t, w, v in fields(value) if w == 0 or t == 1}: last name, last numeric time.
+        const PbField* name = nullptr;
+        const PbField* time = nullptr;
+        const std::vector<PbField> event_fields = pb_fields(f.data);
+        for (const PbField& e : event_fields) {
+            if (e.tag == 1) name = &e;
+            else if (e.tag == 2 && e.wire == 0) time = &e;
+        }
+        if (!name || name->wire == 0) throw Rejected("achievement event without name");
+        const std::string text(name->data.begin(), name->data.end());
+        if (utf8_replace(text) != text) throw Rejected("achievement event name is not UTF-8");
+        Json event = Json::object();
+        event.set("name", Json::of(text));
+        event.set("time", time ? Json::of(time->number) : Json::null());
+        events.items.push_back(std::move(event));
+    }
+    if (events.items.empty()) throw Rejected("achievement report without events");
+    std::filesystem::create_directories(path_.parent_path());
+    std::ofstream out(path_, std::ios::app | std::ios::binary);
+    const std::uint64_t received = static_cast<std::uint64_t>(std::time(nullptr));
+    for (const Json& event : events.items) {
+        Json row = Json::object();
+        row.set("account", Json::of(std::to_string(account)));
+        row.set("received", Json::of(received));
+        row.set("event", Json::of(dump_json_spaced(event)));
+        out << dump_json(row) << '\n';
+    }
+    return events;
+}
+Bytes AchievementStore::states_message(const std::vector<Param>& params, std::uint64_t) const {
+    const std::vector<PbField> values = struct_request(params);
+    require_context(values);
+    std::vector<std::uint64_t> kind, limit;
+    std::vector<const PbField*> token;
+    for (const PbField& f : values) {
+        if (f.tag == 2 && f.wire == 0) kind.push_back(f.number);
+        if (f.tag == 3 && f.wire == 0) limit.push_back(f.number);
+        if (f.tag == 4) token.push_back(&f);
+    }
+    if (kind.size() != 1 || kind[0] >= 8 || limit != std::vector<std::uint64_t>{100} ||
+        !(token.empty() || (token.size() == 1 && token[0]->wire != 0 && token[0]->data.empty())))
+        throw Rejected("unsupported achievement states request");
+    for (const PbField& f : values)
+        if (f.tag >= 5 && f.tag <= 7) throw Rejected("achievement state filters not supported");
+    return {}; // no states, no next page token
+}
+
+std::optional<Bytes> pitstop_task(const TaskRequest& request, std::uint64_t account,
+                                  MarketplaceStore& marketplace, AchievementStore& achievements) {
+    const unsigned service = request.service;
+    const std::uint64_t task = request.task;
+    if (!((service == 80 && (task == 165 || task == 245)) || (service == 125 && (task == 1 || task == 3)))) return std::nullopt;
+    try {
+        if (service == 80 && task == 165) { marketplace.inventory_page(request.params, account); return task_reply(task); }
+        if (service == 80) return struct_reply(task, marketplace.balances_message(request.params, account));
+        if (task == 1) { achievements.report_events(request.params, account); return task_reply(task); }
+        return struct_reply(task, achievements.states_message(request.params, account));
+    } catch (const std::exception&) {
+        return task_reply(task, nullptr, UNSERVED_ERROR);
+    }
+}
+
 Json friend_page(std::int64_t offset, std::int64_t limit) {
     if (offset < 0 || limit < 1 || limit > 500) throw Rejected("invalid friend pagination");
     Json page = Json::object();

@@ -47,7 +47,7 @@ std::uint64_t read_varint(const Bytes& data, std::size_t& offset) {
     }
     throw ProtocolError("varint overflow");
 }
-struct Field { std::uint64_t tag; unsigned wire; std::uint64_t number; Bytes data; };
+using Field = PbField;
 std::vector<Field> fields(const Bytes& data) {
     std::vector<Field> result;
     std::size_t offset = 0;
@@ -85,6 +85,9 @@ std::string utf8_strict(const Bytes& data) {
 }
 std::atomic<std::uint64_t> transactions{0};
 } // namespace
+
+std::vector<PbField> pb_fields(const Bytes& data) { return fields(data); }
+Bytes pb_varint(std::uint64_t value) { return varint(value); }
 
 Json params_json(const std::vector<Param>& params) {
     Json out = Json::array();
@@ -142,6 +145,15 @@ Param Reader::value() {
         offset_ += n;
         return p;
     }
+    if (kind == typed::STRUCT) {
+        const Param length = value();
+        if (length.kind != typed::UINT32 || length.value.as_u64() > data_.size() - offset_)
+            throw ProtocolError("invalid struct buffer length");
+        const std::size_t n = static_cast<std::size_t>(length.value.as_u64());
+        p.value = Json::of(hex(slice(data_, offset_, offset_ + n)));
+        offset_ += n;
+        return p;
+    }
     throw ProtocolError("unknown data type " + std::to_string(kind) + " at " + std::to_string(offset_ - 1));
 }
 std::vector<Param> Reader::values() {
@@ -165,6 +177,12 @@ Writer& Writer::blob(const Bytes& value) {
     data_.push_back(typed::BLOB);
     u32(static_cast<std::uint32_t>(value.size()));
     append(data_, value);
+    return *this;
+}
+Writer& Writer::structure(const Bytes& message) {
+    data_.push_back(typed::STRUCT);
+    u32(static_cast<std::uint32_t>(message.size()));
+    append(data_, message);
     return *this;
 }
 Writer& Writer::string(const std::string& value) {
@@ -289,6 +307,13 @@ Bytes task_reply(std::uint64_t task, const Writer* results, std::uint32_t error)
         else writer.raw(results->data());
     }
     return writer.data();
+}
+Bytes struct_reply(std::uint64_t task, const Bytes& message) {
+    Writer writer;
+    writer.u64(next_transaction()).u32(0).u8(static_cast<unsigned>(task)).structure(message);
+    Bytes out = writer.data();
+    out.push_back(0);
+    return out;
 }
 const char* service_name(unsigned service) {
     // "anticheat" is the project's name; reportExtendedAuthInfo appears in the retail eboot.
