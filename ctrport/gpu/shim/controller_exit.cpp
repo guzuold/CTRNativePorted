@@ -17,9 +17,12 @@ std::mutex pad_lock;
 std::vector<SDL_Gamepad*> pads;
 CtrGpuGamepad pad_snapshot{};
 int pad_count=0;
+// Every SDL gamepad except Xbox ones, which the runtime already reads through XInput:
+// compatible DualShock 4 pads often report another vendor ID and an SDL type other than PS4.
+// A controller seen both ways would only be merged with itself.
 bool playstation(SDL_Gamepad* pad){
     const auto type=SDL_GetGamepadType(pad);
-    return type==SDL_GAMEPAD_TYPE_PS3 || type==SDL_GAMEPAD_TYPE_PS4 || type==SDL_GAMEPAD_TYPE_PS5;
+    return type!=SDL_GAMEPAD_TYPE_XBOX360 && type!=SDL_GAMEPAD_TYPE_XBOXONE;
 }
 CtrGpuGamepad read_pad(SDL_Gamepad* pad){
     static const std::pair<SDL_GamepadButton,WORD> map[]={
@@ -102,11 +105,14 @@ void GamepadEvent(const SDL_Event& event){
     std::lock_guard<std::mutex> guard(pad_lock);
     if(event.type==SDL_EVENT_GAMEPAD_ADDED){
         SDL_Gamepad* pad=SDL_OpenGamepad(event.gdevice.which);
-        if(!pad)return;
+        if(!pad){std::fprintf(stderr,"ctrport: SDL gamepad open failed: %s\n",SDL_GetError());return;}
+        const char* name=SDL_GetGamepadName(pad);const char* type=SDL_GetGamepadStringForType(SDL_GetGamepadType(pad));
+        std::fprintf(stderr,"ctrport: SDL gamepad seen: %s type=%s vendor=%04x product=%04x\n",name?name:"?",type?type:"unknown",
+                     SDL_GetGamepadVendor(pad),SDL_GetGamepadProduct(pad));
         // Other controllers stay on XInput; an already open pad only had its reference count raised.
         if(!playstation(pad) || std::find(pads.begin(),pads.end(),pad)!=pads.end()){SDL_CloseGamepad(pad);return;}
         pads.push_back(pad);
-        std::fprintf(stderr,"ctrport: PlayStation controller connected: %s\n",SDL_GetGamepadName(pad));
+        std::fprintf(stderr,"ctrport: PlayStation controller connected: %s\n",name?name:"?");
     }else if(event.type==SDL_EVENT_GAMEPAD_REMOVED){
         for(auto it=pads.begin();it!=pads.end();++it)if(SDL_GetGamepadID(*it)==event.gdevice.which){
             std::fputs("ctrport: PlayStation controller disconnected\n",stderr);
