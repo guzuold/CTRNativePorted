@@ -106,6 +106,8 @@ if use_online:
     key_path.parent.mkdir(parents=True, exist_ok=True)
     key_path.write_bytes(key)
     env['CTR_ONLINE_TRAFFIC_KEY'] = str(key_path)
+if '--mute' in sys.argv:
+    env['CTR_AUDIO_MUTE'] = '1'
 fullscreen = '--fullscreen' in sys.argv or os.environ.get('CTR_GPU_FULLSCREEN') == '1'
 if fullscreen:
     env['CTR_GPU_FULLSCREEN'] = '1'

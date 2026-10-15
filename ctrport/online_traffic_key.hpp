@@ -6,6 +6,7 @@
 // code is unchanged. The original bytes are checked by SHA-256, so no game data is stored in
 // the repository. ctrport/GUEST_PATCHES.md, (development notes)
 #pragma once
+#include "retail_profiles.hpp"
 #include <windows.h>
 #include <bcrypt.h>
 #include <cstdio>
@@ -44,10 +45,8 @@ inline void apply_online_traffic_key(unsigned char* image, const std::string& pi
     constexpr std::size_t key_size = 0x126;
     constexpr char original_sha256[] =
         "356c4bc39a664dd9a14964a3a44258d898a0dbf54cfb10835cbdd63000c9a6b2";
-    const std::uint64_t offset =
-        pin == "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5" ? 0x01becf40ULL
-        : pin == "ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1" ? 0x01ade440ULL
-        : 0ULL;
+    const RetailProfile* profile = retail_profile(pin);
+    const std::uint64_t offset = profile ? profile->online_key : 0ULL;
     if (!offset) throw std::runtime_error("Online traffic key has no binding for this eboot");
     char path[MAX_PATH]{};
     const DWORD length = GetEnvironmentVariableA("CTR_ONLINE_TRAFFIC_KEY", path, sizeof(path));

@@ -6,6 +6,7 @@
 #include "json.hpp"
 #include "protocol.hpp"
 #include "relay.hpp"
+#include "server.hpp"
 #include "stores.hpp"
 #include "launcher_online.hpp"
 #include "upnp.hpp"
@@ -354,6 +355,77 @@ int main() {
         bool bad = false;
         try { sessions.create(42, "multipart/mixed; boundary=B", bytes_of(body + "x")); } catch (const std::exception&) { bad = true; }
         check(bad, "data after the final part refused");
+    }
+
+    // Pit Stop and Wumpa Challenges: exact retail v01.21 requests of
+    // tools/online/test_local_pitstop.py; expected replies (after the transaction ID) produced
+    // by the Python reference handlers (demonware_tasks.handle) for account 42.
+    {
+        MarketplaceStore market(dir / "marketplace.txt");
+        AchievementStore achievements(dir / "achievement_events.jsonl");
+        auto answer = [&](const std::string& request, std::uint64_t account = 42) {
+            const std::optional<Bytes> reply = pitstop_task(parse_task_request(b(request)), account, market, achievements);
+            return reply ? hex(Bytes(reply->begin() + 9, reply->end())) : std::string("none");
+        };
+        const std::string inventory = "5003a5106f6374616e655f70736e000801000000085803000000";
+        const std::string balances = "5003f517080e0000000a0a6f6374616e655f70736e100300";
+        const std::string login = "7d030117082e0000000a0a6f6374616e655f70736e129b8080000a056c6f67696e10f6bac3d606"
+                                  "1a878080000a03656e76100220001a0000";
+        auto states = [](int kind) {
+            char middle[3];
+            std::snprintf(middle, sizeof middle, "%02x", kind);
+            return "7d03031708120000000a0a6f6374616e655f70736e10" + std::string(middle) + "1864220000";
+        };
+        const TaskRequest login_request = parse_task_request(b(login));
+        check(login_request.params.size() == 1 && login_request.params[0].kind == typed::STRUCT &&
+              dump_json(login_request.params_json()) == R"([[23,"0a0a6f6374616e655f70736e129b8080000a056c6f67696e10f6bac3d6061a878080000a03656e76100220001a00"]])",
+              "pit stop: struct buffer parameter logged as the reference");
+        check(answer(inventory) == "080000000003a50800000000", "pit stop: retail inventory page answered empty");
+        check(answer(balances) == "080000000003f517080000000000", "pit stop: retail balances answered with an empty struct");
+        check(answer(login) == "080000000003010800000000", "wumpa: retail login event acknowledged");
+        bool all_kinds = true;
+        for (int kind = 0; kind < 8; ++kind) all_kinds = all_kinds && answer(states(kind)) == "0800000000030317080000000000";
+        check(all_kinds, "wumpa: retail states of the eight kinds answered empty");
+        std::ifstream events_file(dir / "achievement_events.jsonl");
+        std::string line, extra;
+        std::getline(events_file, line);
+        const Json row = parse_json(line);
+        check(!std::getline(events_file, extra) && row.keys() == std::vector<std::string>{"account", "received", "event"} &&
+              row.at("account").text == "42" && row.at("event").text == R"({"name": "login", "time": 1792073078})",
+              "wumpa: event stored with the reference's columns and JSON text");
+        check(answer("0403" "0801") == "none", "pit stop: other tasks left to the server");
+
+        market.set_balance(42, 1, 500);
+        market.set_balance(42, 2, -3);
+        market.set_balance(43, 1, 9);
+        check(answer(balances) == "080000000003f517080d0000000a05080110e8070a040802100500", "pit stop: balances per account, zigzag");
+        check(MarketplaceStore(dir / "marketplace.txt").balances_message(parse_task_request(b(balances)).params, 43) ==
+              b("0a0408011012"), "pit stop: balances reloaded from the state file");
+        bool wide_currency = false;
+        try { market.set_balance(42, 256, 1); } catch (const std::exception&) { wide_currency = true; }
+        check(wide_currency, "pit stop: currency IDs above one byte refused");
+        MarketplaceStore(dir / "marketplace.txt").set_balance(43, 1, 7500); // as ctr_online_server --set-balance
+        check(answer(balances, 43) == "080000000003f51708070000000a05080110987500",
+              "pit stop: balance set from outside reaches the running store");
+        market.set_balance(43, 1, 0);
+        check(answer(balances, 43) == "080000000003f517080000000000", "pit stop: zero balance removed");
+        market.set_inventory(42, 7, 1);
+        check(answer(inventory) == "080100000003a5", "pit stop: nonempty inventory refused (layout not validated)");
+        check(answer(inventory, 43) == "080000000003a50800000000", "pit stop: other account's inventory unaffected");
+        std::string wrong = balances;
+        wrong.replace(wrong.find("6f6374616e655f70736e"), 20, hex(bytes_of("octane_xbx")));
+        check(answer(wrong) == "080100000003f5", "pit stop: other balances context refused");
+        check(answer("7d03031708120000000a0a6f6374616e655f70736e10081864220000") == "08010000000303", "wumpa: state kind 8 refused");
+        check(answer("7d03031708130000000a0a6f6374616e655f70736e100018642201780000") == "08010000000303", "wumpa: paged states refused");
+        check(answer("7d030117080c0000000a0a6f6374616e655f70736e00") == "08010000000301", "wumpa: report without events refused");
+        check(entitlement_page("entitlement_type=service&service_label=0&start=0&size=100") &&
+              dump_json_spaced(*entitlement_page("start=0&size=100&service_label=0&entitlement_type=service")) ==
+                  R"({"total_results": 0, "entitlements": []})" &&
+              !entitlement_page("start=0&size=100&service_label=0&entitlement_type=unified") &&
+              !entitlement_page("start=0&size=0&service_label=0&entitlement_type=service") &&
+              !entitlement_page("start=0&size=100&entitlement_type=service") &&
+              !entitlement_page("start=0&size=100&service_label=0&entitlement_type=service&entitlement_type=service"),
+              "entitlements: empty service list, other requests refused");
     }
 
     // The launcher's hosting: server started in process on the default ports, then stopped.

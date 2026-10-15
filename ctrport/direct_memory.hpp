@@ -4,6 +4,7 @@
 // and measured retail_memory_profile.json. No PS4 allocation/map API yet.
 #pragma once
 #include "flat_loader.hpp"
+#include "retail_profiles.hpp"
 #include "kernel_time.hpp"
 #include "gpu_hooks.hpp"
 #include <array>
@@ -269,23 +270,23 @@ inline int process_cpu_mode() {
     return cpu_mode_from_attributes(retail_psf_attributes);
 }
 inline void configure_direct_memory(const MappedImage& image,const ImageMetadata& metadata) {
-    const bool base=metadata.sha256=="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1";
-    const bool patch=metadata.sha256=="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5";
-    if(!base && !patch) throw std::runtime_error("Direct memory profile SHA unsupported");
+    const auto* profile=retail_profile(metadata.sha256);
+    if(!profile) throw std::runtime_error("Direct memory profile SHA unsupported");
     auto read=[&](std::uint64_t offset) {
         bool backed=false;
         for(const auto& span:metadata.spans) if(offset>=span.first && offset<=span.second && 8<=span.second-offset) backed=true;
         if(!backed) throw std::runtime_error("Direct memory process parameter outside mapped span");
         std::uint64_t value=0;std::memcpy(&value,image.get()+offset,8);return value;
     };
-    const auto proc=base?0x2600000ULL:0x2a00000ULL;
-    const auto mem=base?0x2200090ULL:0x2400090ULL;
+    const auto proc=profile->proc;
+    const auto mem=profile->mem;
     if(read(proc)!=88 || read(proc+16)!=0x6008001ULL || read(proc+64)!=reinterpret_cast<std::uint64_t>(image.get())+mem || read(mem)!=56) throw std::runtime_error("Direct memory process profile differs");
     for(unsigned i=1;i<7;++i) if(read(mem+i*8)!=0) throw std::runtime_error("Direct memory optional parameter unsupported");
     if(direct_memory_backing) throw std::runtime_error("Direct memory already configured");
     direct_memory_backing=std::make_shared<DirectMemoryBacking>(selected_direct_bytes(),2097152);
-    // Same ATTRIBUTE in both versions' param.sfo, so the measured CPU mode holds for both.
-    cpu_mode_retail_base=base || patch;
+    // Same ATTRIBUTE in both EU versions' param.sfo, so the measured CPU mode holds for both;
+    // the US param.sfo ATTRIBUTE has not been read yet.
+    cpu_mode_retail_base=true;
 }
 inline int process_neo_mode() {
     const bool neo=neo_mode_selected();

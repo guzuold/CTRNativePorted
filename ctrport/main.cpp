@@ -1659,7 +1659,9 @@ int main(int argc, char** argv) {
             if(std::string(argv[1])=="--direct-memory-profile-images") {
                 unsigned rejected=0;
                 try {ctrport::direct_memory_size();} catch(const std::runtime_error&) {++rejected;}
-                const auto proc=metadata.front().sha256=="ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1"?0x2600000ULL:0x2a00000ULL;
+                const auto* profile=ctrport::retail_profile(metadata.front().sha256);
+                if(!profile) throw std::runtime_error("Direct memory profile SHA unsupported");
+                const auto proc=profile->proc;
                 std::uint64_t original=0;std::memcpy(&original,images.front().get()+proc+16,8);
                 const std::uint64_t invalid=0;std::memcpy(images.front().get()+proc+16,&invalid,8);
                 try {ctrport::configure_direct_memory(images.front(),metadata.front());} catch(const std::runtime_error&) {++rejected;}

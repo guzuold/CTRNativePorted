@@ -16,6 +16,7 @@ Served so far:
 - UDP discovery: real source endpoints on --peer-host and --stun-secondary-host,
   ports 3074 and --stun-alternate-port; only the observed IP/NAT request versions;
 - /webapi/sdk:userProfile/v1/users/<account>/friendList: project friend graph;
+- /webapi/sdk:entitlement/v1/users/me/entitlements: empty service entitlement list;
   other Web API routes receive 404.
 Other UDP (including QoS) is recorded; other HTTP receives an explicit 404.
 
@@ -38,7 +39,7 @@ from urllib.parse import parse_qs
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import demonware_auth3, demonware_lobby, demonware_tasks, rsa_pss, local_stats, local_friends, local_matchmaking, local_sessions, discovery, room, lobby_documents
+import demonware_auth3, demonware_lobby, demonware_rest, demonware_tasks, rsa_pss, local_stats, local_marketplace, local_achievements, local_friends, local_matchmaking, local_sessions, discovery, room, lobby_documents
 
 root = Path(__file__).resolve().parents[2]
 state = root / 'runtime/user/online'
@@ -234,6 +235,22 @@ def http_answer(method, target, headers, body):
             except NotImplementedError:
                 return 501, {}, b'{"error":{"message":"nonempty friend schema not supported"}}', 'webapi_friends', {}
             return 200, {'Content-Type': 'application/json'}, json.dumps(payload).encode(), 'webapi_friends', {'account': account, 'reply': payload}
+        if method == 'GET' and path.split('?', 1)[0] == 'sdk:entitlement/v1/users/me/entitlements':
+            # Service entitlements bought on the PS Store: the project sells nothing, so the
+            # list is empty. Field names from the retail libSceNpToolkit2.prx parser strings.
+            if not online_id:
+                return 403, {}, b'{"error":{"message":"project identity required"}}', 'webapi_entitlements', {}
+            query = parse_qs(path.partition('?')[2])
+            try:
+                start, size = int(query['start'][0]), int(query['size'][0])
+                int(query['service_label'][0])
+                valid = query['entitlement_type'] == ['service'] and start >= 0 and 0 < size <= 1000
+            except (KeyError, ValueError):
+                valid = False
+            if not valid:
+                return 400, {}, b'{"error":{"message":"invalid entitlement request"}}', 'webapi_entitlements', {}
+            payload = {'total_results': 0, 'entitlements': []}
+            return 200, {'Content-Type': 'application/json'}, json.dumps(payload).encode(), 'webapi_entitlements', {'reply': payload}
         for (route_method, prefix), (status, payload) in WEBAPI_ROUTES.items():
             if route_method == method and path.startswith(prefix):
                 return status, {'Content-Type': 'application/json'}, json.dumps(payload).encode(), 'webapi', {}
@@ -395,6 +412,8 @@ async def main():
     server_key = load_key()
     demonware_tasks.statistics_store = local_stats.Store(state / 'stats.sqlite3')
     demonware_tasks.matchmaking_store = local_matchmaking.Store(state / 'matchmaking.sqlite3')
+    demonware_tasks.marketplace_store = local_marketplace.Store(state / 'marketplace.sqlite3')
+    demonware_tasks.achievement_store = local_achievements.Store(state / 'achievements.sqlite3', demonware_rest.fields)
     global friends_store
     friends_store = local_friends.Store(state / 'friends.sqlite3')
     global session_store

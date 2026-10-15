@@ -4,8 +4,13 @@
 //   ctr_online_server.exe --public-host <public IPv4> [--upnp]   internet, one PC hosting
 //   ctr_online_server.exe --auto-public --upnp                     public address from the router
 //   ctr_online_server.exe                                          loopback development layout
+//   ctr_online_server.exe --set-balance <account|online ID> <currency> <amount>
+//       testing: sets an account's balance (0 removes it) in runtime/user/online/marketplace.txt
+//       and exits; a running server reads the change at the game's next balance request.
+//       Retail v01.21 currencies: 10 Wumpa Coins, 11 Nitro Boost, 12 Free Nitro Boost.
 // Stop with Ctrl+C (the router mappings opened with --upnp are removed).
 #include "server.hpp"
+#include "stores.hpp"
 #include "launcher_online.hpp"
 #include "upnp.hpp"
 #include <windows.h>
@@ -33,7 +38,8 @@ void usage() {
               "                         [--peer-host 127.0.0.2] [--stun-secondary-host 127.0.0.3] [--stun-alternate-port 3076]\n"
               "                         [--public-host IPv4 | --auto-public] [--discovery-port 3078] [--relay-port 3082 (0: off)]\n"
               "                         [--upnp] [--upnp-probe] [--upnp-check]\n"
-              "                         [--upnp-location URL] [--root DIR]");
+              "                         [--upnp-location URL] [--root DIR]\n"
+              "       ctr_online_server --set-balance <account|online ID> <currency> <amount> [--root DIR]");
 }
 } // namespace
 
@@ -42,6 +48,7 @@ int main(int argc, char** argv) {
     ServerConfig config;
     bool upnp = false, auto_public = false, probe = false, check = false;
     std::string location;
+    std::vector<std::string> balance; // --set-balance account currency amount
     std::filesystem::path root;
     try {
         for (int i = 1; i < argc; ++i) {
@@ -66,6 +73,7 @@ int main(int argc, char** argv) {
             else if (arg == "--upnp-check") check = true;
             else if (arg == "--upnp-location") location = next();
             else if (arg == "--root") root = next();
+            else if (arg == "--set-balance") { balance.push_back(next()); balance.push_back(next()); balance.push_back(next()); }
             else if (arg == "--help" || arg == "-h") { usage(); return 0; }
             else throw std::invalid_argument("unknown option " + arg);
         }
@@ -80,6 +88,23 @@ int main(int argc, char** argv) {
         root = find_project_root(std::filesystem::path(path).parent_path());
     }
     config.state_dir = root / "runtime" / "user" / "online";
+    if (!balance.empty()) {
+        // An all-digit value is an account ID (online IDs start with a letter); otherwise the
+        // account the server derives from the online ID at login.
+        try {
+            const bool digits = balance[0].find_first_not_of("0123456789") == std::string::npos;
+            const std::uint64_t account = digits ? std::stoull(balance[0]) : user_id(balance[0]);
+            const std::uint64_t currency = std::stoull(balance[1]);
+            const std::int64_t amount = std::stoll(balance[2]);
+            MarketplaceStore(config.state_dir / "marketplace.txt").set_balance(account, currency, amount);
+            std::printf("{\"event\": \"balance_set\", \"account\": %llu, \"currency\": %llu, \"amount\": %lld}\n",
+                        static_cast<unsigned long long>(account), static_cast<unsigned long long>(currency), static_cast<long long>(amount));
+            return 0;
+        } catch (const std::exception& error) {
+            std::fprintf(stderr, "set-balance: %s\n", error.what());
+            return 2;
+        }
+    }
     config.log_path = default_log_path(root);
     std::mutex out;
     config.on_event = [&](const std::string& line) {

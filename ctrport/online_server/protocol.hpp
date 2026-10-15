@@ -22,6 +22,9 @@ namespace typed {
 enum Kind : int {
     BOOL = 1, INT8, UINT8, WCHAR16, INT16, UINT16, INT32, UINT32, INT64, UINT64,
     FLOAT32 = 13, FLOAT64 = 14, STRING = 16, USTRING = 17, MBSTRING = 18, BLOB = 19,
+    // Struct buffer (protobuf message) parameter, observed in retail requests of services 80,
+    // 125 and 194: type byte 23, typed u32 size, message bytes (decoded as hex).
+    STRUCT = 23,
     UNPARSED = 0, // the rest of a payload the reader could not decode
 };
 } // namespace typed
@@ -55,6 +58,7 @@ public:
     Writer& u32(std::uint32_t value);
     Writer& u64(std::uint64_t value);
     Writer& blob(const Bytes& value);
+    Writer& structure(const Bytes& message);
     Writer& string(const std::string& value);
     Writer& boolean(bool value);
     Writer& raw(const Bytes& value);
@@ -83,7 +87,14 @@ TaskRequest parse_task_request(const Bytes& payload);
 bool is_rest_task(unsigned service, std::uint64_t task);
 std::uint64_t next_transaction();
 Bytes task_reply(std::uint64_t task, const Writer* results = nullptr, std::uint32_t error = 0);
+// Reply carrying a struct buffer: header, struct buffer, end marker (as the REST proxy).
+Bytes struct_reply(std::uint64_t task, const Bytes& message);
 constexpr std::uint32_t UNSERVED_ERROR = 1;
+
+// Protobuf-style message fields (demonware_rest.fields): number for wire type 0, bytes otherwise.
+struct PbField { std::uint64_t tag; unsigned wire; std::uint64_t number; Bytes data; };
+std::vector<PbField> pb_fields(const Bytes& data);
+Bytes pb_varint(std::uint64_t value);
 constexpr int LSG_TASK_REPLY = 1;
 const char* service_name(unsigned service);
 const char* task_name(unsigned service, std::uint64_t task);
