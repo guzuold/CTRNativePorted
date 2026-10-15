@@ -3,7 +3,25 @@
 The launcher Settings card has **Icone Xbox colorate**. Disable it to retain the
 original PS4 symbols. Command-line runs use `CTR_XBOX_PROMPTS=1` (unset/0 = PS4).
 
-Prepare the base archives and, for v01.21, the update archive once, using the actual retail files selected by
+The launcher prepares the archives itself, without Python, the first time PLAY is
+pressed with the option on (`ctrport/xbox_prepare.hpp`, about 10 s for v01.21; the
+button shows ATTENDI meanwhile). It reads the same archives the runtime mounts
+(patch first, then base), reads the PNGs from `assets/xbox-default` next to
+`launcher.exe` (release) or `ctrport/assets/xbox-default` (source tree), and keeps
+`runtime/user/mods/xbox-default/sources.cache` (path, size, write time -> source
+hash) so later launches do not rehash the retail archives. On failure it shows the
+error and does not start the game; disabling the option falls back to PS4 symbols.
+**A release must ship `assets/xbox-default/` (the CC0 PNGs, LICENSE.txt,
+provenance.json)**; v0.2.0 did not, and needed the Python tool below.
+
+The native port decodes the retail LZMA blocks with its own decoder: the six
+extracted fonts match the SHA256 values that `ctr_nf_iga.py` produces
+(`tools/input_prompts/xbox_prepare_test.cpp extract`). Icons are resized with GDI+
+bicubic instead of Pillow Lanczos, so the patched atlas differs from the Python
+output only inside the glyph rectangles (37,246 of 10,043,828 bytes for
+GeekSpeak_Outline); a side-by-side render of the two atlases was inspected.
+
+Equivalent manual preparation with Python, using the actual retail files selected by
 the patch-over-base mount:
 
 ```powershell
