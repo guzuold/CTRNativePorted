@@ -3,16 +3,21 @@
 // np_online.cpp, online_config.cpp). Calls each exported guest function through its SysV
 // entry point, exactly as the guest does, on loopback only.
 // Run from the repository root: build/CTRPort-gpu/ctr_hle_online_test.exe
+// --relay and --relay-block check the relay transport (online_relay.h) against a fake project
+// server (relay-session over HTTP, relay over UDP) in a process of their own, because the
+// runtime reads its switches once.
 // Exit code 0 and a final {"scope":"online_services_test","passed":true} line on success.
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <wincrypt.h>
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <thread>
+#include <vector>
 
 #define SYSV __attribute__((sysv_abi))
 
@@ -67,9 +72,209 @@ struct EpollEvent {
     std::uint64_t data;
 };
 constexpr int kErrorBase = static_cast<int>(0x80410100u);
+
+void set_env(const char* name, const char* value) {
+    _putenv_s(name, value);
+    SetEnvironmentVariableA(name, value);
+}
+OrbisSockaddrIn guest_address(const char* ip, std::uint16_t port) {
+    OrbisSockaddrIn a{};
+    a.len = sizeof(a);
+    a.family = 2;
+    a.port = htons(port);
+    inet_pton(AF_INET, ip, &a.addr);
+    return a;
+}
+std::string bytes_text(const char* data, int size) { return std::string(data, data + (size > 0 ? size : 0)); }
+
+// Relay transport against a fake project server. block: CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT=1
+// without the relay (direct peer traffic dropped both ways).
+int relay_test(bool block) {
+    WSADATA wsa{};
+    WSAStartup(MAKEWORD(2, 2), &wsa);
+    auto udp = [](const char* ip) {
+        SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        sockaddr_in a{};
+        a.sin_family = AF_INET;
+        inet_pton(AF_INET, ip, &a.sin_addr);
+        bind(s, reinterpret_cast<sockaddr*>(&a), sizeof(a));
+        DWORD timeout = 1500;
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+        return s;
+    };
+    auto port_of = [](SOCKET s) {
+        sockaddr_in a{};
+        int n = sizeof(a);
+        getsockname(s, reinterpret_cast<sockaddr*>(&a), &n);
+        return ntohs(a.sin_port);
+    };
+    const SOCKET relay = udp("0.0.0.0"), direct_peer = udp("127.0.0.9");
+    const std::uint16_t relay_port = port_of(relay), peer_port = port_of(direct_peer);
+    // Next datagram at the fake relay other than a keepalive HELLO (22 bytes, type 1).
+    auto recv_relay = [&](char* out, int capacity) {
+        for (;;) {
+            const int got = recv(relay, out, capacity, 0);
+            if (got != 22 || out[5] != 1) return got;
+        }
+    };
+
+    // Fake HTTP: answers every request with the relay session and records the request heads.
+    const SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sockaddr_in local{};
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bind(listener, reinterpret_cast<sockaddr*>(&local), sizeof(local));
+    listen(listener, 8);
+    const std::string http = std::to_string(port_of(listener));
+    std::vector<std::string> requests;
+    std::atomic<bool> stop{false};
+    std::thread server([&] {
+        while (!stop) {
+            const SOCKET c = accept(listener, nullptr, nullptr);
+            if (c == INVALID_SOCKET) return;
+            std::string head;
+            char ch;
+            while (head.find("\r\n\r\n") == std::string::npos && recv(c, &ch, 1, 0) == 1) head += ch;
+            requests.push_back(head);
+            // /ctr/v1/config: discovery on the relay socket's port, public address 127.0.0.5.
+            const std::string body = head.rfind("GET /ctr/v1/config ", 0) == 0
+                                         ? "{\"discovery_port\": " + std::to_string(relay_port) + ", \"public_host\": \"127.0.0.5\"}"
+                                         : "{\"token\": \"00112233445566778899aabbccddeeff\", \"port\": " +
+                                               std::to_string(relay_port) + ", \"lease\": 60}";
+            const std::string reply = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
+                                      std::to_string(body.size()) + "\r\nConnection: close\r\n\r\n" + body;
+            send(c, reply.data(), static_cast<int>(reply.size()), 0);
+            closesocket(c);
+        }
+    });
+
+    set_env("CTR_ONLINE", "1");
+    set_env("CTR_ONLINE_SERVER", "127.0.0.1");
+    set_env("CTR_ONLINE_ID", "RelayRacer");
+    set_env("CTR_ONLINE_HTTP_PORT", http.c_str());
+    set_env("CTR_ONLINE_PORT_OFFSET", "2100");
+    set_env("CTR_ONLINE_ROOM_TOKEN", "abababababababababababababababababababababababababababababababab");
+    set_env(block ? "CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT" : "CTR_ONLINE_NAT_TRANSPORT", block ? "1" : "relay");
+    HMODULE library = LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve")) : nullptr;
+    if (!resolve) {
+        std::printf("{\"scope\":\"online_services_test\",\"error\":\"ctr_hle.dll not loaded\"}\n");
+        return 2;
+    }
+    auto net_init = bind<int(SYSV*)()>("Nlev7Lg8k3A", "libSceNet");
+    auto net_socket = bind<int(SYSV*)(const char*, int, int, int)>("Q4qBuN-c0ZM", "libSceNet");
+    auto net_bind = bind<int(SYSV*)(int, const void*, std::uint32_t)>("bErx49PgxyY", "libSceNet");
+    auto net_sendto = bind<int(SYSV*)(int, const void*, std::uint64_t, int, const void*, std::uint32_t)>("gvD1greCu0A", "libSceNet");
+    auto net_recvfrom = bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, std::uint32_t*)>("304ooNZxWDY", "libSceNet");
+    auto net_setsockopt = bind<int(SYSV*)(int, int, int, const void*, std::uint32_t)>("2mKX2Spso7I", "libSceNet");
+    auto net_close = bind<int(SYSV*)(int)>("45ggEzakPJQ", "libSceNet");
+    net_init();
+    const int game = net_socket("game", 2, 2, 0);
+    const OrbisSockaddrIn any = guest_address("0.0.0.0", 3074);
+    check(game > 0 && net_bind(game, &any, sizeof(any)) == 0, "relay: game socket bound on the peer port");
+    sockaddr_in game_host{};
+    game_host.sin_family = AF_INET;
+    game_host.sin_port = htons(3074 + 2100);
+    inet_pton(AF_INET, "127.0.0.1", &game_host.sin_addr);
+    const OrbisSockaddrIn peer = guest_address("127.0.0.9", peer_port);
+    char buffer[2048];
+    sockaddr_in from{};
+    int from_length = sizeof(from);
+
+    if (block) {
+        check(net_sendto(game, "lost", 4, 0, &peer, sizeof(peer)) == 4, "relay test switch: direct send reported as sent");
+        check(recv(direct_peer, buffer, sizeof(buffer), 0) == SOCKET_ERROR, "relay test switch: nothing reaches the peer directly");
+        sendto(direct_peer, "in", 2, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        const SOCKET discovery = udp("127.0.0.2"); // a project server address in development
+        sendto(discovery, "server", 6, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        OrbisSockaddrIn source{};
+        std::uint32_t source_length = sizeof(source);
+        const int got = net_recvfrom(game, buffer, sizeof(buffer), 0, &source, &source_length);
+        check(got == 6 && bytes_text(buffer, got) == "server" && ntohs(source.port) == port_of(discovery),
+              "relay test switch: direct peer datagram dropped, server datagram delivered");
+        closesocket(discovery);
+    } else {
+        // The game socket registers by itself (HELLO) before the game sends anything.
+        int n = recvfrom(relay, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&from), &from_length);
+        check(n == 22 && !std::memcmp(buffer, "CTRR\x01\x01", 6) &&
+                  !std::memcmp(buffer + 6, "\x00\x11\x22\x33\x44\x55\x66\x77\x88\x99\xaa\xbb\xcc\xdd\xee\xff", 16) &&
+                  ntohs(from.sin_port) == 3074 + 2100,
+              "relay: HELLO with the token from the game socket before any game send");
+        check(net_sendto(game, "race data", 9, 0, &peer, sizeof(peer)) == 9, "relay: game send reported as sent");
+        do { // repeated HELLOs (no WELCOME yet) are skipped
+            n = recvfrom(relay, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&from), &from_length);
+        } while (n == 22);
+        check(n == 21 && !std::memcmp(buffer, "CTRR\x01\x03\x7f\x00\x00\x09", 10) &&
+                  (static_cast<unsigned char>(buffer[10]) << 8 | static_cast<unsigned char>(buffer[11])) == peer_port &&
+                  bytes_text(buffer + 12, n - 12) == "race data",
+              "relay: SEND carries the game's destination and payload");
+        check(recv(direct_peer, buffer, sizeof(buffer), 0) == SOCKET_ERROR, "relay: nothing sent directly to the peer");
+        check(!requests.empty() && requests[0].rfind("POST /ctr/v1/relay-session ", 0) == 0 &&
+                  requests[0].find("RelayRacer") != std::string::npos &&
+                  requests[0].find("abababababababababababababababababababababababababababababababab") != std::string::npos,
+              "relay: session asked with identity and room token");
+
+        const char welcome[] = "CTRR\x01\x02\x7f\x00\x00\x01\x14\x1e\x00\x3c";
+        const char deliver[] = "CTRR\x01\x04\xc6\x33\x64\x07\x0c\xca" "from host";
+        sendto(relay, welcome, 14, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        sendto(relay, deliver, 21, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        OrbisSockaddrIn source{};
+        std::uint32_t source_length = sizeof(source);
+        int got = net_recvfrom(game, buffer, sizeof(buffer), 0, &source, &source_length);
+        char text[16] = {};
+        inet_ntop(AF_INET, &source.addr, text, sizeof(text));
+        check(got == 9 && bytes_text(buffer, got) == "from host" && !std::strcmp(text, "198.51.100.7") && ntohs(source.port) == 3274,
+              "relay: WELCOME skipped, DELIVER unwrapped with the sender address from the relay");
+        // A refused destination falls back to the direct path.
+        char refused[13];
+        std::memcpy(refused, "CTRR\x01\x05\x7f\x00\x00\x09", 10);
+        refused[10] = static_cast<char>(peer_port >> 8);
+        refused[11] = static_cast<char>(peer_port & 0xFF);
+        refused[12] = 2; // unknown destination
+        sendto(relay, refused, 13, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        sendto(relay, deliver, 21, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        got = net_recvfrom(game, buffer, sizeof(buffer), 0, &source, &source_length);
+        check(got == 9, "relay: REFUSED consumed before the next delivered datagram");
+        check(net_sendto(game, "direct", 6, 0, &peer, sizeof(peer)) == 6, "relay: send after refusal");
+        n = recv(direct_peer, buffer, sizeof(buffer), 0);
+        check(n == 6 && bytes_text(buffer, n) == "direct", "relay: refused destination reached directly");
+        // Non-blocking: a control message alone leaves nothing for the game.
+        const int one = 1;
+        check(net_setsockopt(game, 0xFFFF, 0x1200, &one, 4) == 0, "relay: socket non-blocking");
+        sendto(relay, welcome, 14, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        Sleep(200);
+        got = net_recvfrom(game, buffer, sizeof(buffer), 0, &source, &source_length);
+        check(got == (kErrorBase | 35), "relay: control message alone gives EWOULDBLOCK");
+        // The server's own ports are never wrapped.
+        const OrbisSockaddrIn service = guest_address("127.0.0.1", relay_port);
+        check(net_sendto(game, "raw", 3, 0, &service, sizeof(service)) == 3, "relay: send to a server port");
+        n = recv_relay(buffer, sizeof(buffer));
+        check(n == 3 && bytes_text(buffer, n) == "raw", "relay: datagram to the server's own port sent as is");
+        // Discovery to the server's port 3074 (mapped to its discovery port) fetches the
+        // configuration; afterwards the server's public address is a server address too.
+        const OrbisSockaddrIn discovery = guest_address("127.0.0.1", 3074);
+        check(net_sendto(game, "probe", 5, 0, &discovery, sizeof(discovery)) == 5, "relay: discovery send");
+        n = recv_relay(buffer, sizeof(buffer));
+        check(n == 5 && bytes_text(buffer, n) == "probe", "relay: discovery sent as is to the configured discovery port");
+        const OrbisSockaddrIn public_service = guest_address("127.0.0.5", relay_port);
+        check(net_sendto(game, "public", 6, 0, &public_service, sizeof(public_service)) == 6, "relay: send to the public address");
+        n = recv_relay(buffer, sizeof(buffer));
+        check(n == 6 && bytes_text(buffer, n) == "public", "relay: server's public address with a service port not relayed");
+    }
+    net_close(game);
+    stop = true;
+    closesocket(listener);
+    server.join();
+    std::printf("{\"scope\":\"online_services_test\",\"mode\":\"%s\",\"passed\":%s}\n", block ? "relay-block" : "relay",
+                failures ? "false" : "true");
+    return failures ? 1 : 0;
+}
 } // namespace
 
 int main(int argc, char** argv) {
+    if (argc > 1 && (!std::strcmp(argv[1], "--relay") || !std::strcmp(argv[1], "--relay-block"))) {
+        return relay_test(!std::strcmp(argv[1], "--relay-block"));
+    }
     // --offline: without CTR_ONLINE no online registration is resolved, so the offline
     // runtime keeps its existing bindings; non-online ctr_hle functions still resolve.
     if (argc > 1 && !std::strcmp(argv[1], "--offline")) {
@@ -286,8 +491,12 @@ int main(int argc, char** argv) {
     int state = -1;
     check(netctl_state(&state) == 0 && state == 3, "sceNetCtlGetState IPOBTAINED");
     char info[256] = {};
-    check(netctl_info(14, info) == 0 && !std::strcmp(info, "127.0.0.1"),
-          "sceNetCtlGetInfo IP_ADDRESS");
+    // With the project server on loopback the console reports the host's LAN address (the
+    // default-route source), loopback only on a machine without any network route.
+    in_addr reported{};
+    check(netctl_info(14, info) == 0 && InetPtonA(AF_INET, info, &reported) == 1 &&
+              reported.s_addr != 0,
+          "sceNetCtlGetInfo IP_ADDRESS (LAN address with a loopback server)");
     check(netctl_info(6, info) == static_cast<int>(0x80412109u), "sceNetCtlGetInfo SSID not avail");
 
     // --- libSceNpManager / libSceNpAuth ---
@@ -656,6 +865,104 @@ int main(int argc, char** argv) {
         check(term()==0 && invitation_init()==0 && init()==static_cast<int>(0x80B80008u), "invitation owner excludes profile initialization");
         check(invitation_term()==0 && !common_used, "invitation termination releases shared owner");
     }
+
+    // --- Internet play: peers confirmed by the project server, discovery port mapping ---
+    {
+        const SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        sockaddr_in local{};
+        local.sin_family = AF_INET;
+        local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        bind(listener, reinterpret_cast<sockaddr*>(&local), sizeof(local));
+        listen(listener, 8);
+        int local_length = sizeof(local);
+        getsockname(listener, reinterpret_cast<sockaddr*>(&local), &local_length);
+        const std::string http_port = std::to_string(ntohs(local.sin_port));
+        _putenv_s("CTR_ONLINE_HTTP_PORT", http_port.c_str());
+        // Project discovery socket on loopback (the test's project server address).
+        const SOCKET discovery = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        sockaddr_in discovery_address{};
+        discovery_address.sin_family = AF_INET;
+        discovery_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        bind(discovery, reinterpret_cast<sockaddr*>(&discovery_address), sizeof(discovery_address));
+        int discovery_length = sizeof(discovery_address);
+        getsockname(discovery, reinterpret_cast<sockaddr*>(&discovery_address), &discovery_length);
+        const int discovery_port = ntohs(discovery_address.sin_port);
+        static std::string seen_paths;
+        std::atomic<bool> serving{true};
+        std::thread server([listener, discovery_port, &serving] {
+            while (serving) {
+                const SOCKET client = accept(listener, nullptr, nullptr);
+                if (client == INVALID_SOCKET) break;
+                std::string request;
+                char buffer[2048];
+                while (request.find("\r\n\r\n") == std::string::npos) {
+                    const int n = recv(client, buffer, sizeof(buffer), 0);
+                    if (n <= 0) break;
+                    request.append(buffer, n);
+                }
+                const std::string path = request.substr(4, request.find(' ', 4) - 4);
+                seen_paths += path + "\n";
+                std::string body = "{}", status = "403 Forbidden";
+                if (path == "/ctr/v1/config") {
+                    status = "200 OK";
+                    body = "{\"discovery_port\":" + std::to_string(discovery_port) + "}";
+                } else if (path == "/ctr/v1/peer-allowed?ip=203.0.113.5") {
+                    status = "200 OK";
+                }
+                const std::string answer = "HTTP/1.1 " + status + "\r\nContent-Length: " +
+                                           std::to_string(body.size()) + "\r\n\r\n" + body;
+                send(client, answer.data(), static_cast<int>(answer.size()), 0);
+                closesocket(client);
+            }
+        });
+        const int peer_socket = net_socket("internet_udp", 2, 2, 0);
+        auto any = loopback(0);
+        any.addr = 0; // INADDR_ANY, as the game binds its UDP socket
+        net_bind(peer_socket, &any, sizeof(any));
+        OrbisSockaddrIn confirmed{}, refused{};
+        confirmed.len = refused.len = 16;
+        confirmed.family = refused.family = 2;
+        confirmed.port = refused.port = htons(3074);
+        InetPtonA(AF_INET, "203.0.113.5", &confirmed.addr);
+        InetPtonA(AF_INET, "203.0.113.6", &refused.addr);
+        const char probe[] = "peer";
+        // TEST-NET-3 addresses (RFC 5737): never assigned to a host.
+        check(net_sendto(peer_socket, probe, 4, 0, &confirmed, sizeof(confirmed)) == 4,
+              "sendto public peer confirmed by the project server");
+        check(net_sendto(peer_socket, probe, 4, 0, &refused, sizeof(refused)) == (kErrorBase | 65),
+              "sendto public address refused by the project server");
+        check(net_sendto(peer_socket, probe, 4, 0, &confirmed, sizeof(confirmed)) == 4 &&
+                  seen_paths.find("/ctr/v1/peer-allowed?ip=203.0.113.5\n") ==
+                      seen_paths.rfind("/ctr/v1/peer-allowed?ip=203.0.113.5\n"),
+              "confirmed peer cached (one server query)");
+        auto server_3074 = loopback(3074);
+        const char discovery_request[] = {30, 3, 0};
+        check(net_sendto(peer_socket, discovery_request, 3, 0, &server_3074, sizeof(server_3074)) == 3,
+              "sendto project server port 3074");
+        char received[16] = {};
+        sockaddr_in client_address{};
+        int client_length = sizeof(client_address);
+        const DWORD wait = 2000;
+        setsockopt(discovery, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&wait), sizeof(wait));
+        const int got = recvfrom(discovery, received, sizeof(received), 0,
+                                 reinterpret_cast<sockaddr*>(&client_address), &client_length);
+        check(got == 3 && !std::memcmp(received, discovery_request, 3),
+              "datagram to server:3074 delivered to the announced discovery port");
+        const char reply[] = {31, 3, 0};
+        sendto(discovery, reply, 3, 0, reinterpret_cast<sockaddr*>(&client_address), client_length);
+        OrbisSockaddrIn source{};
+        std::uint32_t source_length = sizeof(source);
+        char answer[16] = {};
+        check(net_recvfrom(peer_socket, answer, sizeof(answer), 0, &source, &source_length) == 3 &&
+                  source.port == htons(3074) && source.addr == htonl(INADDR_LOOPBACK),
+              "discovery reply reported from server port 3074");
+        serving = false;
+        closesocket(listener);
+        server.join();
+        closesocket(discovery);
+        net_close(peer_socket);
+    }
+
     std::printf("{\"scope\":\"online_services_test\",\"passed\":%s,\"failures\":%d}\n",
                 failures ? "false" : "true", failures);
     return failures ? 1 : 0;

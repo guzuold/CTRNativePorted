@@ -10,6 +10,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include "online_room.hpp"
+#include "online_server/launcher_online.hpp"
 #include <commctrl.h>
 #include <dwmapi.h>
 #include <shobjidl.h>
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -47,6 +49,7 @@ namespace {
 constexpr wchar_t kTitle[] = L"Crash Team Racing Native Ported";
 constexpr float kWidth = 1040, kHeight = 640;
 constexpr UINT WM_APP_FINISHED = WM_APP + 1;
+constexpr UINT WM_APP_HOST_READY = WM_APP + 2;
 
 // Design 2a Pit Lane Palette (from Claude Design token specification)
 constexpr ARGB kArcadeBg      = 0xFF1B1446;  // Deep arcade purple/indigo
@@ -89,7 +92,7 @@ enum : int {
     ID_MOD_TOGGLE_BASE = 140, // 140..143 for sample mods
     ID_OPEN_MODS = 150,
     ID_SAVE_BACKUP = 160, ID_OPEN_SAVES, ID_OPEN_DUMP, ID_OPEN_LOGS, ID_AUDIO_TEST,
-    ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT
+    ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT, ID_ONLINE_HOST, ID_ONLINE_RELAY
 };
 
 struct ModItem {
@@ -105,6 +108,13 @@ struct Config {
     bool xbox_prompts = true;
     std::wstring online_id = L"CTRPlayer";
     std::wstring online_server = L"127.0.0.1";
+    // Hosting: the project server runs inside the launcher; online_public_ip overrides the
+    // address found with UPnP (empty: automatic).
+    bool online_host = false;
+    std::wstring online_public_ip;
+    // Race traffic through the server's relay (CTR_ONLINE_NAT_TRANSPORT=relay), for players
+    // behind NAT or CGNAT; the server must be reachable from the internet.
+    bool online_relay = false;
 };
 
 // ---- Settings JSON parsing ----
@@ -274,6 +284,10 @@ struct App {
     HWND window = nullptr, base_edit = nullptr, patch_edit = nullptr, width_edit = nullptr, height_edit = nullptr;
     HWND patch_browse = nullptr, fps_toggle = nullptr, pro_toggle = nullptr, native_4k_toggle = nullptr, launch = nullptr, hot = nullptr;
     HWND online_toggle = nullptr, online_id_edit = nullptr, online_server_edit = nullptr, online_password_edit = nullptr;
+    HWND online_host_toggle = nullptr;
+    ctr_online::Host host;
+    bool host_busy = false;           // server starting or stopping in the background
+    ctr_online::HostStatus host_status;
     std::vector<HWND> pills;
     std::vector<HWND> tab_buttons;
     std::map<HWND, Control> controls;
@@ -334,6 +348,8 @@ void load_config() {
             text(L"base_dir", g.cfg.base_dir); text(L"patch_dir", g.cfg.patch_dir); text(L"resolution", g.cfg.resolution);
             text(L"custom_w", g.cfg.custom_w); text(L"custom_h", g.cfg.custom_h);
             text(L"online_id", g.cfg.online_id); text(L"online_server", g.cfg.online_server);
+            text(L"online_public_ip", g.cfg.online_public_ip); flag(L"online_host", g.cfg.online_host);
+            flag(L"online_relay", g.cfg.online_relay);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
             flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
             flag(L"online", g.cfg.online);
@@ -362,7 +378,7 @@ void save_config() {
     g.cfg.resolution = kResolutions[g.resolution];
     if (g.resolution == 4) { g.cfg.custom_w = window_text(g.width_edit); g.cfg.custom_h = window_text(g.height_edit); }
     if (g.online_id_edit) g.cfg.online_id = window_text(g.online_id_edit);
-    if (g.online_server_edit) g.cfg.online_server = window_text(g.online_server_edit);
+    if (g.online_server_edit) (g.cfg.online_host ? g.cfg.online_public_ip : g.cfg.online_server) = window_text(g.online_server_edit);
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
     const std::string json = "{\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
@@ -371,7 +387,10 @@ void save_config() {
         ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) +
         ",\n  \"online\": " + flag(g.cfg.online) +
         ",\n  \"online_id\": " + json_string(g.cfg.online_id) +
-        ",\n  \"online_server\": " + json_string(g.cfg.online_server) + "\n}";
+        ",\n  \"online_server\": " + json_string(g.cfg.online_server) +
+        ",\n  \"online_host\": " + flag(g.cfg.online_host) +
+        ",\n  \"online_relay\": " + flag(g.cfg.online_relay) +
+        ",\n  \"online_public_ip\": " + json_string(g.cfg.online_public_ip) + "\n}";
     std::error_code ec;
     fs::create_directories(config_path().parent_path(), ec);
     std::ofstream(config_path(), std::ios::binary | std::ios::trunc) << json;
@@ -658,18 +677,23 @@ void paint_window(HDC target) {
                 draw_field(gr, rect(548, 252, 190, 32), g.online_id_edit);
                 text(gr, L"Nome mostrato nelle gare\n(3-16 car. es. CrashBandicoot)", 1, 10.0f, FontStyleRegular, rect(548, 288, 190, 28), kTextMuted);
 
-                text(gr, L"Server Matchmaking:", 1, 11.5f, FontStyleBold, rect(548, 324, 190, 18), kTextMuted);
+                text(gr, g.cfg.online_host ? L"IP pubblico (vuoto = auto):" : L"Server (IP di chi ospita):", 1, 11.5f, FontStyleBold, rect(548, 324, 190, 18), kTextMuted);
                 draw_field(gr, rect(548, 346, 190, 32), g.online_server_edit);
-                text(gr, L"Default: 127.0.0.1 (LAN)\nDemonware auth3 & lobby", 1, 10.0f, FontStyleRegular, rect(548, 382, 190, 28), kTextMuted);
 
-                text(gr, L"Password partita:", 1, 11.5f, FontStyleBold, rect(548, 426, 190, 18), kTextMuted);
+                text(gr, L"Password (uguale per tutti):", 1, 11.5f, FontStyleBold, rect(548, 426, 190, 18), kTextMuted);
                 draw_field(gr, rect(548, 448, 190, 32), g.online_password_edit);
-                text(gr, L"Stessa password per giocare insieme", 1, 9.5f, FontStyleRegular, rect(548, 484, 190, 28), kTextMuted);
 
                 // Online status badge at bottom of Card 2
-                draw_slanted_box(gr, rect(548, 526, 190, 26), 0.12f, 2.0f, SolidBrush(Color(g.cfg.online ? kArcadeLime : 0xFF2A2170)), kArcadeDark, 2.0f);
-                text(gr, g.cfg.online ? L"MULTIPLAYER ATTIVO" : L"OFFLINE (SINGLE PLAYER)", 1, 10.5f, FontStyleBold, rect(548, 526, 190, 26),
-                     g.cfg.online ? kArcadeDark : kTextMuted, StringAlignmentCenter);
+                std::wstring badge = g.cfg.online ? L"MULTIPLAYER ATTIVO" : L"OFFLINE (SINGLE PLAYER)";
+                ARGB badge_color = g.cfg.online ? kArcadeLime : 0xFF2A2170;
+                if (g.host_busy) { badge = L"SERVER: AVVIO..."; badge_color = kArcadeGold; }
+                else if (g.host_status.running) {
+                    badge = L"SERVER " + widen(g.host_status.public_ip);
+                    badge_color = g.host_status.warnings.empty() ? kArcadeLime : kArcadeOrange;
+                }
+                draw_slanted_box(gr, rect(548, 526, 190, 26), 0.12f, 2.0f, SolidBrush(Color(badge_color)), kArcadeDark, 2.0f);
+                text(gr, badge, 1, 10.5f, FontStyleBold, rect(548, 526, 190, 26),
+                     g.cfg.online || g.host_busy || g.host_status.running ? kArcadeDark : kTextMuted, StringAlignmentCenter);
 
                 // Card 3: CONTROLLER & AUDIO
                 const RectF c_card = rect(768, 126, 222, 450);
@@ -883,6 +907,7 @@ void validate() {
         if (g.cfg.online) {
             const std::wstring id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
             summary += L" · Online (" + (id.empty() ? L"CTRPlayer" : id) + L")";
+            if (g.host_status.running) summary += L" · Server " + widen(g.host_status.public_ip);
         }
         g.global = {summary, 1};
     }
@@ -979,6 +1004,82 @@ void backup_save_data() {
     }
 }
 
+// Hosting: the project server runs in this process while the launcher is open.
+void copy_to_clipboard(const std::wstring& text) {
+    if (!OpenClipboard(g.window)) return;
+    EmptyClipboard();
+    if (HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, (text.size() + 1) * sizeof(wchar_t))) {
+        std::memcpy(GlobalLock(memory), text.c_str(), (text.size() + 1) * sizeof(wchar_t));
+        GlobalUnlock(memory);
+        if (!SetClipboardData(CF_UNICODETEXT, memory)) GlobalFree(memory);
+    }
+    CloseClipboard();
+}
+
+bool g_host_quiet = false;
+void host_toggled(bool quiet = false) {
+    // While hosting, the server field holds the optional public address override.
+    g.updating = true;
+    SetWindowTextW(g.online_server_edit, (g.cfg.online_host ? g.cfg.online_public_ip : g.cfg.online_server).c_str());
+    g.updating = false;
+    if (g.cfg.online_host && !g.cfg.online) {
+        g.cfg.online = true;
+        InvalidateRect(g.online_toggle, nullptr, FALSE);
+    }
+    g.host_busy = true;
+    g_host_quiet = quiet;
+    EnableWindow(g.online_host_toggle, FALSE);
+    std::thread([start = g.cfg.online_host, root = g.root, manual = narrow(g.cfg.online_public_ip), window = g.window] {
+        if (start) {
+            std::string address = manual;
+            address.erase(0, address.find_first_not_of(" \t"));
+            address.erase(address.find_last_not_of(" \t") + 1);
+            const std::string ip = address.empty() ? std::string() : ctr_online::resolve_ipv4(address);
+            if (address.empty() || !ip.empty()) g.host.start(root, ip, true);
+        } else {
+            g.host.stop();
+        }
+        PostMessageW(window, WM_APP_HOST_READY, start ? 1 : 0, 0);
+    }).detach();
+    validate();
+}
+
+void host_ready(bool started) {
+    g.host_busy = false;
+    EnableWindow(g.online_host_toggle, TRUE);
+    g.host_status = g.host.status();
+    if (started && !g.host_status.running) {
+        g.cfg.online_host = false;
+        g.updating = true;
+        SetWindowTextW(g.online_server_edit, g.cfg.online_server.c_str());
+        g.updating = false;
+        InvalidateRect(g.online_host_toggle, nullptr, FALSE);
+        const std::wstring reason = g.host_status.error.empty() ? L"indirizzo pubblico non valido o nome non trovato" : widen(g.host_status.error);
+        MessageBoxW(g.window, (L"Impossibile avviare il server su questo PC:\n" + reason).c_str(), kTitle, MB_ICONERROR);
+    } else if (started) {
+        const ctr_online::HostStatus& st = g.host_status;
+        const std::wstring ip = widen(st.public_ip);
+        copy_to_clipboard(ip);
+        std::wstring ports_open, ports_closed;
+        for (const auto& port : st.ports)
+            (port.ok ? ports_open : ports_closed) += widen(port.request.protocol) + L" " + std::to_wstring(port.request.port) + L"  ";
+        std::wstring message = L"Server avviato su questo PC.\n\nGli altri giocatori scrivono come server: " + ip +
+                               L"  (copiato negli appunti)\ne usano la stessa password partita. Tu giochi normalmente da questo launcher.\n\n";
+        if (st.address_source == "upnp") message += L"Indirizzo pubblico fornito dal router (UPnP).\n";
+        else if (st.address_source == "manual") message += L"Indirizzo pubblico inserito a mano.\n";
+        else message += L"Il router non ha fornito un indirizzo pubblico: per ora funziona solo in rete locale (" + ip +
+                        L").\nPer giocare via internet scrivi qui il tuo IP pubblico e inoltra le porte sul router.\n";
+        if (!ports_open.empty()) message += L"Porte aperte automaticamente sul router: " + ports_open + L"\n";
+        if (!ports_closed.empty() || !st.upnp_router)
+            message += L"Porte da inoltrare a mano verso " + widen(st.lan_ip) + L": " +
+                       (st.upnp_router ? ports_closed : std::wstring(L"TCP 8780, TCP 3074, UDP 3078-3082, UDP 3174")) + L"\n";
+        for (const std::string& warning : st.warnings) message += L"\n- " + widen(warning);
+        if (!g_host_quiet) MessageBoxW(g.window, message.c_str(), kTitle, st.warnings.empty() ? MB_ICONINFORMATION : MB_ICONWARNING);
+    }
+    validate();
+    InvalidateRect(g.window, nullptr, FALSE);
+}
+
 // Launching ctrport.exe
 std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring>& set, const std::vector<std::wstring>& remove) {
     std::vector<std::wstring> entries;
@@ -1059,39 +1160,60 @@ void launch_game() {
         if (id.size() > 16) id.resize(16);
         set[L"CTR_ONLINE_ID"] = id;
 
-        std::wstring server = g.online_server_edit ? window_text(g.online_server_edit) : g.cfg.online_server;
-        if (server.empty()) server = L"127.0.0.1";
-        set[L"CTR_ONLINE_SERVER"] = server;
-
+        // The server's public key replaces the auth3 traffic key in the eboot: it is always taken
+        // from the server being joined (a cached copy only when that server cannot be reached).
         const fs::path online_dir = g.root / "runtime/user/online";
         fs::create_directories(online_dir, ec);
-        fs::path key_path = online_dir / (L"traffic_key_" + server + L"_8780.der");
-        if (!fs::exists(key_path, ec)) key_path = online_dir / L"server_key.der";
-        if (!fs::exists(key_path, ec)) {
-            const std::wstring url = L"http://" + server + L":8780/ctr/v1/traffic-key";
-            const fs::path dl_target = online_dir / (L"traffic_key_" + server + L"_8780.der");
-            const HRESULT hr = URLDownloadToFileW(nullptr, url.c_str(), dl_target.c_str(), 0, nullptr);
-            if (SUCCEEDED(hr) && fs::exists(dl_target, ec)) {
-                key_path = dl_target;
-            }
-        }
-        if (fs::exists(key_path, ec)) {
-            set[L"CTR_ONLINE_TRAFFIC_KEY"] = key_path.wstring();
-        } else {
-            const std::wstring warn = L"Modalità Online attiva, ma la chiave pubblica del server non è stata trovata.\n"
-                                      L"Assicurati che il server online sia in esecuzione:\n"
-                                      L"python tools/online/ctr_online_server.py\n\n"
-                                      L"Vuoi procedere comunque?";
-            if (MessageBoxW(g.window, warn.c_str(), kTitle, MB_YESNO | MB_ICONWARNING) != IDYES) {
+        std::wstring server;
+        fs::path key_path;
+        if (g.cfg.online_host) {
+            if (g.host_busy || !g.host.running()) {
                 g.lock.release();
+                MessageBoxW(g.window, L"Il server su questo PC non è attivo: attendi l'avvio o riattiva \"Ospita server qui\".", kTitle, MB_ICONERROR);
                 return;
             }
+            server = L"127.0.0.1"; // the host's game reaches its own server over loopback
+            key_path = g.host_status.traffic_key;
+            // The host's game shares the server's public address: its UDP port must differ from
+            // the server's 3074, to which every player's runtime sends discovery (3174, forwarded
+            // by host_ports()).
+            set[L"CTR_ONLINE_PORT_OFFSET"] = std::to_wstring(ctr_online::kHostGamePortOffset);
+        } else {
+            std::wstring typed = g.online_server_edit ? window_text(g.online_server_edit) : g.cfg.online_server;
+            typed.erase(0, typed.find_first_not_of(L" \t"));
+            typed.erase(typed.find_last_not_of(L" \t") + 1);
+            if (typed.empty()) typed = L"127.0.0.1";
+            const std::string ip = ctr_online::resolve_ipv4(narrow(typed));
+            if (ip.empty()) {
+                g.lock.release();
+                MessageBoxW(g.window, (L"Indirizzo del server non valido o nome non trovato: " + typed).c_str(), kTitle, MB_ICONERROR);
+                return;
+            }
+            server = widen(ip);
+            key_path = online_dir / (L"traffic_key_" + server + L"_8780.der");
+            std::string body;
+            if (ctr_online::http_get(ip, 8780, "/ctr/v1/traffic-key", body) == 200 && body.size() == 0x126) {
+                std::ofstream(key_path, std::ios::binary | std::ios::trunc).write(body.data(), static_cast<std::streamsize>(body.size()));
+            } else {
+                const bool cached = fs::exists(key_path, ec);
+                const std::wstring warn = L"Il server " + server + L" non risponde sulla porta 8780.\n"
+                                          L"Controlla che chi ospita abbia attivato \"Ospita server qui\" e che l'indirizzo sia giusto.\n\n" +
+                                          std::wstring(cached ? L"Avviare comunque con la chiave salvata in precedenza?" : L"Avviare comunque (online non funzionerà)?");
+                if (MessageBoxW(g.window, warn.c_str(), kTitle, MB_YESNO | MB_ICONWARNING) != IDYES) {
+                    g.lock.release();
+                    return;
+                }
+            }
         }
+        set[L"CTR_ONLINE_SERVER"] = server;
+        if (g.cfg.online_relay) set[L"CTR_ONLINE_NAT_TRANSPORT"] = L"relay";
+        if (fs::exists(key_path, ec)) set[L"CTR_ONLINE_TRAFFIC_KEY"] = key_path.wstring();
     }
     auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR", L"CTR_STARTUP_MUTEX_DLL_DIR", L"CTR_PARK_MISSING_NID",
         L"CTR_PARK_MISSING_SERVICE", L"CTR_TILING_TIMING", L"CTR_60FPS_PATCH", L"CTR_NEO_MODE", L"CTR_NATIVE_4K", L"CTR_UNLOCK_ALL",
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION",
-        L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN"});
+        L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
+        L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     const auto open_log = [&](const wchar_t* suffix) {
@@ -1252,7 +1374,10 @@ void create_controls() {
 
     g.online_server_edit = add_edit(ID_ONLINE_SERVER_EDIT, rect(548, 346, 190, 32), g.cfg.online_server);
     SendMessageW(g.online_server_edit, EM_LIMITTEXT, 64, 0);
+    if (g.cfg.online_host) SetWindowTextW(g.online_server_edit, g.cfg.online_public_ip.c_str());
+    g.online_host_toggle = add_button(ID_ONLINE_HOST, Kind::Toggle, rect(548, 384, 190, 26), L"Ospita server qui", &g.cfg.online_host, -1, TAB_SETTINGS);
     g.online_password_edit = add_edit(ID_ONLINE_PASSWORD_EDIT, rect(548, 448, 190, 32), L"");
+    add_button(ID_ONLINE_RELAY, Kind::Toggle, rect(548, 490, 190, 26), L"Relay (NAT / CGNAT)", &g.cfg.online_relay, -1, TAB_SETTINGS);
     SetWindowLongPtrW(g.online_password_edit, GWL_STYLE, GetWindowLongPtrW(g.online_password_edit, GWL_STYLE) | ES_PASSWORD);
     SendMessageW(g.online_password_edit, EM_SETPASSWORDCHAR, 0x2022, 0);
     SendMessageW(g.online_password_edit, EM_LIMITTEXT, 128, 0);
@@ -1285,6 +1410,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         g.updating = false;
         select_tab(TAB_HOME);
         select_resolution(g.resolution);
+        if (g.cfg.online && g.cfg.online_host) host_toggled(true);
         SetFocus(IsWindowEnabled(g.launch) ? g.launch : g.window);
         return 0;
     }
@@ -1320,7 +1446,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
                 g.cfg.online_id = window_text(g.online_id_edit);
             }
             if (!g.updating && id == ID_ONLINE_SERVER_EDIT && g.online_server_edit) {
-                g.cfg.online_server = window_text(g.online_server_edit);
+                (g.cfg.online_host ? g.cfg.online_public_ip : g.cfg.online_server) = window_text(g.online_server_edit);
             }
             validate();
             return 0;
@@ -1385,6 +1511,12 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
                 } else if (id == ID_PRO && !g.cfg.ps4_pro && g.cfg.native_4k) {
                     g.cfg.native_4k = false;
                     InvalidateRect(g.native_4k_toggle, nullptr, FALSE);
+                } else if (id == ID_ONLINE_HOST) {
+                    host_toggled();
+                } else if (id == ID_ONLINE_TOGGLE && !g.cfg.online && g.cfg.online_host) {
+                    g.cfg.online_host = false;
+                    InvalidateRect(g.online_host_toggle, nullptr, FALSE);
+                    host_toggled();
                 }
                 InvalidateRect(found->first, nullptr, FALSE);
                 validate();
@@ -1395,9 +1527,13 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_APP_FINISHED:
         game_finished(static_cast<DWORD>(wparam));
         return 0;
+    case WM_APP_HOST_READY:
+        host_ready(wparam != 0);
+        return 0;
     case WM_CLOSE:
-        if (g.process) return 0;
+        if (g.process || g.host_busy) return 0;
         save_config();
+        g.host.stop(); // closes the router ports opened for hosting
         DestroyWindow(window);
         return 0;
     case WM_DESTROY:

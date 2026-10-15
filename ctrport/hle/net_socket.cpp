@@ -9,6 +9,10 @@
 // online_config.h (never Sony or Activision hosts).
 // CTR_ONLINE_PORT_OFFSET remaps the local UDP 3074 bind for same-PC instances;
 // getsockname reports the actual port, and peer destination/source ports stay intact.
+// UDP to the project server's port 3074 goes to its discovery port (online_config.h), and
+// datagrams from that port are reported as coming from 3074, as the game expects.
+// CTR_ONLINE_NAT_TRANSPORT=relay sends the game socket's peer traffic through the project
+// server's UDP relay (online_relay.h); without it these paths are unchanged.
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <atomic>
@@ -23,6 +27,7 @@
 #include <vector>
 #include "ctr_hle.h"
 #include "online_config.h"
+#include "online_relay.h"
 #pragma comment(lib, "ws2_32.lib")
 
 namespace {
@@ -86,6 +91,7 @@ struct Socket {
         usesignature = 0, ttlchk = 0, maxttl = 0, mss = 0;
     std::uint32_t peer = 0; // last connect destination, network order
     std::uint16_t peer_port = 0;
+    bool game = false;      // UDP socket bound to the game's peer port 3074
 };
 struct Resolver {
     std::string name;
@@ -218,6 +224,26 @@ void log_net(const char* function, long long result, const std::string& extra) {
     ctr_hle::log_call("libSceNet", function, result, extra.c_str());
 }
 
+bool datagram(const Socket& entry) {
+    return entry.type == SOCK_DGRAM_ || entry.type == SOCK_DGRAM_P2P;
+}
+
+void map_discovery_destination(const Socket& entry, sockaddr_in* host) {
+    if (datagram(entry) && host->sin_addr.s_addr == ctr_hle::online::server_address() &&
+        ntohs(host->sin_port) == 3074) {
+        host->sin_port = htons(ctr_hle::online::discovery_port());
+    }
+}
+
+void map_discovery_source(const Socket& entry, sockaddr_in* host) {
+    const std::uint16_t port = ctr_hle::online::known_discovery_port();
+    if (port != 3074 && datagram(entry) &&
+        host->sin_addr.s_addr == ctr_hle::online::server_address() &&
+        ntohs(host->sin_port) == port) {
+        host->sin_port = htons(3074);
+    }
+}
+
 bool ready(SOCKET handle, bool read) {
     WSAPOLLFD entry{handle, static_cast<SHORT>(read ? POLLRDNORM : POLLWRNORM), 0};
     return WSAPoll(&entry, 1, 0) > 0;
@@ -327,6 +353,9 @@ CTR_SYSV int sceNetSocketClose(int id) {
             sockets.erase(it);
         }
     }
+    if (entry && entry->game) {
+        ctr_hle::online::relay::detach(entry->handle);
+    }
     const int result = entry ? (closesocket(entry->handle) ? fail_wsa() : 0) : fail(E_BADF);
     log_net("sceNetSocketClose", result, ",\"socket\":" + std::to_string(id));
     return result;
@@ -347,6 +376,7 @@ CTR_SYSV int sceNetBind(int id, const void* address, std::uint32_t length) {
         // sendto/recvfrom preserve peer ports; applying our local offset there would
         // also redirect traffic meant for the server or another instance.
         if ((entry->type == SOCK_DGRAM_ || entry->type == SOCK_DGRAM_P2P) && ntohs(host.sin_port) == 3074) {
+            entry->game = true;
             const char* value = std::getenv("CTR_ONLINE_PORT_OFFSET");
             if (value && *value) {
                 char* end = nullptr;
@@ -357,6 +387,9 @@ CTR_SYSV int sceNetBind(int id, const void* address, std::uint32_t length) {
         }
         result = bind(entry->handle, reinterpret_cast<sockaddr*>(&host), sizeof(host)) ? fail_wsa()
                                                                                          : 0;
+        if (result == 0 && entry->game) {
+            ctr_hle::online::relay::attach(entry->handle);
+        }
     }
     log_net("sceNetBind", result,
             ",\"socket\":" + std::to_string(id) + ",\"address\":\"" +
@@ -423,6 +456,7 @@ CTR_SYSV int sceNetConnect(int id, const void* address, std::uint32_t length) {
     } else {
         entry->peer = host.sin_addr.s_addr;
         entry->peer_port = host.sin_port;
+        map_discovery_destination(*entry, &host);
         if (connect(entry->handle, reinterpret_cast<sockaddr*>(&host), sizeof(host)) == 0) {
             result = 0;
         } else {
@@ -484,6 +518,27 @@ int send_common(const char* function, int id, const void* data, std::uint64_t le
         return fail(E_WOULDBLOCK);
     }
     const int size = length > 0x7fffffff ? 0x7fffffff : static_cast<int>(length);
+    namespace relay = ctr_hle::online::relay;
+    if (has_address && entry->game && (relay::enabled() || relay::block_direct()) && relay::is_peer(host)) {
+        const bool relayed = relay::enabled() &&
+                             relay::send(entry->handle, static_cast<const char*>(data), size, host) ==
+                                 relay::SendResult::Relayed;
+        if (relayed || relay::block_direct()) {
+            // Relayed, or dropped by the test switch as a NAT would: the game sees a normal send.
+            if (!relayed) {
+                relay::note_dropped_out(host);
+            }
+            log_net(function, size,
+                    ",\"socket\":" + std::to_string(id) + ",\"to\":\"" +
+                        endpoint(host.sin_addr.s_addr, host.sin_port) + "\",\"" +
+                        (relayed ? "relayed" : "test_dropped") + "\":true,\"bytes\":\"" +
+                        hex_prefix(data, size) + "\"");
+            return size;
+        }
+    }
+    if (has_address) {
+        map_discovery_destination(*entry, &host);
+    }
     const int sent =
         has_address ? sendto(entry->handle, static_cast<const char*>(data), size, 0,
                              reinterpret_cast<sockaddr*>(&host), sizeof(host))
@@ -503,6 +558,56 @@ int send_common(const char* function, int id, const void* data, std::uint64_t le
     return sent;
 }
 
+// Receive on the game socket with the relay or its test switch active: each datagram is read
+// whole, relay control messages and dropped direct datagrams are skipped, relayed game
+// datagrams are unwrapped and reported with the sender address the relay gave.
+int receive_game(const char* function, int id, const Socket& entry, char* buffer, int size, int flags,
+                 int host_flags, void* address, std::uint32_t* address_length) {
+    namespace relay = ctr_hle::online::relay;
+    thread_local std::vector<char> scratch(65536);
+    for (;;) {
+        sockaddr_in host{};
+        int host_length = sizeof(host);
+        const int received = recvfrom(entry.handle, scratch.data(), static_cast<int>(scratch.size()), host_flags,
+                                      reinterpret_cast<sockaddr*>(&host), &host_length);
+        if (received == SOCKET_ERROR) {
+            const int result = fail(map_wsa(WSAGetLastError()));
+            if (net_errno != E_WOULDBLOCK) {
+                log_net(function, result, ",\"socket\":" + std::to_string(id));
+            }
+            return result;
+        }
+        int offset = 0, payload = received;
+        sockaddr_in source = host;
+        const relay::Incoming kind =
+            relay::receive(entry.handle, scratch.data(), received, host, &offset, &payload, &source);
+        if (kind == relay::Incoming::Consumed || kind == relay::Incoming::Dropped) {
+            if (host_flags & MSG_PEEK) { // take the skipped datagram off the queue
+                recvfrom(entry.handle, scratch.data(), static_cast<int>(scratch.size()), 0, nullptr, nullptr);
+            }
+            if ((flags & MSG_DONTWAIT_) && !ready(entry.handle, true)) {
+                return fail(E_WOULDBLOCK);
+            }
+            continue;
+        }
+        if (kind == relay::Incoming::Pass) {
+            map_discovery_source(entry, &source);
+        }
+        const int copied = payload < size ? payload : size;
+        std::memcpy(buffer, scratch.data() + offset, copied);
+        if (address) {
+            to_guest(source, address, address_length);
+        }
+        log_net(function, copied,
+                ",\"socket\":" + std::to_string(id) + ",\"from\":\"" +
+                    endpoint(source.sin_addr.s_addr, source.sin_port) + "\"" +
+                    (kind == relay::Incoming::Data ? ",\"relayed\":true" : "") +
+                    (payload > size ? ",\"truncated\":true" : "") + ",\"bytes\":\"" +
+                    hex_prefix(buffer, copied) + "\"");
+        return copied;
+    }
+}
+
 int receive_common(const char* function, int id, void* buffer, std::uint64_t length, int flags,
                    void* address, std::uint32_t* address_length) {
     const auto entry = find_socket(id);
@@ -520,6 +625,11 @@ int receive_common(const char* function, int id, void* buffer, std::uint64_t len
         host_flags |= MSG_WAITALL;
     }
     const int size = length > 0x7fffffff ? 0x7fffffff : static_cast<int>(length);
+    namespace relay = ctr_hle::online::relay;
+    if (entry->game && datagram(*entry) && (relay::enabled() || relay::block_direct())) {
+        return receive_game(function, id, *entry, static_cast<char*>(buffer), size, flags, host_flags, address,
+                            address_length);
+    }
     sockaddr_in host{};
     int host_length = sizeof(host);
     const int received = recvfrom(entry->handle, static_cast<char*>(buffer), size, host_flags,
@@ -541,6 +651,7 @@ int receive_common(const char* function, int id, void* buffer, std::uint64_t len
         host.sin_addr.s_addr = entry->peer;
         host.sin_port = entry->peer_port;
     }
+    map_discovery_source(*entry, &host);
     if (address) {
         to_guest(host, address, address_length);
     }
