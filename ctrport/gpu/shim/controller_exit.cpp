@@ -1,12 +1,56 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include <windows.h>
 #include <Xinput.h>
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <mutex>
+#include <vector>
 #include <SDL3/SDL.h>
 #include "controller_exit_state.h"
 #include "ctr_gpu.h"
+static_assert(sizeof(CtrGpuGamepad)==sizeof(XINPUT_GAMEPAD),"CtrGpuGamepad keeps the XINPUT_GAMEPAD layout");
 namespace {
+// PlayStation controllers through SDL's HIDAPI drivers, without DS4Windows or Steam Input.
+// Opened and polled on the window thread; the runtime reads the last snapshot.
+std::mutex pad_lock;
+std::vector<SDL_Gamepad*> pads;
+CtrGpuGamepad pad_snapshot{};
+int pad_count=0;
+bool playstation(SDL_Gamepad* pad){
+    const auto type=SDL_GetGamepadType(pad);
+    return type==SDL_GAMEPAD_TYPE_PS3 || type==SDL_GAMEPAD_TYPE_PS4 || type==SDL_GAMEPAD_TYPE_PS5;
+}
+CtrGpuGamepad read_pad(SDL_Gamepad* pad){
+    static const std::pair<SDL_GamepadButton,WORD> map[]={
+        {SDL_GAMEPAD_BUTTON_SOUTH,XINPUT_GAMEPAD_A},{SDL_GAMEPAD_BUTTON_EAST,XINPUT_GAMEPAD_B},
+        {SDL_GAMEPAD_BUTTON_WEST,XINPUT_GAMEPAD_X},{SDL_GAMEPAD_BUTTON_NORTH,XINPUT_GAMEPAD_Y},
+        {SDL_GAMEPAD_BUTTON_START,XINPUT_GAMEPAD_START},{SDL_GAMEPAD_BUTTON_BACK,XINPUT_GAMEPAD_BACK},
+        // The runtime maps XINPUT_GAMEPAD_BACK to the PS4 touch pad button.
+        {SDL_GAMEPAD_BUTTON_TOUCHPAD,XINPUT_GAMEPAD_BACK},
+        {SDL_GAMEPAD_BUTTON_LEFT_STICK,XINPUT_GAMEPAD_LEFT_THUMB},{SDL_GAMEPAD_BUTTON_RIGHT_STICK,XINPUT_GAMEPAD_RIGHT_THUMB},
+        {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER,XINPUT_GAMEPAD_LEFT_SHOULDER},{SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER,XINPUT_GAMEPAD_RIGHT_SHOULDER},
+        {SDL_GAMEPAD_BUTTON_DPAD_UP,XINPUT_GAMEPAD_DPAD_UP},{SDL_GAMEPAD_BUTTON_DPAD_DOWN,XINPUT_GAMEPAD_DPAD_DOWN},
+        {SDL_GAMEPAD_BUTTON_DPAD_LEFT,XINPUT_GAMEPAD_DPAD_LEFT},{SDL_GAMEPAD_BUTTON_DPAD_RIGHT,XINPUT_GAMEPAD_DPAD_RIGHT}};
+    CtrGpuGamepad out{};
+    for(const auto& [button,bit]:map)if(SDL_GetGamepadButton(pad,button))out.buttons|=bit;
+    // SDL sticks are -32768..32767 with Y down, triggers 0..32767; XInput has Y up, triggers 0..255.
+    const auto up=[](Sint16 y){return static_cast<int16_t>(y==-32768?32767:-y);};
+    const auto trigger=[](Sint16 v){return static_cast<uint8_t>(std::clamp<int>(v,0,32767)*255/32767);};
+    out.left_x=SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_LEFTX);out.left_y=up(SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_LEFTY));
+    out.right_x=SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_RIGHTX);out.right_y=up(SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_RIGHTY));
+    out.left_trigger=trigger(SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_LEFT_TRIGGER));
+    out.right_trigger=trigger(SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_RIGHT_TRIGGER));
+    return out;
+}
+// Same merge as the runtime's XInput slots: buttons OR-ed, larger trigger, larger stick deflection.
+void merge(CtrGpuGamepad& into,const CtrGpuGamepad& pad){
+    const auto stick=[](int16_t& x,int16_t& y,int16_t nx,int16_t ny){
+        if(static_cast<long long>(nx)*nx+static_cast<long long>(ny)*ny>static_cast<long long>(x)*x+static_cast<long long>(y)*y){x=nx;y=ny;}};
+    into.buttons|=pad.buttons;
+    into.left_trigger=std::max(into.left_trigger,pad.left_trigger);into.right_trigger=std::max(into.right_trigger,pad.right_trigger);
+    stick(into.left_x,into.left_y,pad.left_x,pad.left_y);stick(into.right_x,into.right_y,pad.right_x,pad.right_y);
+}
 Frontend::ExitGesture gesture;
 std::atomic<bool> captured{false};
 HWND dialog{};
@@ -39,14 +83,54 @@ void show(HWND owner){
 }
 }
 extern "C" CTR_GPU_API int ctr_gpu_input_captured(){return captured.load(std::memory_order_relaxed)?1:0;}
+extern "C" CTR_GPU_API int ctr_gpu_gamepad_state(CtrGpuGamepad* out){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    if(out)*out=pad_count?pad_snapshot:CtrGpuGamepad{};
+    return pad_count;
+}
+extern "C" CTR_GPU_API void ctr_gpu_gamepad_rumble(uint16_t low_frequency,uint16_t high_frequency){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    // The game sets a level and keeps it until it sets another; SDL needs a duration.
+    for(auto* pad:pads)SDL_RumbleGamepad(pad,low_frequency,high_frequency,(low_frequency||high_frequency)?10000:0);
+}
 namespace Frontend {
+void InitGamepads(){
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");
+    if(!SDL_InitSubSystem(SDL_INIT_GAMEPAD))std::fprintf(stderr,"ctrport: SDL gamepad subsystem unavailable: %s\n",SDL_GetError());
+}
+void GamepadEvent(const SDL_Event& event){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    if(event.type==SDL_EVENT_GAMEPAD_ADDED){
+        SDL_Gamepad* pad=SDL_OpenGamepad(event.gdevice.which);
+        if(!pad)return;
+        // Other controllers stay on XInput; an already open pad only had its reference count raised.
+        if(!playstation(pad) || std::find(pads.begin(),pads.end(),pad)!=pads.end()){SDL_CloseGamepad(pad);return;}
+        pads.push_back(pad);
+        std::fprintf(stderr,"ctrport: PlayStation controller connected: %s\n",SDL_GetGamepadName(pad));
+    }else if(event.type==SDL_EVENT_GAMEPAD_REMOVED){
+        for(auto it=pads.begin();it!=pads.end();++it)if(SDL_GetGamepadID(*it)==event.gdevice.which){
+            std::fputs("ctrport: PlayStation controller disconnected\n",stderr);
+            SDL_CloseGamepad(*it);pads.erase(it);break;
+        }
+    }
+}
+void UpdateGamepads(){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    CtrGpuGamepad merged{};int count=0;
+    for(auto* pad:pads)if(SDL_GamepadConnected(pad)){merge(merged,read_pad(pad));++count;}
+    pad_snapshot=merged;pad_count=count;
+}
 bool PollControllerExit(SDL_Window* window){
     using GetState=DWORD(WINAPI*)(DWORD,XINPUT_STATE*);
     static auto poll=[] {auto module=LoadLibraryExW(L"xinput1_4.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);return module?reinterpret_cast<GetState>(GetProcAddress(module,"XInputGetState")):nullptr;}();
     HWND owner=static_cast<HWND>(SDL_GetPointerProperty(SDL_GetWindowProperties(window),SDL_PROP_WINDOW_WIN32_HWND_POINTER,nullptr));
     HWND foreground=GetForegroundWindow();bool focused=foreground==owner || (dialog && foreground==dialog);
-    XINPUT_STATE state{};bool connected=poll && poll(0,&state)==ERROR_SUCCESS;
-    const auto action=gesture.update(state.Gamepad.wButtons,connected,focused,GetTickCount64());
+    // View + Menu on any XInput slot, or Share/touch pad + Options on a PlayStation controller.
+    WORD buttons=0;bool connected=false;
+    for(DWORD slot=0;poll && slot<4;++slot){XINPUT_STATE state{};if(poll(slot,&state)==ERROR_SUCCESS){connected=true;buttons|=state.Gamepad.wButtons;}}
+    CtrGpuGamepad playstation_pad{};
+    if(ctr_gpu_gamepad_state(&playstation_pad)>0){connected=true;buttons|=playstation_pad.buttons;}
+    const auto action=gesture.update(buttons,connected,focused,GetTickCount64());
     if(action==ExitGesture::Action::Open)show(owner);
     if(action==ExitGesture::Action::Cancel){dismiss();std::fputs("ctrport: controller exit cancelled\n",stderr);}
     if(action==ExitGesture::Action::Confirm)requested=true;

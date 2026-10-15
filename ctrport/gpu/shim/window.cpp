@@ -9,11 +9,17 @@
 
 namespace Frontend {
 bool PollControllerExit(SDL_Window* window);
+void InitGamepads();
+void GamepadEvent(const SDL_Event& event);
+void UpdateGamepads();
 
 WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}, height{height_} {
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
         UNREACHABLE_MSG("Failed to initialize SDL video: {}", SDL_GetError());
     }
+    // ctrport: PlayStation controllers through SDL (controller_exit.cpp); XInput pads are read
+    // by the runtime directly.
+    InitGamepads();
     SDL_PropertiesID props = SDL_CreateProperties();
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title);
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
@@ -61,10 +67,15 @@ bool WindowSDL::PollEvents() {
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             is_open = false;
             break;
+        case SDL_EVENT_GAMEPAD_ADDED:
+        case SDL_EVENT_GAMEPAD_REMOVED:
+            GamepadEvent(event);
+            break;
         default:
             break;
         }
     }
+    UpdateGamepads();
     return is_open;
 }
 
