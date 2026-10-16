@@ -114,6 +114,7 @@ struct AuthSession {
     std::uint32_t title_id = 0;
     Bytes session_key;
     std::string room_token;
+    unsigned wumpa_multiplier = 1;
 };
 struct Auth3Reply {
     int status = 400;

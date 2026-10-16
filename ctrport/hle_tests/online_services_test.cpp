@@ -754,6 +754,7 @@ int main(int argc, char** argv) {
                       std::string::npos &&
                   seen_requests.find("Accept: application/json") != std::string::npos &&
                   seen_requests.find("X-Ctr-Online-Id: TestRacer") != std::string::npos &&
+                  seen_requests.find("X-Ctr-Wumpa-Multiplier: 1\r\n") != std::string::npos &&
                   seen_requests.find("POST /webapi/sessionInvitation/v1/users/me/invitations") !=
                       std::string::npos &&
                   seen_requests.find("{\"x\":1}") != std::string::npos,
@@ -820,6 +821,7 @@ int main(int argc, char** argv) {
         check(context > 0 && tmpl > 0 && connection > 0 && request > 0 &&
                   http_status(request, &status) == static_cast<int>(0x80431065u),
               "sceHttp objects, status before send");
+        set_env("CTR_WUMPA_MULTIPLIER", "100");
         check(http_send(request, "hello", 5) == 0 && http_status(request, &status) == 0 &&
                   status == 200,
               "sceHttpSendRequest to project server");
@@ -841,7 +843,9 @@ int main(int argc, char** argv) {
                       static_cast<int>(0x80432025u),
               "sceHttpGetAllResponseHeaders and ParseResponseHeader");
         server.join();
-        check(seen.find("POST /v1.0/auth/x HTTP/1.1") != std::string::npos &&
+        set_env("CTR_WUMPA_MULTIPLIER", "1");
+        check(seen.find("X-Ctr-Wumpa-Multiplier: 100\r\n") != std::string::npos &&
+                  seen.find("POST /v1.0/auth/x HTTP/1.1") != std::string::npos &&
                   seen.find("Host: umbrella.live.demonware.net") != std::string::npos &&
                   seen.find("X-Ctr-Original-Url: https://umbrella.live.demonware.net/v1.0/auth/x") !=
                       std::string::npos &&

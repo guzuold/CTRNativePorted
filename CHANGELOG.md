@@ -1,3 +1,67 @@
+# CTRNativePorted v0.3.1 — Wumpa Coins and Pit Stop purchases
+
+## New since v0.3.0
+
+- The launcher's visible player name is passed to the game in both Online and
+  offline sessions, fixing the unwanted CTRPlayer fallback for valid names.
+- Wumpa Coins are credited from valid end-of-race activity reports, including
+  single-player Adventure. Rewards use the local retail track/rank table; unknown
+  tracks use a project fallback of 32 coins, and unranked activities use first-place
+  base rewards. These are simplified project rules, not complete retail bonus parity.
+- Optional **Wumpa Coins x100** switch in launcher Settings, off by default and
+  saved per player. The multiplier applies to race earnings, not purchase prices.
+- Pit Stop single-item and bundle purchases, with persistent inventory and balance.
+  Already-owned bundle contents are excluded from the charge. Balance and all
+  granted items save together; repeated requests do not debit twice.
+- Shop and reward catalogues are read locally from the user's v01.21 runtime.
+  No game data or catalogues are included in this download or source repository.
+
+## Install and use
+
+Extract `CTRNativePorted-v0.3.1-win64.zip` and run `launcher.exe`. When upgrading,
+close the launcher and game, replace program files, and keep your existing
+`runtime/user` directory to retain saves, settings, friends and local wallet.
+
+Supply your own CUSA14876 base dump and v01.21 update for these economy features.
+Enable **Online** in Settings to start the project service, even when playing
+single-player; no friend or lobby is required to earn coins in Adventure.
+Choose **Wumpa Coins x100** before launching if you want faster unlocks.
+The existing friends, parties (up to 8 players) and relay features remain included.
+
+## Verification
+
+- Runtime, launcher and server builds pass; 189 server checks pass.
+- Original retail Adventure Crash Cove: 32 coins awarded and visible in Pit Stop.
+- Real Velo purchased for 1500, selectable, retained after a cold restart.
+- Back N. Time: Baby Crash bundle purchased for 3375: all four contents available,
+  balance reduced from 8500 to 5125 and inventory persisted.
+- Synthetic tests cover insufficient funds, write-failure rollback, duplicate
+  requests after restart, partial ownership and per-player x1/x100 isolation.
+
+## Known limits
+
+Wumpa Challenges progression/rewards are not implemented; opening their screen
+and recording events does not mean completing them pays coins. Individual
+activity modes and x100 have not all been verified through the original game UI.
+Economy currently requires Online enabled. Wallets belong to the service host;
+wallet migration across remote lobbies is not provided. Catalogue variants with
+unsupported price accessors/handle aliases and multi-page inventories are deferred.
+Partial-ownership discounts have synthetic coverage, not an original-client test.
+
+No remote-PC retail online race or full online support (R8) is claimed. Existing
+NAT/CGNAT and party restart limitations remain. This experimental release adds
+no reconstructed engine replacement; original game code still runs at runtime.
+
+## Credits and license
+
+GPL-2.0 project; renderer adapted from shadPS4 v0.18.0, with bbport references.
+DHT uses jech/dht (license included). Xbox icons: Julio Cacko, CC0-1.0.
+User-supplied launcher branding, transparency edited with OpenAI imagegen;
+marks remain their owners' property. Implementation/review assisted by Claude,
+Gemini and OpenAI Codex. See the included README and provenance/license files.
+
+---
+
 # CTRNativePorted v0.3.0 — Friends, parties and launcher refresh
 
 ## New since v0.2.2

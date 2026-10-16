@@ -78,6 +78,9 @@ bool http_exchange(const std::string& method, const std::string& target,
     if (!has_host) {
         message += "Host: ctr-online\r\n";
     }
+    const char* multiplier = std::getenv("CTR_WUMPA_MULTIPLIER");
+    message += std::string("X-Ctr-Wumpa-Multiplier: ") +
+        (multiplier && std::string(multiplier) == "100" ? "100" : "1") + "\r\n";
     message += "X-Ctr-Online-Id: " + identity().online_id + "\r\nConnection: close\r\n";
     if (!room_token().empty()) message += "X-Ctr-Room-Token: " + room_token() + "\r\n";
     message += "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n" + body;

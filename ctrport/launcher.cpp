@@ -109,7 +109,7 @@ enum : int {
     ID_MOD_TOGGLE_BASE = 140, // 140..143 for sample mods
     ID_OPEN_MODS = 150,
     ID_SAVE_BACKUP = 160, ID_OPEN_SAVES, ID_OPEN_DUMP, ID_OPEN_LOGS, ID_AUDIO_TEST,
-    ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT, ID_ONLINE_HOST, ID_ONLINE_FRIENDS
+    ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT, ID_ONLINE_HOST, ID_ONLINE_FRIENDS, ID_WUMPA_X100
 };
 
 struct ModItem {
@@ -123,6 +123,7 @@ struct Config {
     std::wstring game_language = L"en";
     bool use_patch = true, fps_60 = true, ps4_pro = true, native_4k = false, unlock_all = false, fullscreen = false;
     bool online = false;
+    bool wumpa_x100 = false;
     bool xbox_prompts = true;
     std::wstring online_id = L"CTRPlayer";
     std::wstring online_server = L"127.0.0.1";
@@ -382,7 +383,7 @@ void load_config() {
             text(L"online_public_ip", g.cfg.online_public_ip); flag(L"online_host", g.cfg.online_host);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
             flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
-            flag(L"online", g.cfg.online);
+            flag(L"online", g.cfg.online); flag(L"wumpa_x100", g.cfg.wumpa_x100);
         }
     }
     if (g.cfg.native_4k) g.cfg.ps4_pro = true;
@@ -416,6 +417,7 @@ void save_config() {
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
         ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) + ",\n  \"game_language\": " + json_string(g.cfg.game_language) +
         ",\n  \"online\": " + flag(g.cfg.online) +
+        ",\n  \"wumpa_x100\": " + flag(g.cfg.wumpa_x100) +
         ",\n  \"online_id\": " + json_string(g.cfg.online_id) +
         ",\n  \"online_server\": " + json_string(g.cfg.online_server) +
         ",\n  \"online_friend_code\": " + json_string(g.cfg.online_friend_code) +
@@ -900,6 +902,7 @@ void paint_window(HDC target) {
                 text(gr, L"Name displayed in races\n(3–16 characters)", 1, 10.0f, FontStyleRegular, rect(548, 288, 190, 28), kTextMuted);
 
                 text(gr,L"Invita gli amici o entra nella\nloro lobby dalla lista amici\nnella Home. Massimo 8 giocatori.",1,12,FontStyleRegular,rect(548,334,190,90),kTextMuted);
+                text(gr,L"Rewards: next game launch",1,10,FontStyleRegular,rect(548,458,190,22),kTextMuted);
                 text(gr,g.cfg.online ? L"ONLINE" : L"OFFLINE",0,18,FontStyleBold,rect(548,490,190,28),g.cfg.online ? kArcadeLime : kTextMuted);
 
                 // Card 3: CONTROLLER & AUDIO
@@ -1099,10 +1102,14 @@ void validate() {
     int width = 0, height = 0;
     const bool size_ok = g.cfg.fullscreen || (parse_size(window_text(g.width_edit), 320, 7680, width) && parse_size(window_text(g.height_edit), 240, 4320, height));
     const bool runtime_ok = !g.root.empty() && fs::exists(g.runtime_exe, ec);
-    g.can_launch = runtime_ok && base_modules && (!g.cfg.use_patch || patch_ok) && size_ok;
+    const auto player_name=g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
+    const bool name_ok=player_name.size()>=3 && player_name.size()<=16 &&
+        player_name.find_first_not_of(L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")==std::wstring::npos;
+    g.can_launch = runtime_ok && base_modules && (!g.cfg.use_patch || patch_ok) && size_ok && name_ok;
     if (!runtime_ok) g.global = {L"Runtime not found: ctrport.exe and ctr_gpu.dll required", 2};
     else if (!base_modules || (g.cfg.use_patch && !patch_ok)) g.global = {L"Select valid dump folders to start the game", 2};
     else if (!size_ok) g.global = {L"Invalid resolution (320×240 to 7680×4320)", 2};
+    else if (!name_ok) g.global = {L"Player name: 3-16 letters, digits, hyphen or underscore", 2};
     else {
         std::wstring summary = L"Ready · ";
         summary += g.cfg.use_patch ? L"v01.21 (Nitro Tour)" : L"v01.00 (Classic)";
@@ -1387,6 +1394,8 @@ void launch_game() {
                                              {L"CTR_NO_FRAME_OBSERVATION", L"1"}, {L"CTR_BASE_DIR", base.wstring()}};
     set[L"CTR_SYSTEM_LANGUAGE"] = std::to_wstring(kGameLanguages[game_language_index(g.cfg.game_language)].system_id);
     set[L"CTR_XBOX_PROMPTS"] = g.cfg.xbox_prompts ? L"1" : L"0";
+    set[L"CTR_WUMPA_MULTIPLIER"] = g.cfg.wumpa_x100 ? L"100" : L"1";
+    set[L"CTR_ONLINE_ID"] = g.cfg.online_id; // Display name applies to offline sessions too.
     if (g.cfg.use_patch) set[L"CTR_PATCH_DIR"] = patch.wstring();
     if (g.cfg.use_patch && g.cfg.fps_60) set[L"CTR_60FPS_PATCH"] = L"1";
     if (g.cfg.ps4_pro || g.cfg.native_4k) set[L"CTR_NEO_MODE"] = L"1";
@@ -1413,7 +1422,6 @@ void launch_game() {
             key.write(reinterpret_cast<const char*>(verified.traffic_key.data()),static_cast<std::streamsize>(verified.traffic_key.size()));
             key.close();if(!key) throw std::runtime_error("Impossibile salvare la chiave della lobby");
             set[L"CTR_ONLINE"]=L"1";
-            set[L"CTR_ONLINE_ID"]=g.cfg.online_id;
             set[L"CTR_ONLINE_ROOM_TOKEN"]=widen(g.party.room);
             set[L"CTR_ONLINE_SERVER"]=widen(g.party.ip);
             set[L"CTR_ONLINE_TRAFFIC_KEY"]=key_path.wstring();
@@ -1585,6 +1593,8 @@ void create_controls() {
     g.online_id_edit = add_edit(ID_ONLINE_ID_EDIT, rect(548, 252, 190, 32), g.cfg.online_id);
     SendMessageW(g.online_id_edit, EM_LIMITTEXT, 16, 0);
 
+
+    add_button(ID_WUMPA_X100, Kind::Toggle, rect(548, 426, 190, 26), L"Wumpa Coins x100", &g.cfg.wumpa_x100, -1, TAB_SETTINGS);
 
     // Controller & Audio (Card 3)
     add_button(ID_XBOX_PROMPTS, Kind::Toggle, rect(784, 234, 190, 26), L"Colored Xbox icons", &g.cfg.xbox_prompts, -1, TAB_SETTINGS);

@@ -13,7 +13,7 @@ against the execution of the original code.
 
 ## Status
 
-Latest release: **v0.3.0** (experimental).
+Latest release: **v0.3.1** (experimental).
 
 
 **Reconstruction:** original functions replaced at run time by verified C++: **0** so
@@ -148,11 +148,25 @@ service/protocol tests pass, but an online retail race across remote PCs has not
 been verified. This is not a claim of complete online support. Signed requests
 authenticate peers; they do not encrypt the HTTP transport.
 
-**Pit Stop and Wumpa Challenges** open online with v01.21: the server keeps each player's
-Wumpa Coin balance and challenge events (catalogue, prices and challenges come from the game's
-own data). Buying items and earning coins from races are not implemented yet, so the balance
-starts at 0; for testing, `ctr_online_server.exe --set-balance <online ID> 10 <amount>` sets an
-account's Wumpa Coins (currency 10), picked up at the game's next login.
+## Wumpa Coins and Pit Stop (v01.21, experimental)
+
+Enable **Online** in Settings to start the project service, including for single-player
+Adventure; no friend or party is required. Valid end-of-race reports earn persistent
+Wumpa Coins from the local track/rank table. Unknown tracks use 32 coins and unranked
+activities use first-place base rewards. These simplified project rules do not
+replicate all retail bonuses. **Wumpa Coins x100** is optional in Settings and off
+by default; choose it before PLAY. It changes earnings, not prices.
+
+Pit Stop supports single-item and bundle purchases, persistent ownership and
+balance, and exclusion of already-owned bundle contents from the price. Catalogues
+are read locally from your own game; none are distributed. Adventure earnings,
+Real Velo purchase/persistence and a four-item Baby Crash bundle were verified
+in the original game. Partial ownership and x100 have synthetic test coverage.
+
+**Limits:** Wumpa Challenges progression and payouts are not implemented. Economy
+with Online disabled, wallet migration across remote services, unsupported catalogue
+variants and multi-page inventory remain deferred. Keep the same player name and
+local service to retain access to that account's wallet. See CHANGELOG for scope.
 
 The server also exists as a standalone program, `ctr_online_server.exe --auto-public --upnp`
 (built by `ctrport/online_server/build_online_server.ps1`), and the original Python reference,

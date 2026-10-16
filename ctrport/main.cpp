@@ -700,6 +700,7 @@ int main(int argc, char** argv) {
     if(argc==2 && std::string(argv[1])=="--pad-read-state-control")return ctrport::pad_read_state_control();
     if(argc==2 && std::string(argv[1])=="--pad-open-control")return ctrport::pad_open_control();
     if(argc==2 && std::string(argv[1])=="--user-name-control")return ctrport::user_name_control();
+    if(argc==3 && std::string(argv[1])=="--user-name-control")return ctrport::user_name_control(argv[2]);
     if(argc==2 && std::string(argv[1])=="--flexible-memory-control")return ctrport::flexible_memory_control();
     if(argc==2 && std::string(argv[1])=="--np-web-context-control")return ctrport::np_web_context_control();
     if(argc==2 && std::string(argv[1])=="--http-context-control")return ctrport::http_context_control();

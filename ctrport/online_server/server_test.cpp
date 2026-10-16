@@ -415,9 +415,17 @@ int run_tests(int argc, char* argv[]) {
         std::string line, extra;
         std::getline(events_file, line);
         const Json row = parse_json(line);
-        check(!std::getline(events_file, extra) && row.keys() == std::vector<std::string>{"account", "received", "event"} &&
-              row.at("account").text == "42" && row.at("event").text == R"({"name": "login", "time": 1792073078})",
-              "wumpa: event stored with the reference's columns and JSON text");
+        check(!std::getline(events_file, extra) && row.keys() == std::vector<std::string>{"account", "received", "event", "request_hex"} &&
+              row.at("account").text == "42" && row.at("event").text == R"({"name": "login", "time": 1792073078})" &&
+              row.at("request_hex").text == login_request.params[0].value.text,
+              "wumpa: event summary and complete retail attribute bytes persisted");
+        const auto blocked_path=dir / "event_file_as_directory";
+        std::filesystem::create_directories(blocked_path);
+        AchievementStore blocked_events(blocked_path);
+        const auto failed_write=pitstop_task(login_request,42,market,blocked_events);
+        check(failed_write && failed_write->size() >= 9 &&
+              hex(Bytes(failed_write->begin() + 9, failed_write->end())) == "08010000000301",
+              "wumpa: persistence failure returns task error instead of acknowledging lost events");
         check(answer("0403" "0801") == "none", "pit stop: other tasks left to the server");
 
         market.set_balance(42, 1, 500);
@@ -451,6 +459,146 @@ int run_tests(int argc, char* argv[]) {
               !entitlement_page("start=0&size=100&entitlement_type=service") &&
               !entitlement_page("start=0&size=100&service_label=0&entitlement_type=service&entitlement_type=service"),
               "entitlements: empty service list, other requests refused");
+    }
+
+    // Synthetic economy fixtures exercise persistence, not retail reward parity.
+    {
+        const auto economy = dir / "economy";
+        std::filesystem::create_directories(economy);
+        std::ofstream(economy / "retail_reward_catalog.json") <<
+            R"({"schema":1,"eboot_sha256":"39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5","tracks":[{"id":101,"ranks":[40,30,20,10]}]})";
+        auto add = [](Bytes& target, const Bytes& part) { target.insert(target.end(), part.begin(), part.end()); };
+        auto field = [&](unsigned tag, const Bytes& value) {
+            Bytes out = pb_varint(tag * 8 + 2); add(out, pb_varint(value.size())); add(out, value); return out;
+        };
+        auto race = [&](unsigned timestamp, unsigned mode = 1, unsigned duration = 120, unsigned rank = 2, unsigned laps = 3, unsigned online = 0, unsigned track = 101, unsigned golden = 0) {
+            Bytes event = field(1, bytes_of("end_race")); add(event, pb_varint(16)); add(event, pb_varint(timestamp));
+            for (const auto& [key, value] : std::map<std::string, unsigned>{
+                    {"Track",track},{"Rank",rank},{"RaceMode",mode},{"CompletedLap",laps},
+                    {"Online",online},{"RewardGoldenWumpa",golden},{"Time",duration}}) {
+                Bytes attr = field(1, bytes_of(key)); add(attr, pb_varint(16)); add(attr, pb_varint(value));
+                add(event, field(3, attr));
+            }
+            Bytes message = field(1, bytes_of("octane_psn")); add(message, field(2, event));
+            return std::vector<Param>{{typed::STRUCT, Json::of(hex(message))}};
+        };
+        const auto balance_request = parse_task_request(b("5003f517080e0000000a0a6f6374616e655f70736e100300")).params;
+        const auto wallet = economy / "marketplace.txt";
+        MarketplaceStore market(wallet);
+        market.award_races(race(999), 41);
+        check(hex(market.balances_message(balance_request,41)) == "0a04080a103c", "reward: modifier defaults to normal base payout");
+        market.award_races(race(999), 41,100);
+        check(hex(market.balances_message(balance_request,41)) == "0a04080a103c", "reward: changing multiplier does not repay old event");
+        market.award_races(race(1000), 42,100);
+        check(hex(market.balances_message(balance_request,42)) == "0a05080a10f02e", "reward: base amount read from local catalogue");
+        market.award_races(race(1000), 42,100);
+        MarketplaceStore restarted(wallet);
+        restarted.award_races(race(1000), 42,100);
+        check(hex(restarted.balances_message(balance_request,42)) == "0a05080a10f02e", "reward: replay does not credit twice across restart");
+        restarted.award_races(race(1000), 43,100);
+        check(hex(restarted.balances_message(balance_request,43)) == "0a05080a10f02e", "reward: receipts scoped to account");
+        bool reward_rejected = false;
+        try { restarted.award_races(race(1001, 9, 0), 42,100); } catch (const std::exception&) { reward_rejected = true; }
+        check(reward_rejected && hex(restarted.balances_message(balance_request,42)) == "0a05080a10f02e", "reward: zero-duration activity refused without wallet change");
+        restarted.award_races(race(2000,9,120,2,0,1,101,1),44,100);
+        check(hex(restarted.balances_message(balance_request,44)) == "0a05080a10f02e",
+              "reward: alternate mode, zero laps, online and golden flag accept common x100 policy");
+        restarted.award_races(race(2001,2,120,0,0),45,100);
+        check(hex(restarted.balances_message(balance_request,45)) == "0a05080a10c03e",
+              "reward: unranked activity uses first-place base x100");
+        restarted.award_races(race(2002,8,120,1,0,0,999),46,100);
+        check(hex(restarted.balances_message(balance_request,46)) == "0a05080a108032",
+              "reward: unknown arena uses common 3200 payout");
+        MarketplaceStore no_catalogue(dir / "economy_no_catalogue" / "marketplace.txt");
+        no_catalogue.award_races(race(2003),47,100);
+        check(hex(no_catalogue.balances_message(balance_request,47)) == "0a05080a108032",
+              "reward: missing retail catalogue does not block activity credit");
+        std::filesystem::create_directory(wallet.string() + ".tmp");
+        reward_rejected = false;
+        try { restarted.award_races(race(1001), 42,100); } catch (const std::exception&) { reward_rejected = true; }
+        check(reward_rejected && hex(restarted.balances_message(balance_request,42)) == "0a05080a10f02e" &&
+              hex(MarketplaceStore(wallet).balances_message(balance_request,42)) == "0a05080a10f02e",
+              "reward: failed write rolls back balance and leaves disk intact");
+        std::filesystem::remove(wallet.string() + ".tmp");
+        restarted.award_races(race(1001), 42,100);
+        check(hex(restarted.balances_message(balance_request,42)) == "0a05080a10e05d", "reward: failed transaction can retry successfully");
+        restarted.set_balance(42,10,INT64_MAX);
+        reward_rejected = false;
+        try { restarted.award_races(race(1002),42,100); } catch (const std::exception&) { reward_rejected = true; }
+        check(reward_rejected && restarted.balances_message(balance_request,42) == MarketplaceStore(wallet).balances_message(balance_request,42),
+              "reward: balance overflow refused without mutation");
+    }
+
+    // Synthetic single-item purchase transaction and inventory wire record.
+    {
+        const auto shop = dir / "shop";
+        std::filesystem::create_directories(shop);
+        std::ofstream(shop / "retail_shop_catalog.json") << R"({"schema":1,"eboot_sha256":"39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5","skus":[{"id":21,"currency":10,"price":15,"item":31,"quantity":1}]})";
+        const auto wallet = shop / "marketplace.txt";
+        MarketplaceStore market(wallet);
+        Writer request; request.string("octane_psn").u32(1).u32(21).u32(1).u32(1).boolean(false).u32(1).u64(0).string("").u32(0).u32(0).u8(0).u32(0);
+        const auto purchase = Reader(request.data()).values();
+        const auto balances = parse_task_request(b("5003f517080e0000000a0a6f6374616e655f70736e100300")).params;
+        const auto page = parse_task_request(b("5003a5106f6374616e655f70736e000801000000085803000000")).params;
+        market.set_balance(42,10,100);
+        market.purchase(purchase,42);
+        check(hex(market.balances_message(balances,42)) == "0a05080a10aa01", "shop: purchase debits catalogue price");
+        MarketplaceStore restarted(wallet);
+        restarted.purchase(purchase,42);
+        const auto inventory_bytes = restarted.inventory_page(page,42);
+        const auto record = Reader(inventory_bytes).values();
+        check(record.size()==12 && record[0].value.as_u64()==1 && record[1].value.as_u64()==1 &&
+              record[2].value.as_u64()==42 && record[3].value.text=="psn" && record[4].value.as_u64()==31 &&
+              record[5].value.as_u64()==1 && record[9].value.as_i64()==-1 && record[10].kind==typed::UINT16,
+              "shop: persisted inventory serializes account, item, quantity and expiry fields");
+        check(hex(restarted.balances_message(balances,42)) == "0a05080a10aa01", "shop: retry after restart does not charge twice");
+        restarted.set_balance(43,10,10);
+        bool shop_rejected=false;
+        try { restarted.purchase(purchase,43); } catch(const std::exception&) { shop_rejected=true; }
+        check(shop_rejected && restarted.inventory_page(page,43).empty(), "shop: insufficient balance grants no item");
+        auto unknown=purchase; unknown[2].value=Json::of(999);
+        shop_rejected=false;
+        try { restarted.purchase(unknown,42); } catch(const std::exception&) { shop_rejected=true; }
+        check(shop_rejected, "shop: unknown SKU rejected");
+        restarted.set_balance(44,10,100);
+        std::filesystem::create_directory(wallet.string()+".tmp");
+        shop_rejected=false;
+        try { restarted.purchase(purchase,44); } catch(const std::exception&) { shop_rejected=true; }
+        check(shop_rejected && restarted.inventory_page(page,44).empty() &&
+              hex(restarted.balances_message(balances,44))=="0a05080a10c801", "shop: failed persistence rolls back money and item");
+        std::filesystem::remove(wallet.string()+".tmp");
+        restarted.purchase(purchase,44);
+        check(!MarketplaceStore(wallet).inventory_page(page,44).empty(), "shop: failed purchase can retry successfully");
+        std::ofstream(shop / "retail_shop_catalog.json") << R"({"schema":1,"eboot_sha256":"39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5","skus":[{"id":21,"currency":10,"price":15,"item":31,"quantity":1},{"id":22,"currency":10,"price":20,"item":32,"quantity":1},{"id":23,"components":[21,22]}]})";
+        auto bundle_request=[](std::vector<unsigned> ids) {
+            Writer w; w.string("octane_psn").u32(static_cast<unsigned>(ids.size()));
+            for(auto id:ids) w.u32(id);
+            w.u32(static_cast<unsigned>(ids.size())); for(std::size_t i=0;i<ids.size();++i) w.u32(1);
+            w.boolean(false).u32(static_cast<unsigned>(ids.size())); for(std::size_t i=0;i<ids.size();++i) w.u64(0).string("");
+            w.u32(0).u32(0).u8(0).u32(0); return Reader(w.data()).values();
+        };
+        const auto bundle=bundle_request({23,21,22});
+        restarted.set_balance(45,10,100);
+        auto rejects=[&](const std::vector<Param>& p, unsigned account) {
+            try { restarted.purchase(p,account); return false; } catch(const std::exception&) { return true; }
+        };
+        check(rejects(bundle_request({23,21}),45) && restarted.inventory_page(page,45).empty(), "shop: incomplete bundle cannot partially grant");
+        check(rejects(bundle_request({23,21,21}),45), "shop: duplicate bundle SKU rejected");
+        restarted.purchase(bundle,45);
+        check(Reader(restarted.inventory_page(page,45)).values()[0].value.as_u64()==2 &&
+            hex(restarted.balances_message(balances,45))=="0a05080a108201", "shop: bundle debits sum and grants both items");
+        MarketplaceStore(wallet).purchase(bundle,45);
+        check(hex(restarted.balances_message(balances,45))=="0a05080a108201", "shop: bundle retry after restart is free");
+        restarted.purchase(bundle_request({23,22}),42);
+        check(hex(restarted.balances_message(balances,42))=="0a05080a108201", "shop: owned component excluded from bundle price");
+        restarted.set_balance(46,10,30);
+        check(rejects(bundle,46) && restarted.inventory_page(page,46).empty(), "shop: insufficient bundle balance grants nothing");
+        restarted.set_balance(47,10,100);
+        std::filesystem::create_directory(wallet.string()+".tmp");
+        check(rejects(bundle,47) && restarted.inventory_page(page,47).empty() &&
+            hex(restarted.balances_message(balances,47))=="0a05080a10c801", "shop: bundle write failure rolls back every item and debit");
+        std::filesystem::remove(wallet.string()+".tmp");
+
     }
 
     // The launcher's hosting: server started in process on the default ports, then stopped.
