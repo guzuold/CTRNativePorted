@@ -54,6 +54,32 @@ slot (`tls_storage.hpp`), so later executions no longer fault. Same length, same
 
 ## CTR_NATIVE_4K
 
+### Configurable scene resolution: CTR_SCENE_HEIGHT
+
+`CTR_SCENE_HEIGHT=720|900|1080|1440|1800|2160` generalizes the same verified
+Neo scale site below. The launcher exposes it as **Internal 3D resolution**;
+`play_gpu.py --internal-res 720 --res 1920 1080` selects a 1280x720 scene in a
+1920x1080 host window. Changes apply on the next game launch. Invalid values
+fail, rather than silently falling back. Explicit scene height takes precedence
+over the legacy Pro/4K switches; absent the new option, their behavior is preserved.
+
+The explicit option enables Neo and keeps the guest VideoOut/UI canvas at
+3840x2160 so the original game's Neo scale path runs independently of the host
+window/fullscreen size. The patched float is `height / 1080.0f`, giving 16:9
+scene targets from 1280x720 through 3840x2160. This does not reduce every UI,
+shadow or post-processing pass to the scene resolution. Above 1440p, the existing
+1920 MiB Garlic pool and expanded direct-memory budget are used; lower presets
+retain the 960 MiB Neo pool. The SHA-selected addresses and original-byte checks
+below still apply. No retail file on disk is changed.
+
+`CTR_SCENE_TRACE=1` enables bounded, deduplicated diagnostics in the Vulkan
+rasterizer: `CTR_SCENE_TARGET color=WxH depth=WxH render=WxH` records the actual
+attachments of depth-tested draws. `tools/profiler/scene_resolution_probe.py`
+compares these with each preset while measuring the host window's client size,
+captures the game, and writes hashes/logs under `runtime/user`. Tests run offline
+in isolated save directories. A configured scale or screenshot size alone is
+not accepted as evidence that scene resolution changed.
+
 Written for ctrport. Raises the internal 3D scene rendering resolution in PS4 Pro mode
 (`CTR_NEO_MODE=1`) from `2560x1440` (scale `1.3333334f` relative to `1920x1080`) to native
 4K `3840x2160` (scale `2.0f` relative to `1920x1080`), matching the `3840x2160` VideoOut

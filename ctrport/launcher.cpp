@@ -85,6 +85,11 @@ const wchar_t* const kTabNames[TAB_COUNT] = {
 };
 
 const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)", L"3840x2160 (4K)", L"Custom"};
+const wchar_t* const kSceneHeights[] = {L"720", L"900", L"1080", L"1440", L"1800", L"2160"};
+constexpr int ID_UPSCALER = 905;
+const wchar_t* const kUpscalers[] = {L"off", L"fsr1", L"dlss"};
+const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"DLSS (experimental)"};
+const wchar_t* const kSceneLabels[] = {L"1280 x 720", L"1600 x 900", L"1920 x 1080", L"2560 x 1440", L"3200 x 1800", L"3840 x 2160 (4K)"};
 const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
 
@@ -104,7 +109,7 @@ enum : int {
     ID_MINIMIZE = 191, ID_CLOSE,
     ID_XBOX_PROMPTS = 190,
     ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
-    ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_NATIVE_4K, ID_UNLOCK, ID_LAUNCH,
+    ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_NATIVE_4K, ID_SCENE_RES, ID_UNLOCK, ID_LAUNCH,
     ID_TAB_BASE = 130, // 130..133 for 4 tabs
     ID_MOD_TOGGLE_BASE = 140, // 140..143 for sample mods
     ID_OPEN_MODS = 150,
@@ -121,6 +126,8 @@ struct ModItem {
 struct Config {
     std::wstring base_dir, patch_dir, resolution = L"2560x1440 (1440p)", custom_w = L"1920", custom_h = L"1080";
     std::wstring game_language = L"en";
+    std::wstring scene_height = L"1440";
+    std::wstring upscaler = L"off";
     bool use_patch = true, fps_60 = true, ps4_pro = true, native_4k = false, unlock_all = false, fullscreen = false;
     bool online = false;
     bool wumpa_x100 = false;
@@ -299,7 +306,9 @@ struct Status { std::wstring text; int kind = 0; };  // 0 neutral, 1 ok, 2 error
 
 struct App {
     HWND window = nullptr, base_edit = nullptr, patch_edit = nullptr, width_edit = nullptr, height_edit = nullptr;
-    HWND patch_browse = nullptr, fps_toggle = nullptr, pro_toggle = nullptr, native_4k_toggle = nullptr, launch = nullptr, hot = nullptr;
+    HWND scene_combo = nullptr;
+    HWND upscaler_combo = nullptr;
+    HWND patch_browse = nullptr, fps_toggle = nullptr, launch = nullptr, hot = nullptr;
     HWND online_toggle = nullptr, online_id_edit = nullptr;
     HWND friends_drawer = nullptr, friends_manage = nullptr;
     bool friends_open = false, friends_animating = false;
@@ -383,10 +392,14 @@ void load_config() {
             text(L"online_public_ip", g.cfg.online_public_ip); flag(L"online_host", g.cfg.online_host);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
             flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
+            g.cfg.scene_height = g.cfg.native_4k ? L"2160" : (g.cfg.ps4_pro ? L"1440" : L"1080");
+            text(L"scene_height", g.cfg.scene_height);
+            text(L"upscaler", g.cfg.upscaler);
             flag(L"online", g.cfg.online); flag(L"wumpa_x100", g.cfg.wumpa_x100);
         }
     }
-    if (g.cfg.native_4k) g.cfg.ps4_pro = true;
+    if (std::find(std::begin(kSceneHeights), std::end(kSceneHeights), g.cfg.scene_height) == std::end(kSceneHeights)) g.cfg.scene_height = L"1440";
+    if (std::find(std::begin(kUpscalers), std::end(kUpscalers), g.cfg.upscaler) == std::end(kUpscalers)) g.cfg.upscaler = L"off";
     g.cfg.game_language = kGameLanguages[game_language_index(g.cfg.game_language)].code;
     if (g.cfg.online_id.empty()) g.cfg.online_id = L"CTRPlayer";
     if (g.cfg.online_server.empty()) g.cfg.online_server = L"127.0.0.1";
@@ -411,7 +424,7 @@ void save_config() {
     if (g.resolution == 4) { g.cfg.custom_w = window_text(g.width_edit); g.cfg.custom_h = window_text(g.height_edit); }
     if (g.online_id_edit) g.cfg.online_id = window_text(g.online_id_edit);
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
-    const std::string json = "{\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
+    const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"scene_height\": " + json_string(g.cfg.scene_height) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
         ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) +
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
@@ -890,6 +903,10 @@ void paint_window(HDC target) {
                     text(gr, L"x", 1, 12.0f, FontStyleBold, rect(400, 314, 12, 28), kTextMuted, StringAlignmentCenter);
                 }
 
+                text(gr, L"Internal 3D resolution:", 1, 11.5f, FontStyleBold, rect(312, 420, 190, 20), kTextMuted);
+                text(gr, L"Scene upscaling:", 1, 11.5f, FontStyleBold, rect(312, 482, 190, 20), kTextMuted);
+                text(gr, L"Applied at next launch. DLSS: RTX.", 1, 9.0f, FontStyleRegular, rect(312, 544, 190, 24), kTextMuted);
+
                 // Card 2: ONLINE & MULTIPLAYER
                 const RectF o_card = rect(532, 126, 222, 450);
                 fill_round(gr, o_card, 18, SolidBrush(Color(kArcadeCard)));
@@ -1115,8 +1132,8 @@ void validate() {
         summary += g.cfg.use_patch ? L"v01.21 (Nitro Tour)" : L"v01.00 (Classic)";
         if (g.cfg.use_patch && g.cfg.fps_60) summary += L" · 60 FPS";
         summary += g.cfg.fullscreen ? L" · Fullscreen" : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
-        if (g.cfg.native_4k) summary += L" · Native 4K 3D";
-        else if (g.cfg.ps4_pro) summary += L" · PS4 Pro 1440p";
+        summary += L" · 3D " + g.cfg.scene_height + L"p";
+        if (g.cfg.upscaler != L"off") summary += L" · " + g.cfg.upscaler;
         if (g.cfg.online) {
             const std::wstring id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
             summary += L" · Online (" + (id.empty() ? L"CTRPlayer" : id) + L")";
@@ -1166,6 +1183,8 @@ void select_tab(int tab) {
 
     const bool show_settings = (tab == TAB_SETTINGS);
     ShowWindow(g.language_combo, show_settings ? SW_SHOW : SW_HIDE);
+    ShowWindow(g.scene_combo, show_settings ? SW_SHOW : SW_HIDE);
+    ShowWindow(g.upscaler_combo, show_settings ? SW_SHOW : SW_HIDE);
     if (g.online_id_edit) ShowWindow(g.online_id_edit, show_settings ? SW_SHOW : SW_HIDE);
 
     const bool show_custom = (show_settings && g.resolution == 4 && !g.cfg.fullscreen);
@@ -1371,6 +1390,12 @@ void xbox_prompts_ready(std::wstring* raw_error) {
 void launch_game() {
     validate();
     if (!g.can_launch || g.process || g.xbox_busy) return;
+    if (g.cfg.upscaler == L"dlss" &&
+        (!fs::exists(g.runtime_exe.parent_path() / "ctr_dlss.dll") ||
+         !fs::exists(g.runtime_exe.parent_path() / "nvngx_dlss.dll"))) {
+        MessageBoxW(g.window, L"DLSS richiede ctr_dlss.dll e nvngx_dlss.dll accanto a ctrport.exe.\nInstalla il bridge e l'SDK NVIDIA, oppure scegli Off o AMD FSR 1.", L"DLSS non disponibile", MB_ICONERROR);
+        return;
+    }
     if (g.cfg.xbox_prompts && !g.xbox_ready) { prepare_xbox_prompts(); return; }
     g.xbox_ready = false;
     save_config();
@@ -1408,8 +1433,10 @@ void launch_game() {
     set[L"CTR_ONLINE_ID"] = g.cfg.online_id; // Display name applies to offline sessions too.
     if (g.cfg.use_patch) set[L"CTR_PATCH_DIR"] = patch.wstring();
     if (g.cfg.use_patch && g.cfg.fps_60) set[L"CTR_60FPS_PATCH"] = L"1";
-    if (g.cfg.ps4_pro || g.cfg.native_4k) set[L"CTR_NEO_MODE"] = L"1";
-    if (g.cfg.native_4k) set[L"CTR_NATIVE_4K"] = L"1";
+    set[L"CTR_NEO_MODE"] = L"1";
+    set[L"CTR_SCENE_HEIGHT"] = g.cfg.scene_height;
+    set[L"CTR_UPSCALER"] = g.cfg.upscaler;
+    set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
     if (g.cfg.fullscreen) set[L"CTR_GPU_FULLSCREEN"] = L"1";
     else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
@@ -1442,6 +1469,7 @@ void launch_game() {
     }
     auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR", L"CTR_STARTUP_MUTEX_DLL_DIR", L"CTR_PARK_MISSING_NID",
         L"CTR_PARK_MISSING_SERVICE", L"CTR_TILING_TIMING", L"CTR_60FPS_PATCH", L"CTR_NEO_MODE", L"CTR_NATIVE_4K", L"CTR_UNLOCK_ALL",
+        L"CTR_SCENE_HEIGHT", L"CTR_GPU_INTERNAL_WIDTH", L"CTR_GPU_INTERNAL_HEIGHT",
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION",
         L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
         L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT"});
@@ -1595,8 +1623,21 @@ void create_controls() {
 
     g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(312, 356, 190, 26), L"60 FPS Unlock", &g.cfg.fps_60, -1, TAB_SETTINGS);
     add_button(ID_FULLSCREEN, Kind::Toggle, rect(312, 388, 190, 26), L"Fullscreen Mode", &g.cfg.fullscreen, -1, TAB_SETTINGS);
-    g.pro_toggle = add_button(ID_PRO, Kind::Toggle, rect(312, 420, 190, 26), L"PS4 Pro 1440p", &g.cfg.ps4_pro, -1, TAB_SETTINGS);
-    g.native_4k_toggle = add_button(ID_NATIVE_4K, Kind::Toggle, rect(312, 452, 190, 26), L"Native 4K Buffer", &g.cfg.native_4k, -1, TAB_SETTINGS);
+    g.scene_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+        px(312), px(444), px(190), px(220), g.window, reinterpret_cast<HMENU>(ID_SCENE_RES), nullptr, nullptr);
+    SendMessageW(g.scene_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
+    for (int i=0; i<6; ++i) {
+        SendMessageW(g.scene_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kSceneLabels[i]));
+        if (g.cfg.scene_height == kSceneHeights[i]) SendMessageW(g.scene_combo, CB_SETCURSEL, i, 0);
+    }
+
+    g.upscaler_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+        px(312), px(506), px(190), px(170), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_UPSCALER)), nullptr, nullptr);
+    SendMessageW(g.upscaler_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
+    for (int i = 0; i < 3; ++i) {
+        SendMessageW(g.upscaler_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kUpscalerLabels[i]));
+        if (g.cfg.upscaler == kUpscalers[i]) SendMessageW(g.upscaler_combo, CB_SETCURSEL, i, 0);
+    }
 
     // Online Section (Card 2)
     g.online_toggle = add_button(ID_ONLINE_TOGGLE, Kind::Toggle, rect(548, 196, 190, 26), L"Multiplayer Online", &g.cfg.online, -1, TAB_SETTINGS);
@@ -1682,6 +1723,18 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_COMMAND: {
         const int id = LOWORD(wparam), code = HIWORD(wparam);
         if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) { launch_game(); return 0; }
+        if (id == ID_SCENE_RES && code == CBN_SELCHANGE) {
+            const auto selected = SendMessageW(g.scene_combo, CB_GETCURSEL, 0, 0);
+            if (selected >= 0 && selected < 6) g.cfg.scene_height = kSceneHeights[selected];
+            validate();
+            return 0;
+        }
+        if (id == ID_UPSCALER && code == CBN_SELCHANGE) {
+            const auto selected = SendMessageW(g.upscaler_combo, CB_GETCURSEL, 0, 0);
+            if (selected >= 0 && selected < 3) g.cfg.upscaler = kUpscalers[selected];
+            validate();
+            return 0;
+        }
         if (id == ID_GAME_LANGUAGE && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.language_combo, CB_GETCURSEL, 0, 0);
             if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kGameLanguages)))
@@ -1770,13 +1823,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             const auto found = g.controls.find(reinterpret_cast<HWND>(lparam));
             if (found != g.controls.end() && found->second.kind == Kind::Toggle) {
                 *found->second.value = !*found->second.value;
-                if (id == ID_NATIVE_4K && g.cfg.native_4k && !g.cfg.ps4_pro) {
-                    g.cfg.ps4_pro = true;
-                    InvalidateRect(g.pro_toggle, nullptr, FALSE);
-                } else if (id == ID_PRO && !g.cfg.ps4_pro && g.cfg.native_4k) {
-                    g.cfg.native_4k = false;
-                    InvalidateRect(g.native_4k_toggle, nullptr, FALSE);
-                } else if (id == ID_ONLINE_TOGGLE) {
+                if (id == ID_ONLINE_TOGGLE) {
                     host_toggled(true);
                 }
                 InvalidateRect(found->first, nullptr, FALSE);

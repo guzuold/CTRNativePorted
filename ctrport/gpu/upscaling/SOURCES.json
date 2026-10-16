@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/GetLostIn/CTR-NitroFueled-PC",
+  "revision": "fc625e6f593df13f3e5afc4cec2eb04451db615e",
+  "sha256": {
+    "gpu/shadps4/video_core/renderer_vulkan/vk_dlss_ngx.h": "8866ac430a3f451fe8b5a15f2c9405bd195ed3bd43ed7b43accc27a64f2e3729",
+    "gpu/shadps4/video_core/renderer_vulkan/vk_dlss_ngx.cpp": "45449b0551e53436f8678201610e930f225fbe1b4453829854ae921c4068807f",
+    "dlss_bridge/shadps4_dlss_bridge.h": "cebb2f624fa41b7724695310fbfdf57f66e0bb1adb793fc0dce218873ca264dd",
+    "dlss_bridge/shadps4_dlss_bridge.cpp": "a6bc8cefc239c1a86d8b16a129d3419073e3579989b4cbbd7013c78614ff5ba8",
+    "dlss_bridge/LICENSE.txt": "251a5ca3a97f41e7d02e602aea6d6028dd7e4d3a8d079fe7e253634e524463df",
+    "gpu/shadps4/video_core/renderer_vulkan/vk_ctr_fsr3.h": "99ead0f300c50220b88b5fd6a7d96e1f937029c1afcf1224b9301335d92bcd14",
+    "gpu/shadps4/video_core/renderer_vulkan/vk_ctr_fsr3.cpp": "4a6241e9523ee91f6fbbad31cf5f4d440a114815e0fc54f5715aec73c765a3ae",
+    "gpu/shadps4/video_core/host_shaders/ctr_fsr3_inputs.comp": "445e097e847cf39da20787b9ab89fb8056ab65071b24dff11d84d062beae4927"
+  },
+  "adaptation": "FSR 1 from pinned shadPS4. CTR temporal input conversion and DLSS wrapper adapted to v0.18.0; FSR 3 dependency removed. Object motion remains experimental."
+}

@@ -90,10 +90,21 @@ if (NOT PATCH_RESULT EQUAL 0)
     message(FATAL_ERROR "make_patched.py failed")
 endif()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/make_patched.py)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/upscaling/rasterizer_members.inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/upscaling/rasterizer_methods.inc)
 file(GLOB_RECURSE VIDEO_CORE CONFIGURE_DEPENDS ${SHAD}/src/video_core/*.cpp)
 list(FILTER VIDEO_CORE EXCLUDE REGEX "renderdoc\\.cpp$")
 list(FILTER VIDEO_CORE EXCLUDE REGEX "renderer_vulkan/vk_presenter\\.cpp$")
 list(APPEND VIDEO_CORE ${PATCHED}/video_core/renderer_vulkan/vk_presenter.cpp)
+list(FILTER VIDEO_CORE EXCLUDE REGEX "renderer_vulkan/vk_rasterizer\\.cpp$")
+list(APPEND VIDEO_CORE ${PATCHED}/video_core/renderer_vulkan/vk_rasterizer.cpp)
+foreach(FILE vk_instance.cpp vk_platform.cpp)
+    list(FILTER VIDEO_CORE EXCLUDE REGEX "renderer_vulkan/${FILE}$")
+    list(APPEND VIDEO_CORE ${PATCHED}/video_core/renderer_vulkan/${FILE})
+endforeach()
+list(APPEND VIDEO_CORE ${CMAKE_CURRENT_SOURCE_DIR}/upscaling/ctr_dlss.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/upscaling/vk_dlss_ngx.cpp)
 file(GLOB_RECURSE RECOMPILER CONFIGURE_DEPENDS ${SHAD}/src/shader_recompiler/*.cpp)
 set(COMMON
     ${SHAD}/src/common/decoder.cpp ${SHAD}/src/common/error.cpp ${SHAD}/src/common/io_file.cpp
@@ -103,7 +114,7 @@ set(COMMON
     ${SHAD}/src/common/signal_context.cpp)
 set(LIBRARIES
     ${SHAD}/src/core/libraries/gnmdriver/gnmdriver.cpp
-    ${SHAD}/src/core/libraries/videoout/driver.cpp
+    ${PATCHED}/core/libraries/videoout/driver.cpp
     ${SHAD}/src/core/libraries/videoout/video_out.cpp
     ${SHAD}/src/core/libraries/kernel/equeue.cpp)
 file(GLOB_RECURSE SHIM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shim/*.cpp)
@@ -111,6 +122,7 @@ file(GLOB_RECURSE SHIM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shi
 add_library(ctr_gpu SHARED ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${LIBRARIES} ${SHIM_SOURCES})
 add_dependencies(ctr_gpu host_shaders)
 target_include_directories(ctr_gpu BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/shim)
+target_include_directories(ctr_gpu BEFORE PRIVATE ${PATCHED})
 target_include_directories(ctr_gpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${SHAD}/src ${SHAD}
                            ${CMAKE_CURRENT_BINARY_DIR}/include ${EXT}/renderdoc)
 target_compile_definitions(ctr_gpu PRIVATE CTR_GPU_BUILD)
