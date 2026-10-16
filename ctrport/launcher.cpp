@@ -10,6 +10,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include "online_server/launcher_online.hpp"
+#include "online_server/local_backup.hpp"
 #include "friends_dialog.hpp"
 #include "online_server/friend_store.hpp"
 #include <commctrl.h>
@@ -1293,6 +1294,7 @@ void poll_party() {
             g.party.snapshot=response.at("party");
             g.invite_count=static_cast<unsigned>(response.at("invitations").items.size());
             g.party_error.clear();
+            if (const auto* error = g.party.snapshot.find("backup_error")) g.party_error = widen(error->text);
         } catch(const std::exception& e) {
             if(g.party_poll_owner==g.party.owner && g.party_poll_room==g.party.room) g.party_error=widen(e.what());
         }
@@ -1405,16 +1407,11 @@ void launch_game() {
     const fs::path logs = g.root / "runtime/user/logs";
     fs::create_directories(logs, ec);
     g.log_stem = logs / (L"play_" + stamp);
-    const fs::path saves = g.root / "runtime/user/savedata";
-    if (g.cfg.unlock_all && fs::exists(saves, ec)) {
-        const fs::path backup = g.root / "runtime/user/savedata_backups" / (L"before_unlock_all_" + stamp);
-        fs::create_directories(backup.parent_path(), ec);
-        fs::copy(saves, backup, fs::copy_options::recursive, ec);
-        if (ec) {
-            MessageBoxW(g.window, (L"Save backup failed; launch cancelled:\n" + widen(ec.message())).c_str(), kTitle, MB_ICONERROR);
-            g.lock.release();
-            return;
-        }
+    try { ctr_online::backup_savedata(g.root, "before_launch"); }
+    catch (const std::exception& error) {
+        MessageBoxW(g.window, (L"Save backup failed; launch cancelled:\n" + widen(error.what())).c_str(), kTitle, MB_ICONERROR);
+        g.lock.release();
+        return;
     }
     const fs::path base = resolve(g.cfg.base_dir), patch = resolve(g.cfg.patch_dir);
     const fs::path eboot = (g.cfg.use_patch ? patch : base) / "eboot.bin";
@@ -1500,10 +1497,19 @@ void launch_game() {
     g.process = info.hProcess;
     InvalidateRect(g.launch, nullptr, FALSE);
     ShowWindow(g.window, SW_HIDE);
-    std::thread([process = info.hProcess, window = g.window] {
+    std::thread([process = info.hProcess, window = g.window, root = g.root, selection = g.party, online = g.cfg.online] {
         WaitForSingleObject(process, INFINITE);
         DWORD code = 0;
         GetExitCodeProcess(process, &code);
+        try {
+            ctr_online::backup_savedata(root, "after_exit");
+            if (online) {
+                auto response = ctr_online::party_request(root, selection.ip, selection.owner, party_command("heartbeat"));
+                if (const auto* error = response.find("backup_error")) throw std::runtime_error(error->text);
+            }
+        } catch (const std::exception& error) {
+            MessageBoxW(window, (L"Local backup incomplete:\n" + widen(error.what())).c_str(), kTitle, MB_ICONWARNING);
+        }
         PostMessageW(window, WM_APP_FINISHED, code, 0);
     }).detach();
 }

@@ -10,6 +10,7 @@ import datetime, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.lane_lock import lane_lock
+from tools.online.local_backup import backup_savedata
 
 root = Path(__file__).resolve().parents[1]
 os.chdir(root)
@@ -168,14 +169,9 @@ log = user_root / 'logs' / ('play_' + datetime.datetime.now().strftime('%Y%m%d_%
 command = [str(root / 'build/CTRPort-claude/ctrport.exe'), '--entry-after-libc-init-images', str(eboot)] + \
           [str(p) for p in sorted((game / 'sce_module').glob('*.prx'))]
 res_info = 'fullscreen' if fullscreen else f'{width or 1280}x{height or 720}'
-# The game keeps saving during an unlock-all run; keep a copy of the saves made before it.
-saves = user_root / 'savedata'
-if use_unlock_all and saves.exists():
-    backup = user_root / 'savedata_backups' / ('before_unlock_all_' + log.name.removeprefix('play_'))
-    shutil.copytree(saves, backup)
-    print('CTRPort: saves copied to', backup, flush=True)
 print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, scene_height={scene_height or "legacy"}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, display={res_info}): close window to quit. Logs:', log, flush=True)
 with (instance_lock(workdir) if instance_name else lane_lock('shared', 'claude', timeout=600)), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
+    print('CTRPort: pre-run save backup:', backup_savedata(user_root, 'before_launch'), flush=True)
     child = subprocess.Popen(command, cwd=workdir, env=env, stdout=out, stderr=err)
     log.with_suffix('.run.json').write_text(json.dumps({'pid': child.pid, 'cwd': str(workdir),
         'instance': instance_name, 'online_id': env.get('CTR_ONLINE_ID'),
@@ -188,6 +184,7 @@ with (instance_lock(workdir) if instance_name else lane_lock('shared', 'claude',
         if child.poll() is None:
             child.terminate()
             child.wait(timeout=10)
+        print('CTRPort: post-run save backup:', backup_savedata(user_root, 'after_exit'), flush=True)
 print('exit code', code)
 reasons = []
 for name in ('.stdout.log', '.stderr.log'):

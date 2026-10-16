@@ -8,6 +8,7 @@
 #include "relay.hpp"
 #include "server.hpp"
 #include "stores.hpp"
+#include "local_backup.hpp"
 #include "launcher_online.hpp"
 #include "upnp.hpp"
 #include "friend_identity.hpp"
@@ -208,7 +209,7 @@ int run_tests(int argc, char* argv[]) {
 
     // RSA key: SPKI size, persistence, PSS signature verified by CNG with salt 0.
     const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ctr_online_server_test";
-    std::filesystem::remove_all(dir);
+    std::filesystem::remove_all(backup_io_path(dir));
     {
         RsaKey rsa(dir / "key.cng");
         check(rsa.spki().size() == 0x126, "SPKI DER is 0x126 bytes");
@@ -692,6 +693,19 @@ int run_tests(int argc, char* argv[]) {
         std::filesystem::remove(wallet.string()+".tmp");
         restarted.purchase(purchase,44);
         check(!MarketplaceStore(wallet).inventory_page(page,44).empty(), "shop: failed purchase can retry successfully");
+        check(std::filesystem::is_directory(shop / "backups/local") &&
+              std::filesystem::directory_iterator(shop / "backups/local")!=std::filesystem::directory_iterator(),
+              "backup: committed wallet versions archived before replacement");
+        const auto bad_backup=dir / "blocked_backup";
+        std::filesystem::create_directories(bad_backup);
+        MarketplaceStore blocked(bad_backup / "marketplace.txt");
+        blocked.set_balance(42,10,100);
+        { std::ofstream deny(bad_backup / "backups"); deny << "block directory creation"; }
+        bool backup_failed=false;
+        try { blocked.set_balance(42,10,50); } catch(const std::exception&) { backup_failed=true; }
+        check(backup_failed && blocked.snapshot(42).at("state").text=="balance 42 10 100\n" &&
+              MarketplaceStore(bad_backup / "marketplace.txt").snapshot(42).at("state").text=="balance 42 10 100\n",
+              "backup: disk failure prevents wallet overwrite and rolls back memory");
         std::ofstream(shop / "retail_shop_catalog.json") << R"({"schema":1,"eboot_sha256":"39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5","skus":[{"id":21,"currency":10,"price":15,"item":31,"quantity":1},{"id":22,"currency":10,"price":20,"item":32,"quantity":1},{"id":23,"components":[21,22]}]})";
         auto bundle_request=[](std::vector<unsigned> ids) {
             Writer w; w.string("octane_psn").u32(static_cast<unsigned>(ids.size()));
@@ -777,6 +791,45 @@ int run_tests(int argc, char* argv[]) {
         Json heartbeat=Json::object();heartbeat.set("action",Json::of("heartbeat"));
         check(party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat).at("count").as_u64()==2,
               "signed HTTP heartbeat preserves party membership");
+        MarketplaceStore backup_wallet(root / "runtime/user/online/marketplace.txt");
+        backup_wallet.set_balance(user_id("Guest"),10,8500);
+        backup_wallet.set_inventory(user_id("Guest"),139,1);
+        backup_wallet.set_balance(user_id("Another"),10,999);
+        auto copied = party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat);
+        if (const auto* error=copied.find("backup_error")) std::fprintf(stderr,"Backup error: %s\n",error->text.c_str());
+        const auto saved = copied.at("wallet_backup");
+        check(!copied.find("backup_error") && saved.at("account").as_u64()==user_id("Guest") &&
+              saved.at("state").text.find("139 1")!=std::string::npos &&
+              saved.at("state").text.find(std::to_string(user_id("Another")))==std::string::npos,
+              "backup: signed host response contains only authenticated member wallet");
+        const auto archives = backup_io_path(guest_root / "runtime/user/online/backups/hosts" /
+            hex(sha256(bytes_of(status.friend_code))) / std::to_string(user_id("Guest")));
+        const auto previous_copy = archives / (hex(sha256(bytes_of(dump_json(saved)))) + ".json");
+        check(std::filesystem::exists(previous_copy), "backup: remote wallet actually persisted on guest disk");
+        const auto count_files = [](const auto& folder) {
+            return std::distance(std::filesystem::directory_iterator(folder), std::filesystem::directory_iterator());
+        };
+        const auto before_count = count_files(archives);
+        party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat);
+        check(count_files(archives)==before_count, "backup: unchanged heartbeat deduplicates snapshot");
+        backup_wallet.set_inventory(user_id("Guest"),139,0);
+        backup_wallet.set_balance(user_id("Guest"),10,0);
+        party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat);
+        check(count_files(archives)==before_count+1 && std::filesystem::exists(previous_copy),
+              "backup: reset inventory cannot overwrite earlier ownership snapshot");
+        auto forged=heartbeat;forged.set("account",Json::of(user_id("Another")));
+        check(party_request(guest_root,"127.0.0.1",status.friend_code,forged).at("wallet_backup").at("account").as_u64()==user_id("Guest"),
+              "backup: caller cannot select another account");
+        const auto saves = guest_root / "runtime/user/savedata/test";
+        std::filesystem::create_directories(saves);
+        { std::ofstream f(saves / "save.bin",std::ios::binary); f << "original"; }
+        const auto save_copy=backup_savedata(guest_root,"before_launch");
+        { std::ofstream f(saves / "save.bin",std::ios::binary); f << "updated"; }
+        const auto second_copy=backup_savedata(guest_root,"after_exit");
+        std::ifstream old_save(backup_io_path(save_copy / "test/save.bin"),std::ios::binary);
+        std::string old_data((std::istreambuf_iterator<char>(old_save)),{});
+        check(old_data=="original" && save_copy!=second_copy && std::filesystem::exists(backup_io_path(second_copy / "test/save.bin")),
+              "backup: before and after game saves remain independent immutable copies");
 
         // Invalid friend code verification fails with InvalidIdentity
         const HostIdentity other_host = HostIdentity::load_or_create(dir / "other_identity.json");
@@ -1019,7 +1072,7 @@ int run_tests(int argc, char* argv[]) {
           "server names resolved to IPv4");
     check(ipv4_scope("192.168.1.5") == "private" && ipv4_scope("100.70.1.1") == "cgnat" && ipv4_scope("203.0.113.9") == "public",
           "address scope classification");
-    std::filesystem::remove_all(dir);
+    std::filesystem::remove_all(backup_io_path(dir));
     std::printf("{\"scope\": \"online_server_test\", \"passed\": %s, \"failures\": %d}\n", failures ? "false" : "true", failures);
     return failures ? 1 : 0;
 }
