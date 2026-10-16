@@ -8,10 +8,11 @@
 #include <memory>
 #include <stdexcept>
 #include <array>
+#include <string>
 #include "kernel_time.hpp"
 namespace ctrport {
 class UserService {
-    struct Session {int local_user_id;bool login_pending=true;}; // Runtime-owned offline identity, no external account.
+    struct Session {int local_user_id;bool login_pending=true;std::string name;}; // Runtime-owned identity, no external account.
     int next_local_user_id=1;
     std::mutex lock;
     std::unique_ptr<Session> session;
@@ -21,7 +22,11 @@ public:
         std::lock_guard<std::mutex> guard(lock);
         if(session) return static_cast<int>(0x80960003U);
         if(next_local_user_id==std::numeric_limits<int>::max())throw std::runtime_error("Local user identity space exhausted");
-        session=std::make_unique<Session>(Session{next_local_user_id++});return 0;
+        char configured[17]{};
+        const DWORD length=GetEnvironmentVariableA("CTR_ONLINE_ID",configured,sizeof(configured));
+        const std::string name=length>=3 && length<=16 ? std::string(configured,length) : std::string{};
+        const bool valid=!name.empty() && name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")==std::string::npos;
+        session=std::make_unique<Session>(Session{next_local_user_id++,true,valid ? name : "CTRPlayer"});return 0;
     }
     int login_user_list(std::int32_t* output) {
         if(!output)return static_cast<int>(0x80960005U);
@@ -54,9 +59,9 @@ public:
         std::lock_guard<std::mutex> guard(lock);
         if(!session)return static_cast<int>(0x80960002U);
         if(id!=session->local_user_id)return static_cast<int>(0x80960009U);
-        constexpr char name[]="CTRPlayer"; // Name of our runtime-owned offline session.
-        if(size<sizeof(name))return static_cast<int>(0x8096000aU);
-        require_time_output(output,sizeof(name));std::memcpy(output,name,sizeof(name));return 0;
+        const auto bytes=session->name.size()+1;
+        if(size<bytes)return static_cast<int>(0x8096000aU);
+        require_time_output(output,bytes);std::memcpy(output,session->name.c_str(),bytes);return 0;
     }
     int terminate() {
         std::lock_guard<std::mutex> guard(lock);
@@ -85,13 +90,15 @@ extern "C" int ctr_np_id(int id,void* output,std::uint64_t caller){
  std::printf("{\"scope\":\"original_NpGetNpId_return\",\"caller\":%llu,\"result\":%d,\"output_written\":false}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);return result;
 }
 extern "C" void ctr_sysv_np_id();
-inline int user_name_control(){
- UserService service;char output[12];std::memset(output,0x5a,sizeof(output));
- if(service.get_name(1,output+1,10)!=static_cast<int>(0x80960002U) || service.initialize(nullptr))return 1;
- if(service.get_name(2,output+1,10)!=static_cast<int>(0x80960009U) || service.get_name(1,output+1,9)!=static_cast<int>(0x8096000aU) || output[1]!=0x5a)return 2;
- if(service.get_name(1,output+1,10) || std::strcmp(output+1,"CTRPlayer") || output[0]!=0x5a || output[11]!=0x5a)return 3;
+inline int user_name_control(const char* expected="CTRPlayer"){
+ UserService service;char output[19];std::memset(output,0x5a,sizeof(output));
+ const auto bytes=std::strlen(expected)+1;if(bytes>17)return 8;
+ if(service.get_name(1,output+1,bytes)!=static_cast<int>(0x80960002U) || service.initialize(nullptr))return 1;
+ if(service.get_name(2,output+1,bytes)!=static_cast<int>(0x80960009U) || service.get_name(1,output+1,bytes-1)!=static_cast<int>(0x8096000aU) || output[1]!=0x5a)return 2;
+ if(service.get_name(1,output+1,bytes) || std::strcmp(output+1,expected) || output[0]!=0x5a || output[bytes+1]!=0x5a)return 3;
  if(user_service.initialize(nullptr))return 4;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_user_name),1,reinterpret_cast<std::uint64_t>(output+1),10))return 5;
+ std::memset(output,0x5a,sizeof(output));
+ if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_user_name),1,reinterpret_cast<std::uint64_t>(output+1),bytes) || std::strcmp(output+1,expected) || output[0]!=0x5a || output[bytes+1]!=0x5a)return 5;
  if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_np_id),1,reinterpret_cast<std::uint64_t>(output),0))!=static_cast<int>(0x80550006U) || output[0]!=0x5a)return 6;
  if(offline_np_id(-1,output)!=static_cast<int>(0x80550003U) || offline_np_id(2,output)!=static_cast<int>(0x80550007U))return 7;
  std::cout<<"{\"scope\":\"owned_user_name\",\"passed\":true}\n";return 0;

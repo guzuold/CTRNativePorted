@@ -32,16 +32,17 @@ private:
 
 // Pit Stop state (local_marketplace.py): Wumpa currency balances and inventory per account.
 // Retail v01.21 requests: service 80 task 165 typed [STRING "octane_psn", UINT32 1, UINT32 856]
-// (inventory page) and task 245 struct {1: "octane_psn", 2: max results} (balances). Only empty
-// inventory pages are served until the retail item record layout is validated. Stored as text
+// (inventory page) and task 245 struct {1: "octane_psn", 2: max results} (balances).
+// Nonempty item records verified by a retail purchase/unlock. Stored as text
 // lines "balance <account> <currency> <amount>" / "inventory <account> <item> <quantity>"
 // (the rows of the reference's two SQLite tables). The file is read again when it changes on
 // disk, so balances set with ctr_online_server.exe --set-balance reach a running server.
 class MarketplaceStore {
 public:
     explicit MarketplaceStore(std::filesystem::path path);
-    // Task 165: throws on an unexpected request or a nonempty inventory.
-    void inventory_page(const std::vector<Param>& params, std::uint64_t account);
+    // Task 165: observed inventory record layout; rejects unsupported pagination.
+    Bytes inventory_page(const std::vector<Param>& params, std::uint64_t account);
+    void purchase(const std::vector<Param>& params, std::uint64_t account);
     // Task 245: struct reply message, repeated field 1 {1: currency, 2: zigzag amount}.
     Bytes balances_message(const std::vector<Param>& params, std::uint64_t account);
     // The client reads a currency ID as one byte (it fails the whole reply above 255) and
@@ -49,12 +50,16 @@ public:
     // 11 "Nitro Boost", 12 "Free Nitro Boost". Amount 0 removes the balance.
     void set_balance(std::uint64_t account, std::uint64_t currency, std::int64_t amount);
     void set_inventory(std::uint64_t account, std::uint64_t item, std::int64_t quantity);
+    // Project rule: all end_race activities, track base x1/x100, common base32 if
+    // unavailable. Unranked uses first-place base. Receipts prevent replay credit.
+    void award_races(const std::vector<Param>& params, std::uint64_t account, unsigned multiplier = 1);
 private:
     void load();
     void save();
     std::filesystem::path path_;
     std::filesystem::file_time_type loaded_{};
     std::map<std::pair<std::string, std::uint64_t>, std::int64_t> balances_, inventory_;
+    std::set<std::pair<std::string, std::string>> rewarded_;
 };
 
 // Wumpa Challenge state (local_achievements.py), achievement engine service 125, struct
@@ -74,7 +79,7 @@ private:
 // Replies of the Pit Stop and Wumpa Challenge tasks (80/165, 80/245, 125/1, 125/3), as
 // demonware_tasks.handle; nullopt for other tasks. Rejected requests get UNSERVED_ERROR.
 std::optional<Bytes> pitstop_task(const TaskRequest& request, std::uint64_t account,
-                                  MarketplaceStore& marketplace, AchievementStore& achievements);
+                                  MarketplaceStore& marketplace, AchievementStore& achievements, unsigned multiplier = 1);
 
 // Project friend graph: always empty (no social service). Nonempty pages are not served.
 Json friend_page(std::int64_t offset, std::int64_t limit);

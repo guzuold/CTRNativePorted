@@ -5,6 +5,8 @@
 #include <fstream>
 #include <initializer_list>
 #include <cstdlib>
+#include <windows.h>
+#include <sstream>
 
 namespace ctr_online {
 namespace {
@@ -114,14 +116,28 @@ void MarketplaceStore::load() {
     if (error || written == loaded_) return;
     std::ifstream in(path_);
     std::string table, account;
-    std::uint64_t key;
+    std::string raw_key;
     std::int64_t value;
-    balances_.clear();
-    inventory_.clear();
-    while (in >> table >> account >> key >> value) {
-        if (table == "balance" && key <= 255) balances_[{account, key}] = value;
-        else if (table == "inventory") inventory_[{account, key}] = value;
+    if (!in) throw Rejected("marketplace state cannot be read");
+    decltype(balances_) balances, inventory;
+    decltype(rewarded_) rewarded;
+    while (in >> table) {
+        if (!(in >> account >> raw_key >> value)) throw Rejected("truncated marketplace state");
+        if (table == "reward") {
+            if (raw_key.size() != 64 || raw_key.find_first_not_of("0123456789abcdef") != std::string::npos)
+                throw Rejected("invalid reward receipt");
+            rewarded.insert({account, raw_key});
+        } else {
+            std::size_t consumed = 0;
+            const auto key = std::stoull(raw_key, &consumed);
+            if (consumed != raw_key.size()) throw Rejected("invalid marketplace key");
+            if (table == "balance" && key <= 255) balances[{account, key}] = value;
+            else if (table == "inventory") inventory[{account, key}] = value;
+            else throw Rejected("unknown marketplace row");
+        }
     }
+    if (!in.eof()) throw Rejected("marketplace state read failed");
+    balances_.swap(balances); inventory_.swap(inventory); rewarded_.swap(rewarded);
     loaded_ = written;
 }
 void MarketplaceStore::save() {
@@ -131,33 +147,229 @@ void MarketplaceStore::save() {
         std::ofstream out(temporary, std::ios::trunc);
         for (const auto& [key, amount] : balances_) out << "balance " << key.first << ' ' << key.second << ' ' << amount << '\n';
         for (const auto& [key, quantity] : inventory_) out << "inventory " << key.first << ' ' << key.second << ' ' << quantity << '\n';
+        for (const auto& key : rewarded_) out << "reward " << key.first << ' ' << key.second << " 0\n";
+        out.close();
+        if (!out) throw Rejected("marketplace state write failed");
     }
-    std::filesystem::rename(temporary, path_);
-    loaded_ = std::filesystem::last_write_time(path_);
+    if (!MoveFileExW(temporary.c_str(), path_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        throw Rejected("marketplace state replacement failed");
+    std::error_code error;
+    loaded_ = std::filesystem::last_write_time(path_, error);
 }
 void MarketplaceStore::set_balance(std::uint64_t account, std::uint64_t currency, std::int64_t amount) {
     if (currency > 255) throw Rejected("currency ID above 255");
     load();
+    const auto before = balances_;
     // A zero balance reads like no balance; dropping the row keeps the client's few slots
     // (it asks for as many balances as it has currencies) for the nonzero ones.
     if (amount) balances_[{std::to_string(account), currency}] = amount;
     else balances_.erase({std::to_string(account), currency});
-    save();
+    try { save(); } catch (...) { balances_ = before; throw; }
 }
 void MarketplaceStore::set_inventory(std::uint64_t account, std::uint64_t item, std::int64_t quantity) {
     load();
+    const auto before = inventory_;
     inventory_[{std::to_string(account), item}] = quantity;
-    save();
+    try { save(); } catch (...) { inventory_ = before; throw; }
 }
-void MarketplaceStore::inventory_page(const std::vector<Param>& params, std::uint64_t account) {
+void MarketplaceStore::award_races(const std::vector<Param>& params, std::uint64_t account, unsigned multiplier) {
+    // Project economy chosen by the user (2026-10-16): all end_race modes,
+    // base payout x1 or x100 selected by the player. These are our rules, not a reconstruction of retail
+    // weekend/daily/golden bonuses. Unknown tracks use a common 32-coin base.
+    constexpr std::int64_t fallback_base = 32;
+    if (multiplier != 1 && multiplier != 100) throw Rejected("unsupported Wumpa multiplier");
+    const auto catalogue_path = path_.parent_path() / "retail_reward_catalog.json";
+    const auto fields = struct_request(params);
+    require_context(fields);
+    std::vector<std::pair<std::string, std::int64_t>> awards;
+    Json tracks = Json::array();
+    if (std::filesystem::exists(catalogue_path)) {
+        std::ifstream catalogue_file(catalogue_path);
+        const Json catalogue = parse_json(std::string(std::istreambuf_iterator<char>(catalogue_file), {}));
+        if (catalogue.at("schema").as_u64() != 1 || catalogue.at("eboot_sha256").text !=
+            "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5")
+            throw Rejected("unsupported reward catalogue");
+        tracks = catalogue.at("tracks");
+        if (!tracks.is_array()) throw Rejected("invalid reward tracks");
+    }
+    for (const auto& field : fields) {
+        if (field.tag != 2 || field.wire != 2) continue;
+        const auto event = pb_fields(field.data);
+        const auto* name = last_field(event, 1);
+        if (!name || std::string(name->data.begin(), name->data.end()) != "end_race") continue;
+        const auto* time = last_field(event, 2);
+        if (!time || time->wire != 0 || !time->number) throw Rejected("race timestamp missing");
+        std::map<std::string, std::uint64_t> attributes;
+        for (const auto& part : event) {
+            if (part.tag != 3 || part.wire != 2) continue;
+            const auto pair = pb_fields(part.data);
+            const auto* key = last_field(pair, 1); const auto* value = last_field(pair, 2);
+            if (!key || key->wire != 2 || !value || value->wire != 0 ||
+                !attributes.emplace(std::string(key->data.begin(), key->data.end()), value->number).second)
+                throw Rejected("invalid race attribute");
+        }
+        if (!attributes.at("Time") || attributes.at("Online") > 1 ||
+            attributes.at("Track") > UINT32_MAX || attributes.at("RaceMode") > UINT32_MAX)
+            throw Rejected("invalid activity completion");
+        // Unranked activities use the track's first-place base. No lap-count or
+        // mode filter: battles and timed activities need not have three laps.
+        const auto rank = attributes.find("Rank");
+        const auto place = rank != attributes.end() && rank->second >= 1 && rank->second <= 8
+            ? std::min<std::uint64_t>(rank->second, 4) : 1;
+        std::int64_t amount = -1;
+        bool found = false;
+        for (const auto& track : tracks.items) {
+            if (track.at("id").as_u64() != attributes.at("Track")) continue;
+            if (found || !track.at("ranks").is_array() || track.at("ranks").items.size() != 4)
+                throw Rejected("ambiguous reward track");
+            found = true;
+            amount = track.at("ranks").items[static_cast<std::size_t>(place - 1)].as_i64();
+        }
+        if (!found) amount = fallback_base;
+        if (amount <= 0 || amount > 1000000) throw Rejected("invalid base reward");
+        amount *= multiplier;
+        std::ostringstream canonical;
+        canonical << "end_race:" << time->number;
+        for (const auto& [key, value] : attributes) canonical << ':' << key << '=' << value;
+        awards.emplace_back(hex(sha256(bytes_of(canonical.str()))), amount);
+    }
+    if (awards.empty()) return;
+    load();
+    const auto balances_before = balances_;
+    const auto receipts_before = rewarded_;
+    bool changed = false;
+    try {
+        for (const auto& [receipt, amount] : awards) {
+            if (!rewarded_.insert({std::to_string(account), receipt}).second) continue;
+            auto& balance = balances_[{std::to_string(account), 10}];
+            if (balance < 0 || balance > INT64_MAX - amount) throw Rejected("reward balance overflow");
+            balance += amount;
+            changed = true;
+        }
+        if (changed) save();
+    } catch (...) { balances_ = balances_before; rewarded_ = receipts_before; throw; }
+}
+void MarketplaceStore::purchase(const std::vector<Param>& params, std::uint64_t account) {
+    // Observed single/bundle request: parallel SKU, quantity and recipient arrays.
+    if (params.size()<13 || params[0].kind!=typed::STRING ||
+        params[0].value.text!=MARKET_CONTEXT || params[1].kind!=typed::UINT32)
+        throw Rejected("unsupported purchase request");
+    const auto count=params[1].value.as_u64();
+    if (!count || count>32 || params.size()!=9+4*count)
+        throw Rejected("unsupported purchase size");
+    std::size_t pos=2;
+    auto number=[&](int kind, std::uint64_t expected) {
+        const auto& p=params.at(pos++);
+        if (p.kind!=kind || !equals_int(p.value,expected)) throw Rejected("unsupported purchase field");
+    };
+    std::vector<std::uint64_t> requested;
+    std::set<std::uint64_t> unique;
+    for (std::size_t i=0;i<count;++i) {
+        const auto& p=params.at(pos++);
+        if (p.kind!=typed::UINT32 || !unique.insert(p.value.as_u64()).second)
+            throw Rejected("duplicate or invalid SKU");
+        requested.push_back(p.value.as_u64());
+    }
+    number(typed::UINT32,count);
+    for (std::size_t i=0;i<count;++i) number(typed::UINT32,1);
+    number(1,0); number(typed::UINT32,count);
+    for (std::size_t i=0;i<count;++i) {
+        number(typed::UINT64,0);
+        const auto& p=params.at(pos++);
+        if (p.kind!=typed::STRING || !p.value.text.empty()) throw Rejected("purchase recipient unsupported");
+    }
+    number(typed::UINT32,0); number(typed::UINT32,0); number(typed::UINT8,0); number(typed::UINT32,0);
+    std::ifstream in(path_.parent_path() / "retail_shop_catalog.json");
+    const Json catalogue = parse_json(std::string(std::istreambuf_iterator<char>(in), {}));
+    if (catalogue.at("schema").as_u64() != 1 || catalogue.at("eboot_sha256").text !=
+        "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5" ||
+        !catalogue.at("skus").is_array()) throw Rejected("unsupported shop catalogue");
+    std::map<std::uint64_t,const Json*> skus;
+    for (const auto& candidate:catalogue.at("skus").items)
+        if (!skus.emplace(candidate.at("id").as_u64(),&candidate).second)
+            throw Rejected("ambiguous shop SKU");
+    auto lookup=[&](std::uint64_t id)->const Json& {
+        auto it=skus.find(id);
+        if (it==skus.end()) throw Rejected("unknown shop SKU");
+        return *it->second;
+    };
+    load();
+    const auto owner=std::to_string(account);
+    auto owned=[&](std::uint64_t item) {
+        auto it=inventory_.find({owner,item}); return it!=inventory_.end() && it->second>0;
+    };
+    const auto& first=lookup(requested.front());
+    std::set<std::uint64_t> expected;
+    if (const auto* components=first.find("components")) {
+        if (!components->is_array() || components->items.empty() || components->items.size()>31)
+            throw Rejected("invalid bundle");
+        for (const auto& id:components->items) {
+            const auto& component=lookup(id.as_u64());
+            if (component.find("components")) throw Rejected("nested bundle unsupported");
+            if (!owned(component.at("item").as_u64())) expected.insert(id.as_u64());
+        }
+        // A retry may still include components already granted. Every unowned component
+        // must be present and no unrelated component may be submitted.
+        std::set<std::uint64_t> allowed;
+        for (const auto& id:components->items) allowed.insert(id.as_u64());
+        for (std::size_t i=1;i<requested.size();++i)
+            if (!allowed.count(requested[i])) throw Rejected("SKU outside bundle");
+        for (auto id:expected) if (!unique.count(id)) throw Rejected("incomplete bundle");
+    } else {
+        if (count!=1) throw Rejected("multiple purchases require bundle");
+        expected.insert(requested.front());
+    }
+    std::int64_t price=0;
+    std::set<std::uint64_t> grants;
+    for (auto id:expected) {
+        const auto& sku=lookup(id);
+        const auto item=sku.at("item").as_u64();
+        const auto cost=sku.at("price").as_i64();
+        if (sku.at("currency").as_u64()!=10 || sku.at("quantity").as_u64()!=1 ||
+            !item || item>UINT32_MAX || cost<=0 || cost>INT32_MAX)
+            throw Rejected("invalid shop item/price");
+        if (!owned(item)) {
+            if (!grants.insert(item).second) throw Rejected("duplicate bundle item");
+            price+=cost;
+        }
+    }
+    if (grants.empty()) return;
+    const auto money = balances_.find({owner,10});
+    if (money == balances_.end() || money->second < price) throw Rejected("insufficient Wumpa balance");
+    const auto balances_before = balances_, inventory_before = inventory_;
+    try {
+        balances_[{owner,10}] -= price;
+        for (auto item:grants) inventory_[{owner,item}] = 1;
+        save();
+    } catch (...) { balances_ = balances_before; inventory_ = inventory_before; throw; }
+}
+Bytes MarketplaceStore::inventory_page(const std::vector<Param>& params, std::uint64_t account) {
     load();
     if (kinds(params) != std::vector<int>{typed::STRING, typed::UINT32, typed::UINT32} || params[0].value.text != MARKET_CONTEXT)
         throw Rejected("unsupported inventory request");
     if (params[1].value.as_u64() != 1 || params[2].value.as_u64() == 0 || params[2].value.as_u64() > 4096)
         throw Rejected("unsupported inventory page");
     const std::string owner = std::to_string(account);
-    for (const auto& entry : inventory_)
-        if (entry.first.first == owner) throw Rejected("nonempty inventory record layout not validated");
+    std::vector<std::pair<std::uint32_t,std::uint32_t>> entries;
+    for (const auto& entry : inventory_) {
+        if (entry.first.first != owner || entry.second <= 0) continue;
+        if (entry.first.second > UINT32_MAX || entry.second > UINT32_MAX)
+            throw Rejected("inventory value out of range");
+        entries.emplace_back(static_cast<std::uint32_t>(entry.first.second), static_cast<std::uint32_t>(entry.second));
+    }
+    if (entries.empty()) return {};
+    // Enable nonempty replies only with the local catalogue used by the purchase path.
+    if (!std::filesystem::exists(path_.parent_path() / "retail_shop_catalog.json"))
+        throw Rejected("nonempty inventory requires local shop catalogue");
+    if (entries.size() > params[2].value.as_u64()) throw Rejected("inventory pagination not supported");
+    Writer out;
+    out.u32(static_cast<std::uint32_t>(entries.size())).u32(static_cast<std::uint32_t>(entries.size()));
+    for (const auto& [item, quantity] : entries) {
+        out.u64(account).string("psn").u32(item).u32(quantity).u32(0).blob({}).u32(0);
+        out.raw({typed::INT64,255,255,255,255,255,255,255,255});
+        out.raw({typed::UINT16,0,0}).u32(0);
+    }
+    return out.data();
 }
 Bytes MarketplaceStore::balances_message(const std::vector<Param>& params, std::uint64_t account) {
     load();
@@ -212,8 +424,13 @@ Json AchievementStore::report_events(const std::vector<Param>& params, std::uint
         row.set("account", Json::of(std::to_string(account)));
         row.set("received", Json::of(received));
         row.set("event", Json::of(dump_json_spaced(event)));
+        // Keep the complete retail struct request, including event attributes and
+        // unknown fields, so reward/challenge evidence survives summary parsing.
+        row.set("request_hex", params[0].value);
         out << dump_json(row) << '\n';
     }
+    out.flush();
+    if (!out) throw Rejected("achievement event persistence failed");
     return events;
 }
 Bytes AchievementStore::states_message(const std::vector<Param>& params, std::uint64_t) const {
@@ -235,14 +452,23 @@ Bytes AchievementStore::states_message(const std::vector<Param>& params, std::ui
 }
 
 std::optional<Bytes> pitstop_task(const TaskRequest& request, std::uint64_t account,
-                                  MarketplaceStore& marketplace, AchievementStore& achievements) {
+                                  MarketplaceStore& marketplace, AchievementStore& achievements, unsigned multiplier) {
     const unsigned service = request.service;
     const std::uint64_t task = request.task;
-    if (!((service == 80 && (task == 165 || task == 245)) || (service == 125 && (task == 1 || task == 3)))) return std::nullopt;
+    if (!((service == 80 && (task == 154 || task == 165 || task == 245)) || (service == 125 && (task == 1 || task == 3)))) return std::nullopt;
     try {
-        if (service == 80 && task == 165) { marketplace.inventory_page(request.params, account); return task_reply(task); }
+        if (service == 80 && task == 154) { marketplace.purchase(request.params,account); return task_reply(task); }
+        if (service == 80 && task == 165) {
+            const auto records = marketplace.inventory_page(request.params, account);
+            if (records.empty()) return task_reply(task);
+            Writer out; out.raw(records); return task_reply(task,&out);
+        }
         if (service == 80) return struct_reply(task, marketplace.balances_message(request.params, account));
-        if (task == 1) { achievements.report_events(request.params, account); return task_reply(task); }
+        if (task == 1) {
+            achievements.report_events(request.params, account);
+            marketplace.award_races(request.params, account, multiplier);
+            return task_reply(task);
+        }
         return struct_reply(task, achievements.states_message(request.params, account));
     } catch (const std::exception&) {
         return task_reply(task, nullptr, UNSERVED_ERROR);

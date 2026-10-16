@@ -17,6 +17,7 @@
 #include "direct_memory.hpp"
 #include "online_traffic_key.hpp"
 #include "retail_profiles.hpp"
+#include "retail_reward_catalog.hpp"
 #include "gnm_init_dispatch.hpp"
 #include "gnm_submission_snapshot.hpp"
 #include "gnm_command_cursor.hpp"
@@ -2938,6 +2939,7 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     std::cout.flush();
     if(continue_after_libc_init) {
         GuestStack initial_stack(1024*1024,4096);
+        reward_catalog::start(images.front().get(),pin,startup_images);
         std::cout<<"{\"scope\":\"original_startup_committed_stack\",\"usable_bytes\":"<<initial_stack.size()<<",\"guard_bytes\":4096,\"main_reached\":false}\n"<<std::flush;
         ctr_jump_startup_owned(images.front().get()+0x80,&startup,functions.memory.get(),initial_stack.top(),initial_stack.bottom());
     }else ctr_jump_startup(images.front().get()+0x80,&startup,functions.memory.get());

@@ -475,6 +475,9 @@ struct Server::Impl {
             try { request = parse_json(std::string(body.begin(), body.end())); } catch (const std::exception&) {
                 return json_answer(400, R"({"error":"bad json"})", "auth3", false);
             }
+            const auto multiplier_header = header("x-ctr-wumpa-multiplier");
+            if (!multiplier_header.empty() && multiplier_header != "1" && multiplier_header != "100")
+                return json_answer(400, R"({"error":"unsupported Wumpa multiplier"})", "auth3", false);
             Auth3Reply reply;
             try { reply = auth3_reply(request, online_id, *key); } catch (const std::exception&) {
                 return json_answer(400, R"({"error":"bad auth3 request"})", "auth3", false);
@@ -484,6 +487,7 @@ struct Server::Impl {
             Json session_user = Json::null();
             if (reply.session) {
                 reply.session->room_token = room;
+                reply.session->wumpa_multiplier = multiplier_header == "100" ? 100u : 1u;
                 session_user = Json::of(reply.session->user_id);
                 std::lock_guard<std::mutex> lock(state);
                 bool replaced = false;
@@ -729,7 +733,7 @@ struct Server::Impl {
             w.u32(1).u32(1).u32(static_cast<std::uint32_t>(std::time(nullptr)));
             return task_reply(task, &w);
         }
-        if (auto answer = pitstop_task(request, user.user_id, *marketplace, *achievements)) return *answer;
+        if (auto answer = pitstop_task(request, user.user_id, *marketplace, *achievements, user.wumpa_multiplier)) return *answer;
         if (service == 4 && task == 1) return guarded([&] { stats->write(params, user.user_id); return task_reply(task); });
         if (service == 145 && task == 2)
             return guarded([&] { matchmaking.advertise(params, user.user_id, user.room_token); return task_reply(task); });
