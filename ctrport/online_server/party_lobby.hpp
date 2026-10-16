@@ -20,8 +20,10 @@ private:
     std::mutex mutex_;
     std::string owner_, room_, destination_;
     std::map<std::string, Member> members_;
-    std::set<std::string> invited_;
+    struct Invitation { std::string sender; std::uint64_t created; };
+    std::map<std::string, Invitation> invited_;
     std::map<std::string, std::string> inbox_;
+    std::map<std::string, std::uint64_t> inbox_seen_;
     void expire(std::uint64_t now);
     Json snapshot(const std::string& caller) const;
 };

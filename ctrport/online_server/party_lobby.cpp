@@ -31,6 +31,12 @@ Json verify_party_message(const Json& packet, const std::string& expected_code, 
 }
 PartyLobby::PartyLobby(std::string owner) : owner_(std::move(owner)), room_(hex(random_bytes(32))), destination_(owner_) {}
 void PartyLobby::expire(std::uint64_t now) {
+    for (auto it=invited_.begin(); it!=invited_.end();) {
+        if (now>it->second.created && now-it->second.created>900) it=invited_.erase(it); else ++it;
+    }
+    for (auto it=inbox_seen_.begin(); it!=inbox_seen_.end();) {
+        if (now>it->second && now-it->second>900) { inbox_.erase(it->first); it=inbox_seen_.erase(it); } else ++it;
+    }
     for (auto it=members_.begin(); it!=members_.end();) {
         if (it->first != owner_ && now > it->second.seen && now-it->second.seen > 180) it=members_.erase(it);
         else ++it;
@@ -60,6 +66,16 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
     expire(now);
     const std::string action=request.at("action").text;
     const bool self=caller==owner_;
+    // Authenticated pull: never exposes another recipient's invitations or the room secret.
+    if (action=="invitations") {
+        Json result=Json::object(), invitations=Json::array();
+        const auto it=invited_.find(caller);
+        if (it!=invited_.end() && destination_==owner_) {
+            Json row=Json::object(); row.set("from",Json::of(it->second.sender));
+            row.set("owner",Json::of(owner_)); invitations.items.push_back(row);
+        }
+        result.set("invitations",invitations); return result;
+    }
     if (!self && !friend_allowed && !members_.count(caller) && !invited_.count(caller))
         throw std::runtime_error("Aggiungi reciprocamente il codice amico prima di collegarti");
     if (action=="configure" || action=="join") {
@@ -84,13 +100,20 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
         if (members_.size()>=8) throw std::runtime_error("Lobby piena (8/8)");
         FriendCodeInfo target;
         if (parse_friend_code(request.at("target").text,target)!=CodeParseError::Ok) throw std::runtime_error("Codice invitato non valido");
-        if (invited_.size()>=64) throw std::runtime_error("Troppi inviti pendenti");
-        invited_.insert(target.code);
-    } else if (action=="notify") {
+        if (invited_.size()>=64 && !invited_.count(target.code)) throw std::runtime_error("Troppi inviti pendenti");
+        invited_[target.code]={caller,now};
+    } else if (action=="notify" || action=="receive_invite") {
+        std::string sender=caller;
+        if(action=="receive_invite") {
+            if(!self) throw std::runtime_error("Operazione riservata al launcher locale");
+            FriendCodeInfo from;
+            if(parse_friend_code(request.at("from").text,from)!=CodeParseError::Ok) throw std::runtime_error("Mittente non valido");
+            sender=from.code;
+        }
         FriendCodeInfo host;
         if (parse_friend_code(request.at("owner").text,host)!=CodeParseError::Ok) throw std::runtime_error("Host invito non valido");
-        if (inbox_.size()>=64 && !inbox_.count(caller)) throw std::runtime_error("Troppi inviti ricevuti");
-        inbox_[caller]=host.code;
+        if (inbox_.size()>=64 && !inbox_.count(sender)) throw std::runtime_error("Troppi inviti ricevuti");
+        inbox_[sender]=host.code; inbox_seen_[sender]=now;
     } else if (action=="destination" || action=="new") {
         if (!self) throw std::runtime_error("Operazione riservata al launcher locale");
         if (members_.size()>1) throw std::runtime_error("La tua lobby contiene altri giocatori");
@@ -100,7 +123,7 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
         const auto new_room=hex(random_bytes(32));
         destination_=target.code;room_=new_room;members_.clear();invited_.clear();
         for(auto it=inbox_.begin();it!=inbox_.end();) {
-            if(it->second==destination_) it=inbox_.erase(it);else ++it;
+            if(it->second==destination_) { inbox_seen_.erase(it->first); it=inbox_.erase(it); } else ++it;
         }
     } else if (action!="status") throw std::runtime_error("Azione lobby sconosciuta");
     return snapshot(caller);

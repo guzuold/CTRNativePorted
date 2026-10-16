@@ -1,3 +1,27 @@
+## v0.3.1 invitation update — 2026-10-16
+
+- Invitations are now stored on the existing lobby/relay host and retrieved by
+  the recipient through outbound authenticated HTTP requests. Sending no longer
+  requires discovering or connecting to the recipient's IP or public TCP 8780.
+  No extra server or account is required. Game datagrams, direct/relay selection
+  and the game room selector are unchanged.
+- Add the actual lobby host's friend code to the recipient's address book (and
+  the inviter's code if different). The host must remain reachable and running.
+  This does not solve an unreachable host behind CGNAT or discovery of an unknown
+  host. Update both launchers. Pending invites expire after 15 minutes or host
+  restart/lobby reset. Choose **Inviti ricevuti** to check known hosts; the main
+  launcher also polls one known host every 15 seconds.
+- Cached addresses are identity-verified before DHT lookup. Manual friend lookup
+  waits up to 20 seconds; diagnostics distinguish local DHT startup failure,
+  missing nodes and a missing friend announcement.
+- Validation: 189 existing server checks, 11 invitation-pull checks, 5 isolated
+  DHT checks, and game Auto Direct/Relay fallback controls pass. Invitation tests
+  include an absent recipient listener, identity isolation, expiry, duplicate
+  delivery and accepting into the unchanged game room. No real two-PC CGNAT
+  invitation or retail online race is claimed by these tests.
+- See `INVITATIONS.md` in the download for operation and limitations. All earlier
+  v0.3.1 economy features and limitations remain applicable.
+
 # CTRNativePorted v0.3.1 — Wumpa Coins and Pit Stop purchases
 
 ## New since v0.3.0
