@@ -193,3 +193,7 @@ The server also exists as a standalone program, `ctr_online_server.exe --auto-pu
 - 60 FPS patch: "60 FPS Unlock" 2.0 by **illusion**, from the
   [GoldHEN Patch Repository](https://github.com/GoldHEN/GoldHEN_Patch_Repository).
 - Crash Team Racing Nitro-Fueled is a trademark of Activision Publishing, Inc.
+
+## Invitation delivery update (v0.3.1)
+
+Invitations are held on the existing lobby/relay host; recipients retrieve them through outgoing connections. Add the actual host code to the recipient address book. No public listener is required on the recipient, but the host must remain reachable. See [the invitation guide](ctrport/online_server/INVITATIONS.md) for setup, expiry and discovery limits. Game transport is unchanged.

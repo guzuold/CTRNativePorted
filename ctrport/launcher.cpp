@@ -1243,6 +1243,8 @@ void host_toggled(bool = false) {
     g.party={};g.party_error.clear();g.invite_count=0;
     EnableWindow(g.online_toggle,FALSE);
     std::thread([start=g.cfg.online,root=g.root,window=g.window] {
+        // The bounded invitation lookup borrows the host DHT. Drain it before stop/restart.
+        if(g.party_poll.valid()) g.party_poll.wait();
         if(start) g.host.start(root,{},true); else g.host.stop();
         PostMessageW(window,WM_APP_HOST_READY,start ? 1 : 0,0);
     }).detach();
@@ -1282,7 +1284,15 @@ void poll_party() {
     if(GetTickCount64()-last<15000) return;
     last=GetTickCount64();
     g.party_poll_owner=g.party.owner;g.party_poll_room=g.party.room;
-    g.party_poll=std::async(std::launch::async,[root=g.root,selection=g.party,self=g.host_status.friend_code] {
+    static std::size_t invite_poll_index=0;
+    const auto invite_index=invite_poll_index++;
+    g.party_poll=std::async(std::launch::async,[root=g.root,selection=g.party,self=g.host_status.friend_code,invite_index,dht=g.host.dht()] {
+        // Check one known host per tick, with no inbound connection to this launcher.
+        const auto entries=ctr_online::FriendStore(root/"runtime/user/online/friends.json").entries();
+        if(!entries.empty()) {
+            try { ctr_online::poll_party_invitations(root,entries[invite_index%entries.size()].friend_code,dht,2000); }
+            catch(...) {} // An unavailable friend must not interrupt the current lobby heartbeat.
+        }
         auto response=ctr_online::party_request(root,"127.0.0.1",self,party_command("status"));
         response.set("party",ctr_online::party_request(root,selection.ip,selection.owner,party_command("heartbeat")));
         return response;

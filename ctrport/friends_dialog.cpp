@@ -191,7 +191,22 @@ LRESULT CALLBACK DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     const auto self=local_friend_code(root);
                     auto command=[](const char* action) { Json j=Json::object();j.set("action",Json::of(action));return j; };
                     if(id==108) {
+                        FriendStore book(root/"runtime/user/online/friends.json");
+                        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);
+                        unsigned reached=0, attempted=0;
+                        for(const auto& entry:book.entries()) {
+                            if(entry.friend_code==self) continue;
+                            if(std::chrono::steady_clock::now()>=deadline) break;
+                            ++attempted;
+                            try { if(poll_party_invitations(root,entry.friend_code,dht,2000)) ++reached; } catch(...) {}
+                        }
                         out.snapshot=party_request(root,"127.0.0.1",self,command("status"));
+                        out.detail="Host controllati: "+std::to_string(reached)+"/"+std::to_string(attempted)+
+                            ". Gli host non raggiunti potrebbero avere inviti in attesa.";
+                    } else if(id==107) {
+                        if(code==self) throw std::runtime_error("Non puoi invitare te stesso");
+                        Json invite=command("invite");invite.set("target",Json::of(code));
+                        out.snapshot=party_request(root,selection.ip,selection.owner,invite);
                     } else if(id==109) {
                         if(selection.owner!=self) { try {party_request(root,selection.ip,selection.owner,command("leave"));} catch(...) {} }
                         party_request(root,"127.0.0.1",self,command("new"));
@@ -200,20 +215,15 @@ LRESULT CALLBACK DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         out.party={"127.0.0.1",self,out.snapshot.at("room").text,out.snapshot};
                     } else {
                         if(code==self) throw std::runtime_error("Sei gia nella tua lobby: seleziona un altro amico");
-                        auto found=find_friend_server(root,code,8000,3000,{},dht);
+                        auto found=find_friend_server(root,code,20000,3000,{},dht);
                         if(found.status!=VerifyStatus::Verified) throw std::runtime_error(found.detail);
                         auto status=party_request(root,found.ip,code,command("status"));
                         out.snapshot=status;
-                        if(id==107) {
-                            Json invite=command("invite");invite.set("target",Json::of(code));
-                            party_request(root,selection.ip,selection.owner,invite);
-                            Json notify=command("notify");notify.set("owner",Json::of(selection.owner));
-                            party_request(root,found.ip,code,notify);
-                        } else if(id==104) {
+                        if(id==104) {
                             const std::string owner=status.at("owner").text;
                             if(owner==selection.owner) throw std::runtime_error("Sei gia nella stessa lobby di questo amico");
                             if(owner!=code) {
-                                found=find_friend_server(root,owner,8000,3000,{},dht);
+                                found=find_friend_server(root,owner,20000,3000,{},dht);
                                 if(found.status!=VerifyStatus::Verified) throw std::runtime_error(found.detail);
                             }
                             Json join=command("join");join.set("name",Json::of(name));
@@ -275,10 +285,10 @@ LRESULT CALLBACK DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if(result.action==104 || result.action==109) {
             state->selection=result.party; state->chosen=true; DestroyWindow(hwnd);
         } else if(result.action==107) {
-            SetWindowTextW(state->status_lbl,L"Invito inviato. L'amico puo accettarlo da Inviti ricevuti.");
+            SetWindowTextW(state->status_lbl,L"Invito disponibile sull'host per 15 minuti. L'amico lo ritira da Inviti ricevuti; deve avere il codice dell'host in rubrica.");
         } else if(result.action==108) {
             const auto& invitations=result.snapshot.at("invitations").items;
-            if(invitations.empty()) SetWindowTextW(state->status_lbl,L"Nessun invito ricevuto.");
+            if(invitations.empty()) SetWindowTextW(state->status_lbl,to_wide("Nessun invito recuperato. "+result.detail).c_str());
             else {
                 // Keep invitations visible in the address book: accepting uses the
                 // same authenticated join action and rechecks owner capacity.

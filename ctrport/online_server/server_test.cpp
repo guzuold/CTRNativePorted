@@ -42,7 +42,130 @@ Bytes b(const std::string& h) { return from_hex(h); }
 Param param(int kind, Json value) { Param p; p.kind = kind; p.value = std::move(value); return p; }
 } // namespace
 
+void test_dht_discovery() {
+    // Isolated 2-process DHT discovery test
+    {
+        wchar_t exe_path[MAX_PATH];
+        GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+
+        const std::uint16_t host_dht_port = 8793;
+        const Bytes test_info_hash = sha1(bytes_of("test_2proc_dht_info_hash_vector_1"));
+
+        const std::string hex_hash = hex(test_info_hash);
+        const std::wstring w_hex(hex_hash.begin(), hex_hash.end());
+        std::wstring cmd = std::wstring(L"\"") + exe_path + L"\" --dht-node-host " +
+                           std::to_wstring(host_dht_port) + L" " + w_hex;
+
+        STARTUPINFOW si{sizeof(si)};
+        PROCESS_INFORMATION pi{};
+        BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
+        check(ok != FALSE, "spawned DHT host child process");
+        if (ok) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+            dht_allow_loopback = 1;
+            DhtService guest_dht;
+            const bool guest_started = guest_dht.start(0, {}, {"127.0.0.1:1"});
+            check(guest_started, "guest DHT node started and bootstrapped to host child process");
+            // Reproduce a cold start: lookup starts before any bootstrap reply.
+            std::thread delayed_bootstrap([&] {
+                std::this_thread::sleep_for(std::chrono::milliseconds(700));
+                guest_dht.ping_node("127.0.0.1", host_dht_port);
+            });
+
+            const std::vector<std::string> candidates = guest_dht.search(test_info_hash, 3500);
+            delayed_bootstrap.join();
+            guest_dht.stop();
+            dht_allow_loopback = 0;
+
+            bool found = false;
+            for (const auto& ep : candidates) {
+                if (ep == "127.0.0.1:8780") found = true;
+            }
+            check(found, "2-process isolated DHT test: guest discovered host candidate 127.0.0.1:8780 via BitTorrent DHT");
+
+            TerminateProcess(pi.hProcess, 0);
+            WaitForSingleObject(pi.hProcess, 1000);
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+        }
+    }
+
+}
+
+void test_invitation_pull() {
+    const auto root=std::filesystem::temp_directory_path()/("ctr_invite_pull_"+hex(random_bytes(8)));
+    const auto aroot=root/"host", broot=root/"guest", croot=root/"stranger";
+    const auto a=local_friend_code(aroot), b=local_friend_code(broot), c=local_friend_code(croot);
+    auto req=[](const char* action) { auto j=Json::object();j.set("action",Json::of(action));return j; };
+    ServerConfig ac; ac.host="127.0.0.2"; ac.public_host=ac.host; ac.party_enabled=true;
+    ac.state_dir=aroot/"runtime/user/online"; ac.log_path=aroot/"runtime/user/logs/pull.jsonl";
+    Server server(ac);server.start();
+    auto configure=req("configure");configure.set("name",Json::of("Host"));
+    const auto original=party_request(aroot,ac.host,a,configure);
+    auto invite=req("invite");invite.set("target",Json::of(b));
+    party_request(aroot,ac.host,a,invite);
+    // No recipient service exists: all network requests below originate from the guest.
+    const auto fetched=party_request(broot,ac.host,a,req("invitations"));
+    check(fetched.at("invitations").items.size()==1 && fetched.at("invitations").items[0].at("from").text==a,
+          "invite pulled from existing host without any recipient listener");
+    check(!fetched.find("room") && !fetched.find("members"),"invitation pull discloses no room secret or roster");
+    check(party_request(croot,ac.host,a,req("invitations")).at("invitations").items.empty(),
+          "different signed identity cannot retrieve another recipient invitation");
+    FriendStore book(broot/"runtime/user/online/friends.json");book.add_or_update(a,"Host");
+    book.update_endpoint(a,"127.0.0.2:8780","verified");
+    ServerConfig bc=ac;bc.host="127.0.0.1";bc.public_host=bc.host;
+    bc.state_dir=broot/"runtime/user/online";bc.log_path=broot/"runtime/user/logs/pull.jsonl";
+    Server receiver(bc);receiver.start();
+    check(poll_party_invitations(broot,a,nullptr,0),"launcher pulls via cached host without DHT or incoming remote connection");
+    check(party_request(broot,bc.host,b,req("status")).at("invitations").items.size()==1,
+          "verified outbound pull updates local launcher inbox");
+    poll_party_invitations(broot,a,nullptr,0);
+    check(party_request(broot,bc.host,b,req("status")).at("invitations").items.size()==1,"repeated polls do not duplicate invitation");
+    auto join=req("join");join.set("name",Json::of("Guest"));
+    const auto joined=party_request(broot,ac.host,a,join);
+    check(joined.at("room").text==original.at("room").text,"accepting pulled invite preserves original game room selector");
+    check(party_request(broot,ac.host,a,req("invitations")).at("invitations").items.empty(),"accepting consumes server invitation");
+    auto destination=req("destination");destination.set("owner",Json::of(a));
+    check(party_request(broot,bc.host,b,destination).at("invitations").items.empty(),"accepting clears local inbox");
+    receiver.stop();server.stop();
+    PartyLobby ttl(a);const auto now=party_now();ttl.apply(a,configure,false,now);ttl.apply(a,invite,false,now);
+    check(ttl.apply(b,req("invitations"),false,now+901).at("invitations").items.empty(),"unclaimed invitations expire after fifteen minutes");
+    bool rejected=false;try {ttl.apply(b,join,false,now+901);}catch(...) {rejected=true;}
+    check(rejected,"expired invitation no longer authorizes joining");
+    std::filesystem::remove_all(root);
+}
+
 int run_tests(int argc, char* argv[]) {
+    if(argc>=2 && std::string(argv[1])=="--invite-pull-only") {test_invitation_pull();return failures ? 1 : 0;}
+    if (argc >= 2 && std::string(argv[1]) == "--dht-network-check") {
+        DhtService dht;
+        if (!dht.start(0, {})) return 2;
+        for (int i = 0; i < 4; ++i) {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            const auto s = dht.stats();
+            std::printf("DHT elapsed=%d good=%d dubious=%d incoming=%d port=%u\n",
+                        (i + 1) * 5, s.good_nodes, s.dubious_nodes, s.incoming_nodes,
+                        static_cast<unsigned>(s.bound_port));
+            std::fflush(stdout);
+        }
+        const auto s = dht.stats();
+        return s.good_nodes + s.dubious_nodes > 0 ? 0 : 1;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--dht-only") {
+        test_dht_discovery();
+        const auto root = std::filesystem::temp_directory_path() / ("ctr_dht_diagnostic_" + hex(random_bytes(8)));
+        const auto code = local_friend_code(root);
+        const auto absent = find_friend_server(root, code, 100, 100, {"127.0.0.1:1"});
+        check(absent.status == VerifyStatus::NoResponse && absent.detail.find("Nessun nodo DHT raggiunto") != std::string::npos,
+              "unreachable bootstrap is distinguished from missing friend announcement");
+        DhtService stopped;
+        const auto unavailable = find_friend_server(root, code, 100, 100, {}, &stopped);
+        check(unavailable.status == VerifyStatus::NoResponse && unavailable.detail.find("DHT locale non avviata") != std::string::npos,
+              "stopped local DHT is reported separately");
+        std::filesystem::remove_all(root);
+        return failures ? 1 : 0;
+    }
     if (argc >= 4 && std::string(argv[1]) == "--dht-node-host") {
         const std::uint16_t port = static_cast<std::uint16_t>(std::stoi(argv[2]));
         const Bytes info_hash = from_hex(argv[3]);
@@ -890,48 +1013,7 @@ int run_tests(int argc, char* argv[]) {
         check(!dht.is_running(), "DhtService reports stopped");
     }
 
-    // Isolated 2-process DHT discovery test
-    {
-        wchar_t exe_path[MAX_PATH];
-        GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
-
-        const std::uint16_t host_dht_port = 8793;
-        const Bytes test_info_hash = sha1(bytes_of("test_2proc_dht_info_hash_vector_1"));
-
-        const std::string hex_hash = hex(test_info_hash);
-        const std::wstring w_hex(hex_hash.begin(), hex_hash.end());
-        std::wstring cmd = std::wstring(L"\"") + exe_path + L"\" --dht-node-host " +
-                           std::to_wstring(host_dht_port) + L" " + w_hex;
-
-        STARTUPINFOW si{sizeof(si)};
-        PROCESS_INFORMATION pi{};
-        BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
-        check(ok != FALSE, "spawned DHT host child process");
-        if (ok) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(400));
-
-            dht_allow_loopback = 1;
-            DhtService guest_dht;
-            const bool guest_started = guest_dht.start(0, {}, {"127.0.0.1:" + std::to_string(host_dht_port)});
-            check(guest_started, "guest DHT node started and bootstrapped to host child process");
-            std::this_thread::sleep_for(std::chrono::milliseconds(250));
-
-            const std::vector<std::string> candidates = guest_dht.search(test_info_hash, 3500);
-            guest_dht.stop();
-            dht_allow_loopback = 0;
-
-            bool found = false;
-            for (const auto& ep : candidates) {
-                if (ep == "127.0.0.1:8780") found = true;
-            }
-            check(found, "2-process isolated DHT test: guest discovered host candidate 127.0.0.1:8780 via BitTorrent DHT");
-
-            TerminateProcess(pi.hProcess, 0);
-            WaitForSingleObject(pi.hProcess, 1000);
-            CloseHandle(pi.hThread);
-            CloseHandle(pi.hProcess);
-        }
-    }
+    test_dht_discovery();
 
     check(resolve_ipv4("127.0.0.1") == "127.0.0.1" && resolve_ipv4("localhost") == "127.0.0.1" && resolve_ipv4("no such host.invalid").empty(),
           "server names resolved to IPv4");

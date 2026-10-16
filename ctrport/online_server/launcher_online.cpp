@@ -180,6 +180,8 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
     std::vector<std::string> candidates;
     for (const auto& entry : store.entries()) {
         if (entry.friend_code == info.code && !entry.last_endpoint.empty()) {
+            auto cached=verify_candidate_endpoint(entry.last_endpoint,info,verify_timeout_ms);
+            if(cached.status==VerifyStatus::Verified) return cached;
             candidates.push_back(entry.last_endpoint);
             break;
         }
@@ -187,9 +189,12 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
 
     // Perform DHT search
     DhtService dht;
-    if (shared_dht || dht.start(0, dht_cache, extra_bootstrap_nodes)) {
+    DhtStats lookup_stats;
+    const bool dht_started = shared_dht ? shared_dht->is_running() : dht.start(0, dht_cache, extra_bootstrap_nodes);
+    if (dht_started) {
         const Bytes info_hash = friend_dht_info_hash(info.public_key);
         const std::vector<std::string> dht_results = (shared_dht ? shared_dht : &dht)->search(info_hash, dht_timeout_ms);
+        lookup_stats = (shared_dht ? shared_dht : &dht)->stats();
         for (const std::string& ep : dht_results) {
             if (std::find(candidates.begin(), candidates.end(), ep) == candidates.end()) {
                 candidates.push_back(ep);
@@ -200,8 +205,18 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
 
     if (candidates.empty()) {
         result.status = VerifyStatus::NoResponse;
-        result.detail = "No response from DHT nodes (host may be offline or behind restrictive NAT)";
-        store.update_endpoint(info.code, "", "Nessuna risposta dai nodi noti");
+        if (!dht_started) {
+            result.detail = "DHT locale non avviata: impossibile cercare l'amico. Riprova o usa l'indirizzo IP.";
+        } else if (lookup_stats.good_nodes + lookup_stats.dubious_nodes == 0) {
+            result.detail = "Nessun nodo DHT raggiunto entro " + std::to_string(dht_timeout_ms / 1000) +
+                " s: bootstrap incompleto o rete UDP non disponibile. Lo stato dell'amico e sconosciuto.";
+        } else {
+            result.detail = "Amico non trovato nella DHT entro " + std::to_string(dht_timeout_ms / 1000) +
+                " s (nodi attivi: " + std::to_string(lookup_stats.good_nodes) +
+                ", altri nodi noti: " + std::to_string(lookup_stats.dubious_nodes) +
+                "). Verifica che il launcher remoto sia online e riprova: l'annuncio potrebbe non essere ancora disponibile.";
+        }
+        store.update_endpoint(info.code, "", result.detail);
         return result;
     }
 
@@ -278,6 +293,35 @@ int http_request(const std::string& ipv4, std::uint16_t port, const std::string&
 }
 int http_get(const std::string& ip, std::uint16_t port, const std::string& path, std::string& body, int timeout_ms) {
     return http_request(ip,port,path,{},body,timeout_ms);
+}
+bool poll_party_invitations(const std::filesystem::path& root, const std::string& host_code,
+                           DhtService* shared_dht, int lookup_timeout_ms) {
+    const auto self=local_friend_code(root);
+    if(host_code==self) return false;
+    FriendStore friends(root / "runtime/user/online/friends.json");
+    VerifyResult host;
+    for(const auto& entry:friends.entries()) {
+        if(entry.friend_code==host_code && !entry.last_endpoint.empty()) {
+            host=verify_candidate_endpoint(entry.last_endpoint,host_code,1000);
+            break;
+        }
+    }
+    if(host.status!=VerifyStatus::Verified && lookup_timeout_ms>0)
+        host=find_friend_server(root,host_code,lookup_timeout_ms,1000,{},shared_dht);
+    if(host.status!=VerifyStatus::Verified) return false;
+    Json request=Json::object();request.set("action",Json::of("invitations"));
+    const auto response=party_request(root,host.ip,host_code,request);
+    for(const auto& invite:response.at("invitations").items) {
+        const auto sender=invite.at("from").text;
+        if(invite.at("owner").text!=host_code) throw std::runtime_error("Host invito non corrispondente");
+        bool trusted=false;
+        for(const auto& entry:friends.entries()) if(entry.friend_code==sender) trusted=true;
+        if(!trusted) continue;
+        Json receive=Json::object();receive.set("action",Json::of("receive_invite"));
+        receive.set("from",Json::of(sender));receive.set("owner",Json::of(host_code));
+        party_request(root,"127.0.0.1",self,receive);
+    }
+    return true;
 }
 Json party_request(const std::filesystem::path& root, const std::string& ip, const std::string& code, Json request) {
     const auto identity=HostIdentity::load_or_create(root / "runtime/user/identity/host_identity.json");

@@ -80,6 +80,10 @@ struct PartySelection {
     Json snapshot = Json::object();
 };
 Json party_request(const std::filesystem::path& root, const std::string& ip, const std::string& code, Json request);
+// Pull invitations from a known lobby host through an outbound connection.
+// The destination never needs a listening public port. Returns false if host lookup fails.
+bool poll_party_invitations(const std::filesystem::path& root, const std::string& host_code,
+                           DhtService* shared_dht, int lookup_timeout_ms = 2000);
 
 // IPv4 text for a server name or address ("" when it cannot be resolved). The runtime only
 // accepts a numeric IPv4 address.
