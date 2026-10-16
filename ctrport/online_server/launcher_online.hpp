@@ -4,6 +4,8 @@
 // fetching the server's traffic key fresh at each launch.
 #pragma once
 #include "upnp.hpp"
+#include "json.hpp"
+#include "friend_verifier.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -35,7 +37,10 @@ struct HostStatus {
     std::string error;           // set when the server could not start
     std::filesystem::path traffic_key;
     std::filesystem::path log;
+    std::string friend_code;
 };
+
+class DhtService;
 
 class Host {
 public:
@@ -48,13 +53,33 @@ public:
     bool running() const;
     HostStatus status() const;
     std::size_t players() const;
+    DhtService* dht() const;
 
 private:
     mutable std::mutex mutex_;
     std::unique_ptr<Server> server_;
     std::unique_ptr<PortMapper> mapper_;
+    std::unique_ptr<DhtService> dht_;
     HostStatus status_;
 };
+
+// Gets the local player's friend code from runtime/user/identity/host_identity.json (created if missing).
+std::string local_friend_code(const std::filesystem::path& root);
+
+// Searches the DHT and verifies candidates against the given friend code.
+// Returns VerifyResult (status Verified, NoResponse, InvalidIdentity, etc.).
+VerifyResult find_friend_server(const std::filesystem::path& root,
+                                const std::string& friend_code,
+                                int dht_timeout_ms = 8000,
+                                int verify_timeout_ms = 4000,
+                                const std::vector<std::string>& extra_bootstrap_nodes = {},
+                                DhtService* shared_dht = nullptr);
+
+struct PartySelection {
+    std::string ip, owner, room;
+    Json snapshot = Json::object();
+};
+Json party_request(const std::filesystem::path& root, const std::string& ip, const std::string& code, Json request);
 
 // IPv4 text for a server name or address ("" when it cannot be resolved). The runtime only
 // accepts a numeric IPv4 address.

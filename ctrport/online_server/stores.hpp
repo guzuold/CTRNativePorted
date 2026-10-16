@@ -106,7 +106,8 @@ public:
     void update_session_players(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
     std::uint64_t start_search(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
     // Selects connected pending players with equal room and retail filters.
-    std::vector<LobbyPlan> match_ready(const std::map<std::uint64_t, std::string>& available);
+    std::vector<LobbyPlan> match_ready(const std::map<std::uint64_t, std::string>& available,
+                                       const std::map<std::string, std::size_t>& expected = {});
     void save_documents(std::uint64_t lobby, const Json& host, const Json& backend, std::uint64_t update_id);
     bool sync_document(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
     void cancel_pending(std::uint64_t account, const std::string& selector);

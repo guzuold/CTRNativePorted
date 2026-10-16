@@ -10,15 +10,23 @@
 #include "stores.hpp"
 #include "launcher_online.hpp"
 #include "upnp.hpp"
+#include "friend_identity.hpp"
+#include "dht_service.hpp"
+#include "friend_verifier.hpp"
+#include "friend_store.hpp"
+#include "party_lobby.hpp"
+#include "../dht/dht.h"
 #include <windows.h>
 #include <wincrypt.h>
 #include <bcrypt.h>
+#include <chrono>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <map>
 #include <string>
+#include <thread>
 #pragma comment(lib, "crypt32.lib")
 #pragma comment(lib, "bcrypt.lib")
 
@@ -27,13 +35,29 @@ namespace {
 int failures = 0;
 void check(bool ok, const char* what) {
     std::printf("{\"scope\": \"online_server_test\", \"check\": \"%s\", \"ok\": %s}\n", what, ok ? "true" : "false");
+    std::fflush(stdout);
     if (!ok) ++failures;
 }
 Bytes b(const std::string& h) { return from_hex(h); }
 Param param(int kind, Json value) { Param p; p.kind = kind; p.value = std::move(value); return p; }
 } // namespace
 
-int main() {
+int run_tests(int argc, char* argv[]) {
+    if (argc >= 4 && std::string(argv[1]) == "--dht-node-host") {
+        const std::uint16_t port = static_cast<std::uint16_t>(std::stoi(argv[2]));
+        const Bytes info_hash = from_hex(argv[3]);
+        dht_allow_loopback = 1;
+        DhtService dht;
+        if (!dht.start(port, {}, {"127.0.0.1:1"})) return 2;
+        dht.set_announce(info_hash, 8780);
+        std::printf("DHT_HOST_RUNNING\n");
+        std::fflush(stdout);
+        for (int i = 0; i < 150; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        dht.stop();
+        return 0;
+    }
     // JSON: order, 64-bit integers, Python compact and default separators, ensure_ascii.
     const Json parsed = parse_json("{\"b\":18446744073709551615,\"a\":[-5,1.5,true,null],\"t\":\"\xC3\xA8\xF0\x9F\x98\x80\\\"\\n\"}");
     check(dump_json(parsed) == "{\"b\":18446744073709551615,\"a\":[-5,1.5,true,null],\"t\":\"\\u00e8\\ud83d\\ude00\\\"\\n\"}",
@@ -210,7 +234,8 @@ int main() {
         const std::uint64_t id = store.start_search(searches[43], 43, first);
         check(id > 0 && id < (1ull << 52) && store.start_search(searches[43], 43, first) == id, "repeated search keeps its ID");
         check(store.match_ready({{42, other}, {43, first}, {44, other}}).empty(), "player connected in another room not paired");
-        const auto plans = store.match_ready(available);
+        check(store.match_ready(available,{{first,3}}).empty(), "launcher lobby waits for all three members rather than pairing first two");
+        const auto plans = store.match_ready(available,{{first,2}});
         check(plans.size() == 1 && plans[0].players.size() == 2 && plans[0].players[0].account == 42 && plans[0].players[1].account == 43 &&
               plans[0].host == 42, "same password pairs 42 and 43, 42 hosts");
         check(store.match_ready(available).empty(), "paired searches not paired again");
@@ -442,15 +467,324 @@ int main() {
         const std::string key_on_disk{std::istreambuf_iterator<char>(key_file), {}};
         check(http_get("127.0.0.1", 8780, "/ctr/v1/traffic-key", key_body) == 200 && key_body.size() == 0x126 && key_body == key_on_disk,
               "traffic key served equals the key file the host's game uses");
+        check(!status.friend_code.empty(), "host assigns a valid friend code");
+        std::string id_resp;
+        const int id_code = http_get("127.0.0.1", 8780, "/ctr/v1/identity?nonce=0123456789abcdef0123456789abcdef", id_resp);
+        check(id_code == 200, "identity endpoint responds with 200 for valid nonce");
+        const Json id_json = parse_json(id_resp);
+        check(id_json.at("protocol").text == "ctr-friend-auth-v1", "identity response protocol is ctr-friend-auth-v1");
+
+        // Candidate verification via verify_candidate_endpoint
+        const VerifyResult v_ok = verify_candidate_endpoint("127.0.0.1:8780", status.friend_code, 2000);
+        check(v_ok.status == VerifyStatus::Verified, "candidate endpoint successfully verified against friend code");
+        check(!v_ok.traffic_key.empty() && v_ok.traffic_key.size() == 0x126, "verified candidate returns matching traffic key");
+
+        FriendCodeInfo expected_friend;
+        parse_friend_code(status.friend_code, expected_friend);
+        check(verify_friend_document("{}", expected_friend, "nonce").status == VerifyStatus::MalformedResponse,
+              "missing identity fields return MalformedResponse without throwing");
+        check(verify_friend_document(R"({"protocol":"ctr-friend-auth-v1","version":1,"timestamp":18446744073709551615})",
+              expected_friend, "nonce").status == VerifyStatus::MalformedResponse,
+              "extreme unsigned timestamp rejected without signed overflow");
+        FriendStore host_book(root / "runtime/user/online/friends.json");
+        host_book.add_or_update(status.friend_code, "Host");
+        host_book.update_endpoint(status.friend_code, "127.0.0.1:8780", "saved");
+        check(find_friend_server(root, status.friend_code, 50, 2000, {}, host.dht()).status == VerifyStatus::Verified,
+              "friend search while hosting reuses DHT and verifies cached endpoint");
+        check(host.dht()->is_running(), "friend search does not stop host DHT");
+
+        const auto guest_root=dir/"party_guest_root";
+        const auto guest=HostIdentity::load_or_create(guest_root/"runtime/user/identity/host_identity.json");
+        FriendStore permitted(root/"runtime/user/online/friends.json");
+        permitted.add_or_update(guest.friend_code(),"Guest");
+        Json configure=Json::object();configure.set("action",Json::of("configure"));configure.set("name",Json::of("Owner"));
+        const auto local_party=party_request(root,"127.0.0.1",status.friend_code,configure);
+        Json join=Json::object();join.set("action",Json::of("join"));join.set("name",Json::of("Guest"));
+        const auto remote_party=party_request(guest_root,"127.0.0.1",status.friend_code,join);
+        check(remote_party.at("room").text==local_party.at("room").text && remote_party.at("count").as_u64()==2,
+              "signed HTTP join assigns same retail network selector to two launchers");
+        Json heartbeat=Json::object();heartbeat.set("action",Json::of("heartbeat"));
+        check(party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat).at("count").as_u64()==2,
+              "signed HTTP heartbeat preserves party membership");
+
+        // Invalid friend code verification fails with InvalidIdentity
+        const HostIdentity other_host = HostIdentity::load_or_create(dir / "other_identity.json");
+        const VerifyResult v_wrong = verify_candidate_endpoint("127.0.0.1:8780", other_host.friend_code(), 2000);
+        check(v_wrong.status == VerifyStatus::InvalidIdentity, "verification against different friend code rejected");
+
+        // Malformed / missing nonces rejected with 400
+        std::string err_resp;
+        check(http_get("127.0.0.1", 8780, "/ctr/v1/identity", err_resp) == 400, "identity endpoint rejects missing nonce");
+        check(http_get("127.0.0.1", 8780, "/ctr/v1/identity?nonce=tooshort", err_resp) == 400, "identity endpoint rejects short nonce");
+        check(http_get("127.0.0.1", 8780, "/ctr/v1/identity?nonce=not_hex_0123456789abcdef01234567", err_resp) == 400, "identity endpoint rejects non-hex nonce");
+
         Host second;
         const HostStatus busy = second.start(root, "192.0.2.10", false);
         check(!busy.running && !busy.error.empty(), "second host on the same ports refused with a reason");
         host.stop();
         check(http_get("127.0.0.1", 8780, "/ctr/v1/config", body, 1000) == 0, "ports released when hosting stops");
+
+        const VerifyResult v_offline = verify_candidate_endpoint("127.0.0.1:8780", status.friend_code, 500);
+        check(v_offline.status == VerifyStatus::NoResponse, "offline endpoint returns NoResponse");
+
         const HostStatus again = host.start(root, "192.0.2.10", false);
         check(again.running, "hosting starts again after a stop");
         host.stop();
     }
+
+    // Two actual HTTP services: invite delivery, acceptance and identical game selector.
+    {
+        const auto aroot=dir/"party_net_a", broot=dir/"party_net_b";
+        const auto acode=local_friend_code(aroot), bcode=local_friend_code(broot);
+        FriendStore(aroot/"runtime/user/online/friends.json").add_or_update(bcode,"Bob");
+        FriendStore(broot/"runtime/user/online/friends.json").add_or_update(acode,"Alice");
+        ServerConfig ac;ac.host="127.0.0.1";ac.public_host="127.0.0.1";ac.party_enabled=true;
+        ac.state_dir=aroot/"runtime/user/online";ac.log_path=aroot/"runtime/user/logs/party.jsonl";
+        ServerConfig bc=ac;bc.host="127.0.0.2";bc.public_host="127.0.0.2";
+        bc.state_dir=broot/"runtime/user/online";bc.log_path=broot/"runtime/user/logs/party.jsonl";
+        Server aserver(ac), bserver(bc);aserver.start();bserver.start();
+        auto req=[](const char* action){auto j=Json::object();j.set("action",Json::of(action));return j;};
+        auto configure=req("configure");configure.set("name",Json::of("Alice"));
+        const auto ap=party_request(aroot,"127.0.0.1",acode,configure);
+        configure.set("name",Json::of("Bob"));party_request(broot,"127.0.0.2",bcode,configure);
+        auto invitation=req("invite");invitation.set("target",Json::of(bcode));
+        party_request(aroot,"127.0.0.1",acode,invitation);
+        auto notify=req("notify");notify.set("owner",Json::of(acode));
+        party_request(aroot,"127.0.0.2",bcode,notify);
+        const auto inbox=party_request(broot,"127.0.0.2",bcode,req("status"));
+        check(inbox.at("invitations").items.size()==1 && inbox.at("invitations").items[0].at("from").text==acode,
+              "two HTTP servers: signed invitation delivered to friend inbox");
+        auto join=req("join");join.set("name",Json::of("Bob"));
+        const auto bp=party_request(broot,"127.0.0.1",acode,join);
+        auto destination=req("destination");destination.set("owner",Json::of(acode));
+        const auto moved=party_request(broot,"127.0.0.2",bcode,destination);
+        check(bp.at("room").text==ap.at("room").text && moved.at("owner").text==acode && moved.at("invitations").items.empty(),
+              "accept invite: same retail room, presence redirects to owner, invitation consumed");
+        party_request(broot,"127.0.0.1",acode,req("leave"));
+        check(party_request(aroot,"127.0.0.1",acode,req("status")).at("count").as_u64()==1,
+              "two HTTP servers: leaving frees membership immediately");
+        aserver.stop();bserver.stop();
+    }
+
+    // Friend identity: generation, persistence, friend code encoding and Crockford Base32 error tolerance
+    {
+        const std::filesystem::path id_path = dir / "friend_id.json";
+        const HostIdentity ident1 = HostIdentity::load_or_create(id_path);
+        check(ident1.public_key().size() == 64, "ECDSA P-256 public key is 64 bytes uncompressed (X, Y)");
+        check(ident1.dht_info_hash().size() == 20, "DHT infohash is 20 bytes SHA-1");
+        check(ident1.friend_code().rfind("CTR1-", 0) == 0, "friend code starts with CTR1- prefix");
+
+        const HostIdentity ident2 = HostIdentity::load_or_create(id_path);
+        check(ident1.public_key() == ident2.public_key() && ident1.friend_code() == ident2.friend_code() &&
+              ident1.dht_info_hash() == ident2.dht_info_hash(), "host identity persists across loads");
+
+        // Code parsing and validation
+        FriendCodeInfo info;
+        check(parse_friend_code(ident1.friend_code(), info) == CodeParseError::Ok && info.public_key == ident1.public_key(),
+              "valid friend code parses correctly");
+
+        // Case insensitivity and whitespace / hyphen tolerance
+        std::string lower_code = ident1.friend_code();
+        for (char& c : lower_code) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        FriendCodeInfo info_lower;
+        check(parse_friend_code(lower_code, info_lower) == CodeParseError::Ok && info_lower.public_key == ident1.public_key(),
+              "friend code parsing is case-insensitive");
+
+        std::string spaced_code = ident1.friend_code();
+        spaced_code.insert(10, "  ");
+        spaced_code.erase(std::remove(spaced_code.begin(), spaced_code.end(), '-'), spaced_code.end());
+        spaced_code = "CTR1-" + spaced_code.substr(4);
+        FriendCodeInfo info_spaced;
+        check(parse_friend_code(spaced_code, info_spaced) == CodeParseError::Ok && info_spaced.public_key == ident1.public_key(),
+              "friend code parsing ignores formatting whitespace/hyphens");
+
+        // Corrupted code checksum
+        std::string corrupt_code = ident1.friend_code();
+        std::size_t target_idx = corrupt_code.size() - 2;
+        while (target_idx > 4 && corrupt_code[target_idx] == '-') {
+            --target_idx;
+        }
+        corrupt_code[target_idx] = (corrupt_code[target_idx] == '0') ? '1' : '0';
+        check(parse_friend_code(corrupt_code, info) == CodeParseError::ChecksumMismatch, "corrupted friend code caught by checksum");
+
+        // Bad prefix, bad length, invalid characters
+        check(parse_friend_code("CTR2" + ident1.friend_code().substr(4), info) == CodeParseError::InvalidPrefix, "bad prefix rejected");
+        check(parse_friend_code(ident1.friend_code().substr(0, 30), info) == CodeParseError::InvalidLength, "truncated code rejected");
+        std::string bad_char_code = ident1.friend_code();
+        bad_char_code[12] = 'U'; // 'U' is excluded from Crockford Base32
+        check(parse_friend_code(bad_char_code, info) == CodeParseError::InvalidCharacters, "invalid Crockford base32 character rejected");
+
+        // Test Crockford 'O' -> 0 mapping if '0' is in friend code
+        std::string mapped_code = ident1.friend_code();
+        auto zero_pos = mapped_code.find('0');
+        if (zero_pos != std::string::npos) {
+            mapped_code[zero_pos] = 'O';
+            FriendCodeInfo info_mapped;
+            check(parse_friend_code(mapped_code, info_mapped) == CodeParseError::Ok && info_mapped.public_key == ident1.public_key(),
+                  "friend code Crockford Base32 maps 'O' to '0'");
+        }
+
+        // ECDSA challenge signing & signature verification
+        const std::string nonce = "0123456789abcdef0123456789abcdef";
+        const Bytes tk = Bytes(0x126, 0x42);
+        const std::uint64_t ts = 1700000000;
+        const Bytes sig = ident1.sign_challenge(nonce, tk, ts);
+        check(!sig.empty() && verify_friend_response(ident1.public_key(), nonce, tk, ts, sig),
+              "ECDSA P-256 challenge signature verifies against public key");
+
+        // Tampering checks
+        check(!verify_friend_response(ident1.public_key(), "ffffffffffffffffffffffffffffffff", tk, ts, sig),
+              "altered nonce fails signature verification");
+
+        check(!verify_friend_response(ident1.public_key(), nonce, tk, ts + 1, sig),
+              "altered timestamp fails signature verification");
+
+        const Bytes other_tk = Bytes(0x126, 0x43);
+        check(!verify_friend_response(ident1.public_key(), nonce, other_tk, ts, sig),
+              "altered traffic key fails signature verification");
+
+        Bytes tampered_sig = sig;
+        tampered_sig[10] ^= 0x55;
+        check(!verify_friend_response(ident1.public_key(), nonce, tk, ts, tampered_sig),
+              "altered signature byte fails verification");
+
+        const HostIdentity other_ident = HostIdentity::load_or_create(dir / "other2.json");
+        check(!verify_friend_response(other_ident.public_key(), nonce, tk, ts, sig),
+              "signature fails against different public key");
+    }
+
+    {
+        const auto corrupt_path = dir / "corrupt_identity.json";
+        std::ofstream(corrupt_path) << "broken";
+        bool refused = false;
+        try { HostIdentity::load_or_create(corrupt_path); } catch (const std::exception&) { refused = true; }
+        std::ifstream in(corrupt_path);
+        std::string unchanged; in >> unchanged;
+        check(refused && unchanged == "broken", "corrupt identity refused without replacing existing friend code");
+    }
+    // Launcher lobby: signed identities, membership cap, invitations and room admission.
+    {
+        const auto owner=HostIdentity::load_or_create(dir/"party_owner.json");
+        PartyLobby party(owner.friend_code());
+        const auto now=party_now();
+        auto request=[](const char* action,const std::string& name="") {
+            Json req=Json::object();req.set("action",Json::of(action));req.set("name",Json::of(name));return req;
+        };
+        const Json configured=party.apply(owner.friend_code(),request("configure","Owner"),false,now);
+        const auto room=configured.at("room").text;
+        check(room.size()==64 && party.admits(room,"Owner") && !party.admits(room,"Unknown"),"party room admits only its registered names");
+        std::vector<std::string> codes;
+        for(int i=0;i<8;++i) codes.push_back(HostIdentity::load_or_create(dir/("party_guest"+std::to_string(i)+".json")).friend_code());
+        bool refused=false;
+        try {party.apply(codes[0],request("join","Guest0"),false,now);} catch (...) {refused=true;}
+        check(refused,"unlisted uninvited identity cannot join party");
+        for(int i=0;i<7;++i) party.apply(codes[i],request("join","Guest"+std::to_string(i)),true,now);
+        check(party.expected_players().at(room)==8,"party holds exactly eight including owner");
+        refused=false;
+        try {party.apply(codes[7],request("join","Guest7"),true,now);} catch (...) {refused=true;}
+        check(refused && party.expected_players().at(room)==8,"ninth party member rejected without modifying roster");
+        party.apply(codes[0],request("leave"),true,now);
+        check(!party.admits(room,"Guest0"),"leaving withdraws game admission");
+        Json invite=request("invite");invite.set("target",Json::of(codes[7]));
+        party.apply(owner.friend_code(),invite,false,now);
+        party.apply(codes[7],request("join","Guest7"),false,now);
+        check(party.admits(room,"Guest7"),"invited identity can join without sharing a password");
+        refused=false;
+        try {party.apply(codes[7],request("join","Owner"),true,now);} catch (...) {refused=true;}
+        check(refused,"duplicate display name rejected to preserve retail account identity");
+        PartyLobby inbox(codes[0]);
+        Json notification=request("notify");notification.set("owner",Json::of(owner.friend_code()));
+        inbox.apply(owner.friend_code(),notification,true,now);
+        check(inbox.apply(codes[0],request("status"),false,now).at("invitations").items.size()==1,"authenticated invite reaches recipient inbox");
+        party.apply(owner.friend_code(),request("status"),false,now+181);
+        check(party.expected_players().at(room)==1,"offline guests expire and release capacity");
+        Json message=request("status");message.set("nonce",Json::of("0123456789abcdef0123456789abcdef"));
+        Json signed_message=sign_party_message(owner,message);
+        check(verify_party_message(signed_message,owner.friend_code(),now)==message,"party signed request round trip");
+        signed_message.set("payload",Json::of("{}"));refused=false;
+        try {verify_party_message(signed_message,owner.friend_code(),now);}catch(...){refused=true;}
+        check(refused,"party tampering rejected before mutation");
+    }
+    // Friend store (address book)
+    {
+        const std::filesystem::path book_path = dir / "friends.json";
+        FriendStore store(book_path);
+        const HostIdentity bob_id = HostIdentity::load_or_create(dir / "bob.json");
+        std::string err;
+        check(store.add_or_update(bob_id.friend_code(), "Bob", &err), "valid friend added to store");
+        check(!store.add_or_update("CTR1-INVALID", "Bad", &err) && !err.empty(), "invalid friend code rejected by store");
+        check(store.entries().size() == 1 && store.entries()[0].nickname == "Bob", "friend store has Bob");
+
+        store.update_endpoint(bob_id.friend_code(), "198.51.100.5:8780", "verified");
+        FriendStore reloaded(book_path);
+        check(reloaded.entries().size() == 1 && reloaded.entries()[0].last_endpoint == "198.51.100.5:8780" &&
+              reloaded.entries()[0].last_status == "verified", "friend store persists updates across reloads");
+
+        check(reloaded.entries()[0].last_seen > 0, "friend last_seen survives integer JSON reload");
+        check(reloaded.add_or_update(bob_id.friend_code(), "Robert", &err), "friend rename saves without manual mutex unlock");
+        check(FriendStore(book_path).entries()[0].nickname == "Robert", "renamed friend persisted");
+        reloaded.remove(bob_id.friend_code());
+        check(reloaded.entries().empty(), "friend removed from store");
+        FriendStore reloaded2(book_path);
+        check(reloaded2.entries().empty(), "friend removal persists");
+    }
+
+    // DHT Service isolated single-node lifecycle
+    {
+        const std::filesystem::path dht_cache = dir / "dht_cache.dat";
+        DhtService dht;
+        check(dht.start(8792, dht_cache, {"127.0.0.1:1"}), "DhtService starts on UDP port");
+        check(dht.is_running(), "DhtService reports running");
+        DhtService second;
+        check(!second.start(0, {}, {"127.0.0.1:1"}), "second process-global DHT instance rejected without corrupting first");
+        check(dht.is_running(), "first DHT survives rejected second instance");
+        dht.stop();
+        check(!dht.is_running(), "DhtService reports stopped");
+    }
+
+    // Isolated 2-process DHT discovery test
+    {
+        wchar_t exe_path[MAX_PATH];
+        GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+
+        const std::uint16_t host_dht_port = 8793;
+        const Bytes test_info_hash = sha1(bytes_of("test_2proc_dht_info_hash_vector_1"));
+
+        const std::string hex_hash = hex(test_info_hash);
+        const std::wstring w_hex(hex_hash.begin(), hex_hash.end());
+        std::wstring cmd = std::wstring(L"\"") + exe_path + L"\" --dht-node-host " +
+                           std::to_wstring(host_dht_port) + L" " + w_hex;
+
+        STARTUPINFOW si{sizeof(si)};
+        PROCESS_INFORMATION pi{};
+        BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
+        check(ok != FALSE, "spawned DHT host child process");
+        if (ok) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+            dht_allow_loopback = 1;
+            DhtService guest_dht;
+            const bool guest_started = guest_dht.start(0, {}, {"127.0.0.1:" + std::to_string(host_dht_port)});
+            check(guest_started, "guest DHT node started and bootstrapped to host child process");
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+
+            const std::vector<std::string> candidates = guest_dht.search(test_info_hash, 3500);
+            guest_dht.stop();
+            dht_allow_loopback = 0;
+
+            bool found = false;
+            for (const auto& ep : candidates) {
+                if (ep == "127.0.0.1:8780") found = true;
+            }
+            check(found, "2-process isolated DHT test: guest discovered host candidate 127.0.0.1:8780 via BitTorrent DHT");
+
+            TerminateProcess(pi.hProcess, 0);
+            WaitForSingleObject(pi.hProcess, 1000);
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+        }
+    }
+
     check(resolve_ipv4("127.0.0.1") == "127.0.0.1" && resolve_ipv4("localhost") == "127.0.0.1" && resolve_ipv4("no such host.invalid").empty(),
           "server names resolved to IPv4");
     check(ipv4_scope("192.168.1.5") == "private" && ipv4_scope("100.70.1.1") == "cgnat" && ipv4_scope("203.0.113.9") == "public",
@@ -458,4 +792,12 @@ int main() {
     std::filesystem::remove_all(dir);
     std::printf("{\"scope\": \"online_server_test\", \"passed\": %s, \"failures\": %d}\n", failures ? "false" : "true", failures);
     return failures ? 1 : 0;
+}
+
+int main(int argc, char* argv[]) {
+    try { return run_tests(argc, argv); }
+    catch (const std::exception& error) {
+        std::fprintf(stderr, "online_server_test exception: %s\n", error.what());
+        return 1;
+    }
 }

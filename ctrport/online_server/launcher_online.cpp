@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "launcher_online.hpp"
 #include "server.hpp"
+#include "dht_service.hpp"
+#include "friend_identity.hpp"
+#include "friend_store.hpp"
+#include "party_lobby.hpp"
+#include "crypto.hpp"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
 #pragma comment(lib, "ws2_32.lib")
 
 namespace ctr_online {
+namespace fs = std::filesystem;
 namespace {
 struct Wsa {
     Wsa() { WSADATA d; WSAStartup(MAKEWORD(2, 2), &d); }
@@ -17,12 +23,13 @@ struct Wsa {
 std::vector<PortRequest> host_ports(std::uint16_t http_port, std::uint16_t discovery_port, std::uint16_t game_udp_port) {
     return {{"TCP", http_port, "server HTTP"},
             {"TCP", 3074, "lobby"},
-            {"UDP", game_udp_port, "gioco"},
+            {"UDP", game_udp_port, "game"},
             {"UDP", discovery_port, "discovery"},
             {"UDP", static_cast<std::uint16_t>(discovery_port + 1), "discovery"},
             {"UDP", static_cast<std::uint16_t>(discovery_port + 2), "discovery"},
             {"UDP", static_cast<std::uint16_t>(discovery_port + 3), "discovery"},
-            {"UDP", 3082, "relay"}};
+            {"UDP", 3082, "relay"},
+            {"UDP", 8788, "dht"}};
 }
 
 Host::Host() = default;
@@ -38,7 +45,7 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
         status.ports = mapper->results();
         if (!status.upnp_router) status.warnings.push_back("UPnP: " + mapper->error());
         for (const PortResult& port : status.ports)
-            if (!port.ok) status.warnings.push_back("porta " + port.request.protocol + " " + std::to_string(port.request.port) + " non aperta: " + port.error);
+            if (!port.ok) status.warnings.push_back("port " + port.request.protocol + " " + std::to_string(port.request.port) + " not opened: " + port.error);
     }
     if (!manual_public_ip.empty()) {
         status.public_ip = manual_public_ip;
@@ -48,34 +55,45 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
         status.address_source = "upnp";
     } else {
         if (status.upnp_router)
-            status.warnings.push_back("il router riporta l'indirizzo " + mapper->external_ip() + " (" + ipv4_scope(mapper->external_ip()) +
-                                      "): la connessione e' dietro un secondo NAT (per esempio CGNAT); da internet non e' raggiungibile");
+            status.warnings.push_back("the router reports address " + mapper->external_ip() + " (" + ipv4_scope(mapper->external_ip()) +
+                                      "): the connection is behind another NAT (such as CGNAT) and cannot be reached from the internet");
         status.public_ip = status.lan_ip.empty() ? "127.0.0.1" : status.lan_ip;
         status.address_source = "lan";
     }
     ServerConfig config;
     config.public_host = status.public_ip;
+    config.party_enabled = true;
     config.state_dir = root / "runtime" / "user" / "online";
     config.log_path = default_log_path(root);
+    config.identity_path = root / "runtime" / "user" / "identity" / "host_identity.json";
     status.log = config.log_path;
     auto server = std::make_unique<Server>(config);
+    auto dht = std::make_unique<DhtService>();
     try {
         const std::vector<std::string> listening = server->start();
         status.listen_failures = server->failures();
         status.traffic_key = server->traffic_key_path();
+        status.friend_code = server->friend_code();
         bool http = false, lobby = false;
         for (const std::string& name : listening) {
             if (name.rfind("http/", 0) == 0) http = true;
             if (name == "lobby/tcp/3074") lobby = true;
         }
         if (!http || !lobby) {
-            status.error = "porte del server occupate (un altro server online e' gia' in esecuzione?)";
+            status.error = "server ports are busy (is another online server already running?)";
             for (const std::string& failure : status.listen_failures) status.error += "\n" + failure;
             server->stop();
             mapper->close();
             std::lock_guard<std::mutex> lock(mutex_);
             status_ = status;
             return status;
+        }
+        // Start DHT service and publish announce on public infohash
+        const fs::path dht_cache = root / "runtime" / "user" / "online" / "dht_nodes.dat";
+        if (dht->start(8788, dht_cache)) {
+            if (const auto* ident = server->host_identity()) {
+                dht->set_announce(ident->dht_info_hash(), 8780);
+            }
         }
         status.running = true;
     } catch (const std::exception& error) {
@@ -88,6 +106,7 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
     std::lock_guard<std::mutex> lock(mutex_);
     server_ = std::move(server);
     mapper_ = std::move(mapper);
+    dht_ = std::move(dht);
     status_ = status;
     return status;
 }
@@ -95,13 +114,21 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
 void Host::stop() {
     std::unique_ptr<Server> server;
     std::unique_ptr<PortMapper> mapper;
+    std::unique_ptr<DhtService> dht;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         server = std::move(server_);
         mapper = std::move(mapper_);
+        dht = std::move(dht_);
         status_.running = false;
     }
-    if (server) server->stop();
+    if (dht) {
+        dht->clear_announce();
+        dht->stop();
+    }
+    if (server) {
+        server->stop();
+    }
     if (mapper) mapper->close();
 }
 
@@ -116,6 +143,85 @@ HostStatus Host::status() const {
 std::size_t Host::players() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return server_ ? server_->connected_players() : 0;
+}
+DhtService* Host::dht() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return dht_.get();
+}
+
+std::string local_friend_code(const std::filesystem::path& root) {
+    const std::filesystem::path path = root / "runtime" / "user" / "identity" / "host_identity.json";
+    try {
+        return HostIdentity::load_or_create(path).friend_code();
+    } catch (...) {
+        return {};
+    }
+}
+
+VerifyResult find_friend_server(const std::filesystem::path& root,
+                                const std::string& friend_code,
+                                int dht_timeout_ms,
+                                int verify_timeout_ms,
+                                const std::vector<std::string>& extra_bootstrap_nodes, DhtService* shared_dht) {
+    VerifyResult result;
+    FriendCodeInfo info;
+    const CodeParseError parse_err = parse_friend_code(friend_code, info);
+    if (parse_err != CodeParseError::Ok) {
+        result.status = VerifyStatus::InvalidIdentity;
+        result.detail = code_parse_error_string(parse_err);
+        return result;
+    }
+
+    const std::filesystem::path dht_cache = root / "runtime" / "user" / "online" / "dht_nodes.dat";
+    const std::filesystem::path friends_path = root / "runtime" / "user" / "online" / "friends.json";
+    FriendStore store(friends_path);
+
+    // Collect candidate endpoints: first try cached endpoint if available, then DHT
+    std::vector<std::string> candidates;
+    for (const auto& entry : store.entries()) {
+        if (entry.friend_code == info.code && !entry.last_endpoint.empty()) {
+            candidates.push_back(entry.last_endpoint);
+            break;
+        }
+    }
+
+    // Perform DHT search
+    DhtService dht;
+    if (shared_dht || dht.start(0, dht_cache, extra_bootstrap_nodes)) {
+        const Bytes info_hash = friend_dht_info_hash(info.public_key);
+        const std::vector<std::string> dht_results = (shared_dht ? shared_dht : &dht)->search(info_hash, dht_timeout_ms);
+        for (const std::string& ep : dht_results) {
+            if (std::find(candidates.begin(), candidates.end(), ep) == candidates.end()) {
+                candidates.push_back(ep);
+            }
+        }
+        dht.stop();
+    }
+
+    if (candidates.empty()) {
+        result.status = VerifyStatus::NoResponse;
+        result.detail = "No response from DHT nodes (host may be offline or behind restrictive NAT)";
+        store.update_endpoint(info.code, "", "Nessuna risposta dai nodi noti");
+        return result;
+    }
+
+    // Verify candidates
+    for (const std::string& candidate : candidates) {
+        VerifyResult v = verify_candidate_endpoint(candidate, info, verify_timeout_ms);
+        if (v.status == VerifyStatus::Verified) {
+            store.update_endpoint(info.code, v.ip + ":" + std::to_string(v.port), "Server verificato");
+            return v;
+        } else if (v.status == VerifyStatus::InvalidIdentity) {
+            result = v;
+            store.update_endpoint(info.code, "", "Identità non valida");
+            return result; // Security: identity mismatch must not be silently ignored
+        }
+    }
+
+    result.status = VerifyStatus::NoResponse;
+    result.detail = "Candidates contacted but none responded or verified successfully";
+    store.update_endpoint(info.code, "", "Nessuna risposta dai candidati");
+    return result;
 }
 
 std::string resolve_ipv4(const std::string& host) {
@@ -134,7 +240,7 @@ std::string resolve_ipv4(const std::string& host) {
     return text;
 }
 
-int http_get(const std::string& ipv4, std::uint16_t port, const std::string& path, std::string& body, int timeout_ms) {
+int http_request(const std::string& ipv4, std::uint16_t port, const std::string& path, const std::string& payload, std::string& body, int timeout_ms) {
     Wsa wsa;
     sockaddr_in address{};
     address.sin_family = AF_INET;
@@ -154,8 +260,13 @@ int http_get(const std::string& ipv4, std::uint16_t port, const std::string& pat
     ioctlsocket(s, FIONBIO, &nonblocking);
     const DWORD timeout = static_cast<DWORD>(timeout_ms);
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
-    const std::string request = "GET " + path + " HTTP/1.1\r\nHost: " + ipv4 + "\r\nConnection: close\r\n\r\n";
-    send(s, request.data(), static_cast<int>(request.size()), 0);
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+    const std::string request = std::string(payload.empty() ? "GET " : "POST ") + path + " HTTP/1.1\r\nHost: " + ipv4 +
+        "\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: " + std::to_string(payload.size()) + "\r\n\r\n" + payload;
+    for (std::size_t sent=0; sent<request.size();) {
+        const int n=send(s,request.data()+sent,static_cast<int>(request.size()-sent),0);
+        if(n<=0){closesocket(s);return 0;} sent+=n;
+    }
     std::string raw;
     char buffer[8192];
     for (int n; (n = recv(s, buffer, sizeof(buffer), 0)) > 0 && raw.size() < (1u << 20);) raw.append(buffer, static_cast<std::size_t>(n));
@@ -164,5 +275,23 @@ int http_get(const std::string& ipv4, std::uint16_t port, const std::string& pat
     if (end == std::string::npos || raw.compare(0, 5, "HTTP/") != 0) return 0;
     body = raw.substr(end + 4);
     return std::atoi(raw.c_str() + raw.find(' ') + 1);
+}
+int http_get(const std::string& ip, std::uint16_t port, const std::string& path, std::string& body, int timeout_ms) {
+    return http_request(ip,port,path,{},body,timeout_ms);
+}
+Json party_request(const std::filesystem::path& root, const std::string& ip, const std::string& code, Json request) {
+    const auto identity=HostIdentity::load_or_create(root / "runtime/user/identity/host_identity.json");
+    const auto nonce=hex(random_bytes(16));
+    request.set("nonce",Json::of(nonce));
+    std::string body;
+    const int status=http_request(ip,8780,"/ctr/v1/party",dump_json(sign_party_message(identity,request)),body,3000);
+    if(status!=200) {
+        std::string reason="Amico non raggiungibile";
+        try { reason=parse_json(body).at("error").text; } catch (...) {}
+        throw std::runtime_error(reason);
+    }
+    Json response=verify_party_message(parse_json(body),code,party_now());
+    if(response.at("nonce").text!=nonce) throw std::runtime_error("Risposta lobby non corrispondente");
+    return response;
 }
 } // namespace ctr_online

@@ -5,6 +5,9 @@
 #include "protocol.hpp"
 #include "relay.hpp"
 #include "stores.hpp"
+#include "friend_identity.hpp"
+#include "friend_store.hpp"
+#include "party_lobby.hpp"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mstcpip.h>
@@ -190,6 +193,10 @@ struct Server::Impl {
     std::mutex log_mutex;
     std::ofstream log;
     std::unique_ptr<RsaKey> key;
+    std::unique_ptr<HostIdentity> host_identity;
+    std::unique_ptr<PartyLobby> party;
+    std::mutex party_requests_mutex;
+    std::map<std::string, std::uint64_t> party_nonces;
     std::vector<std::string> listening, failed;
 
     // State shared by connections (the reference server's module globals), under `state`.
@@ -401,13 +408,69 @@ struct Server::Impl {
             a.fields.set("account", Json::of(account));
             return a;
         }
+        if (method == "POST" && target == "/ctr/v1/party") {
+            if (!party) return json_answer(404, R"({"error":"Lobby launcher non disponibile"})", "party_unavailable");
+            try {
+                if (body.size()>16384) throw std::runtime_error("Messaggio troppo grande");
+                const Json packet=parse_json(std::string(body.begin(),body.end()));
+                const std::string caller=packet.at("code").text;
+                const auto now=party_now();
+                const Json request=verify_party_message(packet,caller,now);
+                const std::string nonce=request.at("nonce").text;
+                if (nonce.size()!=32 || nonce.find_first_not_of("0123456789abcdef")!=std::string::npos)
+                    throw std::runtime_error("Nonce non valido");
+                {
+                    std::lock_guard<std::mutex> guard(party_requests_mutex);
+                    for (auto it=party_nonces.begin();it!=party_nonces.end();) {
+                        if (now>it->second && now-it->second>120) it=party_nonces.erase(it); else ++it;
+                    }
+                    if (party_nonces.size()>=4096 || !party_nonces.emplace(caller+nonce,now).second)
+                        throw std::runtime_error("Messaggio duplicato o limite richieste");
+                }
+                FriendStore friends(config.state_dir / "friends.json");
+                bool allowed=false;
+                for (const auto& entry : friends.entries()) if (entry.friend_code==caller) allowed=true;
+                Json response=party->apply(caller,request,allowed,now);
+                response.set("nonce",Json::of(nonce));
+                return json_answer(200,dump_json(sign_party_message(*host_identity,response)),"party_"+request.at("action").text);
+            } catch (const std::exception& error) {
+                Json response=Json::object(); response.set("error",Json::of(error.what()));
+                return json_answer(403,dump_json(response),"party_rejected");
+            }
+        }
         if (method == "GET" && target == "/ctr/v1/traffic-key") {
             HttpAnswer a{200, {{"Content-Type", "application/octet-stream"}}, std::string(key->spki().begin(), key->spki().end()), "traffic_key"};
+            return a;
+        }
+        if (method == "GET" && starts_with(target, "/ctr/v1/identity")) {
+            const std::string query = target.find('?') == std::string::npos ? "" : target.substr(target.find('?') + 1);
+            const std::string nonce_hex = query_value(query, "nonce", "");
+            if (nonce_hex.size() < 16 || nonce_hex.size() > 64 || nonce_hex.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) {
+                return json_answer(400, R"({"error":"invalid nonce"})", "identity_rejected");
+            }
+            if (!host_identity) {
+                return json_answer(500, R"({"error":"host identity unavailable"})", "identity_rejected");
+            }
+            const auto ts = static_cast<std::uint64_t>(std::time(nullptr));
+            const Bytes sig = host_identity->sign_challenge(nonce_hex, key->spki(), ts);
+            Json payload = Json::object();
+            payload.set("protocol", Json::of("ctr-friend-auth-v1"));
+            payload.set("version", Json::of(1));
+            payload.set("friend_code", Json::of(host_identity->friend_code()));
+            payload.set("traffic_key", Json::of(base64_encode(key->spki())));
+            payload.set("traffic_key_sha256", Json::of(hex(sha256(key->spki()))));
+            payload.set("signature", Json::of(hex(sig)));
+            payload.set("timestamp", Json::of(ts));
+
+            HttpAnswer a = json_answer(200, dump_json_spaced(payload), "identity_verified");
+            a.fields.set("nonce", Json::of(nonce_hex));
+            a.fields.set("friend_code", Json::of(host_identity->friend_code()));
             return a;
         }
         if (method == "POST" && starts_with(target, "/auth/") && host.find("-auth3.") != std::string::npos) {
             const std::string room = header("x-ctr-room-token");
             if (!valid_room_token(room)) return json_answer(400, R"({"error":"project room password required"})", "auth3_room_rejected", false);
+            if (party && !party->admits(room,online_id)) return json_answer(403, R"({"error":"Join a launcher lobby first"})", "auth3_membership_rejected");
             Json request;
             try { request = parse_json(std::string(body.begin(), body.end())); } catch (const std::exception&) {
                 return json_answer(400, R"({"error":"bad json"})", "auth3", false);
@@ -600,8 +663,9 @@ struct Server::Impl {
     }
     void create_ready_lobbies() { // state held
         std::map<std::uint64_t, std::string> available;
-        for (const auto& [account, client] : live_clients) available[account] = client->user.room_token;
-        for (LobbyPlan& plan : matchmaking.match_ready(available)) {
+        for (const auto& [account, client] : live_clients)
+            if (!party || party->admits(client->user.room_token,client->user.online_id)) available[account] = client->user.room_token;
+        for (LobbyPlan& plan : matchmaking.match_ready(available, party ? party->expected_players() : std::map<std::string, std::size_t>{})) {
             const Json advertisement = parse_json(*matchmaking.player_info(plan.host));
             const auto [host_doc, backend_doc] = lobby_documents(plan, advertisement, static_cast<std::uint64_t>(std::time(nullptr)));
             matchmaking.save_documents(plan.lobby_id, host_doc, backend_doc, 1);
@@ -956,6 +1020,10 @@ struct Server::Impl {
         key = std::make_unique<RsaKey>(config.state_dir / "server_key.cng");
         std::ofstream(config.state_dir / "server_key.der", std::ios::binary)
             .write(reinterpret_cast<const char*>(key->spki().data()), static_cast<std::streamsize>(key->spki().size()));
+        fs::path ident_path = config.identity_path;
+        if (ident_path.empty()) ident_path = config.state_dir.parent_path() / "identity" / "host_identity.json";
+        host_identity = std::make_unique<HostIdentity>(HostIdentity::load_or_create(ident_path));
+        if (config.party_enabled) party = std::make_unique<PartyLobby>(host_identity->friend_code());
         stats = std::make_unique<StatsStore>(config.state_dir / "stats.txt");
         marketplace = std::make_unique<MarketplaceStore>(config.state_dir / "marketplace.txt");
         achievements = std::make_unique<AchievementStore>(config.state_dir / "achievement_events.jsonl");
@@ -1046,6 +1114,12 @@ fs::path Server::traffic_key_path() const { return impl_->config.state_dir / "se
 std::size_t Server::connected_players() const {
     std::lock_guard<std::mutex> lock(impl_->state);
     return impl_->live_clients.size();
+}
+std::string Server::friend_code() const {
+    return impl_->host_identity ? impl_->host_identity->friend_code() : std::string();
+}
+const HostIdentity* Server::host_identity() const {
+    return impl_->host_identity.get();
 }
 
 std::optional<Json> entitlement_page(const std::string& query) {

@@ -26,6 +26,28 @@ constexpr auto kKeepalive = std::chrono::seconds(5);
 constexpr auto kDirectAfterUnknown = std::chrono::seconds(10);
 constexpr auto kDirectAfterOffline = std::chrono::seconds(2);
 constexpr auto kSessionRetry = std::chrono::seconds(2);
+constexpr auto kDefaultDirectProbeTimeout = std::chrono::milliseconds(1000);
+
+std::chrono::milliseconds direct_probe_timeout() {
+    static const auto value = [] {
+        if (const char* v = std::getenv("CTR_ONLINE_DIRECT_PROBE_MS")) {
+            const int ms = std::atoi(v);
+            if (ms > 0 && ms <= 60000) return std::chrono::milliseconds(ms);
+        }
+        return kDefaultDirectProbeTimeout;
+    }();
+    return value;
+}
+
+enum class PeerRoute { ProbingDirect, Direct, Relay };
+
+struct PeerInfo {
+    PeerRoute route = PeerRoute::ProbingDirect;
+    clock::time_point first_send{};
+    std::uint64_t direct_sent_count = 0;
+    bool logged_fallback = false;
+    bool logged_direct = false;
+};
 
 bool flag(const char* name, const char* a, const char* b = nullptr) {
     const char* value = std::getenv(name);
@@ -68,7 +90,8 @@ struct State {
     std::map<std::uint64_t, clock::time_point> direct_until; // destination -> fallback deadline
     std::map<std::uint64_t, bool> seen_send, seen_deliver;   // first datagram per peer is logged
     std::set<std::uint64_t> logged_refusals;                 // (destination << 8 | reason) logged once
-    std::uint64_t relayed = 0, delivered = 0, dropped_out = 0, dropped_in = 0;
+    std::map<std::uint64_t, PeerInfo> peers;                 // per-peer auto fallback tracking
+    std::uint64_t relayed = 0, delivered = 0, dropped_out = 0, dropped_in = 0, direct_sent = 0;
 };
 State& state() {
     static State value;
@@ -152,9 +175,20 @@ void detach(SOCKET handle) {
     s.sockets.erase(handle);
 }
 
-bool enabled() {
-    static const bool value = flag("CTR_ONLINE_NAT_TRANSPORT", "relay", "1");
+TransportMode mode() {
+    static const TransportMode value = [] {
+        const char* v = std::getenv("CTR_ONLINE_NAT_TRANSPORT");
+        if (v && (!std::strcmp(v, "0") || !std::strcmp(v, "direct") || !std::strcmp(v, "off")))
+            return TransportMode::Off;
+        if (v && (!std::strcmp(v, "relay") || !std::strcmp(v, "force")))
+            return TransportMode::Relay;
+        return TransportMode::Auto;
+    }();
     return value;
+}
+
+bool enabled() {
+    return mode() != TransportMode::Off;
 }
 bool block_direct() {
     static const bool value = flag("CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT", "1");
@@ -196,6 +230,33 @@ SendResult send(SOCKET handle, const char* data, int size, const sockaddr_in& de
     }
     const auto own = s.sockets.find(handle);
     if (size < 0 || size > 1400 || s.token.empty() || own == s.sockets.end()) return SendResult::Direct;
+
+    if (mode() == TransportMode::Auto) {
+        PeerInfo& peer = s.peers[key];
+        if (peer.route == PeerRoute::Direct) {
+            ++s.direct_sent;
+            return SendResult::Direct;
+        }
+        if (peer.route == PeerRoute::ProbingDirect) {
+            const auto now = clock::now();
+            if (peer.first_send == clock::time_point{}) {
+                peer.first_send = now;
+            }
+            if (now - peer.first_send < direct_probe_timeout()) {
+                ++peer.direct_sent_count;
+                ++s.direct_sent;
+                return SendResult::Direct;
+            }
+            peer.route = PeerRoute::Relay;
+            if (!peer.logged_fallback) {
+                peer.logged_fallback = true;
+                ctr_hle::log_call("ctr_online", "relay_auto_fallback", static_cast<long long>(peer.direct_sent_count),
+                                  (",\"peer\":\"" + text_of(destination.sin_addr.s_addr, destination.sin_port) +
+                                   "\",\"reason\":\"direct_probe_timeout\"").c_str());
+            }
+        }
+    }
+
     const sockaddr_in to = relay_endpoint(s);
     hello_if_due(s, handle, own->second);
     std::vector<char> packet(kMagic, kMagic + 5);
@@ -239,6 +300,20 @@ Incoming receive(SOCKET handle, const char* datagram, int size, const sockaddr_i
                                   (",\"from\":\"" + text_of(from.sin_addr.s_addr, from.sin_port) + "\"").c_str());
             return Incoming::Dropped;
         }
+        if (peer_with(from, s.port ? s.port : 3082)) {
+            const std::uint64_t key = key_of(from.sin_addr.s_addr, from.sin_port);
+            PeerInfo& peer = s.peers[key];
+            if (mode() == TransportMode::Auto) {
+                if (peer.route != PeerRoute::Direct) {
+                    peer.route = PeerRoute::Direct;
+                    if (!peer.logged_direct) {
+                        peer.logged_direct = true;
+                        ctr_hle::log_call("ctr_online", "relay_auto_direct_confirmed", 1,
+                                          (",\"peer\":\"" + text_of(from.sin_addr.s_addr, from.sin_port) + "\"").c_str());
+                    }
+                }
+            }
+        }
         return Incoming::Pass;
     }
     if (size < 12 || std::memcmp(datagram, kMagic, 5) != 0) return Incoming::Consumed;
@@ -253,6 +328,18 @@ Incoming receive(SOCKET handle, const char* datagram, int size, const sockaddr_i
         *source = address;
         ++s.delivered;
         const std::uint64_t key = key_of(address.sin_addr.s_addr, address.sin_port);
+        if (mode() == TransportMode::Auto) {
+            PeerInfo& peer = s.peers[key];
+            if (peer.route != PeerRoute::Relay) {
+                peer.route = PeerRoute::Relay;
+                if (!peer.logged_fallback) {
+                    peer.logged_fallback = true;
+                    ctr_hle::log_call("ctr_online", "relay_auto_fallback", 0,
+                                      (",\"peer\":\"" + text_of(address.sin_addr.s_addr, address.sin_port) +
+                                       "\",\"reason\":\"peer_using_relay\"").c_str());
+                }
+            }
+        }
         if (!s.seen_deliver[key]) {
             s.seen_deliver[key] = true;
             ctr_hle::log_call("ctr_online", "relay_first_deliver", size - 12,

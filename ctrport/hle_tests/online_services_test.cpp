@@ -89,7 +89,10 @@ std::string bytes_text(const char* data, int size) { return std::string(data, da
 
 // Relay transport against a fake project server. block: CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT=1
 // without the relay (direct peer traffic dropped both ways).
-int relay_test(bool block) {
+int relay_test(const char* test_mode) {
+    const bool block = !std::strcmp(test_mode, "relay-block");
+    const bool auto_direct = !std::strcmp(test_mode, "relay-auto-direct");
+    const bool auto_fallback = !std::strcmp(test_mode, "relay-auto-fallback");
     WSADATA wsa{};
     WSAStartup(MAKEWORD(2, 2), &wsa);
     auto udp = [](const char* ip) {
@@ -154,7 +157,17 @@ int relay_test(bool block) {
     set_env("CTR_ONLINE_HTTP_PORT", http.c_str());
     set_env("CTR_ONLINE_PORT_OFFSET", "2100");
     set_env("CTR_ONLINE_ROOM_TOKEN", "abababababababababababababababababababababababababababababababab");
-    set_env(block ? "CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT" : "CTR_ONLINE_NAT_TRANSPORT", block ? "1" : "relay");
+    if (block) {
+        set_env("CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT", "1");
+    } else if (auto_direct) {
+        set_env("CTR_ONLINE_NAT_TRANSPORT", "auto");
+        set_env("CTR_ONLINE_DIRECT_PROBE_MS", "500");
+    } else if (auto_fallback) {
+        set_env("CTR_ONLINE_NAT_TRANSPORT", "auto");
+        set_env("CTR_ONLINE_DIRECT_PROBE_MS", "50");
+    } else {
+        set_env("CTR_ONLINE_NAT_TRANSPORT", "relay");
+    }
     HMODULE library = LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
     resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve")) : nullptr;
     if (!resolve) {
@@ -193,6 +206,53 @@ int relay_test(bool block) {
         check(got == 6 && bytes_text(buffer, got) == "server" && ntohs(source.port) == port_of(discovery),
               "relay test switch: direct peer datagram dropped, server datagram delivered");
         closesocket(discovery);
+    } else if (auto_direct) {
+        int n = recvfrom(relay, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&from), &from_length);
+        check(n == 22 && !std::memcmp(buffer, "CTRR\x01\x01", 6) && ntohs(from.sin_port) == 3074 + 2100,
+              "relay auto: registered with relay before sending");
+        check(net_sendto(game, "direct_probe", 12, 0, &peer, sizeof(peer)) == 12, "relay auto: probe sent directly");
+        n = recv(direct_peer, buffer, sizeof(buffer), 0);
+        check(n == 12 && bytes_text(buffer, n) == "direct_probe", "relay auto: direct probe reached peer directly");
+        sendto(direct_peer, "direct_ack", 10, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        OrbisSockaddrIn source{};
+        std::uint32_t source_length = sizeof(source);
+        int got = net_recvfrom(game, buffer, sizeof(buffer), 0, &source, &source_length);
+        check(got == 10 && bytes_text(buffer, got) == "direct_ack" && ntohs(source.port) == peer_port,
+              "relay auto: direct reply received, direct confirmed");
+        check(net_sendto(game, "stream_data", 11, 0, &peer, sizeof(peer)) == 11,
+              "relay auto: subsequent send after direct confirmed");
+        n = recv(direct_peer, buffer, sizeof(buffer), 0);
+        check(n == 11 && bytes_text(buffer, n) == "stream_data", "relay auto: subsequent send delivered directly");
+        DWORD fast_to = 200;
+        setsockopt(relay, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&fast_to), sizeof(fast_to));
+        n = recv_relay(buffer, sizeof(buffer));
+        check(n == SOCKET_ERROR, "relay auto: zero data packets sent to relay on confirmed direct path");
+    } else if (auto_fallback) {
+        int n = recvfrom(relay, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&from), &from_length);
+        check(n == 22 && !std::memcmp(buffer, "CTRR\x01\x01", 6) && ntohs(from.sin_port) == 3074 + 2100,
+              "relay auto fallback: registered with relay before sending");
+        check(net_sendto(game, "probe_lost", 10, 0, &peer, sizeof(peer)) == 10,
+              "relay auto fallback: initial probe sent directly");
+        n = recv(direct_peer, buffer, sizeof(buffer), 0);
+        check(n == 10 && bytes_text(buffer, n) == "probe_lost", "relay auto fallback: direct peer drops probe (no reply)");
+        Sleep(80); // exceed 50ms probe timeout
+        check(net_sendto(game, "relayed_after_to", 16, 0, &peer, sizeof(peer)) == 16,
+              "relay auto fallback: send after probe timeout");
+        do {
+            n = recvfrom(relay, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&from), &from_length);
+        } while (n == 22);
+        check(n == 28 && !std::memcmp(buffer, "CTRR\x01\x03\x7f\x00\x00\x09", 10) &&
+                  bytes_text(buffer + 12, n - 12) == "relayed_after_to",
+              "relay auto fallback: packet routed via relay after timeout");
+        const char welcome[] = "CTRR\x01\x02\x7f\x00\x00\x01\x14\x1e\x00\x3c";
+        const char deliver[] = "CTRR\x01\x04\x7f\x00\x00\x09\x12\x34relayed_reply";
+        sendto(relay, welcome, 14, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        sendto(relay, deliver, 25, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
+        OrbisSockaddrIn source{};
+        std::uint32_t source_length = sizeof(source);
+        int got = net_recvfrom(game, buffer, sizeof(buffer), 0, &source, &source_length);
+        check(got == 13 && bytes_text(buffer, got) == "relayed_reply",
+              "relay auto fallback: reply received through relay");
     } else {
         // The game socket registers by itself (HELLO) before the game sends anything.
         int n = recvfrom(relay, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&from), &from_length);
@@ -265,15 +325,18 @@ int relay_test(bool block) {
     stop = true;
     closesocket(listener);
     server.join();
-    std::printf("{\"scope\":\"online_services_test\",\"mode\":\"%s\",\"passed\":%s}\n", block ? "relay-block" : "relay",
+    std::printf("{\"scope\":\"online_services_test\",\"mode\":\"%s\",\"passed\":%s}\n", test_mode,
                 failures ? "false" : "true");
     return failures ? 1 : 0;
 }
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc > 1 && (!std::strcmp(argv[1], "--relay") || !std::strcmp(argv[1], "--relay-block"))) {
-        return relay_test(!std::strcmp(argv[1], "--relay-block"));
+    if (argc > 1 && (!std::strcmp(argv[1], "--relay") ||
+                     !std::strcmp(argv[1], "--relay-block") ||
+                     !std::strcmp(argv[1], "--relay-auto-direct") ||
+                     !std::strcmp(argv[1], "--relay-auto-fallback"))) {
+        return relay_test(argv[1] + 2);
     }
     // --offline: without CTR_ONLINE no online registration is resolved, so the offline
     // runtime keeps its existing bindings; non-online ctr_hle functions still resolve.

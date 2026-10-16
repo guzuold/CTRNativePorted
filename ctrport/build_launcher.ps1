@@ -13,11 +13,16 @@ $cl=Join-Path $env:VCToolsInstallDir 'bin/HostX64/x64/cl.exe'
 # The project server (ctrport/online_server) runs inside the launcher when hosting.
 $obj=Join-Path $out 'launcher_obj'
 New-Item -ItemType Directory -Force $obj | Out-Null
-$server=@('json.cpp','crypto.cpp','protocol.cpp','stores.cpp','relay.cpp','server.cpp','upnp.cpp','launcher_online.cpp') | ForEach-Object { Join-Path $PSScriptRoot "online_server/$_" }
-& $cl /nologo /c /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DWIN32_LEAN_AND_MEAN /DNOMINMAX @server "/Fo$obj/" *> "$out/launcher_build.log"
+$dhtDir=Join-Path $PSScriptRoot 'dht'
+& $cl /nologo /c /O2 /W3 /wd4244 /wd4267 /D_CRT_SECURE_NO_WARNINGS /DWIN32_LEAN_AND_MEAN /DNOMINMAX (Join-Path $dhtDir 'dht.c') "/Fo$obj/dht.obj" *> "$out/launcher_build.log"
+if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher dht build failed'}
+$server=@('json.cpp','crypto.cpp','protocol.cpp','stores.cpp','relay.cpp','server.cpp','upnp.cpp','launcher_online.cpp','friend_identity.cpp','dht_service.cpp','friend_verifier.cpp','friend_store.cpp','party_lobby.cpp') | ForEach-Object { Join-Path $PSScriptRoot "online_server/$_" }
+& $cl /nologo /c /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DWIN32_LEAN_AND_MEAN /DNOMINMAX @server (Join-Path $PSScriptRoot 'friends_dialog.cpp') "/Fo$obj/" *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher online server build failed'}
 $objects=Get-ChildItem $obj -Filter *.obj | ForEach-Object { $_.FullName }
 & $cl /nologo /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DUNICODE /D_UNICODE "$PSScriptRoot/launcher.cpp" @objects "/Fo$out/launcher.obj" "/Fe$out/launcher.exe" /link /SUBSYSTEM:WINDOWS *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher build failed'}
+New-Item -ItemType Directory -Force "$out/assets/launcher" | Out-Null
+Copy-Item "$PSScriptRoot/assets/launcher/logo.png" "$out/assets/launcher/logo.png" -Force
 Copy-Item "$out/launcher.exe" "$out/CTRNativePorted.exe" -Force
 Write-Output "launcher build ok: $out/launcher.exe"
