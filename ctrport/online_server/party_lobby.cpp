@@ -126,7 +126,12 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
             if(it->second==destination_) { inbox_seen_.erase(it->first); it=inbox_.erase(it); } else ++it;
         }
     } else if (action!="status") throw std::runtime_error("Azione lobby sconosciuta");
-    return snapshot(caller);
+    auto result = snapshot(caller);
+    // Resolve the backup account from authenticated membership, never a caller
+    // supplied account number. Only that member's join/configure/heartbeat gets it.
+    if (action == "heartbeat" || action == "configure" || action == "join")
+        result.set("backup_name", Json::of(members_.at(caller).name));
+    return result;
 }
 bool PartyLobby::admits(const std::string& room,const std::string& name) {
     std::lock_guard<std::mutex> lock(mutex_);

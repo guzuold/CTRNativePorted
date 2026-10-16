@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "launcher_online.hpp"
+#include "local_backup.hpp"
+#include "protocol.hpp"
 #include "server.hpp"
 #include "dht_service.hpp"
 #include "friend_identity.hpp"
@@ -336,6 +338,24 @@ Json party_request(const std::filesystem::path& root, const std::string& ip, con
     }
     Json response=verify_party_message(parse_json(body),code,party_now());
     if(response.at("nonce").text!=nonce) throw std::runtime_error("Risposta lobby non corrispondente");
+    const auto action = request.at("action").text;
+    if (action == "heartbeat" || action == "configure" || action == "join") {
+        // Store the authenticated response, partitioned by host and account. No
+        // automatic merging: balances from two hosts are not additive progress.
+        try {
+            const auto* wallet = response.find("wallet_backup");
+            if (!wallet) throw std::runtime_error("Host da aggiornare: backup Pit Stop remoto non disponibile");
+            if (wallet->at("format").text != "ctr-marketplace-account-v1" ||
+                !wallet->at("state").is_string() || wallet->at("state").text.size() > 8 * 1024 * 1024 ||
+                wallet->at("account").as_u64() != user_id(response.at("backup_name").text))
+                throw std::runtime_error("Invalid wallet backup response");
+            const auto folder = root / "runtime/user/online/backups/hosts" /
+                hex(sha256(bytes_of(code))) / std::to_string(wallet->at("account").as_u64());
+            backup_blob(folder, body, dump_json(*wallet));
+        } catch (const std::exception& error) {
+            response.set("backup_error", Json::of(error.what()));
+        }
+    }
     return response;
 }
 } // namespace ctr_online

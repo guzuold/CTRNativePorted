@@ -431,6 +431,10 @@ struct Server::Impl {
                 bool allowed=false;
                 for (const auto& entry : friends.entries()) if (entry.friend_code==caller) allowed=true;
                 Json response=party->apply(caller,request,allowed,now);
+                if (const auto* name = response.find("backup_name")) {
+                    std::lock_guard<std::mutex> guard(state);
+                    response.set("wallet_backup", marketplace->snapshot(user_id(name->text)));
+                }
                 response.set("nonce",Json::of(nonce));
                 return json_answer(200,dump_json(sign_party_message(*host_identity,response)),"party_"+request.at("action").text);
             } catch (const std::exception& error) {

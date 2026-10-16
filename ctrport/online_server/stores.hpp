@@ -40,6 +40,8 @@ private:
 class MarketplaceStore {
 public:
     explicit MarketplaceStore(std::filesystem::path path);
+    // Account-only backup; never exposes other players' balances or receipts.
+    Json snapshot(std::uint64_t account);
     // Task 165: observed inventory record layout; rejects unsupported pagination.
     Bytes inventory_page(const std::vector<Param>& params, std::uint64_t account);
     void purchase(const std::vector<Param>& params, std::uint64_t account);

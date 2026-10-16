@@ -1,3 +1,15 @@
+## v0.3.1 local backup update — 2026-10-16
+
+- Automatic game-save copies before every launch and after game exit, including crash exits, in `runtime/user/savedata_backups/`. A failed pre-launch copy cancels launch.
+- The local server archives the previous wallet before replacing it; a failed backup prevents the transaction from overwriting the wallet.
+- Signed local copies of your Pit Stop inventory, coin balances and reward receipts on joining a lobby, every successful 15-second heartbeat, and after game exit. Snapshots are separated by host/account; unchanged snapshots are deduplicated and an empty inventory never overwrites an older copy.
+- **Update both your launcher and your friend's/host's launcher.** Older hosts cannot supply wallet backups. Interrupted connections can leave changes since the last successful copy unbacked up.
+- These are recovery copies, not automatic wallet synchronization between hosts. Missing past purchases still require the previous host's data or a prior backup. No balances are automatically merged or restored.
+- Validation: 197 server checks and 2 CLI backup tests passed, including signed HTTP host/guest transfer, account isolation, empty-inventory history retention, backup-write failure rollback and Windows long paths. No new remote two-PC gameplay claim.
+- See `LOCAL_BACKUPS.md` in the download. Earlier economy, invitation and graphics features and their limitations remain unchanged.
+
+Upgrade: close the game and launcher, replace program files from the ZIP, and **preserve your existing `runtime/user` folder**. Both players should download this updated v0.3.1 package.
+
 ## v0.3.1 graphics update — 2026-10-16
 
 - Independent internal scene resolution: 720p, 900p, 1080p, 1440p, 1800p and 2160p, selected in launcher Settings. Display/window resolution remains separate.

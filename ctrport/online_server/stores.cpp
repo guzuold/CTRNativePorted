@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "stores.hpp"
+#include "local_backup.hpp"
 #include <algorithm>
 #include <ctime>
 #include <fstream>
@@ -142,6 +143,15 @@ void MarketplaceStore::load() {
 }
 void MarketplaceStore::save() {
     std::filesystem::create_directories(path_.parent_path());
+    if (std::filesystem::exists(path_)) {
+        std::ifstream previous(path_, std::ios::binary);
+        std::ostringstream contents; contents << previous.rdbuf();
+        if (!previous || previous.bad()) throw Rejected("Cannot back up previous marketplace state");
+        Json archive = Json::object();
+        archive.set("format", Json::of("ctr-marketplace-file-v1"));
+        archive.set("state", Json::of(contents.str()));
+        backup_blob(path_.parent_path() / "backups/local", dump_json(archive));
+    }
     const std::filesystem::path temporary = path_.string() + ".tmp";
     {
         std::ofstream out(temporary, std::ios::trunc);
@@ -155,6 +165,22 @@ void MarketplaceStore::save() {
         throw Rejected("marketplace state replacement failed");
     std::error_code error;
     loaded_ = std::filesystem::last_write_time(path_, error);
+}
+Json MarketplaceStore::snapshot(std::uint64_t account) {
+    load();
+    const auto owner = std::to_string(account);
+    std::ostringstream rows;
+    for (const auto& [key, amount] : balances_) if (key.first == owner)
+        rows << "balance " << owner << ' ' << key.second << ' ' << amount << '\n';
+    for (const auto& [key, quantity] : inventory_) if (key.first == owner)
+        rows << "inventory " << owner << ' ' << key.second << ' ' << quantity << '\n';
+    for (const auto& key : rewarded_) if (key.first == owner)
+        rows << "reward " << owner << ' ' << key.second << " 0\n";
+    Json result = Json::object();
+    result.set("format", Json::of("ctr-marketplace-account-v1"));
+    result.set("account", Json::of(account));
+    result.set("state", Json::of(rows.str()));
+    return result;
 }
 void MarketplaceStore::set_balance(std::uint64_t account, std::uint64_t currency, std::int64_t amount) {
     if (currency > 255) throw Rejected("currency ID above 255");

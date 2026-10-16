@@ -201,3 +201,7 @@ Invitations are held on the existing lobby/relay host; recipients retrieve them 
 ## Graphics update (v0.3.1)
 
 Internal scene resolution (720p–4K) is independent of the display. FSR 1 is included. DLSS is experimental, requires a separately built NVIDIA SDK bridge/runtime, has unresolved object motion and measured slower in the current race test. See [upscaling details](ctrport/gpu/UPSCALING.md) and CHANGELOG for exact test limits.
+
+## Local backups (v0.3.1 update)
+
+Game saves are copied before launch and after exit. Updated hosts also provide signed local snapshots of your Pit Stop wallet. Update both launchers and preserve `runtime/user` when replacing program files. Snapshots retain history but do not automatically synchronize wallets between hosts or restore missing past purchases. See [local backup details](ctrport/LOCAL_BACKUPS.md).
