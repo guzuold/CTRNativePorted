@@ -39,9 +39,13 @@ struct ServerConfig {
     std::uint16_t relay_port = 3082;
     std::filesystem::path state_dir;  // runtime/user/online
     std::filesystem::path log_path;   // runtime/user/logs/online_server_<time>.jsonl
+    bool party_enabled = false; // launcher-managed membership and admission
+    std::filesystem::path identity_path; // optional custom path for host_identity.json
     // Called with each event's one-line summary (also written to stdout by the standalone server).
     std::function<void(const std::string&)> on_event;
 };
+
+class HostIdentity;
 
 class Server {
 public:
@@ -55,6 +59,8 @@ public:
     const std::vector<std::string>& failures() const;
     std::filesystem::path traffic_key_path() const;
     std::size_t connected_players() const;
+    std::string friend_code() const;
+    const HostIdentity* host_identity() const;
 
 private:
     struct Impl;

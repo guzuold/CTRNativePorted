@@ -18,8 +18,8 @@ inline int system_parameter(int id,int* output) {
         if(length>=32)throw std::runtime_error("CTR_SYSTEM_LANGUAGE too long");
         if(length) {
             char* end=nullptr;auto parsed=std::strtol(setting,&end,10);
-            // Initially support the public pre-firmware language domain only.
-            if(!*setting || *end || parsed<0 || parsed>18)throw std::runtime_error("CTR_SYSTEM_LANGUAGE must be integer0..18");
+            // Public OpenOrbis language ABI; Arabic (21) is present in CUSA14876 EU.
+            if(!*setting || *end || parsed<0 || (parsed>18 && parsed!=21))throw std::runtime_error("CTR_SYSTEM_LANGUAGE must be integer0..18 or21");
             value=static_cast<int>(parsed);
         }
     } else if(id==1000) {

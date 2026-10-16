@@ -1133,13 +1133,15 @@ int main(int argc, char** argv) {
     if(argc==2 && std::string(argv[1])=="--system-language-control") {
         _putenv_s("CTR_SYSTEM_LANGUAGE","");int value=91;
         if(ctrport::system_parameter(1,&value) || value!=1 || ctrport::system_parameter(1,nullptr)!=static_cast<int>(0x80a10003U))return 1;
-        _putenv_s("CTR_SYSTEM_LANGUAGE","4");
-        if(ctrport::ctr_call_original_integer2(reinterpret_cast<void*>(&ctrport::ctr_sysv_system_parameter),1,reinterpret_cast<std::uint64_t>(&value)) || value!=4)return 1;
+        for(const int language : {1,2,5,4,3,21}) {
+        _putenv_s("CTR_SYSTEM_LANGUAGE",std::to_string(language).c_str());
+        if(ctrport::ctr_call_original_integer2(reinterpret_cast<void*>(&ctrport::ctr_sysv_system_parameter),1,reinterpret_cast<std::uint64_t>(&value)) || value!=language)return 1;
+        }
         _putenv_s("CTR_SYSTEM_LANGUAGE","999");value=91;unsigned rejected=0;
         try{ctrport::system_parameter(1,&value);}catch(const std::runtime_error&){++rejected;}
         try{ctrport::system_parameter(2,&value);}catch(const std::runtime_error&){++rejected;}
         _putenv_s("CTR_SYSTEM_LANGUAGE","");if(rejected!=2 || value!=91)return 1;
-        std::cout<<"{\"scope\":\"virtual_console_language\",\"default_us_english\":true,\"configured_italian\":true,\"failure_preserves_output\":true}\n";return 0;
+        std::cout<<"{\"scope\":\"virtual_console_language\",\"default_us_english\":true,\"eu_six_language_ids\":true,\"failure_preserves_output\":true}\n";return 0;
     }
     if(argc==2 && std::string(argv[1])=="--semaphore-poll-control") {
         auto& sem=ctrport::kernel_semaphores;std::uint32_t id=0;

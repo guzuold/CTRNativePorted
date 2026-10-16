@@ -13,6 +13,9 @@ against the execution of the original code.
 
 ## Status
 
+Latest release: **v0.3.0** (experimental).
+
+
 **Reconstruction:** original functions replaced at run time by verified C++: **0** so
 far. The reconstructed modules in [`reconstruction/`](reconstruction/) are compiled and
 validated against original execution (thousands of fixtures, zero differences), but none
@@ -113,30 +116,37 @@ python -B ctrport/play_gpu.py --base-dir <CUSA14876 folder> [--1.21 --patch-dir 
 
 Logs, saves and caches go to `runtime/user/`. The game folders are only read.
 
-## Multiplayer (Matchmaking with password)
+## Multiplayer (friends and parties, experimental)
 
-Online play uses the project's own server in place of PSN and Demonware; Sony and Activision
-servers are never contacted. Only the player who hosts runs the server: it is built into the
-launcher (C++, no Python needed).
+Online uses the project's own server in place of PSN and Demonware.
 
-1. **Host**: in the launcher `SETTINGS` tab turn on **Multiplayer Online** and **Ospita server
-   qui** (host server here). The launcher starts the server, asks the router to open the ports
-   with UPnP and shows the address to give the other players (also copied to the clipboard). If
-   the router has UPnP port forwarding disabled, forward TCP 8780, TCP 3074, UDP 3078-3082 and
-   UDP 3174 (the host's own game) to the host PC by hand and type the public IP in the field
-   above the switch.
-2. **Other players**: turn on **Multiplayer Online** and type the host's address as server (a
-   name such as a dynamic DNS host works too). They do not run any server.
-3. Everyone types the same **Password partita** (room password), launches the game and selects
-   **ONLINE > Matchmaking > Go to Lobby**. Same password: same lobby and race; different
-   passwords never match.
+1. In **Settings**, enable **Online** and choose your visible player name (3-16
+   letters, digits, hyphens or underscores). The local service starts automatically.
+2. Open the friends drawer on **Home**. Copy your friend code and exchange codes
+   with your friends; add each other in the friends dialog.
+3. Check an online friend's status, then **invite them** or **join their lobby**.
+   Received invitations can be accepted in the dialog. A party holds at most
+   **8 people, including its owner**; each member needs a different player name.
+4. Form the party **before PLAY**. Everyone launches the game and selects
+   **ONLINE > Matchmaking > Go to Lobby**, using compatible matchmaking modes.
+   The launcher supplies the same network selector to the party's members; the
+   server waits for the whole group before creating the matchmaking lobby.
 
-**Relay (NAT / CGNAT)** (experimental): players whose connection cannot receive traffic from
-the internet (mobile hotspots, carrier-grade NAT, strict routers) can turn this switch on; the
-race traffic then goes through the server instead of directly between players (about 2 KB/s
-per player and direction). It helps only when the server itself is reachable from the internet:
-a host behind CGNAT cannot host the server for players outside its network, relay or not.
-Tested so far on one PC with the direct path blocked on purpose, not yet between real networks.
+No manual server address, host toggle or shared password is needed in the launcher.
+Friend codes identify signed services; discovery uses Mainline BitTorrent DHT.
+Own party/invitation state refreshes periodically; friend status is checked on demand.
+The complete drawer, including its opening tab, disappears outside Home.
+
+**Automatic relay fallback:** traffic tries the direct connection first and falls
+back to the project's relay when the peer probe times out. This does not make an
+unreachable host reachable: restrictive NAT/CGNAT can still prevent discovery or
+hosting. The launcher requests UPnP forwarding when supported by the router.
+
+**Current limits:** changing parties requires closing the game. There is no host
+migration; an owner with guests cannot abandon the party from the dialog. Local
+service/protocol tests pass, but an online retail race across remote PCs has not
+been verified. This is not a claim of complete online support. Signed requests
+authenticate peers; they do not encrypt the HTTP transport.
 
 **Pit Stop and Wumpa Challenges** open online with v01.21: the server keeps each player's
 Wumpa Coin balance and challenge events (catalogue, prices and challenges come from the game's

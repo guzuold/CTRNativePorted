@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Game traffic through the project server's UDP relay (R8 NAT traversal; wire format in
-// ctrport/online_server/relay.hpp). Off unless CTR_ONLINE_NAT_TRANSPORT=relay.
+// ctrport/online_server/relay.hpp). Automatic fallback is enabled by default when online: peer
+// traffic probes directly first, and falls back to the server relay if direct packets do not respond.
 //
 // With the variable, datagrams the game's peer socket (local UDP 3074) sends to another player
 // go to the server's relay port, wrapped with the destination the game chose; datagrams the
@@ -21,6 +22,13 @@
 #include <cstdint>
 
 namespace ctr_hle::online::relay {
+enum class TransportMode {
+    Off,   // Direct only, relay disabled
+    Relay, // Forced relay for all peer traffic
+    Auto,  // Direct first, automatic fallback to relay if direct doesn't respond
+};
+
+TransportMode mode();
 bool enabled();
 bool block_direct();
 // A player's endpoint, as opposed to one of the project server's services.
@@ -30,8 +38,9 @@ void attach(SOCKET handle);
 void detach(SOCKET handle);
 
 enum class SendResult { Relayed, Direct };
-// Sends through the relay from the game's socket; Direct when the relay cannot carry this
-// datagram (no token yet, destination refused recently): the caller sends it directly.
+// Sends through the relay from the game's socket; Direct when the direct path is active (in Auto
+// mode with confirmed direct or probing), or when the relay cannot carry this datagram (no token
+// yet, destination refused recently): the caller sends it directly.
 SendResult send(SOCKET handle, const char* data, int size, const sockaddr_in& destination);
 
 // Counts (and every 500th time logs) a direct datagram dropped by the test switch.

@@ -303,7 +303,7 @@ bool PortMapper::add(const PortRequest& port, std::string& error) {
             soap(service, "DeletePortMapping", {{"NewRemoteHost", ""}, {"NewExternalPort", std::to_string(port.port)}, {"NewProtocol", port.protocol}});
             reply = attempt();
         } else if (!owner.empty()) {
-            error = "porta gia' inoltrata a un altro dispositivo (" + owner + ")";
+            error = "port already forwarded to another device (" + owner + ")";
             return false;
         }
     }
@@ -339,17 +339,17 @@ bool PortMapper::open(const std::vector<PortRequest>& ports, const std::string& 
                 PortResult result{port};
                 result.ok = add(port, result.error);
                 if (log_) log_("upnp: " + port.protocol + " " + std::to_string(port.port) + " (" + port.purpose + "): " +
-                               (result.ok ? "aperta" : "non aperta: " + result.error));
+                               (result.ok ? "opened" : "not opened: " + result.error));
                 results_.push_back(result);
             }
             if (lease_) renewer_ = std::thread([this] { renew_loop(); });
             return true;
         }
     }
-    error_ = locations.empty() ? "nessun dispositivo UPnP ha risposto (UPnP disattivato sul router o rete che lo blocca)"
-                               : "nessuno dei " + std::to_string(locations.size()) +
-                                     " dispositivi UPnP in rete offre l'inoltro delle porte (sul router e' disattivato l'UPnP IGD / "
-                                     "\"inoltro porte automatico\"): attivalo nel router o inoltra le porte a mano";
+    error_ = locations.empty() ? "no UPnP device responded (UPnP disabled on the router or blocked by the network)"
+                               : "none of the " + std::to_string(locations.size()) +
+                                     " UPnP devices on the network offers port forwarding (UPnP IGD / "
+                                     "\"automatic port forwarding\"): enable it on the router or forward ports manually";
     if (log_) log_("upnp: " + error_);
     return false;
 }
@@ -362,7 +362,7 @@ void PortMapper::renew_loop() {
         for (PortResult& result : results_) {
             if (!result.ok) continue;
             std::string error;
-            if (!add(result.request, error) && log_) log_("upnp: rinnovo " + result.request.protocol + " " + std::to_string(result.request.port) + " fallito: " + error);
+            if (!add(result.request, error) && log_) log_("upnp: renewal " + result.request.protocol + " " + std::to_string(result.request.port) + " failed: " + error);
         }
         lock.lock();
     }

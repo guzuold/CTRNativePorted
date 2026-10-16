@@ -403,7 +403,8 @@ std::uint64_t MatchmakingStore::start_search(const std::vector<Param>& params, s
         }
     }
 }
-std::vector<LobbyPlan> MatchmakingStore::match_ready(const std::map<std::uint64_t, std::string>& available) {
+std::vector<LobbyPlan> MatchmakingStore::match_ready(const std::map<std::uint64_t, std::string>& available,
+                                                       const std::map<std::string, std::size_t>& expected) {
     std::vector<std::pair<std::pair<std::string, std::string>, std::vector<Search*>>> groups;
     for (Search& s : searches_) {
         if (s.status != "pending") continue;
@@ -422,7 +423,10 @@ std::vector<LobbyPlan> MatchmakingStore::match_ready(const std::map<std::uint64_
         if (const char* env = std::getenv("CTR_ONLINE_MIN_PLAYERS")) {
             try { min_players = std::max<std::int64_t>(min_players, std::stoll(env)); } catch (...) {}
         }
+        if (const auto party=expected.find(key.first); party!=expected.end())
+            min_players=std::max(min_players,static_cast<std::int64_t>(party->second));
         if (static_cast<std::int64_t>(players.size()) < min_players) continue;
+        if (min_players > signed_of(slots.at("max"))) continue;
         if (static_cast<std::int64_t>(players.size()) > signed_of(slots.at("max"))) players.resize(static_cast<std::size_t>(signed_of(slots.at("max"))));
         std::uint64_t lobby;
         do lobby = random_bits(52); while (!lobby || lobbies_.count(lobby));
