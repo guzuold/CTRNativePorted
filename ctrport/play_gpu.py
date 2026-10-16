@@ -48,7 +48,27 @@ elif '--60fps' in sys.argv:
 # Native 4K 3D scene scale (2.0f + 1920 MiB Garlic pool) in PS4 Pro mode (ctrport/GUEST_PATCHES.md).
 use_native_4k = '--native-4k' in sys.argv or os.environ.get('CTR_NATIVE_4K') == '1'
 # PS4 Pro (Neo) hardware profile, experimental (ctrport/direct_memory.hpp).
-use_pro = '--pro' in sys.argv or '--neo' in sys.argv or use_native_4k or os.environ.get('CTR_NEO_MODE') == '1'
+scene_height = os.environ.get('CTR_SCENE_HEIGHT')
+upscaler = os.environ.get('CTR_UPSCALER', 'off')
+if '--upscaler' in sys.argv:
+    index = sys.argv.index('--upscaler')
+    if index + 1 >= len(sys.argv):
+        sys.exit('--upscaler requires off, fsr1 or dlss')
+    upscaler = sys.argv[index + 1]
+if upscaler not in ('off', 'fsr1', 'dlss'):
+    sys.exit('Invalid upscaler: ' + upscaler)
+env['CTR_UPSCALER'] = upscaler
+env['CTR_GPU_FSR'] = '0'
+if '--internal-res' in sys.argv:
+    index = sys.argv.index('--internal-res')
+    if index + 1 >= len(sys.argv):
+        sys.exit('--internal-res requires 720, 900, 1080, 1440, 1800 or 2160')
+    scene_height = sys.argv[index + 1]
+if scene_height is not None:
+    if scene_height not in ('720', '900', '1080', '1440', '1800', '2160'):
+        sys.exit('Invalid internal resolution: ' + scene_height)
+    env['CTR_SCENE_HEIGHT'] = scene_height
+use_pro = bool(scene_height) or '--pro' in sys.argv or '--neo' in sys.argv or use_native_4k or os.environ.get('CTR_NEO_MODE') == '1'
 env.pop('CTR_NEO_MODE', None)
 env.pop('CTR_NATIVE_4K', None)
 if use_pro:
@@ -154,7 +174,7 @@ if use_unlock_all and saves.exists():
     backup = user_root / 'savedata_backups' / ('before_unlock_all_' + log.name.removeprefix('play_'))
     shutil.copytree(saves, backup)
     print('CTRPort: saves copied to', backup, flush=True)
-print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, display={res_info}): close window to quit. Logs:', log, flush=True)
+print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, scene_height={scene_height or "legacy"}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, display={res_info}): close window to quit. Logs:', log, flush=True)
 with (instance_lock(workdir) if instance_name else lane_lock('shared', 'claude', timeout=600)), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
     child = subprocess.Popen(command, cwd=workdir, env=env, stdout=out, stderr=err)
     log.with_suffix('.run.json').write_text(json.dumps({'pid': child.pid, 'cwd': str(workdir),

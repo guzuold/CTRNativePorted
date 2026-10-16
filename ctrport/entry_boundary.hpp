@@ -2815,7 +2815,8 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     }
     // CTR_ONLINE=1: project server key in place of the auth3 traffic signing key (R8).
     apply_online_traffic_key(images.front().get(),pin);
-    // CTR_NATIVE_4K=1 (with CTR_NEO_MODE=1, ctrport/GUEST_PATCHES.md):
+    // CTR_SCENE_HEIGHT presets, or legacy CTR_NATIVE_4K=1 (ctrport/GUEST_PATCHES.md):
+    // explicit height uses height/1080 for the scale; above 1440 also expands the pool.
     // 1. In the Neo branch of graphics device init (v01.00 0x12e74a8, v01.21 0x13aa638),
     //    the backbuffer at [r14+0x540..0x544] is doubled to 3840x2160 while [r14+0x548] is
     //    loaded from [r12+0x48] (4/3 = 1.3333334f), so the scene scale helper (0x131f9e0 /
@@ -2826,12 +2827,15 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     //    "OOM [1]{7,Garlic}->16711680". In the Neo branch of Gfx/@vramBSize setup (v01.00
     //    0x1aacfcb, v01.21 0x1bbb918), raise the immediate from 0x3c000000 (960 MiB) to
     //    0x78000000 (1920 MiB, matching native_4k_direct_bytes in direct_memory.hpp).
-    if(native_4k_selected()){
+    if(scene_height_selected() || native_4k_selected()){
         const std::uint64_t scale_offset=profile->scale4k;
         const std::uint64_t vram_b_offset=profile->vram4k;
         if(!scale_offset || !vram_b_offset) throw std::runtime_error("CTR_NATIVE_4K has no binding for this eboot");
         const unsigned char original_scale_bytes[]={0x41,0x8b,0x44,0x24,0x48,0x41,0x89,0x86,0x48,0x05,0x00,0x00};
-        const unsigned char patch_scale_bytes[]={0xb8,0x00,0x00,0x00,0x40};
+        const int scene_height=scene_height_selected()?scene_height_selected():2160;
+        const float scene_scale=static_cast<float>(scene_height)/1080.0f;
+        unsigned char patch_scale_bytes[]={0xb8,0,0,0,0};
+        std::memcpy(patch_scale_bytes+1,&scene_scale,sizeof(scene_scale));
         const unsigned char original_vram_b_bytes[]={0xc7,0x45,0xc8,0x00,0x00,0x00,0x3c,0xe9};
         const unsigned char patch_vram_b_bytes[]={0xc7,0x45,0xc8,0x00,0x00,0x00,0x78};
         auto* scale_site=images.front().get()+scale_offset;
@@ -2839,8 +2843,8 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
         if(std::memcmp(scale_site,original_scale_bytes,sizeof(original_scale_bytes))!=0) throw std::runtime_error("CTR_NATIVE_4K scale patch site differs from original bytes");
         if(std::memcmp(vram_b_site,original_vram_b_bytes,sizeof(original_vram_b_bytes))!=0) throw std::runtime_error("CTR_NATIVE_4K vramBSize patch site differs from original bytes");
         std::memcpy(scale_site,patch_scale_bytes,sizeof(patch_scale_bytes));
-        std::memcpy(vram_b_site,patch_vram_b_bytes,sizeof(patch_vram_b_bytes));
-        std::cout<<"{\"scope\":\"guest_native_4k_patch_applied\",\"scale_target\":"<<scale_offset<<",\"vram_b_target\":"<<vram_b_offset<<",\"scene_scale\":2.0,\"garlic_bytes\":2013265920}\n"<<std::flush;
+        if(native_4k_selected()) std::memcpy(vram_b_site,patch_vram_b_bytes,sizeof(patch_vram_b_bytes));
+        std::cout<<"{\"scope\":\"guest_scene_resolution_patch_applied\",\"scale_target\":"<<scale_offset<<",\"vram_b_target\":"<<vram_b_offset<<",\"scene_scale\":"<<scene_scale<<",\"scene_width\":"<<(scene_height*16/9)<<",\"scene_height\":"<<scene_height<<",\"garlic_bytes\":"<<(native_4k_selected()?2013265920ULL:1006632960ULL)<<"}\n"<<std::flush;
     }
     // CTR_UNLOCK_ALL=1, test-only (ctrport/GUEST_PATCHES.md, unlock_all.hpp). Only the
     // non-returning startup path keeps the image mapped for the watcher's lifetime.

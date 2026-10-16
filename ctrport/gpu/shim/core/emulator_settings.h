@@ -29,10 +29,14 @@ public:
         return value;
     }
     u32 GetInternalScreenWidth() {
+        // Explicit scene scaling uses the Neo path; host window size is separate.
+        if (std::getenv("CTR_SCENE_HEIGHT")) return 3840;
         static const auto value = u32(Number("CTR_GPU_INTERNAL_WIDTH", Flag("CTR_NEO_MODE", false) ? 3840 : 1920));
         return value;
     }
     u32 GetInternalScreenHeight() {
+        // Explicit scene scaling uses the Neo path; host window size is separate.
+        if (std::getenv("CTR_SCENE_HEIGHT")) return 2160;
         static const auto value = u32(Number("CTR_GPU_INTERNAL_HEIGHT", Flag("CTR_NEO_MODE", false) ? 2160 : 1080));
         return value;
     }
@@ -65,6 +69,8 @@ public:
         return value;
     }
     bool IsFsrEnabled() {
+        const char* scene = std::getenv("CTR_UPSCALER");
+        if (scene && std::string(scene) != "off") return false;
         static const auto value = Flag("CTR_GPU_FSR", false);
         return value;
     }

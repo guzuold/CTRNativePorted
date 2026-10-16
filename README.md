@@ -197,3 +197,7 @@ The server also exists as a standalone program, `ctr_online_server.exe --auto-pu
 ## Invitation delivery update (v0.3.1)
 
 Invitations are held on the existing lobby/relay host; recipients retrieve them through outgoing connections. Add the actual host code to the recipient address book. No public listener is required on the recipient, but the host must remain reachable. See [the invitation guide](ctrport/online_server/INVITATIONS.md) for setup, expiry and discovery limits. Game transport is unchanged.
+
+## Graphics update (v0.3.1)
+
+Internal scene resolution (720p–4K) is independent of the display. FSR 1 is included. DLSS is experimental, requires a separately built NVIDIA SDK bridge/runtime, has unresolved object motion and measured slower in the current race test. See [upscaling details](ctrport/gpu/UPSCALING.md) and CHANGELOG for exact test limits.

@@ -29,6 +29,7 @@
 #include "core/memory.h"
 #include "core/signals.h"
 #include "ctr_gpu.h"
+#include "../../scene_resolution.hpp"
 #include "sdl_window.h"
 #include "common/path_util.h"
 #include "core/emulator_settings.h"
@@ -204,9 +205,10 @@ u64 PS4_SYSV_ABI sceKernelGetProcessTime() {
     return ticks / frequency * 1'000'000 + (ticks % frequency) * 1'000'000 / frequency;
 }
 s32 PS4_SYSV_ABI sceKernelIsNeoMode() {
-    // Same selection as ctrport's process_neo_mode (direct_memory.hpp): CTR_NEO_MODE=1,
+    // Same selection as ctrport's process_neo_mode: explicit scene height or CTR_NEO_MODE=1,
     // valid for CTR because its param.sfo declares Neo support (ATTRIBUTE bit 23).
     static const s32 neo = [] {
+        if (ctrport::scene_height_selected()) return 1;
         char val[4]{};
         return (GetEnvironmentVariableA("CTR_NEO_MODE", val, sizeof(val)) == 1 && val[0] == '1') ? 1 : 0;
     }();

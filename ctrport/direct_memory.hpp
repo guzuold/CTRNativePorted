@@ -5,6 +5,7 @@
 #pragma once
 #include "flat_loader.hpp"
 #include "retail_profiles.hpp"
+#include "scene_resolution.hpp"
 #include "kernel_time.hpp"
 #include "gpu_hooks.hpp"
 #include <array>
@@ -30,14 +31,15 @@ inline constexpr std::uint64_t native_4k_direct_bytes=6336ULL*1024*1024;
 // sceKernelIsNeoMode, selected only when the title declares Neo support.
 inline bool neo_mode_selected() {
     static const bool requested=[]{char v[4]{};return GetEnvironmentVariableA("CTR_NEO_MODE",v,sizeof(v))==1 && v[0]=='1';}();
-    return requested && ((retail_psf_attributes>>23)&1U);
+    return (requested || scene_height_selected()) && ((retail_psf_attributes>>23)&1U);
 }
-// Native 4K 3D scene profile, opt-in with CTR_NATIVE_4K=1 (requires CTR_NEO_MODE=1):
+// Expanded scene memory: explicit heights above 1440p, or legacy CTR_NATIVE_4K=1
+// (the legacy switch requires CTR_NEO_MODE=1).
 // expands direct memory by 960 MiB so Gfx/@vramBSize (Garlic pool) can double from
 // 960 MiB (0x3c000000) to 1920 MiB (0x78000000) for 3840x2160 3D render targets.
 inline bool native_4k_selected() {
     static const bool requested=[]{char v[4]{};return GetEnvironmentVariableA("CTR_NATIVE_4K",v,sizeof(v))==1 && v[0]=='1';}();
-    return requested && neo_mode_selected();
+    return scene_height_selected() ? scene_height_selected() > 1440 : requested && neo_mode_selected();
 }
 inline std::uint64_t selected_direct_bytes() {
     return native_4k_selected()?native_4k_direct_bytes:(neo_mode_selected()?neo_direct_bytes:standard_direct_bytes);

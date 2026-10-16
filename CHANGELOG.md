@@ -1,3 +1,15 @@
+## v0.3.1 graphics update — 2026-10-16
+
+- Independent internal scene resolution: 720p, 900p, 1080p, 1440p, 1800p and 2160p, selected in launcher Settings. Display/window resolution remains separate.
+- AMD FSR 1 spatial upscaling of the 3D scene before the HUD, selectable from the launcher. This is not FSR 3 or frame generation.
+- Experimental NVIDIA DLSS Super Resolution integration is available in source. The portable GPL package does not bundle the NVIDIA SDK/runtime or SDK-linked bridge. Build the optional bridge against NVIDIA's SDK separately, then put ctr_dlss.dll and nvngx_dlss.dll beside build/CTRPort-gpu/ctrport.exe. See UPSCALING.md and the bridge build script. Without them, selecting DLSS cannot enable NGX; use Off or FSR 1.
+- DLSS object motion is NOT corrected: the inherited target3 heuristic is not a validated moving-object mask. Camera reprojection works in the captured case, but temporal race quality is not certified.
+- Retail v01.21 Crash Cove, RTX 4070 Ti SUPER: single 30-second stationary-grid samples with AI racing measured Off native4K 46.35 FPS, Off1080 49.49, FSR1 1080->4K 50.15, DLSS1080->4K 29.88. Canvas4K/window1080, 60 FPS patch enabled. FSR's observed +8.2% versus native4K is preliminary; rosters/time differ, no deterministic replay or full-lap benchmark. DLSS was slower.
+- Both retail versions were checked at title-scene resolutions; race input/acceleration was observed with FSR1 and DLSS on v01.21. New tools capture actual GPU buffers, measure guest presentations, and check consecutive-frame reprojection.
+- No game files, saves, diagnostic captures or NVIDIA binaries are distributed. Reconstruction remains zero active verified replacements; all prior economy/invitation limitations remain.
+
+Upgrade: close the game/launcher, replace program files, and preserve runtime/user.
+
 ## v0.3.1 invitation update — 2026-10-16
 
 - Invitations are now stored on the existing lobby/relay host and retrieved by
