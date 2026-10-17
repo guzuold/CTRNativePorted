@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Builds the C++ project server as build/CTRPort-dev/ctr_online_server.exe and its test
 # ctr_online_server_test.exe. Only Windows system libraries (Winsock, CNG).
+param([string]$OutputDirectory = 'build/CTRPort-dev')
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$out=Join-Path $taskRoot 'build/CTRPort-dev'
+$out=Join-Path $taskRoot $OutputDirectory
 $obj=Join-Path $out 'online_server_obj'
 New-Item -ItemType Directory -Force $obj | Out-Null
 $env:PATH="$env:PATH;C:\Program Files (x86)\Microsoft Visual Studio\Installer"

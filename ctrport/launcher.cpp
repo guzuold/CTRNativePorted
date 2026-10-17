@@ -11,7 +11,7 @@
 #include <windows.h>
 #include "online_server/launcher_online.hpp"
 #include "online_server/local_backup.hpp"
-#include "friends_dialog.hpp"
+#include "online_server/lobby_actions.hpp"
 #include "online_server/friend_store.hpp"
 #include <commctrl.h>
 #include <dwmapi.h>
@@ -36,6 +36,7 @@
 namespace Gdiplus { using std::min; using std::max; }
 #include <gdiplus.h>
 #include "xbox_prepare.hpp"
+#include "launcher_font.hpp"
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "gdiplus.lib")
@@ -312,17 +313,25 @@ struct App {
     HWND patch_browse = nullptr, fps_toggle = nullptr, launch = nullptr, hot = nullptr;
     HWND online_toggle = nullptr, online_id_edit = nullptr;
     HWND friends_drawer = nullptr, friends_manage = nullptr;
+    HWND lobby_invite = nullptr, lobby_join = nullptr, lobby_leave = nullptr;
+    std::future<ctr_online::LobbyActionResult> lobby_action;
+    bool lobby_busy = false, lobby_notice_error = false;
+    std::wstring lobby_notice;
+    std::uint64_t lobby_revision = 0, poll_revision = 0;
     bool friends_open = false, friends_animating = false;
     float friends_reveal = 0, friends_from = 0;
     ULONGLONG friends_started = 0;
     int friends_scroll = 0;
+    bool lobby_scroll_drag = false;
+    float lobby_scroll_grab = 0;
+    int lobby_wheel_delta = 0;
     std::vector<ctr_online::FriendEntry> friends;
     ctr_online::Host host;
     ctr_online::PartySelection party;
     std::future<ctr_online::Json> party_poll;
     std::string party_poll_owner, party_poll_room;
-    bool friends_dialog_active = false;
     std::wstring party_error;
+    unsigned party_failures = 0;
     unsigned invite_count = 0;
     bool host_busy = false;           // server starting or stopping in the background
     bool xbox_busy = false;           // Xbox prompt archives being prepared in the background
@@ -487,6 +496,10 @@ void draw_slanted_box(Graphics& gr, const RectF& r, float skew_x, float shadow_d
     }
 }
 
+ctrport::launcher_font::Set retail_fonts;
+std::future<ctrport::launcher_font::Set> font_load;
+std::wstring font_requested_key, font_loading_key;
+std::vector<fs::path> font_requested_sources;
 std::unique_ptr<FontFamily> family_cache[4];
 const FontFamily& family(int which) {
     static const wchar_t* const names[4][3] = {{L"Lilita One", L"Segoe UI Black", L"Arial Black"},
@@ -510,6 +523,8 @@ int usable_style(const FontFamily& font_family, int style) {
 }
 void text(Graphics& gr, const std::wstring& value, int which, float size, int style, const RectF& r, ARGB color,
           StringAlignment align = StringAlignmentNear) {
+    const auto* retail = which == 0 ? retail_fonts.title.get() : retail_fonts.body.get();
+    if (retail && retail->draw(gr, value, which == 0 ? size : size * 1.25f, r, color, align)) return;
     Font font(&family(which), size, usable_style(family(which), style), UnitPixel);
     StringFormat format;
     format.SetAlignment(align);
@@ -642,16 +657,61 @@ void draw_field(Graphics& gr, const RectF& r, HWND edit) {
     stroke_round(gr, r, 10, focused ? kArcadeGold : kArcadeDark, focused ? 3.0f : 2.5f);
 }
 
-// Brief2 2a: right-edge pink tab and inset friend cards. Presence is not
-// available from DHT: show saved verification history, never invented online counts.
+// Right-edge lobby drawer: render only the last authenticated host roster.
+// A failed refresh is labelled explicitly; the address book is not presence.
 void reload_friends() {
-    ctr_online::FriendStore store(g.root / "runtime/user/online/friends.json");
-    g.friends = store.entries();
-    g.friends_scroll = std::clamp(g.friends_scroll, 0, std::max(0, static_cast<int>(g.friends.size()) - 5));
+    g.friends.clear();
+    if (const auto* members=g.party.snapshot.find("members")) {
+        for (const auto& member:members->items) {
+            ctr_online::FriendEntry entry;
+            entry.friend_code=member.at("code").text;
+            entry.nickname=member.at("name").text;
+            entry.last_status=entry.friend_code==g.party.owner ? "Host" : "Partecipante";
+            if(entry.friend_code==g.host_status.friend_code) entry.last_status+=" (tu)";
+            g.friends.push_back(entry);
+        }
+    }
+    std::stable_sort(g.friends.begin(),g.friends.end(),[](const auto& a,const auto& b) {
+        const auto rank=[](const auto& entry) {
+            return entry.friend_code==g.party.owner ? 0 : entry.friend_code==g.host_status.friend_code ? 1 : 2;
+        };
+        return rank(a)!=rank(b) ? rank(a)<rank(b) : a.nickname<b.nickname;
+    });
+    g.friends_scroll = std::clamp(g.friends_scroll, 0, std::max(0, static_cast<int>(g.friends.size()) - 4));
 }
 void paint_window(HDC target);
 constexpr UINT_PTR kFriendsTimer = 1;
-constexpr float kFriendsTravel = 236.f;
+constexpr float kFriendsTravel = 320.f;
+void begin_lobby_action(int action);
+void finish_lobby_action();
+void update_lobby_controls();
+
+RectF lobby_scroll_thumb() {
+    const auto count=static_cast<int>(g.friends.size());
+    const float height=count>4 ? 164.f*4.f/static_cast<float>(count) : 164.f;
+    const float offset=count>4 ? (164.f-height)*static_cast<float>(g.friends_scroll)/static_cast<float>(count-4) : 0.f;
+    return rect(329,78+offset,10,height);
+}
+void drag_lobby_scroll(HWND window,float y) {
+    const auto thumb=lobby_scroll_thumb();
+    const int maximum=std::max(0,static_cast<int>(g.friends.size())-4);
+    if(maximum && thumb.Height<164.f) {
+        const float progress=std::clamp((y-78.f-g.lobby_scroll_grab)/(164.f-thumb.Height),0.f,1.f);
+        g.friends_scroll=static_cast<int>(std::lround(progress*static_cast<float>(maximum)));
+        InvalidateRect(window,nullptr,FALSE);
+    }
+}
+
+void update_lobby_controls() {
+    const bool idle=!g.lobby_busy && !g.host_busy && !g.process;
+    const bool ready=g.cfg.online && g.host_status.running && !g.party.room.empty();
+    EnableWindow(g.friends_manage,idle && (!g.cfg.online || (ready && g.party.owner==g.host_status.friend_code)));
+    EnableWindow(g.lobby_join,idle && ready);
+    EnableWindow(g.lobby_leave,idle && ready && g.party.owner!=g.host_status.friend_code);
+    EnableWindow(g.lobby_invite,!g.lobby_busy);
+    SetWindowTextW(g.friends_manage,!g.cfg.online ? L"ATTIVA ONLINE" : L"COPIA INVITO");
+    for(HWND control:{g.friends_manage,g.lobby_join,g.lobby_leave})InvalidateRect(control,nullptr,FALSE);
+}
 constexpr float kFriendsDuration = 320.f;
 
 // Match Brief2's CSS cubic-bezier(.3,1.4,.5,1), including its gentle overshoot.
@@ -669,13 +729,17 @@ void position_friends() {
     // Keep a full-size surface while translating it; the parent clips its right
     // edge. No binary HRGN cuts through the antialiased rounded outlines.
     SetWindowPos(g.friends_drawer, HWND_TOP, px(kWidth - 38 - g.friends_reveal), px(62),
-                 px(310), px(450), SWP_NOACTIVATE | SWP_NOCOPYBITS);
+                 px(370), px(530), SWP_NOACTIVATE | SWP_NOCOPYBITS);
     ShowWindow(g.friends_drawer, g.current_tab == TAB_HOME ? SW_SHOWNA : SW_HIDE);
-    ShowWindow(g.friends_manage, g.current_tab == TAB_HOME && g.friends_open && !g.friends_animating ? SW_SHOWNA : SW_HIDE);
+    const bool show=g.current_tab==TAB_HOME && g.friends_open && !g.friends_animating;
+    for(HWND control:{g.friends_manage,g.lobby_invite,g.lobby_join,g.lobby_leave})
+        ShowWindow(control,show ? SW_SHOWNA : SW_HIDE);
+    update_lobby_controls();
     RedrawWindow(g.window, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
 void animate_friends(bool open) {
     if (g.current_tab != TAB_HOME) return;
+    if(g.lobby_scroll_drag){g.lobby_scroll_drag=false;ReleaseCapture();}
     g.friends_open = open;
     g.friends_from = g.friends_reveal;
     g.friends_started = GetTickCount64();
@@ -685,37 +749,57 @@ void animate_friends(bool open) {
     position_friends();
 }
 void reset_friends() {
+    if(g.lobby_scroll_drag){g.lobby_scroll_drag=false;ReleaseCapture();}
     KillTimer(g.friends_drawer, kFriendsTimer);
     g.friends_open = g.friends_animating = false;
     g.friends_reveal = 0;
 }
 LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARAM lp) {
     switch (message) {
-    case WM_CREATE:
-        g.friends_manage = CreateWindowExW(0, L"BUTTON", L"GESTISCI / CERCA",
-            WS_CHILD | WS_TABSTOP | BS_OWNERDRAW,px(50),px(390),px(210),px(36),window,
-            reinterpret_cast<HMENU>(1),GetModuleHandleW(nullptr),nullptr);
+    case WM_CREATE: {
+        auto button=[&](int id,const wchar_t* title,float x,float y,float w) {
+            return CreateWindowExW(0,L"BUTTON",title,WS_CHILD|WS_TABSTOP|BS_OWNERDRAW,
+                px(x),px(y),px(w),px(32),window,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),nullptr,nullptr);
+        };
+        g.friends_manage=button(110,L"COPIA INVITO",50,272,290);
+        g.lobby_invite=CreateWindowExW(0,L"EDIT",L"",WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL,
+            px(60),px(330),px(270),px(20),window,reinterpret_cast<HMENU>(113),nullptr,nullptr);
+        SendMessageW(g.lobby_invite,WM_SETFONT,reinterpret_cast<WPARAM>(g.edit_font),FALSE);
+        SendMessageW(g.lobby_invite,EM_SETLIMITTEXT,512,0);
+        SendMessageW(g.lobby_invite,EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(L"Incolla l'invito completo"));
+        g.lobby_join=button(111,L"ENTRA",50,366,140);
+        g.lobby_leave=button(109,L"ESCI",200,366,140);
+        SetTimer(window,2,100,nullptr);
         return 0;
+    }
     case WM_COMMAND:
-        if (LOWORD(wp) == 1 && HIWORD(wp) == BN_CLICKED)
-            SendMessageW(g.window,WM_COMMAND,MAKEWPARAM(ID_ONLINE_FRIENDS,BN_CLICKED),0);
+        if(HIWORD(wp)==BN_CLICKED && (LOWORD(wp)==110 || LOWORD(wp)==111 || LOWORD(wp)==109))
+            begin_lobby_action(LOWORD(wp));
+        if(HIWORD(wp)==EN_SETFOCUS || HIWORD(wp)==EN_KILLFOCUS)InvalidateRect(window,nullptr,FALSE);
         return 0;
+    case WM_CTLCOLOREDIT: {
+        const auto dc=reinterpret_cast<HDC>(wp);
+        SetTextColor(dc,RGB(255,248,236));SetBkColor(dc,RGB(27,20,70));
+        return reinterpret_cast<LRESULT>(g.field_brush);
+    }
     case WM_DRAWITEM: {
-        const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lp);
-        Graphics gr(item->hDC);
-        gr.Clear(Color(kArcadeCard));
-        gr.ScaleTransform(g.scale,g.scale);
-        gr.SetSmoothingMode(SmoothingModeAntiAlias);
-        gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-        gr.SetPixelOffsetMode(PixelOffsetModeHalf);
-        fill_round(gr,rect(0,0,210,36),9,SolidBrush(Color(kArcadeCyan)));
-        text(gr,L"GESTISCI / CERCA",1,12,FontStyleBold,rect(0,0,210,36),kArcadeDark,StringAlignmentCenter);
-        if (item->itemState & ODS_FOCUS) stroke_round(gr,rect(3,3,204,30),7,kArcadeDark,2);
+        const auto* item=reinterpret_cast<DRAWITEMSTRUCT*>(lp);
+        Graphics gr(item->hDC);gr.Clear(Color(kArcadeCard));gr.ScaleTransform(g.scale,g.scale);
+        gr.SetSmoothingMode(SmoothingModeAntiAlias);gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
+        const float width=item->CtlID==110 ? 290.f : 140.f;
+        const bool enabled=(item->itemState & ODS_DISABLED)==0;
+        const auto color=!enabled ? kArcadeCardSub : item->CtlID==109 ? kArcadePink : kArcadeCyan;
+        fill_round(gr,rect(0,0,width,32),9,SolidBrush(Color(color)));
+        const auto label=item->CtlID==110 ? (!g.cfg.online ? L"ATTIVA ONLINE" : L"COPIA INVITO") :
+            item->CtlID==111 ? L"ENTRA" : L"ESCI";
+        text(gr,label,1,12,FontStyleBold,rect(0,0,width,32),enabled ? kArcadeDark : kTextMuted,StringAlignmentCenter);
+        if(item->itemState & (ODS_FOCUS|ODS_SELECTED))stroke_round(gr,rect(2,2,width-4,28),7,kArcadeGold,2);
         return TRUE;
     }
     case WM_ERASEBKGND:
         return 1;
     case WM_TIMER:
+        if(wp==2){finish_lobby_action();return 0;}
         if (wp == kFriendsTimer && g.friends_animating) {
             const float elapsed = static_cast<float>(GetTickCount64() - g.friends_started);
             const float progress = std::min(1.f, elapsed / kFriendsDuration);
@@ -737,13 +821,13 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
         break;
     }
     case WM_DESTROY:
-        KillTimer(window, kFriendsTimer);
+        KillTimer(window, kFriendsTimer);KillTimer(window,2);
         return 0;
     case WM_PAINT: {
         PAINTSTRUCT ps{};
         HDC target = BeginPaint(window, &ps);
         HDC dc = CreateCompatibleDC(target);
-        HBITMAP bitmap = CreateCompatibleBitmap(target, px(310), px(450));
+        HBITMAP bitmap = CreateCompatibleBitmap(target, px(370), px(530));
         const HGDIOBJ previous = SelectObject(dc, bitmap);
         // Composite onto the exact Home background so curves have smooth edge
         // pixels instead of the old mismatched GDI region radius (diameter).
@@ -763,63 +847,95 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
             const auto saved = gr.Save();
             gr.TranslateTransform(4,154);
             gr.RotateTransform(-90);
-            text(gr,L"FRIENDS",0,16,FontStyleBold,rect(0,0,102,30),kArcadeDark,StringAlignmentCenter);
+            text(gr,L"LOBBY",0,16,FontStyleBold,rect(0,0,102,30),kArcadeDark,StringAlignmentCenter);
             gr.Restore(saved);
             if (g.friends_reveal > 0) {
-                fill_round(gr,rect(33,7,280,440),16,SolidBrush(Color(kArcadeDark)));
-                fill_round(gr,rect(39,2,280,438),16,SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr,rect(39,2,280,438),16,kArcadeDark,3);
+                fill_round(gr,rect(33,7,330,520),16,SolidBrush(Color(kArcadeDark)));
+                fill_round(gr,rect(39,2,320,518),16,SolidBrush(Color(kArcadeCard)));
+                stroke_round(gr,rect(39,2,320,518),16,kArcadeDark,3);
                 Pen highlight(Color(0xFF473B91), 1.f);
-                gr.DrawLine(&highlight, 57.f, 6.f, 306.f, 6.f);
-                text(gr,L"FRIENDS",0,22,FontStyleBold,rect(50,14,145,30),kArcadeGold);
-                fill_round(gr,rect(218,18,40,24),6,SolidBrush(Color(kArcadeLime)));
-                text(gr,std::to_wstring(g.friends.size()),1,12,FontStyleBold,rect(218,18,40,24),kArcadeDark,StringAlignmentCenter);
+                gr.DrawLine(&highlight, 57.f, 6.f, 346.f, 6.f);
+                text(gr,L"LOBBY",0,22,FontStyleBold,rect(50,14,145,30),kArcadeGold);
+                fill_round(gr,rect(296,18,40,24),6,SolidBrush(Color(kArcadeLime)));
+                text(gr,std::to_wstring(g.friends.size()),1,12,FontStyleBold,rect(296,18,40,24),kArcadeDark,StringAlignmentCenter);
                 const std::wstring lobby_label=!g.cfg.online ? L"Offline" : g.host_busy ? L"Connessione..." :
                     !g.party_error.empty() ? L"Lobby non raggiungibile" :
-                    g.invite_count ? std::to_wstring(g.invite_count)+L" inviti ricevuti" :
                     g.party.snapshot.find("count") ? L"Lobby "+std::to_wstring(g.party.snapshot.at("count").as_u64())+L"/8" : L"Online non pronto";
-                text(gr,lobby_label,1,11,FontStyleRegular,rect(50,47,210,22),kTextMuted);
+                text(gr,lobby_label,1,11,FontStyleRegular,rect(50,47,290,22),kTextMuted);
                 if (g.friends.empty()) {
-                    text(gr,L"La tua griglia di partenza.\nAggiungi il primo amico con\nil suo codice amico.",1,13,FontStyleRegular,rect(54,106,202,100),kTextMuted);
+                    text(gr,L"La tua prossima griglia.\nAttiva Online, condividi un invito\no incolla quello dell'host.",1,13,FontStyleRegular,rect(54,100,280,100),kTextMuted);
                 }
-                for (int row=0; row<5 && row+g.friends_scroll<static_cast<int>(g.friends.size()); ++row) {
+                for (int row=0; row<4 && row+g.friends_scroll<static_cast<int>(g.friends.size()); ++row) {
                     const auto& f=g.friends[row+g.friends_scroll];
-                    const float y=78.f+row*55.f;
-                    fill_round(gr,rect(49,y,212,49),10,SolidBrush(Color(kArcadeBg)));
-                    fill_round(gr,rect(57,y+9,30,30),9,SolidBrush(Color(row%2 ? kArcadeCyan : kArcadeGold)));
+                    const float y=78.f+row*42.f;
+                    fill_round(gr,rect(49,y,g.friends.size()>4 ? 272.f : 291.f,38),10,SolidBrush(Color(kArcadeBg)));
+                    fill_round(gr,rect(57,y+5,28,28),9,SolidBrush(Color(row%2 ? kArcadeCyan : kArcadeGold)));
                     const auto name=widen(f.nickname);
-                    text(gr,name.substr(0,1),0,17,FontStyleBold,rect(57,y+9,30,30),kArcadeDark,StringAlignmentCenter);
-                    text(gr,name,1,13,FontStyleBold,rect(96,y+5,156,21),kTextLight);
-                    text(gr,f.last_status.empty() ? L"Mai contattato" : widen(f.last_status),1,10,FontStyleRegular,rect(96,y+27,156,18),kTextMuted);
+                    text(gr,name.substr(0,1),0,17,FontStyleBold,rect(57,y+5,28,28),kArcadeDark,StringAlignmentCenter);
+                    text(gr,name,1,13,FontStyleBold,rect(96,y+1,215,20),kTextLight);
+                    text(gr,f.last_status.empty() ? L"Mai contattato" : widen(f.last_status),1,10,FontStyleRegular,rect(96,y+20,215,16),kTextMuted);
                 }
-                if (g.friends.size() > 5) text(gr,L"Scorri per altri amici",1,10,FontStyleRegular,rect(52,358,206,18),kTextMuted);
-                fill_round(gr,rect(50,390,210,36),9,SolidBrush(Color(kArcadeCyan)));
-                text(gr,L"GESTISCI / CERCA",1,12,FontStyleBold,rect(50,390,210,36),kArcadeDark,StringAlignmentCenter);
+                if(g.friends.size()>4) {
+                    fill_round(gr,rect(327,76,14,168),7,SolidBrush(Color(kArcadeDark)));
+                    fill_round(gr,lobby_scroll_thumb(),5,SolidBrush(Color(g.lobby_scroll_drag ? kArcadeGold : kArcadeCyan)));
+                }
+                text(gr,L"INVITO STANZA",1,10,FontStyleBold,rect(52,307,288,16),kTextMuted);
+                draw_field(gr,rect(50,324,290,32),g.lobby_invite);
+                const std::wstring feedback=g.lobby_busy ? L"Collegamento in corso..." :
+                    !g.party_error.empty() ? L"Ultimo elenco ricevuto. "+g.party_error : g.lobby_notice;
+                text(gr,feedback,1,11,FontStyleRegular,rect(52,410,286,54),
+                     !g.party_error.empty() || g.lobby_notice_error ? kArcadePink : kArcadeLime);
+                text(gr,L"Nel gioco: Online > Matchmaking\n> Go to Lobby. Restate nella stessa stanza.",1,10,FontStyleRegular,rect(52,474,286,34),kTextMuted);
             }
         }
-        BitBlt(target,0,0,px(310),px(450),dc,0,0,SRCCOPY);
+        BitBlt(target,0,0,px(370),px(530),dc,0,0,SRCCOPY);
         SelectObject(dc,previous);
         DeleteObject(bitmap);
         DeleteDC(dc);
         EndPaint(window,&ps);
         return 0;
     }
+    case WM_LBUTTONDOWN: {
+        const float x=static_cast<float>(static_cast<short>(LOWORD(lp)))/g.scale;
+        const float y=static_cast<float>(static_cast<short>(HIWORD(lp)))/g.scale;
+        if(g.friends_open && !g.friends_animating && g.friends.size()>4 && x>=324 && x<=344 && y>=76 && y<=244) {
+            const auto thumb=lobby_scroll_thumb();
+            g.lobby_scroll_grab=y>=thumb.Y && y<=thumb.GetBottom() ? y-thumb.Y : thumb.Height/2;
+            g.lobby_scroll_drag=true;SetCapture(window);SetFocus(window);
+            drag_lobby_scroll(window,y);InvalidateRect(window,nullptr,FALSE);return 0;
+        }
+        break;
+    }
+    case WM_MOUSEMOVE:
+        if(g.lobby_scroll_drag) {
+            drag_lobby_scroll(window,static_cast<float>(static_cast<short>(HIWORD(lp)))/g.scale);return 0;
+        }
+        break;
+    case WM_CAPTURECHANGED:
+        g.lobby_scroll_drag=false;InvalidateRect(window,nullptr,FALSE);return 0;
     case WM_LBUTTONUP:
+        if(g.lobby_scroll_drag){g.lobby_scroll_drag=false;ReleaseCapture();InvalidateRect(window,nullptr,FALSE);return 0;}
         if (static_cast<short>(LOWORD(lp)) < px(38)) {
             SetFocus(window);
             animate_friends(!g.friends_open);
-        } else if (!g.friends_animating && g.friends_open && static_cast<short>(HIWORD(lp)) >= px(390)) {
-            SendMessageW(g.window,WM_COMMAND,MAKEWPARAM(ID_ONLINE_FRIENDS,BN_CLICKED),0);
         }
         return 0;
     case WM_KEYDOWN:
+        if(g.friends_open && (wp==VK_UP || wp==VK_DOWN || wp==VK_HOME || wp==VK_END || wp==VK_PRIOR || wp==VK_NEXT)) {
+            if(wp==VK_HOME)g.friends_scroll=0;
+            else if(wp==VK_END)g.friends_scroll=static_cast<int>(g.friends.size());
+            else g.friends_scroll+=wp==VK_UP ? -1 : wp==VK_DOWN ? 1 : wp==VK_PRIOR ? -4 : 4;
+            reload_friends();InvalidateRect(window,nullptr,FALSE);return 0;
+        }
         if (wp == VK_ESCAPE || wp == VK_SPACE || wp == VK_RETURN) {
             animate_friends(wp == VK_ESCAPE ? false : !g.friends_open);
             return 0;
         }
         break;
     case WM_MOUSEWHEEL:
-        g.friends_scroll += static_cast<short>(HIWORD(wp)) > 0 ? -1 : 1;
+        g.lobby_wheel_delta+=static_cast<short>(HIWORD(wp));
+        g.friends_scroll-=g.lobby_wheel_delta/WHEEL_DELTA;
+        g.lobby_wheel_delta%=WHEEL_DELTA;
         reload_friends(); InvalidateRect(window,nullptr,FALSE); return 0;
     }
     return DefWindowProcW(window,message,wp,lp);
@@ -919,7 +1035,7 @@ void paint_window(HDC target) {
                 draw_field(gr, rect(548, 252, 190, 32), g.online_id_edit);
                 text(gr, L"Name displayed in races\n(3–16 characters)", 1, 10.0f, FontStyleRegular, rect(548, 288, 190, 28), kTextMuted);
 
-                text(gr,L"Invita gli amici o entra nella\nloro lobby dalla lista amici\nnella Home. Massimo 8 giocatori.",1,12,FontStyleRegular,rect(548,334,190,90),kTextMuted);
+                text(gr,L"Home > LOBBY.\nEntrate nella stessa stanza,\npoi Matchmaking nel gioco.\nMassimo 8 giocatori.",1,12,FontStyleRegular,rect(548,334,190,90),kTextMuted);
                 text(gr,L"Rewards: next game launch",1,10,FontStyleRegular,rect(548,458,190,22),kTextMuted);
                 text(gr,g.cfg.online ? L"ONLINE" : L"OFFLINE",0,18,FontStyleBold,rect(548,490,190,28),g.cfg.online ? kArcadeLime : kTextMuted);
 
@@ -1068,7 +1184,83 @@ std::unique_ptr<Bitmap> load_png(const fs::path& path) {
     gr.DrawImage(file.get(), 0, 0, static_cast<INT>(file->GetWidth()), static_cast<INT>(file->GetHeight()));
     return copy;
 }
+std::unique_ptr<Bitmap> load_launcher_logo() {
+    if (auto logo = load_png(g.exe_dir / "assets/launcher/logo.png")) return logo;
+    // Keep branding available even when only the executable is copied.
+    const HMODULE module = GetModuleHandleW(nullptr);
+    const HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(101), RT_RCDATA);
+    if (!resource) return load_png(g.root / "ctrport/assets/launcher/logo.png");
+    const DWORD size = SizeofResource(module, resource);
+    const void* data = LockResource(LoadResource(module, resource));
+    if (!data || !size) return nullptr;
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, size);
+    if (!memory) return nullptr;
+    void* destination = GlobalLock(memory);
+    if (!destination) { GlobalFree(memory); return nullptr; }
+    std::memcpy(destination, data, size);
+    GlobalUnlock(memory);
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(memory, TRUE, &stream))) { GlobalFree(memory); return nullptr; }
+    std::unique_ptr<Bitmap> copy;
+    {
+        Bitmap source(stream);
+        if (source.GetLastStatus() == Ok) {
+            copy = std::make_unique<Bitmap>(INT(source.GetWidth()), INT(source.GetHeight()), PixelFormat32bppPARGB);
+            Gdiplus::Status drawn;
+            {
+                Graphics graphics(copy.get());
+                drawn = graphics.DrawImage(&source, 0, 0, INT(source.GetWidth()), INT(source.GetHeight()));
+            }
+            if (drawn != Ok) copy.reset();
+        }
+    }
+    stream->Release();
+    return copy;
+}
+void poll_fonts() {
+    if (font_load.valid() && font_load.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        auto loaded = font_load.get();
+        if (font_loading_key == font_requested_key) {
+            retail_fonts = std::move(loaded);
+            std::error_code ec;
+            fs::create_directories(g.root / "runtime/user", ec);
+            std::ofstream(g.root / "runtime/user/launcher_fonts.log") << retail_fonts.diagnostics;
+            render_base_layer();
+            RedrawWindow(g.window, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
+        }
+    }
+    if (!font_load.valid() && font_loading_key != font_requested_key) {
+        font_loading_key = font_requested_key;
+        const auto sources = font_requested_sources;
+        font_load = std::async(std::launch::async, [sources] { return ctrport::launcher_font::load(sources); });
+    }
+}
+void request_fonts() {
+    std::vector<fs::path> sources;
+    std::wstring key;
+    std::error_code ec;
+    const auto base = resolve(g.cfg.base_dir), patch = resolve(g.cfg.patch_dir);
+    for (const wchar_t* name : {L"update.pak", L"permanent.pak"}) {
+        const auto relative = fs::path("archives") / name;
+        fs::path source;
+        if (g.cfg.use_patch && !g.cfg.patch_dir.empty() && fs::is_regular_file(patch / relative, ec)) source = patch / relative;
+        else if (!g.cfg.base_dir.empty() && fs::is_regular_file(base / relative, ec)) source = base / relative;
+        if (source.empty()) continue;
+        sources.push_back(source);
+        const auto stamp = fs::last_write_time(source, ec);
+        key += source.wstring() + L"|" + std::to_wstring(stamp.time_since_epoch().count()) + L"\n";
+    }
+    if (key != font_requested_key) {
+        font_requested_key = key;
+        font_requested_sources = std::move(sources);
+        retail_fonts = {};
+        render_base_layer();
+        RedrawWindow(g.window, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
+    }
+    poll_fonts();
+}
 void refresh_artwork() {
+    request_fonts();
     std::error_code ec;
     fs::path folder;
     for (const fs::path candidate : {g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path(), resolve(g.cfg.base_dir)})
@@ -1142,9 +1334,9 @@ void validate() {
         }
         g.global = {summary, 1};
     }
-    EnableWindow(g.online_toggle,!g.process && !g.host_busy);
+    EnableWindow(g.online_toggle,!g.process && !g.host_busy && !g.lobby_busy);
     EnableWindow(g.online_id_edit,!g.process);
-    EnableWindow(g.launch, g.can_launch);
+    EnableWindow(g.launch, g.can_launch && !g.lobby_busy);
     refresh_artwork();
     InvalidateRect(g.window, nullptr, FALSE);
 }
@@ -1242,28 +1434,28 @@ void backup_save_data() {
 }
 
 // Hosting: the project server runs in this process while the launcher is open.
-void copy_to_clipboard(const std::wstring& text) {
-    if (!OpenClipboard(g.window)) return;
-    EmptyClipboard();
-    if (HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, (text.size() + 1) * sizeof(wchar_t))) {
-        std::memcpy(GlobalLock(memory), text.c_str(), (text.size() + 1) * sizeof(wchar_t));
-        GlobalUnlock(memory);
-        if (!SetClipboardData(CF_UNICODETEXT, memory)) GlobalFree(memory);
-    }
-    CloseClipboard();
+bool copy_to_clipboard(const std::wstring& value) {
+    const auto bytes=(value.size()+1)*sizeof(wchar_t);
+    HGLOBAL memory=GlobalAlloc(GMEM_MOVEABLE,bytes);if(!memory)return false;
+    void* data=GlobalLock(memory);if(!data){GlobalFree(memory);return false;}
+    std::memcpy(data,value.c_str(),bytes);GlobalUnlock(memory);
+    if(!OpenClipboard(g.window)){GlobalFree(memory);return false;}
+    const bool ok=EmptyClipboard() && SetClipboardData(CF_UNICODETEXT,memory);
+    CloseClipboard();if(!ok)GlobalFree(memory);return ok;
 }
 
 ctr_online::Json party_command(const char* action) {
     auto request=ctr_online::Json::object();request.set("action",ctr_online::Json::of(action));return request;
 }
 void host_toggled(bool = false) {
-    if(g.host_busy) return;
+    if(g.host_busy || g.lobby_busy) return;
+    ++g.lobby_revision;g.lobby_notice.clear();
     g.host_busy=true;
     g.cfg.online_host=g.cfg.online;
     g.party={};g.party_error.clear();g.invite_count=0;
     EnableWindow(g.online_toggle,FALSE);
     std::thread([start=g.cfg.online,root=g.root,window=g.window] {
-        // The bounded invitation lookup borrows the host DHT. Drain it before stop/restart.
+        // Drain the previous room request before stopping or restarting the local service.
         if(g.party_poll.valid()) g.party_poll.wait();
         if(start) g.host.start(root,{},true); else g.host.stop();
         PostMessageW(window,WM_APP_HOST_READY,start ? 1 : 0,0);
@@ -1281,41 +1473,89 @@ void host_ready(bool started) {
             SetTimer(g.window,20,1000,nullptr);
         } catch(const std::exception& e) {g.party_error=widen(e.what());}
     } else if(started) g.party_error=widen(g.host_status.error);
-    if(!g.party_error.empty()) MessageBoxW(g.window,g.party_error.c_str(),L"Online non pronto",MB_ICONERROR);
-    validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
+    if(!g.party_error.empty() && g.current_tab==TAB_HOME)animate_friends(true);
+    update_lobby_controls();
+    reload_friends();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
+}
+void begin_lobby_action(int action) {
+    if(g.lobby_busy || g.host_busy || g.process)return;
+    if(!g.cfg.online) {
+        if(action==110){g.cfg.online=true;host_toggled(true);update_lobby_controls();}
+        return;
+    }
+    if(!g.host_status.running || g.party.room.empty()) {
+        g.lobby_notice=L"Online non pronto. Disattiva e riattiva Online in Settings.";
+        g.lobby_notice_error=true;InvalidateRect(g.friends_drawer,nullptr,FALSE);return;
+    }
+    g.lobby_busy=true;g.lobby_notice.clear();g.lobby_notice_error=false;++g.lobby_revision;
+    const auto invitation=narrow(window_text(g.lobby_invite));
+    g.lobby_action=std::async(std::launch::async,[root=g.root,self=g.host_status.friend_code,
+        name=narrow(g.cfg.online_id),ip=g.host_status.public_ip,selection=g.party,invitation,action] {
+        return ctr_online::lobby_action(root,self,name,ip,selection,invitation,action);
+    });
+    update_lobby_controls();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
+}
+void finish_lobby_action() {
+    if(!g.lobby_busy || !g.lobby_action.valid() ||
+       g.lobby_action.wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;
+    const auto result=g.lobby_action.get();g.lobby_busy=false;
+    if(!result.ok){g.lobby_notice=widen(result.detail);g.lobby_notice_error=true;}
+    else if(result.action==110) {
+        SetWindowTextW(g.lobby_invite,widen(result.detail).c_str());
+        const bool copied=copy_to_clipboard(widen(result.detail));g.lobby_notice_error=!copied;
+        g.lobby_notice=copied ? L"Invito copiato! Valido 15 minuti. Un nuovo invito revoca il precedente." :
+            L"Appunti occupati. Copia l'invito dal campo sopra.";
+    } else {
+        g.party=result.party;g.party_error.clear();g.party_failures=0;reload_friends();
+        SetWindowTextW(g.lobby_invite,L"");
+        g.lobby_notice=result.action==109 ? L"Sei nella tua stanza. Condividi un invito per riunire i giocatori." :
+            L"Sei nella lobby. Quando siete pronti, avviate il gioco.";
+    }
+    update_lobby_controls();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
 }
 void poll_party() {
-    if(g.host_busy || g.friends_dialog_active || !g.cfg.online || !g.host_status.running || g.party.owner.empty()) return;
+    if(g.host_busy || g.lobby_busy || !g.cfg.online || !g.host_status.running || g.party.owner.empty()) return;
     if(g.party_poll.valid()) {
         if(g.party_poll.wait_for(std::chrono::seconds(0))!=std::future_status::ready) return;
         try {
             auto response=g.party_poll.get();
-            if(g.party_poll_owner!=g.party.owner || g.party_poll_room!=g.party.room) return;
+            if(g.poll_revision!=g.lobby_revision || g.party_poll_owner!=g.party.owner || g.party_poll_room!=g.party.room) return;
             g.party.snapshot=response.at("party");
-            g.invite_count=static_cast<unsigned>(response.at("invitations").items.size());
+            if(const auto* recovered=response.find("recovered_owner")) {
+                g.party.owner=recovered->text;g.party.ip=response.at("recovered_ip").text;
+                ++g.lobby_revision;
+                g.lobby_notice=L"Stanza trasferita automaticamente a un partecipante.";
+                g.lobby_notice_error=false;update_lobby_controls();validate();
+            }
+            g.party_failures=0;
+            reload_friends();
             g.party_error.clear();
             if (const auto* error = g.party.snapshot.find("backup_error")) g.party_error = widen(error->text);
         } catch(const std::exception& e) {
-            if(g.party_poll_owner==g.party.owner && g.party_poll_room==g.party.room) g.party_error=widen(e.what());
+            if(g.poll_revision==g.lobby_revision && g.party_poll_owner==g.party.owner && g.party_poll_room==g.party.room) {
+                g.party_error=widen(e.what());if(g.party_failures<3)++g.party_failures;
+            }
         }
         InvalidateRect(g.friends_drawer,nullptr,FALSE);
         return;
     }
     static ULONGLONG last=0;
-    if(GetTickCount64()-last<15000) return;
+    if(GetTickCount64()-last<3000) return;
     last=GetTickCount64();
+    g.poll_revision=g.lobby_revision;
     g.party_poll_owner=g.party.owner;g.party_poll_room=g.party.room;
-    static std::size_t invite_poll_index=0;
-    const auto invite_index=invite_poll_index++;
-    g.party_poll=std::async(std::launch::async,[root=g.root,selection=g.party,self=g.host_status.friend_code,invite_index,dht=g.host.dht()] {
-        // Check one known host per tick, with no inbound connection to this launcher.
-        const auto entries=ctr_online::FriendStore(root/"runtime/user/online/friends.json").entries();
-        if(!entries.empty()) {
-            try { ctr_online::poll_party_invitations(root,entries[invite_index%entries.size()].friend_code,dht,2000); }
-            catch(...) {} // An unavailable friend must not interrupt the current lobby heartbeat.
+    char option[2]{};
+    const bool migration=GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",option,2)==1 && option[0]=='1';
+    g.party_poll=std::async(std::launch::async,[root=g.root,selection=g.party,failures=g.party_failures,migration] {
+        auto response=ctr_online::Json::object();
+        try {response.set("party",ctr_online::party_request(root,selection.ip,selection.owner,party_command("heartbeat")));}
+        catch(const std::exception&) {
+            if(!migration || failures<2)throw;
+            const auto recovered=ctr_online::recover_party(root,selection);
+            response.set("party",recovered.snapshot);
+            response.set("recovered_owner",ctr_online::Json::of(recovered.owner));
+            response.set("recovered_ip",ctr_online::Json::of(recovered.ip));
         }
-        auto response=ctr_online::party_request(root,"127.0.0.1",self,party_command("status"));
-        response.set("party",ctr_online::party_request(root,selection.ip,selection.owner,party_command("heartbeat")));
         return response;
     });
 }
@@ -1391,7 +1631,7 @@ void xbox_prompts_ready(std::wstring* raw_error) {
 
 void launch_game() {
     validate();
-    if (!g.can_launch || g.process || g.xbox_busy) return;
+    if (!g.can_launch || g.process || g.xbox_busy || g.lobby_busy) return;
     if (g.cfg.upscaler == L"dlss" &&
         (!fs::exists(g.runtime_exe.parent_path() / "ctr_dlss.dll") ||
          !fs::exists(g.runtime_exe.parent_path() / "nvngx_dlss.dll"))) {
@@ -1439,7 +1679,8 @@ void launch_game() {
     else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
     if (g.cfg.online) {
         if(g.host_busy || !g.host_status.running || g.party.room.empty()) {
-            g.lock.release();MessageBoxW(g.window,L"Attendi la connessione Online e scegli una lobby dalla lista amici.",kTitle,MB_ICONERROR);return;
+            g.lock.release();g.lobby_notice=L"Attendi la connessione Online prima di avviare il gioco.";
+            g.lobby_notice_error=true;animate_friends(true);return;
         }
         try {
             // Fresh membership and signed server identity before retail authentication.
@@ -1461,7 +1702,8 @@ void launch_game() {
             set[L"CTR_ONLINE_TRAFFIC_KEY"]=key_path.wstring();
             set[L"CTR_ONLINE_PORT_OFFSET"]=std::to_wstring(ctr_online::kHostGamePortOffset);
         } catch(const std::exception& e) {
-            g.lock.release();MessageBoxW(g.window,widen(e.what()).c_str(),L"Lobby non disponibile",MB_ICONERROR);return;
+            g.lock.release();g.lobby_notice=widen(e.what());g.lobby_notice_error=true;
+            animate_friends(true);return;
         }
     }
     auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR", L"CTR_STARTUP_MUTEX_DLL_DIR", L"CTR_PARK_MISSING_NID",
@@ -1691,7 +1933,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         friends_class.lpszClassName = L"CTRFriendsDrawer";
         friends_class.hCursor = LoadCursorW(nullptr, IDC_HAND);
         RegisterClassW(&friends_class);
-        g.friends_drawer = CreateWindowExW(WS_EX_CONTROLPARENT, friends_class.lpszClassName, L"Friends: apri o chiudi rubrica",
+        g.friends_drawer = CreateWindowExW(WS_EX_CONTROLPARENT, friends_class.lpszClassName, L"Lobby: apri o chiudi partecipanti",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,0,0,0,0,window,nullptr,friends_class.hInstance,nullptr);
         position_friends();
         select_tab(TAB_HOME);
@@ -1728,6 +1970,8 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     }
     case WM_COMMAND: {
         const int id = LOWORD(wparam), code = HIWORD(wparam);
+        if(id==IDOK && GetFocus()==g.lobby_invite){begin_lobby_action(111);return 0;}
+        if(id==IDCANCEL && g.friends_open){animate_friends(false);return 0;}
         if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) { launch_game(); return 0; }
         if (id == ID_SCENE_RES && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.scene_combo, CB_GETCURSEL, 0, 0);
@@ -1807,20 +2051,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             return 0;
         }
 
-        if (id == ID_ONLINE_FRIENDS) {
-            if(g.current_tab!=TAB_HOME || g.host_busy) return 0;
-            if(!g.cfg.online || g.party.room.empty()) {
-                MessageBoxW(window,L"Attiva Online in Settings per collegarti agli amici.",kTitle,MB_ICONINFORMATION);return 0;
-            }
-            if(g.process) {
-                MessageBoxW(window,L"Chiudi il gioco prima di cambiare lobby. La rete viene assegnata all'avvio.",kTitle,MB_ICONINFORMATION);return 0;
-            }
-            g.friends_dialog_active=true;
-            ctr_online::show_friends_dialog(g.window,g.root,g.party,narrow(g.cfg.online_id),g.host.dht());
-            g.friends_dialog_active=false;
-            reload_friends();InvalidateRect(g.friends_drawer,nullptr,FALSE);
-            return 0;
-        }
+        if(id==ID_ONLINE_FRIENDS){animate_friends(true);return 0;}
 
         if (id == ID_BASE_BROWSE) browse(g.base_edit, L"Base game dump folder (CUSA14876, containing eboot.bin)");
         else if (id == ID_PATCH_BROWSE) browse(g.patch_edit, L"Title update v01.21 folder (e.g. CUSA14876-patch)");
@@ -1839,7 +2070,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 0;
     }
     case WM_TIMER:
-        if(wparam==20) poll_party();
+        if(wparam==20) { poll_party(); poll_fonts(); }
         return 0;
     case WM_APP_FINISHED:
         game_finished(static_cast<DWORD>(wparam));
@@ -1851,7 +2082,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         xbox_prompts_ready(reinterpret_cast<std::wstring*>(lparam));
         return 0;
     case WM_CLOSE:
-        if (g.process || g.host_busy || g.xbox_busy) return 0;
+        if (g.process || g.host_busy || g.xbox_busy || g.lobby_busy) return 0;
         save_config();
         KillTimer(window,20);
         if(g.party_poll.valid()) g.party_poll.wait();
@@ -1898,8 +2129,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     }
     g.scale = static_cast<float>(GetDpiForSystem()) / 96.f;
     load_config();
-    g.logo = load_png(g.exe_dir / "assets/launcher/logo.png");
-    if (!g.logo) g.logo = load_png(g.root / "ctrport/assets/launcher/logo.png");
+    g.logo = load_launcher_logo();
 
     WNDCLASSEXW window_class{sizeof(window_class)};
     window_class.lpfnWndProc = window_proc;
@@ -1935,6 +2165,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     g.logo.reset();
     g.art.reset();
     g.icon.reset();
+    if (font_load.valid()) { auto pending = font_load.get(); }
+    retail_fonts = {};
     for (auto& cached : family_cache) cached.reset();
     GdiplusShutdown(gdiplus);
     CoUninitialize();

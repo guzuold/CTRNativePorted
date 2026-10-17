@@ -698,8 +698,20 @@ std::vector<LobbyPlan> MatchmakingStore::match_ready(const std::map<std::uint64_
     }
     return plans;
 }
+std::string MatchmakingStore::migration_routes(std::uint64_t lobby) const {
+    const auto& room=lobbies_.at(lobby);
+    std::string result="v1|";
+    for(const auto account:room.members) {
+        if(room.departed.count(account) || !player_info_.count(account) || player_rooms_.at(account)!=room.selector)continue;
+        const auto info=parse_json(player_info_.at(account));
+        const auto address=base64_decode(info.at("listen_server").at("local_address").text);
+        result+=std::to_string(account)+"="+hex(address)+";";
+    }
+    return result;
+}
 void MatchmakingStore::save_documents(std::uint64_t lobby, const Json& host, const Json& backend, std::uint64_t update_id) {
     documents_[lobby] = LobbyDocuments{host, backend, update_id};
+    documents_.at(lobby).host.set("ctr_migration",Json::of(migration_routes(lobby)));
 }
 bool MatchmakingStore::sync_document(const std::vector<Param>& params, std::uint64_t account, const std::string& selector) {
     if (params.size() != 3 || kinds(params) != std::vector<int>{typed::UINT64, typed::UINT64, typed::STRING}) throw Rejected("invalid lobby synchronization fields");
@@ -725,7 +737,12 @@ bool MatchmakingStore::sync_document(const std::vector<Param>& params, std::uint
     for (const std::uint64_t m : row->second.members) members.insert(std::to_string(m));
     std::set<std::string> state_keys;
     if (state.is_object()) for (const auto& [name, value] : state.members) state_keys.insert(name);
-    bool state_ok = state.is_object() && state_keys == members;
+    std::set<std::string> required_members;
+    for(const auto member:row->second.members)
+        if(!row->second.departed.count(member))required_members.insert(std::to_string(member));
+    bool state_ok = state.is_object() &&
+        std::includes(members.begin(),members.end(),state_keys.begin(),state_keys.end()) &&
+        std::includes(state_keys.begin(),state_keys.end(),required_members.begin(),required_members.end());
     if (state_ok)
         for (const auto& [name, value] : state.members)
             if (!value.is_integer() || value.kind == Json::Kind::Int || value.as_u64() >= 4) state_ok = false;
@@ -745,6 +762,12 @@ bool MatchmakingStore::sync_document(const std::vector<Param>& params, std::uint
             if ((name != "is_merge_src" && name != "is_merge_dst") || !value.is_bool()) rules_ok = false;
     if (!rules_ok) throw Rejected("unsupported lobby merge rules");
     Json backend = current->second.backend;
+    auto remaining_members=row->second.members;
+    remaining_members.erase(std::remove_if(remaining_members.begin(),remaining_members.end(),
+        [&](auto member){return !state_keys.count(std::to_string(member));}),remaining_members.end());
+    auto& backend_players=backend.find("players")->members;
+    backend_players.erase(std::remove_if(backend_players.begin(),backend_players.end(),
+        [&](const auto& entry){return !state_keys.count(entry.first);}),backend_players.end());
     const std::uint64_t version = expected + 1;
     const auto now = static_cast<std::uint64_t>(std::time(nullptr));
     document.set("update_id", Json::of(version));
@@ -752,6 +775,7 @@ bool MatchmakingStore::sync_document(const std::vector<Param>& params, std::uint
     backend.set("update_id", Json::of(version));
     backend.set("update_time", Json::of(now));
     save_documents(lobby, document, backend, version);
+    row->second.members=std::move(remaining_members);
     return true;
 }
 void MatchmakingStore::cancel_pending(std::uint64_t account, const std::string& selector) {
@@ -818,5 +842,27 @@ Bytes room_update_event(std::uint64_t lobby, const Json& host, const Json& backe
     w.u32(ROOM_UPDATED_EVENT).u64(lobby).u64(host.at("update_id").as_u64());
     w.string(dump_json(host)).string(dump_json(backend));
     return w.data();
+}
+std::vector<LobbyPlan> MatchmakingStore::promote_disconnected(std::uint64_t lost, const std::map<std::uint64_t, std::string>& connected) {
+    std::vector<LobbyPlan> changed;
+    for (auto& [id, lobby] : lobbies_) {
+        if (lobby.host != lost) continue;
+        const auto candidate = std::find_if(lobby.members.begin(), lobby.members.end(), [&](auto a) { return a != lost && !lobby.departed.count(a) && connected.count(a) && connected.at(a)==lobby.selector && player_rooms_.count(a) && player_rooms_.at(a)==lobby.selector && player_info(a); });
+        if (candidate == lobby.members.end() || !documents_.count(id)) continue;
+        const auto account = *candidate;
+        auto& docs = documents_.at(id);
+        const auto advertisement = parse_json(*player_info(account));
+        const auto& listen = advertisement.at("listen_server");
+        docs.host.find("listen_server")->set("host_player_id", Json::of(account));
+        docs.host.find("listen_server")->set("host_address", listen.at("local_address"));
+        ++docs.update_id;
+        docs.host.set("update_id", Json::of(docs.update_id));
+        docs.backend.set("update_id", Json::of(docs.update_id));
+        lobby.host = account;
+        lobby.departed.insert(lost);
+        docs.host.set("ctr_migration",Json::of(migration_routes(id)));
+        LobbyPlan plan; plan.lobby_id = id; plan.host = account; changed.push_back(plan);
+    }
+    return changed;
 }
 } // namespace ctr_online

@@ -80,6 +80,9 @@ struct PartySelection {
     Json snapshot = Json::object();
 };
 Json party_request(const std::filesystem::path& root, const std::string& ip, const std::string& code, Json request);
+// Call after repeated heartbeat failures, using the last authenticated snapshot.
+PartySelection recover_party(const std::filesystem::path& root, const PartySelection& previous,
+                             const std::string& local_ip = "127.0.0.1");
 // Pull invitations from a known lobby host through an outbound connection.
 // The destination never needs a listening public port. Returns false if host lookup fails.
 bool poll_party_invitations(const std::filesystem::path& root, const std::string& host_code,

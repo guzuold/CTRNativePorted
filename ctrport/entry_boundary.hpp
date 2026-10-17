@@ -16,6 +16,7 @@
 #include "sysmodule_service.hpp"
 #include "direct_memory.hpp"
 #include "online_traffic_key.hpp"
+#include "race_host_migration.hpp"
 #include "retail_profiles.hpp"
 #include "retail_reward_catalog.hpp"
 #include "gnm_init_dispatch.hpp"
@@ -2050,6 +2051,7 @@ inline int gnm_submit_ordered_control(){
  std::cout<<"{\"scope\":\"gnm_submit_ordered_control\",\"passed\":true,\"SysV5\":true,\"INDEX_TYPE_and_real_EOP64\":true,\"unknown_packet_rejected_before_EOP\":true,\"no_presentation_receipt\":true,\"synthetic\":true}\n";return 0;
 }
 inline LONG CALLBACK entry_dependency_exception(EXCEPTION_POINTERS* exception) {
+    if(race_migration::handle(exception))return EXCEPTION_CONTINUE_EXECUTION;
     if(gpu_fault_hook && exception->ExceptionRecord->ExceptionCode==EXCEPTION_ACCESS_VIOLATION && gpu_fault_hook(exception))return EXCEPTION_CONTINUE_EXECUTION;
     if(runtime_gpu_resident_memory.diagnose(exception))return EXCEPTION_CONTINUE_SEARCH;
     BankCall call;call.functions=entry_function_bank;call.data=entry_data_bank;
@@ -2815,6 +2817,7 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     }
     // CTR_ONLINE=1: project server key in place of the auth3 traffic signing key (R8).
     apply_online_traffic_key(images.front().get(),pin);
+    race_migration::install(images.front().get(),pin);
     // CTR_SCENE_HEIGHT presets, or legacy CTR_NATIVE_4K=1 (ctrport/GUEST_PATCHES.md):
     // explicit height uses height/1080 for the scale; above 1440 also expands the pool.
     // 1. In the Neo branch of graphics device init (v01.00 0x12e74a8, v01.21 0x13aa638),

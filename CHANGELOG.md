@@ -1,3 +1,26 @@
+# v0.3.2 — Client lobby and experimental host migration
+
+- The right-side drawer is now the room lobby, with complete invitations, participant management and a visible scrollbar for the eight-player list. Common room actions stay inside the client.
+- Load the game's fonts from your own dump, alongside the background. Preserve the top-left logo with an embedded branding fallback. No retail fonts or backgrounds are distributed.
+- Experimental EU1.21 race host migration preserves the live session and surviving players' object ownership. Local three-client Dingo Canyon and four-client Polar Pass tests survived loss of the host and backend; Polar Pass also survived a second host loss during the same race.
+- Signed launcher-room checkpoints support successor recovery, same-room membership and fresh invitations. Three-server HTTP recovery tests passed, including retry and former-host exclusion.
+
+## Experimental limits
+
+Host migration is **disabled by default**. Testing requires `CTR_EXPERIMENTAL_HOST_MIGRATION=1` for launcher/server and runtime. Only the pinned CUSA14876 v01.21 executable is supported. Local tests do not establish Internet/NAT or relay failover. Game backend retargeting is unfinished: after the race, returning to the lobby can display "Unable to connect to servers". Combined launcher UI and retail recovery is not yet validated end to end. Wallet migration, network partitions and unreachable-successor recovery remain unfinished. See HOST_MIGRATION.md.
+
+The existing graphics, economy and local backup features and limitations remain. Full online support (R8) is not claimed. Runtime: local race continuity observed. Reconstruction: zero new verified replacements; compatibility registry unchanged.
+
+## Installation
+
+Close the game and launcher, extract the ZIP and run launcher.exe. Preserve your existing runtime/user folder when upgrading. All participants should update. Supply your own base dump and v01.21 update; game data, saves and credentials are not included.
+
+## Verification and credits
+
+Launcher/server builds and route-parser checks passed. Signed HTTP room recovery reports zero failures; real retail evidence remains local. GPL-2.0 project, shadPS4 and bbport references, jech/dht, Julio Cacko Xbox icons (CC0-1.0), user-supplied branding. Implementation and review assisted by Claude, Gemini and OpenAI Codex. See README and included licenses.
+
+---
+
 ## v0.3.1 local backup update — 2026-10-16
 
 - Automatic game-save copies before every launch and after game exit, including crash exits, in `runtime/user/savedata_backups/`. A failed pre-launch copy cancels launch.

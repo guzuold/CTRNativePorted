@@ -178,7 +178,7 @@ struct Entry { uint32_t index, offset, size, compression; std::string path; };
 // IGA v13 reader matching tools/input_prompts/ctr_nf_iga.py; reads only what it needs.
 class Archive {
 public:
-    explicit Archive(const fs::path& path) : file_(path, std::ios::binary) {
+    explicit Archive(const fs::path& path, bool compact = false) : file_(path, std::ios::binary) {
         if (!file_) fail("cannot open " + path.string());
         file_.seekg(0, std::ios::end); file_size_ = uint64_t(file_.tellg());
         Bytes header = read(0, 56);
@@ -187,17 +187,27 @@ public:
         const uint32_t large_n = rd32(&header[28]), medium_n = rd32(&header[32]), small_n = rd32(&header[36]);
         const uint32_t names_offset = rd32(&header[40]), names_size = rd32(&header[48]);
         const uint64_t tables_end = 56ull + file_count * 20ull + large_n * 4ull + medium_n * 2ull + small_n;
-        directory = read(0, size_t(std::max<uint64_t>(tables_end, uint64_t(names_offset) + names_size)));
+        if (compact && (tables_end > 32 * 1024 * 1024 || names_size > 32 * 1024 * 1024 || uint64_t(file_count) * 4 > names_size))
+            fail("archive directory too large");
+        directory = read(0, size_t(compact ? tables_end : std::max<uint64_t>(tables_end, uint64_t(names_offset) + names_size)));
+        const Bytes names = compact ? read(names_offset, names_size) : Bytes{};
+        const auto& name_data = compact ? names : directory;
+        const size_t names_base = compact ? 0 : names_offset;
         size_t at = 56 + size_t(file_count) * 20;
         for (uint32_t i = 0; i < large_n; ++i, at += 4) large_.push_back(rd32(&directory[at]));
         for (uint32_t i = 0; i < medium_n; ++i, at += 2) medium_.push_back(rd16(&directory[at]));
         small_.assign(directory.begin() + at, directory.begin() + at + small_n);
         for (uint32_t i = 0; i < file_count; ++i) {
             const uint8_t* d = &directory[56 + size_t(file_count) * 4 + size_t(i) * 16];
-            const size_t name = names_offset + rd32(&directory[names_offset + size_t(i) * 4]);
-            const size_t full_end = cstring_end(name), short_end = cstring_end(full_end + 1);
+            const size_t name = names_base + rd32(&name_data[names_base + size_t(i) * 4]);
+            const auto end_string = [&](size_t pos) {
+                while (pos < name_data.size() && name_data[pos]) ++pos;
+                if (pos >= name_data.size()) fail("archive name table");
+                return pos;
+            };
+            const size_t full_end = end_string(name), short_end = end_string(full_end + 1);
             files.push_back({i, rd32(d), rd32(d + 8), rd32(d + 12),
-                             std::string(directory.begin() + full_end + 1, directory.begin() + short_end)});
+                             std::string(name_data.begin() + full_end + 1, name_data.begin() + short_end)});
         }
     }
     Bytes extract(const Entry& e) {

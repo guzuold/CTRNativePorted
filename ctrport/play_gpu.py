@@ -166,7 +166,10 @@ if use_121:
     env['CTR_BASE_DIR'] = str(game)
     env['CTR_PATCH_DIR'] = str(patch)
 log = user_root / 'logs' / ('play_' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-command = [str(root / 'build/CTRPort-dev/ctrport.exe'), '--entry-after-libc-init-images', str(eboot)] + \
+runtime_executable = Path(os.environ.get('CTR_RUNTIME_EXE', str(root / 'build/CTRPort-dev/ctrport.exe'))).resolve()
+if not runtime_executable.is_file():
+    sys.exit(f'CTRPort: runtime executable missing: {runtime_executable}')
+command = [str(runtime_executable), '--entry-after-libc-init-images', str(eboot)] + \
           [str(p) for p in sorted((game / 'sce_module').glob('*.prx'))]
 res_info = 'fullscreen' if fullscreen else f'{width or 1280}x{height or 720}'
 print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, scene_height={scene_height or "legacy"}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, display={res_info}): close window to quit. Logs:', log, flush=True)
