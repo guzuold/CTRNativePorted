@@ -16,6 +16,8 @@
 #include "friend_verifier.hpp"
 #include "friend_store.hpp"
 #include "party_lobby.hpp"
+#include "party_migration.hpp"
+#include "room_invite.hpp"
 #include "../dht/dht.h"
 #include <windows.h>
 #include <wincrypt.h>
@@ -137,7 +139,133 @@ void test_invitation_pull() {
     std::filesystem::remove_all(root);
 }
 
+void test_room_invite() {
+    const auto root=std::filesystem::temp_directory_path()/("ctr_room_invite_"+hex(random_bytes(8)));
+    const auto host=root/"host", guest=root/"guest";
+    const auto a=local_friend_code(host), b=local_friend_code(guest);
+    auto req=[](const char* action) { auto j=Json::object();j.set("action",Json::of(action));return j; };
+    auto configure=req("configure");configure.set("name",Json::of("Host"));
+    auto join=req("join");join.set("name",Json::of("Guest"));
+    auto rejects=[&](auto operation,const char* label) {bool denied=false;try{operation();}catch(const std::exception&){denied=true;}check(denied,label);};
+    PartyLobby lobby(a);
+    const auto original=lobby.apply(a,configure,false,1000);
+    rejects([&]{lobby.apply(b,join,false,1000);},"room: no invitation and no friendship denied");
+    const auto shared=lobby.apply(a,req("share"),false,1000);
+    const auto text=format_room_invite({a,shared.at("token").text,"127.0.0.2"});
+    const auto parsed=parse_room_invite(" \n"+text+"\r\n");
+    check(parsed.host==a && parsed.token==shared.at("token").text && parsed.ip=="127.0.0.2","room: invitation roundtrip with surrounding whitespace");
+    for(const auto& bad:std::vector<std::string>{"",text+"|extra","CTRROOM2"+text.substr(8),text.substr(0,text.size()-9)+"999.0.0.1"})
+        rejects([&]{parse_room_invite(bad);},"room: malformed invitation rejected");
+    join.set("invite_token",Json::of(std::string(64,'0')));
+    rejects([&]{lobby.apply(b,join,false,1001);},"room: wrong token denied");
+    join.set("invite_token",Json::of(parsed.token));
+    PartyLobby expiry(a);expiry.apply(a,configure,false,1000);
+    auto expired_join=join;
+    expired_join.set("invite_token",expiry.apply(a,req("share"),false,1000).at("token"));
+    rejects([&]{expiry.apply(b,expired_join,false,1900);},"room: token expires at fifteen minutes");
+    const auto joined=lobby.apply(b,join,false,1001);
+    check(joined.at("room").text==original.at("room").text && joined.at("count").as_u64()==2,
+          "room: invited non-friend receives the same retail matchmaking selector");
+    check(!joined.find("token") && !joined.find("invite_token"),"room: roster never discloses sharing token");
+    rejects([&]{lobby.apply(b,req("share"),false,1002);},"room: guest cannot mint an invitation");
+    // Test rotation and room lifecycle with monotonic synthetic timestamps.
+    PartyLobby rotation(a);rotation.apply(a,configure,false,2000);
+    const auto old=rotation.apply(a,req("share"),false,2000).at("token").text;
+    const auto fresh=rotation.apply(a,req("share"),false,2001).at("token").text;
+    join.set("invite_token",Json::of(old));
+    rejects([&]{rotation.apply(b,join,false,2002);},"room: copying a fresh invitation revokes previous token");
+    rotation.apply(a,req("new"),false,2002);rotation.apply(a,configure,false,2002);
+    join.set("invite_token",Json::of(fresh));
+    rejects([&]{rotation.apply(b,join,false,2003);},"room: new room revokes old invitation");
+    // Roster lifecycle, with monotonic synthetic time and no game emulation.
+    lobby.apply(b,req("leave"),false,1003);
+    check(lobby.apply(a,req("heartbeat"),false,1004).at("count").as_u64()==1,"room: explicit leave updates roster");
+    join.set("invite_token",Json::of(parsed.token));
+    lobby.apply(b,join,false,1005);
+    check(lobby.apply(a,req("heartbeat"),false,1186).at("count").as_u64()==1,"room: silent guest expires after 180 seconds");
+    join.set("invite_token",rotation.apply(a,req("share"),false,2004).at("token"));
+    for(unsigned i=0;i<7;++i) {
+        auto member=join;member.set("name",Json::of("Player"+std::to_string(i)));
+        rotation.apply(local_friend_code(root/("member"+std::to_string(i))),member,false,2005);
+    }
+    check(rotation.apply(a,req("status"),false,2006).at("count").as_u64()==8,"room: host plus seven guests admitted");
+    rejects([&]{rotation.apply(b,join,false,2006);},"room: ninth player rejected despite valid invitation");
+    // Actual signed HTTP on loopback; no friend entries or guest listener.
+    {
+    ServerConfig config;config.host="127.0.0.2";config.public_host=config.host;config.party_enabled=true;
+    config.state_dir=host/"runtime/user/online";config.log_path=host/"runtime/user/logs/room.jsonl";
+    Server server(config);server.start();
+    const auto before=party_request(host,config.host,a,configure);
+    const auto ticket=party_request(host,config.host,a,req("share"));
+    const auto verified=verify_candidate_endpoint(config.host+":8780",a);
+    check(verified.status==VerifyStatus::Verified,"room: invitation host identity verified over HTTP");
+    join.set("invite_token",ticket.at("token"));
+    const auto after=party_request(guest,config.host,a,join);
+    check(after.at("room").text==before.at("room").text && after.at("count").as_u64()==2,
+          "room: signed HTTP join without reciprocal address books");
+    join=req("join");join.set("name",Json::of("Guest"));
+    check(party_request(guest,config.host,a,join).at("room").text==before.at("room").text,
+          "room: admitted guest revalidates membership at game launch without token");
+    server.stop();
+    } // Close server log and store handles before removing the fixture on Windows.
+    std::filesystem::remove_all(backup_io_path(root));
+}
+
+void test_party_migration_http() {
+    struct Environment {
+        std::string before;bool existed=false;
+        Environment(){char value[256]{};const auto n=GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",value,256);existed=n>0 && n<256;if(existed)before=value;SetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION","1");}
+        ~Environment(){SetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",existed?before.c_str():nullptr);}
+    } environment;
+    const auto root=std::filesystem::temp_directory_path()/("ctr_party_recovery_"+hex(random_bytes(8)));
+    const auto aroot=root/"previous",broot=root/"successor",croot=root/"survivor";
+    const auto a=local_friend_code(aroot),b=local_friend_code(broot),c=local_friend_code(croot);
+    auto config=[](const std::filesystem::path& folder,const char* ip) {
+        ServerConfig x;x.host=ip;x.public_host=ip;x.party_enabled=true;
+        x.state_dir=folder/"runtime/user/online";x.log_path=folder/"runtime/user/logs/recovery.jsonl";return x;
+    };
+    Server previous(config(aroot,"127.0.0.2")),successor(config(broot,"127.0.0.1")),survivor(config(croot,"127.0.0.3"));
+    previous.start();successor.start();survivor.start();
+    auto command=[](const char* action){auto j=Json::object();j.set("action",Json::of(action));return j;};
+    auto configure=command("configure");configure.set("name",Json::of("Host"));
+    party_request(aroot,"127.0.0.2",a,configure);
+    auto invite=command("invite");invite.set("target",Json::of(b));party_request(aroot,"127.0.0.2",a,invite);
+    invite.set("target",Json::of(c));party_request(aroot,"127.0.0.2",a,invite);
+    auto join=command("join");join.set("name",Json::of("Migration2"));join.set("endpoint",Json::of("127.0.0.1"));
+    party_request(broot,"127.0.0.2",a,join);
+    join.set("name",Json::of("Migration1"));join.set("endpoint",Json::of("127.0.0.3"));
+    const auto csnapshot=party_request(croot,"127.0.0.2",a,join);
+    const auto bsnapshot=party_request(broot,"127.0.0.2",a,command("heartbeat"));
+    const auto room=bsnapshot.at("room").text;
+    auto destination=command("destination");destination.set("owner",Json::of(a));destination.set("room",Json::of(room));
+    party_request(broot,"127.0.0.1",b,destination);party_request(croot,"127.0.0.3",c,destination);
+    const PartySelection bselection{"127.0.0.2",a,room,bsnapshot},cselection{"127.0.0.2",a,room,csnapshot};
+    check(verify_party_recovery(bsnapshot.at("migration_ticket"),a,room,party_now()).successor==b,
+          "HTTP recovery checkpoint contains registered successor endpoint");
+    previous.stop();
+    bool pending=false;try{recover_party(croot,cselection,"127.0.0.3");}catch(...){pending=true;}
+    check(pending && party_request(croot,"127.0.0.3",c,command("status")).at("owner").text==a,
+          "survivor waits for successor without changing destination prematurely");
+    const auto hosted=recover_party(broot,bselection);
+    const auto followed=recover_party(croot,cselection,"127.0.0.3");
+    check(hosted.owner==b && followed.owner==b && hosted.room==room && followed.room==room &&
+          followed.snapshot.at("count").as_u64()==2,"HTTP restore reunites both survivors in unchanged room after old server stops");
+    check(party_request(croot,"127.0.0.3",c,command("status")).at("owner").text==b,
+          "survivor local backend follows new room owner");
+    check(recover_party(broot,bselection).owner==b,"restore retry recovers a lost response without replacing room again");
+    check(verify_party_message(followed.snapshot.at("migration_ticket"),b,party_now()).at("room").text==room,
+          "successor refreshes signed checkpoint for next failure");
+    check(party_request(broot,"127.0.0.1",b,command("share")).at("token").text.size()==64,
+          "successor can issue fresh invitations after recovery");
+    bool departed=false;try{party_request(aroot,"127.0.0.1",b,command("heartbeat"));}catch(...){departed=true;}
+    check(departed,"old host is not silently readmitted by recovered membership");
+    survivor.stop();successor.stop();
+    std::printf("{\"scope\":\"party_migration_http\",\"failures\":%d}\n",failures);
+}
+
 int run_tests(int argc, char* argv[]) {
+    if(argc>=2 && std::string(argv[1])=="--party-migration-only") {test_party_migration_http();return failures ? 1 : 0;}
+    if(argc>=2 && std::string(argv[1])=="--room-invite-only") {test_room_invite();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--invite-pull-only") {test_invitation_pull();return failures ? 1 : 0;}
     if (argc >= 2 && std::string(argv[1]) == "--dht-network-check") {
         DhtService dht;
@@ -383,6 +511,40 @@ int run_tests(int argc, char* argv[]) {
             sync[1] = param(typed::UINT64, Json::of(2));
             sync[2] = param(typed::STRING, Json::of(dump_json(next)));
             check(store.sync_document(sync, 42, first) && store.documents(plans[0].lobby_id)->update_id == 3, "null attachment after race start");
+            const auto saved=*store.documents(plans[0].lobby_id);
+            auto successor_info=parse_json(info);
+            successor_info.find("listen_server")->set("local_address",Json::of(base64_encode(Bytes(67,1))));
+            successor_info.find("listen_server")->set("security_id",Json::of(base64_encode(Bytes(8,2))));
+            successor_info.find("listen_server")->set("security_key",Json::of(base64_encode(Bytes(16,3))));
+            store.advertise({param(typed::STRING,Json::of(dump_json(successor_info)))},43,first);
+            check(store.promote_disconnected(43,{{42,first}}).empty(),"guest disconnect does not elect a host");
+            check(store.promote_disconnected(42,{{43,other}}).empty(),"successor in another room rejected");
+            check(store.promote_disconnected(42,{}).empty(),"no connected successor leaves documents unchanged");
+            const auto promoted=store.promote_disconnected(42,{{43,first}});
+            check(promoted.size()==1 && promoted[0].host==43 && promoted[0].lobby_id==plans[0].lobby_id,"connected member inherits the same lobby");
+            const auto* migrated=store.documents(plans[0].lobby_id);
+            check(migrated->update_id==4 && migrated->host.at("listen_server").at("host_player_id").as_u64()==43,"migration increments version and changes owner");
+            auto expected_host=saved.host,expected_backend=saved.backend;
+            expected_host.find("listen_server")->set("host_player_id",Json::of(43));
+            expected_host.find("listen_server")->set("host_address",Json::of(base64_encode(Bytes(67,1))));
+            expected_host.set("update_id",Json::of(4));expected_backend.set("update_id",Json::of(4));
+            const auto routes=migrated->host.at("ctr_migration").text;
+            check(routes.find("43="+hex(Bytes(67,1)))!=std::string::npos && routes.find("42=")==std::string::npos,"cached migration routes contain survivor address only");
+            expected_host.set("ctr_migration",migrated->host.at("ctr_migration"));
+            check(migrated->host==expected_host && migrated->backend==expected_backend,"migration preserves race attachment and security documents");
+            check(store.promote_disconnected(42,{{43,first}}).empty(),"duplicate disconnect does not repeat election");
+            bool former_host=false;
+            try{store.sync_document(sync,42,first);}catch(const std::exception&){former_host=true;}
+            check(former_host,"former owner cannot overwrite successor document");
+            auto pruned=migrated->host;
+            auto& fields=pruned.members;
+            fields.erase(std::remove_if(fields.begin(),fields.end(),[](const auto& e){return e.first=="ctr_migration";}),fields.end());
+            auto& states=pruned.find("player_state")->members;
+            states.erase(std::remove_if(states.begin(),states.end(),[](const auto& e){return e.first=="42";}),states.end());
+            sync[1]=param(typed::UINT64,Json::of(4));sync[2]=param(typed::STRING,Json::of(dump_json(pruned)));
+            check(store.sync_document(sync,43,first),"successor can remove the disconnected former host");
+            check(!store.documents(plans[0].lobby_id)->backend.at("players").find("42"),"departed host removed from backend membership");
+            check(store.promote_disconnected(43,{{42,first}}).empty(),"former host reconnect cannot reclaim an old race");
         }
     }
 
@@ -1028,6 +1190,58 @@ int run_tests(int argc, char* argv[]) {
         signed_message.set("payload",Json::of("{}"));refused=false;
         try {verify_party_message(signed_message,owner.friend_code(),now);}catch(...){refused=true;}
         check(refused,"party tampering rejected before mutation");
+    }
+    // Recovery is authorized by a fresh checkpoint signed by the previous owner.
+    {
+        const auto owner=HostIdentity::load_or_create(dir/"recovery_owner.json");
+        const auto alice=HostIdentity::load_or_create(dir/"recovery_alice.json");
+        const auto bob=HostIdentity::load_or_create(dir/"recovery_bob.json");
+        const auto now=party_now();
+        auto command=[](const char* action,const char* name="",const char* endpoint="") {
+            Json j=Json::object();j.set("action",Json::of(action));j.set("name",Json::of(name));j.set("endpoint",Json::of(endpoint));return j;
+        };
+        PartyLobby source(owner.friend_code());
+        source.apply(owner.friend_code(),command("configure","Owner","127.0.0.1"),false,now);
+        source.apply(alice.friend_code(),command("join","Alice","127.0.0.2"),true,now);
+        const auto joined=source.apply(bob.friend_code(),command("join","Bob","127.0.0.3"),true,now);
+        const auto room=joined.at("room").text;
+        const auto payload=source.recovery_checkpoint(alice.friend_code());
+        const auto recovery_ticket=sign_party_message(owner,payload);
+        const auto plan=verify_party_recovery(recovery_ticket,owner.friend_code(),room,now);
+        const auto& successor=user_id("Alice")<user_id("Bob") ? alice : bob;
+        const auto& other=user_id("Alice")<user_id("Bob") ? bob : alice;
+        check(plan.successor==successor.friend_code() && plan.members.size()==2,"signed checkpoint deterministically elects one surviving member");
+        auto destination=command("destination");destination.set("owner",Json::of(owner.friend_code()));destination.set("room",Json::of(room));
+        PartyLobby target(successor.friend_code());target.apply(successor.friend_code(),destination,false,now);
+        auto restore=command("restore");restore.set("ticket",recovery_ticket);
+        auto rejects=[&](const Json& value,std::uint64_t at,const char* description) {
+            bool refused=false;try{target.apply(successor.friend_code(),value,false,at);}catch(...){refused=true;}
+            check(refused && !target.admits(room,"Alice"),description);
+        };
+        auto bad=restore;auto forged=recovery_ticket;forged.set("payload",Json::of("{}"));bad.set("ticket",forged);
+        rejects(bad,now,"tampered checkpoint cannot mutate destination lobby");
+        bad=restore;bad.set("ticket",sign_party_message(other,payload));
+        rejects(bad,now,"checkpoint from another signer rejected");
+        auto wrong_room=payload;wrong_room.set("room",Json::of(std::string(64,'a')));
+        bad=restore;bad.set("ticket",sign_party_message(owner,wrong_room));
+        rejects(bad,now,"checkpoint cannot replace a different selected room");
+        rejects(restore,now+61,"expired checkpoint cannot restore membership");
+        PartyLobby noncandidate(other.friend_code());noncandidate.apply(other.friend_code(),destination,false,now);
+        bool refused=false;try{noncandidate.apply(other.friend_code(),restore,false,now);}catch(...){refused=true;}
+        check(refused,"noncandidate cannot claim host role from same checkpoint");
+        const auto restored=target.apply(successor.friend_code(),restore,false,now);
+        check(restored.at("room").text==room && restored.at("owner").text==successor.friend_code() &&
+              target.admits(room,"Alice") && target.admits(room,"Bob") && !target.admits(room,"Owner"),
+              "successor restores same room and all surviving members without departed host");
+        check(target.recovery_checkpoint(successor.friend_code()).at("generation").as_u64()==plan.generation+1,
+              "restored room advances generation");
+        refused=false;try{target.apply(successor.friend_code(),restore,false,now);}catch(...){refused=true;}
+        check(refused && target.expected_players().at(room)==2,"checkpoint replay cannot reset an already restored room");
+        refused=false;try{source.recovery_checkpoint(std::string("outsider"));}catch(...){refused=true;}
+        check(refused,"checkpoint is not exposed to outsiders");
+        auto duplicate=payload;duplicate.find("members")->items[1].set("name",duplicate.at("members").items[0].at("name"));
+        refused=false;try{verify_party_recovery(sign_party_message(owner,duplicate),owner.friend_code(),room,now);}catch(...){refused=true;}
+        check(refused,"duplicate account names in signed checkpoint rejected");
     }
     // Friend store (address book)
     {

@@ -7,6 +7,7 @@
 #include "friend_identity.hpp"
 #include "friend_store.hpp"
 #include "party_lobby.hpp"
+#include "party_migration.hpp"
 #include "crypto.hpp"
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -332,7 +333,7 @@ Json party_request(const std::filesystem::path& root, const std::string& ip, con
     std::string body;
     const int status=http_request(ip,8780,"/ctr/v1/party",dump_json(sign_party_message(identity,request)),body,3000);
     if(status!=200) {
-        std::string reason="Amico non raggiungibile";
+        std::string reason="Host della lobby non raggiungibile";
         try { reason=parse_json(body).at("error").text; } catch (...) {}
         throw std::runtime_error(reason);
     }
@@ -357,5 +358,33 @@ Json party_request(const std::filesystem::path& root, const std::string& ip, con
         }
     }
     return response;
+}
+PartySelection recover_party(const std::filesystem::path& root, const PartySelection& previous, const std::string& local_ip) {
+    const auto* ticket=previous.snapshot.find("migration_ticket");
+    if(!ticket)throw std::runtime_error("L'host non ha fornito un checkpoint di migrazione");
+    const auto plan=verify_party_recovery(*ticket,previous.owner,previous.room,party_now());
+    const auto self=local_friend_code(root);
+    if(std::none_of(plan.members.begin(),plan.members.end(),[&](const auto& m){return m.code==self;}))
+        throw std::runtime_error("Questo client non appartiene al checkpoint della stanza");
+    const auto candidate=std::find_if(plan.members.begin(),plan.members.end(),[&](const auto& m){return m.code==plan.successor;});
+    const auto ip=self==plan.successor ? local_ip : candidate->endpoint;
+    auto request=Json::object();
+    if(self==plan.successor) {
+        auto query=Json::object();query.set("action",Json::of("status"));
+        const auto current=party_request(root,ip,self,query);
+        const auto* current_room=current.find("room");
+        if(current.at("owner").text==self && current_room && current_room->text==previous.room)
+            request.set("action",Json::of("heartbeat")); // recover a lost restore response
+        else {request.set("action",Json::of("restore"));request.set("ticket",*ticket);}
+    } else request.set("action",Json::of("heartbeat"));
+    auto snapshot=party_request(root,ip,plan.successor,request);
+    if(snapshot.at("room").text!=previous.room || snapshot.at("owner").text!=plan.successor)
+        throw std::runtime_error("Il successore non ha ripristinato questa stanza");
+    if(self!=plan.successor) {
+        auto destination=Json::object();destination.set("action",Json::of("destination"));
+        destination.set("owner",Json::of(plan.successor));destination.set("room",Json::of(previous.room));
+        party_request(root,local_ip,self,destination);
+    }
+    return {ip,plan.successor,previous.room,std::move(snapshot)};
 }
 } // namespace ctr_online

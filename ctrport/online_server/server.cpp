@@ -415,7 +415,7 @@ struct Server::Impl {
                 const Json packet=parse_json(std::string(body.begin(),body.end()));
                 const std::string caller=packet.at("code").text;
                 const auto now=party_now();
-                const Json request=verify_party_message(packet,caller,now);
+                Json request=verify_party_message(packet,caller,now);
                 const std::string nonce=request.at("nonce").text;
                 if (nonce.size()!=32 || nonce.find_first_not_of("0123456789abcdef")!=std::string::npos)
                     throw std::runtime_error("Nonce non valido");
@@ -430,11 +430,16 @@ struct Server::Impl {
                 FriendStore friends(config.state_dir / "friends.json");
                 bool allowed=false;
                 for (const auto& entry : friends.entries()) if (entry.friend_code==caller) allowed=true;
+                if(caller==host_identity->friend_code() && request.at("action").text=="configure")
+                    request.set("endpoint",Json::of(config.public_host));
                 Json response=party->apply(caller,request,allowed,now);
                 if (const auto* name = response.find("backup_name")) {
                     std::lock_guard<std::mutex> guard(state);
                     response.set("wallet_backup", marketplace->snapshot(user_id(name->text)));
                 }
+                char migration[2]{};
+                if(response.find("backup_name") && GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",migration,2)==1 && migration[0]=='1')
+                    response.set("migration_ticket",sign_party_message(*host_identity,party->recovery_checkpoint(caller)));
                 response.set("nonce",Json::of(nonce));
                 return json_answer(200,dump_json(sign_party_message(*host_identity,response)),"party_"+request.at("action").text);
             } catch (const std::exception& error) {
@@ -679,7 +684,8 @@ struct Server::Impl {
             matchmaking.save_documents(plan.lobby_id, host_doc, backend_doc, 1);
             const PlanPlayer& player = *std::find_if(plan.players.begin(), plan.players.end(),
                                                      [&](const PlanPlayer& p) { return p.account == plan.host; });
-            const Bytes event = room_create_event(player.search_id, plan.lobby_id, host_doc, backend_doc);
+            const auto* saved=matchmaking.documents(plan.lobby_id);
+            const Bytes event = room_create_event(player.search_id, plan.lobby_id, saved->host, saved->backend);
             Json members = Json::array();
             for (const PlanPlayer& p : plan.players) members.items.push_back(Json::of(p.account));
             const std::uint64_t lobby = plan.lobby_id, host = plan.host;
@@ -891,6 +897,22 @@ struct Server::Impl {
             const auto it = live_clients.find(client->user.user_id);
             if (it != live_clients.end() && it->second == client) {
                 live_clients.erase(it);
+                // Paired with the opt-in retail live-session adapter. Older clients
+                // retain their original behavior until the full failover is ready.
+                char migration[2]{};
+                if (GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",migration,2)==1 && migration[0]=='1') {
+                    std::map<std::uint64_t,std::string> remaining;
+                    for(const auto& [account,live]:live_clients)remaining[account]=live->user.room_token;
+                    for(const auto& promoted:matchmaking.promote_disconnected(client->user.user_id,remaining)) {
+                        auto pending=pending_lobbies.find(promoted.lobby_id);
+                        if(pending!=pending_lobbies.end())pending->second.host=promoted.host;
+                        publish_host_document(promoted.lobby_id);
+                        Json evidence=Json::object();
+                        evidence.set("lobby",Json::of(promoted.lobby_id));
+                        evidence.set("host",Json::of(promoted.host));
+                        record("race_host_promoted",std::move(evidence));
+                    }
+                }
                 matchmaking.cancel_pending(client->user.user_id, client->user.room_token);
                 relay.forget(client->user.user_id);
             }

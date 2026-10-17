@@ -13,7 +13,7 @@ against the execution of the original code.
 
 ## Status
 
-Latest release: **v0.3.1** (experimental).
+Latest release: **v0.3.2** (experimental).
 
 
 **Reconstruction:** original functions replaced at run time by verified C++: **0** so
@@ -205,3 +205,7 @@ Internal scene resolution (720p–4K) is independent of the display. FSR 1 is in
 ## Local backups (v0.3.1 update)
 
 Game saves are copied before launch and after exit. Updated hosts also provide signed local snapshots of your Pit Stop wallet. Update both launchers and preserve `runtime/user` when replacing program files. Snapshots retain history but do not automatically synchronize wallets between hosts or restore missing past purchases. See [local backup details](ctrport/LOCAL_BACKUPS.md).
+
+## v0.3.2
+
+The right-side drawer is the room lobby. Retail fonts are loaded from your own dump. Host migration is experimental and disabled by default; see [status and limitations](tools/online/HOST_MIGRATION.md).

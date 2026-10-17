@@ -117,11 +117,15 @@ public:
                                        const std::map<std::string, std::size_t>& expected = {});
     void save_documents(std::uint64_t lobby, const Json& host, const Json& backend, std::uint64_t update_id);
     bool sync_document(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
+    // Preserve the existing race documents/keys while electing a connected member.
+    std::vector<LobbyPlan> promote_disconnected(std::uint64_t lost,
+        const std::map<std::uint64_t, std::string>& connected);
     void cancel_pending(std::uint64_t account, const std::string& selector);
     const std::string* player_info(std::uint64_t account) const;
     const LobbyDocuments* documents(std::uint64_t lobby) const;
 
 private:
+    std::string migration_routes(std::uint64_t lobby) const;
     struct MatchPlayer { Bytes address; std::uint32_t a, b; Bytes custom; };
     struct MatchSession {
         std::string selector, context;
@@ -134,7 +138,7 @@ private:
         std::string selector, compatibility, document, status;
         std::optional<std::uint64_t> lobby;
     };
-    struct Lobby { std::string selector; std::uint64_t host; std::vector<std::uint64_t> members; };
+    struct Lobby { std::string selector; std::uint64_t host; std::vector<std::uint64_t> members; std::set<std::uint64_t> departed; };
     std::map<std::uint64_t, std::string> player_info_, player_rooms_;
     std::map<std::uint64_t, std::uint64_t> player_tokens_;
     std::set<std::uint64_t> token_values_;
