@@ -1,2 +1,0 @@
-# Build output and extracted fixture data live outside this source directory.
-__pycache__/

@@ -3,9 +3,8 @@
 A native Windows runtime for **Crash Team Racing Nitro-Fueled** (PS4), in the style of
 the Bloodborne PC port: it loads **your own** PS4 dump, runs the game's original x86-64
 code directly on the CPU, implements the PS4 system libraries for Windows, and renders
-with Vulkan through the shadPS4 renderer used as a library. Alongside the runtime, the
-game engine is being **reconstructed in C++**, one function at a time, each verified
-against the execution of the original code.
+with Vulkan through the shadPS4 renderer used as a library. All game logic runs as the
+original code from your dump.
 
 > This repository contains **no game files**: no executables, data, archives, audio or
 > video from the game. You need your own legally obtained dump. Not affiliated with
@@ -14,12 +13,6 @@ against the execution of the original code.
 ## Status
 
 Latest release: **v0.3.2** (experimental).
-
-
-**Reconstruction:** original functions replaced at run time by verified C++: **0** so
-far. The reconstructed modules in [`reconstruction/`](reconstruction/) are compiled and
-validated against original execution (thousands of fixtures, zero differences), but none
-is switched on in the runtime yet.
 
 ## How it works
 
@@ -37,7 +30,6 @@ is switched on in the runtime yet.
   ABI (trophies, save data).
 - `ctrport/GUEST_PATCHES.md` — every in-memory change to original game code, bound to the
   eboot SHA256 and checked against the original bytes, with its origin.
-- `reconstruction/` — reconstructed engine C++ code (`include/` and `src/`).
 
 ## Playing (release build)
 

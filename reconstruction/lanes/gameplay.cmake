@@ -1,6 +1,0 @@
-add_library(ctr_gameplay_constant_curve STATIC src/gameplay/constant_curve.cpp)
-target_include_directories(ctr_gameplay_constant_curve PUBLIC include)
-target_compile_features(ctr_gameplay_constant_curve PUBLIC cxx_std_20)
-if(MSVC)
-  target_compile_options(ctr_gameplay_constant_curve PRIVATE /fp:strict)
-endif()
