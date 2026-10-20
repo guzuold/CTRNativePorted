@@ -26,7 +26,7 @@ $objects=@($server | ForEach-Object { Join-Path $obj ([IO.Path]::GetFileNameWith
 & rc.exe /nologo "/I$PSScriptRoot" "/fo$out/launcher.res" "$PSScriptRoot/launcher.rc" *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){throw 'launcher logo resource build failed'}
 $objects += @("$out/launcher.res")
-& $cl /nologo /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DUNICODE /D_UNICODE "/DCTR_LAUNCHER_VERSION=`"$Version`"" "$PSScriptRoot/launcher.cpp" @objects "/Fo$out/launcher.obj" "/Fe$out/launcher.exe" /link /SUBSYSTEM:WINDOWS *>> "$out/launcher_build.log"
+& $cl /nologo /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DUNICODE /D_UNICODE "/DCTR_LAUNCHER_VERSION_TOKEN=$Version" "$PSScriptRoot/launcher.cpp" @objects "/Fo$out/launcher.obj" "/Fe$out/launcher.exe" /link /SUBSYSTEM:WINDOWS *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher build failed'}
 New-Item -ItemType Directory -Force "$out/assets/launcher" | Out-Null
 Copy-Item "$PSScriptRoot/assets/launcher/logo.png" "$out/assets/launcher/logo.png" -Force

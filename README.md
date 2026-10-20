@@ -1,4 +1,4 @@
-> **v0.4.3:** gameplay connection authorization follows the assigned matchmaking lobby or accepted/session join, including across separate launchers. Public matchmaking does not require friend codes. Upgrade both PCs; Internet gameplay still needs verification.
+> **v0.4.4:** JOIN from the in-game friends list is authorized across separate launchers (the Delta path), in addition to v0.4.3's matchmaking and invitation authorization. Upgrade both PCs; Internet gameplay still needs verification.
 
 # CTRNativePorted
 
@@ -14,7 +14,7 @@ original code from your dump.
 
 ## Status
 
-Latest release: **v0.4.3** (experimental).
+Latest release: **v0.4.4** (experimental).
 
 ## How it works
 

@@ -8,6 +8,13 @@
 #include <future>
 #include <string>
 #include "online_server/json.hpp"
+// build_launcher.ps1 passes the version unquoted (CTR_LAUNCHER_VERSION_TOKEN=0.4.4):
+// Windows PowerShell 5.1 drops quotes inside native arguments, so the string is made here.
+#define CTR_LAUNCHER_STRING2(x) #x
+#define CTR_LAUNCHER_STRING(x) CTR_LAUNCHER_STRING2(x)
+#if !defined(CTR_LAUNCHER_VERSION) && defined(CTR_LAUNCHER_VERSION_TOKEN)
+#define CTR_LAUNCHER_VERSION CTR_LAUNCHER_STRING(CTR_LAUNCHER_VERSION_TOKEN)
+#endif
 #ifndef CTR_LAUNCHER_VERSION
 #define CTR_LAUNCHER_VERSION "0.4.0"
 #endif
