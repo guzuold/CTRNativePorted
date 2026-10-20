@@ -1,3 +1,23 @@
+## v0.4.1 — 2026-10-20
+
+Friend presence and invitation recovery fixes, including the launcher updater.
+
+- Keep the last verified friend address during a temporary outage so a restarted launcher can be contacted again without waiting for DHT rediscovery. Failed lookups no longer advance the last-seen timestamp.
+- Do not consume the one-minute discovery retry interval before DHT is ready at launcher startup.
+- Repeated delivery of an invitation preserves its accepted state. Reused invitation IDs with conflicting details are rejected.
+- Do not automatically prompt again for accepted invitations or repeatedly reopen a failed invitation. Acceptance errors now show HTTP/transport details with explicit Retry/Cancel controls. Cancel stops automatic prompts for that pending invitation; it does not claim that joining succeeded.
+
+Validation: 8 restart checks, 34 peer/session checks using real loopback services, and 36 native invitation-dialog checks with mocked HTTP transport. Launcher and HLE library compile. These checks do not establish successful party joining or a playable race across the Internet. The first presence update coinciding with game startup remains an observation to verify on two PCs.
+
+Upgrade both PCs. The refreshed v0.4.0 with **Check updates** can install v0.4.1 from the launcher. Close the game and disable Multiplayer Online before installation. Older launchers without the updater need one manual ZIP extraction into the existing installation; preserve `runtime/user`, your dump and mods. See FIRST_UPDATE.md.
+
+For the two-PC test: first open both launchers with Multiplayer Online enabled and both games closed; check friend presence. Restart one launcher, then check recovery. Start both games and send one invite. Record whether acceptance succeeds or the exact error shown. Logs are under `runtime/user/logs` (including `online_server_*.jsonl` and game stdout/stderr logs).
+
+No game files, identities, saves or user configuration are included. No new retail runtime milestone or verified reconstruction is claimed. Changes prepared with OpenAI Codex; existing project and third-party license notices remain in place.
+## v0.4.0 updater refresh — 2026-10-20
+
+Automatic and manual release checks, SHA-256 verified downloads, separate installer, backup/rollback and launcher restart. The first installation is manual, even from v0.4.0. No runtime binary changes. See FIRST_UPDATE.md.
+
 # v0.4.0 — Friends and public matchmaking without a shared server
 
 Each player's game now talks only to the service running inside their own launcher. The services find each other and cooperate directly; nobody has to host a room or run a server for the others.

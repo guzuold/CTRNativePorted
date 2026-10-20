@@ -124,6 +124,25 @@ bool FriendStore::remove(const std::string& code_str) {
     return removed;
 }
 
+bool FriendStore::update_status(const std::string& code_str, const std::string& status) {
+    FriendCodeInfo info;
+    const auto err = parse_friend_code(code_str, info);
+    const auto target = err == CodeParseError::Ok ? info.code : code_str;
+    bool found = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& entry : entries_) {
+            if (entry.friend_code == target) {
+                entry.last_status = status;
+                found = true;
+                break;
+            }
+        }
+    }
+    if (found && !path_.empty()) save(path_);
+    return found;
+}
+
 bool FriendStore::update_endpoint(const std::string& code_str, const std::string& endpoint, const std::string& status) {
     FriendCodeInfo info;
     const CodeParseError err = parse_friend_code(code_str, info);

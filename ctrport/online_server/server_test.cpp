@@ -270,14 +270,14 @@ namespace ctr_online {
 int http_request(const std::string& ipv4, std::uint16_t port, const std::string& path, const std::string& payload,
                  std::string& body, int timeout_ms); // launcher_online.cpp
 }
-// A request as the game sends it to its local service (identity header, port 8780).
+// A request as the game sends it to its local service (identity header, port 28780).
 int game_http(const std::string& ip, const std::string& method, const std::string& path, const std::string& online_id,
               const std::string& body, std::string& answer, const std::string& content_type = "application/json") {
     answer.clear();
     const SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     sockaddr_in address{};
     address.sin_family = AF_INET;
-    address.sin_port = htons(8780);
+    address.sin_port = htons(28780);
     inet_pton(AF_INET, ip.c_str(), &address.sin_addr);
     if (connect(s, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) { closesocket(s); return 0; }
     const std::string request = method + " " + path + " HTTP/1.1\r\nHost: " + ip + "\r\nConnection: close\r\nX-Ctr-Online-Id: " +
@@ -294,6 +294,56 @@ int game_http(const std::string& ip, const std::string& method, const std::strin
 }
 // Phase 2: three local services on separate addresses. A and B have each other in their
 // rubrica; C has A in its own but A does not know C.
+void test_friend_restart() {
+    const auto root=std::filesystem::temp_directory_path()/("ctr_restart_"+hex(random_bytes(8)));
+    const auto aroot=root/"a",broot=root/"b";
+    const auto a=local_friend_code(aroot),b=local_friend_code(broot);
+    const auto book=aroot/"runtime/user/online/friends.json";
+    FriendStore(book).add_or_update(b,"Bruno");
+    FriendStore(book).update_endpoint(b,"127.0.0.3:28780","Server verificato");
+    FriendStore(broot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
+    ServerConfig cfg;cfg.host="127.0.0.3";cfg.public_host=cfg.host;cfg.relay_port=0;
+    cfg.tcp_record_ports={};cfg.udp_record_ports={};cfg.state_dir=broot/"runtime/user/online";
+    cfg.log_path=broot/"runtime/user/logs/restart.jsonl";cfg.friend_network=true;
+    cfg.http_port=28780;cfg.discovery_port=28781;cfg.local_name="Bruno";cfg.friend_poll_period=std::chrono::hours(1);
+    const auto identity=HostIdentity::load_or_create(aroot/"runtime/user/identity/host_identity.json");
+    FriendWatcher watcher(identity,book,rubrica_resolver(book));
+    DhtService unavailable_dht; // Deliberately stopped: exercise recovery without public discovery.
+    {
+        Server remote(cfg);remote.start();watcher.poll_now();
+        check(watcher.friends().size()==1 && watcher.friends()[0].online && !watcher.friends()[0].in_game,
+              "restart: launcher presence works without a running game");
+        remote.stop();
+    }
+    watcher.poll_now();
+    check(!watcher.friends()[0].online,"restart: stopped launcher is offline");
+    const auto prior=FriendStore(book).entries()[0];
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    const auto lookup=find_friend_server(aroot,b,100,100,{},&unavailable_dht);
+    check(lookup.status==VerifyStatus::NoResponse,"restart: outage is not reported as verified");
+    const auto after=FriendStore(book).entries()[0];
+    check(after.last_endpoint==prior.last_endpoint,"restart: outage retains last verified endpoint");
+    check(after.last_seen==prior.last_seen,"restart: outage does not advance last seen");
+    {
+        Server remote(cfg);remote.start();watcher.poll_now();
+        check(watcher.friends()[0].online && !watcher.friends()[0].in_game,
+              "restart: friend recovers after restart without game or DHT");
+        remote.stop();
+    }
+    const auto croot=root/"c";
+    local_friend_code(croot);
+    FriendStore(croot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
+    cfg.state_dir=croot/"runtime/user/online";
+    cfg.log_path=croot/"runtime/user/logs/restart.jsonl";
+    {
+        Server wrong_peer(cfg);wrong_peer.start();watcher.poll_now();
+        check(!watcher.friends()[0].online,"restart: cached address with another identity stays offline");
+        const auto wrong=find_friend_server(aroot,b,100,100,{},&unavailable_dht);
+        check(wrong.status==VerifyStatus::InvalidIdentity,"restart: another identity is rejected");
+        wrong_peer.stop();
+    }
+    std::error_code ignored;std::filesystem::remove_all(root,ignored);
+}
 void test_peer_channel() {
     const auto root=std::filesystem::temp_directory_path()/("ctr_peer_"+hex(random_bytes(8)));
     const auto aroot=root/"a",broot=root/"b",croot=root/"c";
@@ -303,13 +353,13 @@ void test_peer_channel() {
     FriendStore(croot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
     const std::map<std::string,std::string> address{{a,"127.0.0.2"},{b,"127.0.0.3"},{c,"127.0.0.4"}};
     auto config=[&](const std::filesystem::path& folder,const std::string& ip,const char* name) {
-        ServerConfig x;x.host=ip;x.public_host=ip;x.relay_port=0;x.tcp_record_ports={};x.udp_record_ports={};
+        ServerConfig x;x.http_port=28780;x.discovery_port=28781;x.host=ip;x.public_host=ip;x.relay_port=0;x.tcp_record_ports={};x.udp_record_ports={};
         x.state_dir=folder/"runtime/user/online";x.log_path=folder/"runtime/user/logs/peer.jsonl";
         x.friend_network=true;x.local_name=name;x.friend_poll_period=std::chrono::hours(1);
         x.friend_resolver=[address](const std::string& code)->std::optional<std::pair<std::string,std::uint16_t>> {
             const auto it=address.find(code);
             if(it==address.end()) return std::nullopt;
-            return std::make_pair(it->second,std::uint16_t(8780));
+            return std::make_pair(it->second,std::uint16_t(28780));
         };
         return x;
     };
@@ -325,32 +375,32 @@ void test_peer_channel() {
     const auto bid=HostIdentity::load_or_create(broot/"runtime/user/identity/host_identity.json");
     auto presence=[]{Json j=Json::object();j.set("action",Json::of("presence"));return j;};
     std::string reason;
-    try{peer_request(cid,"127.0.0.2",8780,a,presence());}catch(const std::exception& e){reason=e.what();}
+    try{peer_request(cid,"127.0.0.2",28780,a,presence());}catch(const std::exception& e){reason=e.what();}
     check(reason=="Non e nella lista amici","peer channel: stranger gets the rubrica refusal");
     Json payload=presence();payload.set("nonce",Json::of(hex(random_bytes(16))));payload.set("to",Json::of(a));
     const std::string packet=dump_json(sign_peer_message(bid,payload));
     std::string first,second;
-    const int s1=http_request("127.0.0.2",8780,"/ctr/v1/peer",packet,first,3000);
-    const int s2=http_request("127.0.0.2",8780,"/ctr/v1/peer",packet,second,3000);
+    const int s1=http_request("127.0.0.2",28780,"/ctr/v1/peer",packet,first,3000);
+    const int s2=http_request("127.0.0.2",28780,"/ctr/v1/peer",packet,second,3000);
     check(s1==200 && s2==403 && second.find("duplicato")!=std::string::npos,"peer channel: replayed packet refused");
     Json elsewhere=presence();elsewhere.set("nonce",Json::of(hex(random_bytes(16))));elsewhere.set("to",Json::of(c));
     std::string misdirected;
-    check(http_request("127.0.0.2",8780,"/ctr/v1/peer",dump_json(sign_peer_message(bid,elsewhere)),misdirected,3000)==403 &&
+    check(http_request("127.0.0.2",28780,"/ctr/v1/peer",dump_json(sign_peer_message(bid,elsewhere)),misdirected,3000)==403 &&
           misdirected.find("altro servizio")!=std::string::npos,"peer channel: packet addressed to another service refused");
     Json forged=sign_peer_message(bid,payload);forged.set("code",Json::of(c));
     std::string third;
-    check(http_request("127.0.0.3",8780,"/ctr/v1/peer",dump_json(forged),third,3000)==403,
+    check(http_request("127.0.0.3",28780,"/ctr/v1/peer",dump_json(forged),third,3000)==403,
           "peer channel: claimed sender must match the signature");
     Json unknown=Json::object();unknown.set("action",Json::of("format_disk"));
     reason.clear();
-    try{peer_request(bid,"127.0.0.2",8780,a,unknown);}catch(const std::exception& e){reason=e.what();}
+    try{peer_request(bid,"127.0.0.2",28780,a,unknown);}catch(const std::exception& e){reason=e.what();}
     check(reason.find("Azione non supportata")==0,"peer channel: unknown action refused");
     std::string learned;
-    const auto identified=identify_endpoint("127.0.0.3:8780",learned,2000);
+    const auto identified=identify_endpoint("127.0.0.3:28780",learned,2000);
     check(identified.status==VerifyStatus::Verified && learned==b && identified.ip=="127.0.0.3",
           "public matchmaking: a service's code is learned and verified from its identity answer");
     learned.clear();
-    check(identify_endpoint("127.0.0.9:8780",learned,500).status!=VerifyStatus::Verified && learned.empty(),
+    check(identify_endpoint("127.0.0.9:28780",learned,500).status!=VerifyStatus::Verified && learned.empty(),
           "public matchmaking: an endpoint without a service is not a candidate");
     const MatchHub self{"CTR1-M",""},low{"CTR1-A","10.0.0.1"},high{"CTR1-Z","10.0.0.2"};
     check(choose_hub(self,true,{high,low})->code=="CTR1-A" && choose_hub(self,true,{high})->code=="CTR1-M" &&
@@ -405,13 +455,13 @@ void test_friend_invitation() {
     FriendStore(croot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
     const std::map<std::string,std::string> address{{a,"127.0.0.2"},{b,"127.0.0.3"},{c,"127.0.0.4"}};
     auto config=[&](const std::filesystem::path& folder,const std::string& ip,const char* name) {
-        ServerConfig x;x.host=ip;x.public_host=ip;x.relay_port=0;x.tcp_record_ports={};x.udp_record_ports={};
+        ServerConfig x;x.http_port=28780;x.discovery_port=28781;x.host=ip;x.public_host=ip;x.relay_port=0;x.tcp_record_ports={};x.udp_record_ports={};
         x.state_dir=folder/"runtime/user/online";x.log_path=folder/"runtime/user/logs/invite.jsonl";
         x.friend_network=true;x.local_name=name;x.friend_poll_period=std::chrono::hours(1);
         x.friend_resolver=[address](const std::string& code)->std::optional<std::pair<std::string,std::uint16_t>> {
             const auto it=address.find(code);
             if(it==address.end()) return std::nullopt;
-            return std::make_pair(it->second,std::uint16_t(8780));
+            return std::make_pair(it->second,std::uint16_t(28780));
         };
         return x;
     };
@@ -446,6 +496,13 @@ void test_friend_invitation() {
           answer.find(session)!=std::string::npos,"cross invite: acceptance reaches the host's service");
     check(game_http("127.0.0.3","GET","/ctr/v1/session-invitations","GuestBruno","",answer)==200 && answer=="[]",
           "cross invite: an accepted invitation is no longer pending");
+    Json duplicate=Json::object();duplicate.set("action",Json::of("invitation"));
+    duplicate.set("invitation",Json::of(invitation));duplicate.set("session",Json::of(session));
+    duplicate.set("sender",Json::of("HostAnna"));duplicate.set("recipient",Json::of(guest));
+    peer_request(HostIdentity::load_or_create(aroot/"runtime/user/identity/host_identity.json"),
+                 "127.0.0.3",28780,b,duplicate);
+    check(game_http("127.0.0.3","GET","/ctr/v1/session-invitations","GuestBruno","",answer)==200 && answer=="[]",
+          "cross invite: repeated delivery does not reopen an accepted invitation");
     check(game_http("127.0.0.3","POST","/webapi/sdk:sessionInvitation/v1/sessions/"+session+"/members?index=0&priority=49","GuestBruno","",answer)==204,
           "cross invite: guest joins the host's session from its own service");
     check(game_http("127.0.0.2","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session,"HostAnna","",answer)==200 &&
@@ -463,14 +520,14 @@ void test_friend_invitation() {
         j.set("name",Json::of(name));j.set("content_type",Json::of(""));j.set("body",Json::of(""));return j;
     };
     std::string reason;
-    try{peer_request(bid,"127.0.0.2",8780,a,webapi("HostAnna","DELETE","/webapi/sdk:sessionInvitation/v1/sessions/"+session));}
+    try{peer_request(bid,"127.0.0.2",28780,a,webapi("HostAnna","DELETE","/webapi/sdk:sessionInvitation/v1/sessions/"+session));}
     catch(const std::exception& e){reason=e.what();}
     check(!reason.empty(),"cross invite: a friend's service cannot act as the host's own player");
     reason.clear();
-    try{peer_request(bid,"127.0.0.2",8780,a,webapi("GuestBruno","GET","/ctr/v1/config"));}catch(const std::exception& e){reason=e.what();}
+    try{peer_request(bid,"127.0.0.2",28780,a,webapi("GuestBruno","GET","/ctr/v1/config"));}catch(const std::exception& e){reason=e.what();}
     check(reason=="Richiesta non inoltrabile","cross invite: only session and invitation routes are forwarded");
     reason.clear();
-    try{peer_request(cid,"127.0.0.2",8780,a,webapi("OtherCarla","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session));}
+    try{peer_request(cid,"127.0.0.2",28780,a,webapi("OtherCarla","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session));}
     catch(const std::exception& e){reason=e.what();}
     check(reason=="Non e nella lista amici","cross invite: a stranger's service cannot read the session");
     check(game_http("127.0.0.3","DELETE","/webapi/sdk:sessionInvitation/v1/sessions/"+session+"/members/me","GuestBruno","",answer)==204 &&
@@ -482,6 +539,7 @@ void test_friend_invitation() {
 }
 
 int run_tests(int argc, char* argv[]) {
+    if(argc>=2 && std::string(argv[1])=="--friend-restart-only") {test_friend_restart();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--peer-only") {test_peer_channel();test_friend_invitation();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--party-migration-only") {test_party_migration_http();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--room-invite-only") {test_room_invite();return failures ? 1 : 0;}
