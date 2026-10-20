@@ -9,6 +9,7 @@ objects). Typed values are a type byte followed by the little-endian value.
 """
 import itertools, struct, time
 import demonware_rest
+import demonware_auth3
 
 # Typed byte buffer data types (as numbered in h1-mod byte_buffer, public source).
 BOOL, INT8, UINT8, WCHAR16, INT16, UINT16, INT32, UINT32, INT64, UINT64 = range(1, 11)
@@ -168,6 +169,35 @@ def handle(service, task, params, user):
     if service == 12 and task == 6 and not params:
         # One result, one total result, UTC seconds. Validate with the retail client.
         return reply(task, Writer().u32(1).u32(1).u32(int(time.time())))
+    if service == 12 and task == 10:
+        if not params or params[0][0] != UINT32 or params[0][1] != len(params)-1 or any(
+                p[0] != STRING or not isinstance(p[1], str) or not p[1] for p in params[1:]):
+            return reply(task, error=UNSERVED_ERROR)
+        writer = Writer().u32(len(params)-1).u32(len(params)-1)
+        for _, name in params[1:]:
+            writer.u64(demonware_auth3.user_id(name)).string(name)
+        return reply(task, writer)
+    if service == 138 and task in (19,20,2,3,14) and matchmaking_store is not None:
+        try:
+            if task == 19:
+                session = matchmaking_store.reserve_session(params,user['user_id'],user['room_token'])
+                return reply(task,Writer().u32(1).u32(1).blob(session))
+            if task in (20,2):
+                matchmaking_store.update_session(params,user['user_id'],initialize=task == 20)
+            elif task == 3:
+                matchmaking_store.delete_session(params,user['user_id'])
+            else:
+                if not params or params[0][0] != STRING or any(p[0] != UINT64 for p in params[1:]):
+                    raise ValueError('unsupported friend lookup parameters')
+                sessions = matchmaking_store.friend_sessions(params[0][1],[p[1] for p in params[1:]],user['user_id'])
+                writer = Writer().u32(len(sessions)).u32(len(sessions))
+                for address,session,game_type,maximum,players,custom in sessions:
+                    writer.blob(address).blob(session).u32(game_type).u32(maximum).u32(players)
+                    writer.data += custom  # Retail 1.21 reads the typed attributes directly.
+                return reply(task,writer)
+        except (ValueError,KeyError,TypeError):
+            return reply(task,error=UNSERVED_ERROR)
+        return reply(task)
     if service == 4 and task == 1 and statistics_store is not None:
         try:
             statistics_store.write(params, user['user_id'])

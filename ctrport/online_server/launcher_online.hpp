@@ -6,6 +6,12 @@
 #include "upnp.hpp"
 #include "json.hpp"
 #include "friend_verifier.hpp"
+#include "friend_network.hpp"
+#include "server.hpp"
+#include <atomic>
+#include <condition_variable>
+#include <optional>
+#include <thread>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -42,20 +48,39 @@ struct HostStatus {
 
 class DhtService;
 
+// DHT key on which the services that can host public matchmaking announce themselves.
+Bytes public_matchmaking_key();
+// Hub election: the lowest friend code among the verified candidates and, when it can be
+// reached from the internet, this service itself. nullopt when there is no candidate.
+std::optional<MatchHub> choose_hub(const MatchHub& self, bool self_reachable, const std::vector<MatchHub>& verified);
+
 class Host {
 public:
     Host();
     ~Host();
     // Blocking (UPnP discovery takes a few seconds): call it off the UI thread.
     // manual_public_ip: used as is when not empty (no UPnP address lookup, ports still mapped).
-    HostStatus start(const std::filesystem::path& root, const std::string& manual_public_ip, bool use_upnp);
+    // local_name: the player's online ID, reported to the friends of the rubrica, whose services
+    // this one polls for presence (friend_network.hpp).
+    HostStatus start(const std::filesystem::path& root, const std::string& manual_public_ip, bool use_upnp,
+                     const std::string& local_name = {});
     void stop();
     bool running() const;
     HostStatus status() const;
     std::size_t players() const;
     DhtService* dht() const;
+    // Friends of the rubrica with their last presence (empty while stopped).
+    std::vector<FriendState> friends() const;
+    // Current public matchmaking hub (this service's own code when it hosts or plays alone).
+    std::optional<MatchHub> match_hub() const;
 
 private:
+    void elect_hubs(std::filesystem::path root, MatchHub self, bool self_reachable);
+    mutable std::mutex hub_mutex_;
+    std::condition_variable hub_wake_;
+    bool hub_stop_ = false;
+    std::optional<MatchHub> hub_;
+    std::thread hub_thread_;
     mutable std::mutex mutex_;
     std::unique_ptr<Server> server_;
     std::unique_ptr<PortMapper> mapper_;

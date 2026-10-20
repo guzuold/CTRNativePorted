@@ -332,6 +332,12 @@ std::string room_token(const std::string& password) {
     append(data, password);
     return hex(sha256(data));
 }
+// Public matchmaking: a player that sends no room token searches with everyone else on the
+// server. A distinct prefix keeps it apart from every password-derived token.
+const std::string& public_room_token() {
+    static const std::string token = hex(sha256(bytes_of(std::string("ctr-public-room-v1", 18))));
+    return token;
+}
 bool valid_room_token(const std::string& value) {
     if (value.size() != 64) return false;
     for (const char c : value) if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;

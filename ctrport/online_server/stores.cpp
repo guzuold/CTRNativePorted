@@ -531,8 +531,209 @@ Json SessionStore::create(std::uint64_t account, const std::string& content_type
         throw Rejected("unsupported session metadata");
     const std::string id = uuid4_hex();
     parts.erase(parts.begin());
-    sessions_[id] = Session{account, metadata, std::move(parts)};
+    sessions_[id] = Session{account, metadata, std::move(parts), {{account, ""}}, {account}, {}};
+    sessions_[id].metadata.set("sessionCreateTimestamp", Json::of(static_cast<std::uint64_t>(std::time(nullptr)) * 1000));
+    if (!metadata.find("sessionLockFlag")) sessions_[id].metadata.set("sessionLockFlag", Json::of(false));
     return single("sessionId", Json::of(id));
+}
+
+void SessionStore::update(std::uint64_t account, const std::string& id, const Bytes& body) {
+    const auto found = sessions_.find(id);
+    if (found == sessions_.end() || found->second.owner != account) throw Rejected("unknown session or not its owner");
+    const Json change = strip_bom_parse(body);
+    if (!change.is_object() || change.members.empty()) throw Rejected("unsupported session update");
+    for (const auto& [name, value] : change.members) {
+        const bool ok = (name == "sessionPrivacy" && value.is_string() && (value.text == "public" || value.text == "private")) ||
+                        (name == "sessionMaxUser" && value.is_integer() && signed_of(value) >= 1 && signed_of(value) <= 8) ||
+                        (name == "sessionLockFlag" && value.is_bool()) ||
+                        (name == "sessionStatus" && value.is_string());
+        if (!ok) throw Rejected("unsupported session update field " + name);
+    }
+    for (const auto& [name, value] : change.members) found->second.metadata.set(name, value);
+}
+
+void SessionStore::expire_invitations(std::uint64_t now) {
+    for (auto it = invitations_.begin(); it != invitations_.end();)
+        it = it->second.expires <= now ? invitations_.erase(it) : std::next(it);
+}
+Json SessionStore::invite(std::uint64_t account, const std::string& sender, const std::string& session,
+                        const std::vector<std::uint64_t>& recipients, std::uint64_t now) {
+    expire_invitations(now);
+    const auto owner = sessions_.find(session);
+    if (owner == sessions_.end() || owner->second.owner != account || user_id(sender) != account)
+        throw Rejected("invitation sender must own session");
+    if (recipients.empty() || recipients.size() > 16) throw Rejected("invalid invitation recipient count");
+    const std::set<std::uint64_t> unique(recipients.begin(), recipients.end());
+    if (unique.size() != recipients.size() || unique.count(0) || unique.count(account))
+        throw Rejected("invalid invitation recipients");
+    // Validate the whole batch before insertion; retries reuse an outstanding invitation.
+    for (auto recipient : recipients) {
+        std::size_t count = 0;
+        bool retry = false;
+        for (const auto& [id, invitation] : invitations_) {
+            if (invitation.recipient == recipient) {
+                ++count;
+                retry |= invitation.session == session && invitation.account == account && !invitation.accepted;
+            }
+        }
+        if (!retry && count >= 64) throw Rejected("recipient invitation queue full");
+    }
+    Json sent = Json::array();
+    for (auto recipient : recipients) {
+        auto existing = std::find_if(invitations_.begin(), invitations_.end(), [&](const auto& entry) {
+            return entry.second.recipient == recipient && entry.second.session == session && entry.second.account == account && !entry.second.accepted;
+        });
+        std::string id;
+        if (existing != invitations_.end()) id = existing->first;
+        else {
+            do { id = hex(random_bytes(16)); } while (invitations_.count(id));
+            invitations_.emplace(id, Invitation{session, sender, account, recipient, now + 300});
+        }
+        Json result = Json::object();
+        result.set("invitationId", Json::of(id));
+        result.set("accountId", Json::of(std::to_string(recipient)));
+        sent.items.push_back(result);
+    }
+    return sent;
+}
+Json SessionStore::invitations(std::uint64_t recipient, std::uint64_t now) {
+    expire_invitations(now);
+    Json result = Json::array();
+    for (const auto& [id, invite] : invitations_) {
+        if (invite.recipient != recipient || invite.accepted) continue;
+        Json row = Json::object();
+        row.set("invitationId", Json::of(id));
+        row.set("sessionId", Json::of(invite.session));
+        row.set("onlineId", Json::of(invite.sender));
+        row.set("accountId", Json::of(std::to_string(invite.account)));
+        result.items.push_back(row);
+    }
+    return result;
+}
+void SessionStore::dismiss(std::uint64_t recipient, const std::string& invitation, std::uint64_t now) {
+    expire_invitations(now);
+    const auto it = invitations_.find(invitation);
+    if (it == invitations_.end() || it->second.recipient != recipient)
+        throw Rejected("unknown invitation or not its recipient");
+    invitations_.erase(it);
+}
+Json SessionStore::accept(std::uint64_t recipient, const std::string& id, std::uint64_t now) {
+    expire_invitations(now);
+    const auto it = invitations_.find(id);
+    if (it == invitations_.end() || it->second.recipient != recipient) throw Rejected("unknown invitation");
+    const auto session = sessions_.find(it->second.session);
+    if (session == sessions_.end()) throw Rejected("session closed");
+    if (const auto* locked = session->second.metadata.find("sessionLockFlag"); locked && locked->boolean)
+        throw Rejected("session locked");
+    session->second.admitted.insert(recipient);
+    it->second.accepted = true;
+    Json result = Json::object();
+    result.set("sessionId", Json::of(it->second.session));
+    result.set("invitationId", Json::of(id));
+    return result;
+}
+const SessionStore::Session& SessionStore::readable(std::uint64_t account, const std::string& id) const {
+    const auto it = sessions_.find(id);
+    if (it == sessions_.end()) throw Rejected("unknown session");
+    const auto& session = it->second;
+    const bool invited = std::any_of(invitations_.begin(), invitations_.end(), [&](const auto& item) {
+        return item.second.session == id && item.second.recipient == account &&
+               item.second.expires > static_cast<std::uint64_t>(std::time(nullptr));
+    });
+    if (!session.admitted.count(account) && !session.members.count(account) && !invited &&
+        session.metadata.at("sessionPrivacy").text != "public") throw Rejected("private session");
+    return session;
+}
+Json SessionStore::describe(std::uint64_t account, const std::string& id) const {
+    const auto& session = readable(account, id);
+    Json result = session.metadata;
+    result.set("sessionId", Json::of(id));
+    Json members = Json::array();
+    for (const auto& [member, name] : session.members) {
+        Json row = Json::object();
+        row.set("accountId", Json::of(std::to_string(member)));
+        row.set("onlineId", Json::of(name));
+        row.set("platform", Json::of("PS4"));
+        members.items.push_back(row);
+        if (member == session.owner) result.set("sessionCreator", row);
+    }
+    result.set("members", members);
+    result.set("memberCount", Json::of(static_cast<unsigned>(members.items.size())));
+    return result;
+}
+Part SessionStore::attachment(std::uint64_t account, const std::string& id, const std::string& name) const {
+    const auto& session = readable(account, id);
+    for (const auto& part : session.parts) if (part.name == name) return part;
+    throw Rejected("session attachment absent");
+}
+void SessionStore::join(std::uint64_t account, const std::string& name, const std::string& id) {
+    readable(account, id);
+    auto& session = sessions_.at(id);
+    if (!session.members.count(account)) {
+        if (const auto* locked = session.metadata.find("sessionLockFlag"); locked && locked->boolean)
+            throw Rejected("session locked");
+        if (session.members.size() >= session.metadata.at("sessionMaxUser").as_u64()) throw Rejected("session full");
+    }
+    session.members[account] = name;
+}
+void SessionStore::leave(std::uint64_t account, const std::string& id) {
+    const auto it = sessions_.find(id);
+    if (it == sessions_.end()) throw Rejected("unknown session");
+    if (it->second.owner == account) { erase(account, id); return; }
+    if (!it->second.members.erase(account)) throw Rejected("not a session member");
+    it->second.admitted.erase(account);
+    it->second.priorities.erase(account);
+}
+void SessionStore::erase(std::uint64_t account, const std::string& id) {
+    const auto it = sessions_.find(id);
+    if (it == sessions_.end() || it->second.owner != account) throw Rejected("not session owner");
+    sessions_.erase(it);
+    for (auto invite = invitations_.begin(); invite != invitations_.end();)
+        invite = invite->second.session == id ? invitations_.erase(invite) : std::next(invite);
+}
+void SessionStore::replace_attachment(std::uint64_t account, const std::string& id, Part part) {
+    const auto it = sessions_.find(id);
+    if (it == sessions_.end() || it->second.owner != account) throw Rejected("not session owner");
+    if (part.data.size() > 2 * 1024 * 1024 ||
+        (part.name != "session-image" && part.name != "changeable-session-data"))
+        throw Rejected("invalid mutable session attachment");
+    for (auto& old : it->second.parts) if (old.name == part.name) { old = std::move(part); return; }
+    it->second.parts.push_back(std::move(part));
+}
+Json SessionStore::user_sessions(std::uint64_t requester, std::uint64_t account) const {
+    Json rows = Json::array();
+    for (const auto& [id, session] : sessions_) {
+        if (!session.members.count(account)) continue;
+        try {
+            auto row = describe(requester, id);
+            row.set("index", Json::of(static_cast<unsigned>(rows.items.size())));
+            const auto priority = session.priorities.find(account);
+            row.set("priority", Json::of(priority == session.priorities.end() ? 0 : priority->second));
+            rows.items.push_back(row);
+        }
+        catch (const Rejected&) {} // Private sessions are omitted for non-invited callers.
+    }
+    return rows;
+}
+void SessionStore::member_priority(std::uint64_t account, const std::string& id, std::uint64_t priority) {
+    const auto it = sessions_.find(id);
+    if (it == sessions_.end() || !it->second.members.count(account) || priority > UINT32_MAX)
+        throw Rejected("invalid member priority");
+    it->second.priorities[account] = priority;
+}
+Json SessionStore::invitation(std::uint64_t recipient, const std::string& id, std::uint64_t now) {
+    expire_invitations(now);
+    const auto it = invitations_.find(id);
+    if (it == invitations_.end() || it->second.recipient != recipient) throw Rejected("unknown invitation");
+    // Invitation grants access even before acceptance, while it remains valid.
+    Json row = Json::object(), from = Json::object();
+    from.set("onlineId", Json::of(it->second.sender));
+    from.set("accountId", Json::of(std::to_string(it->second.account)));
+    row.set("fromUser", from);
+    row.set("invitationId", Json::of(id)); row.set("sessionId", Json::of(it->second.session));
+    row.set("usedFlag", Json::of(it->second.accepted)); row.set("expired", Json::of(false));
+    row.set("session", describe(recipient, it->second.session));
+    return row;
 }
 
 void MatchmakingStore::advertise(const std::vector<Param>& params, std::uint64_t account, const std::string& selector) {
@@ -580,10 +781,13 @@ Bytes MatchmakingStore::register_session(const std::vector<Param>& params, std::
     const Bytes address = hex_field(params[1].value), custom = hex_field(params[4].value);
     if (address.size() != 67 || custom.empty() || custom.size() > 65535) throw Rejected("invalid session fields");
     const std::uint32_t a = u32_field(params[2].value), b = u32_field(params[3].value);
+    // A host registering again in the same context replaces its previous session.
+    for (auto it = sessions_.begin(); it != sessions_.end();)
+        it = it->second.owner == account && it->second.context == context ? sessions_.erase(it) : std::next(it);
     while (true) {
         const Bytes session = random_bytes(8);
         if (std::any_of(session.begin(), session.end(), [](unsigned char c) { return c != 0; }) && !sessions_.count(session)) {
-            sessions_[session] = MatchSession{selector, context, account, MatchPlayer{address, a, b, custom}, {}};
+            sessions_[session] = MatchSession{selector, context, account, MatchPlayer{address, a, b, custom}, 1, false};
             return session;
         }
     }
@@ -593,21 +797,69 @@ void MatchmakingStore::update_session_players(const std::vector<Param>& params, 
         throw Rejected("invalid session player header");
     const std::string& context = text_of(params[0].value);
     const Bytes session = hex_field(params[1].value);
-    const Json& count_value = params[2].value;
-    const std::uint64_t count = count_value.as_u64();
-    if (count < 1 || count > 8 || params.size() != 3 + count * 4 || session.size() != 8) throw Rejected("invalid session player count");
+    // Layout: context, session ID, u32 number of players, then the session's full information
+    // (host address, game type, maximum players, attributes) once, whatever the player count.
+    const std::uint64_t count = params[2].value.as_u64();
+    if (count < 1 || count > 8 || params.size() != 7 || session.size() != 8) throw Rejected("invalid session player count");
     const auto it = sessions_.find(session);
     if (it == sessions_.end() || it->second.owner != account || it->second.selector != selector || it->second.context != context)
         throw Rejected("session owner or room mismatch");
-    std::vector<MatchPlayer> rows;
-    for (std::size_t position = 0; position < count; ++position) {
-        const std::size_t base = 3 + position * 4;
-        if (kinds(params, base, 4) != std::vector<int>{typed::BLOB, typed::UINT32, typed::UINT32, typed::BLOB}) throw Rejected("invalid session player fields");
-        const Bytes address = hex_field(params[base].value), custom = hex_field(params[base + 3].value);
-        if (address.size() != 67 || custom.empty() || custom.size() > 65535) throw Rejected("invalid session player values");
-        rows.push_back(MatchPlayer{address, u32_field(params[base + 1].value), u32_field(params[base + 2].value), custom});
+    if (kinds(params, 3, 4) != std::vector<int>{typed::BLOB, typed::UINT32, typed::UINT32, typed::BLOB}) throw Rejected("invalid session player fields");
+    const Bytes address = hex_field(params[3].value), custom = hex_field(params[6].value);
+    if (address.size() != 67 || custom.empty() || custom.size() > 65535) throw Rejected("invalid session player values");
+    it->second.self = MatchPlayer{address, u32_field(params[4].value), u32_field(params[5].value), custom};
+    it->second.players = static_cast<std::uint32_t>(count);
+}
+Bytes MatchmakingStore::reserve_session(const std::vector<Param>& params, std::uint64_t account, const std::string& selector) {
+    if (!valid_room_token(selector) || params.size() != 1 || params[0].kind != typed::STRING) throw Rejected("unsupported session reservation");
+    const std::string& context = text_of(params[0].value);
+    if (context.empty() || context.size() > 16) throw Rejected("invalid session context");
+    for (auto it = sessions_.begin(); it != sessions_.end();)
+        it = it->second.owner == account && it->second.context == context && it->second.reserved ? sessions_.erase(it) : std::next(it);
+    while (true) {
+        const Bytes session = random_bytes(8);
+        if (std::any_of(session.begin(), session.end(), [](unsigned char c) { return c != 0; }) && !sessions_.count(session)) {
+            sessions_[session] = MatchSession{selector, context, account, MatchPlayer{}, 0, true};
+            return session;
+        }
     }
-    it->second.players = std::move(rows);
+}
+void MatchmakingStore::update_session(const std::vector<Param>& params, std::uint64_t account, bool initialize) {
+    if (params.size() != 6 || kinds(params) != std::vector<int>{typed::STRING, typed::BLOB, typed::BLOB, typed::UINT32, typed::UINT32, typed::BLOB})
+        throw Rejected("unsupported session update schema");
+    const auto it = sessions_.find(hex_field(params[1].value));
+    if (it == sessions_.end() || it->second.owner != account || it->second.context != text_of(params[0].value))
+        throw Rejected("unknown session or not its owner");
+    const Bytes address = hex_field(params[2].value), custom = hex_field(params[5].value);
+    if (address.size() != 67 || custom.empty() || custom.size() > 65535) throw Rejected("invalid session fields");
+    it->second.self = MatchPlayer{address, u32_field(params[3].value), u32_field(params[4].value), custom};
+    if (initialize) { it->second.reserved = false; it->second.players = 1; }
+}
+void MatchmakingStore::delete_session(const std::vector<Param>& params, std::uint64_t account) {
+    if (params.size() != 2 || kinds(params) != std::vector<int>{typed::STRING, typed::BLOB}) throw Rejected("unsupported session deletion");
+    const auto it = sessions_.find(hex_field(params[1].value));
+    if (it == sessions_.end() || it->second.owner != account || it->second.context != text_of(params[0].value))
+        throw Rejected("unknown session or not its owner");
+    sessions_.erase(it);
+}
+std::vector<MatchmakingStore::FriendSession> MatchmakingStore::friend_sessions(const std::string& context,
+        const std::vector<std::uint64_t>& accounts, std::uint64_t requester) const {
+    std::vector<FriendSession> found;
+    for (const std::uint64_t account : accounts) {
+        if (account == requester) continue;
+        for (const auto& [id, session] : sessions_) {
+            if (session.owner != account || session.context != context || session.reserved) continue;
+            found.push_back({session.self.address, id, session.self.a, session.self.b, session.players, session.self.custom});
+        }
+    }
+    return found;
+}
+std::vector<std::pair<std::string, MatchmakingStore::FriendSession>> MatchmakingStore::owned_sessions(std::uint64_t account) const {
+    std::vector<std::pair<std::string, FriendSession>> found;
+    for (const auto& [id, session] : sessions_)
+        if (session.owner == account && !session.reserved)
+            found.push_back({session.context, {session.self.address, id, session.self.a, session.self.b, session.players, session.self.custom}});
+    return found;
 }
 std::uint64_t MatchmakingStore::start_search(const std::vector<Param>& params, std::uint64_t account, const std::string& selector) {
     if (params.size() != 1 || params[0].kind != typed::STRING) throw Rejected("expected one search document");
@@ -638,7 +890,7 @@ std::uint64_t MatchmakingStore::start_search(const std::vector<Param>& params, s
     if (filters_ok)
         for (const auto& [name, value] : filters.at("filter").members)
             if (!value.is_integer() || value.kind == Json::Kind::Int) filters_ok = false;
-    if (!filters_ok || performance != single("game_type", Json::of(1))) throw Rejected("unsupported search filters");
+    if (!filters_ok || !keys_are(performance, {"game_type"}) || !performance.at("game_type").is_unsigned() || performance.at("game_type").as_u64() > UINT32_MAX) throw Rejected("unsupported search filters");
     Json compatibility_list = Json::array();
     compatibility_list.items = {slots, filters, performance};
     const std::string compatibility = dump_json_sorted(compatibility_list);
@@ -726,8 +978,10 @@ bool MatchmakingStore::sync_document(const std::vector<Param>& params, std::uint
                                                "listen_server", "team_balance", "ruleset_payload", "attachment"};
     if (!document.is_object()) throw Rejected("unsupported host document schema");
     for (const std::string& key : keys) if (!document.find(key)) throw Rejected("unsupported host document schema");
+    // ctr_migration is the server's own field (save_documents): a host that echoes it back is
+    // accepted, and the value is regenerated from the server's state rather than trusted.
     for (const auto& [name, value] : document.members)
-        if (!keys.count(name) && name != "game_id") throw Rejected("unsupported host document schema");
+        if (!keys.count(name) && name != "game_id" && name != "ctr_migration") throw Rejected("unsupported host document schema");
     const Json& update_time = document.at("update_time");
     if (!equals_u64(document.at("update_id"), expected) || !update_time.is_integer() || update_time.kind == Json::Kind::Int ||
         !document.at("lobby_open").is_bool() || !document.at("lobby_open_for_pres_join").is_bool())

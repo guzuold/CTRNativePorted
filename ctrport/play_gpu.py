@@ -111,8 +111,9 @@ if use_online:
             env['CTR_ONLINE_ROOM_TOKEN'] = room.token(password)
         except ValueError as error:
             sys.exit('CTRPort: ' + str(error))
-    if not room.valid_token(env.get('CTR_ONLINE_ROOM_TOKEN', '')):
-        sys.exit('CTRPort: online play requires a room password (--online-password or CTR_ONLINE_PASSWORD).')
+    # Without a room password the server's public matchmaking is used.
+    if env.get('CTR_ONLINE_ROOM_TOKEN') and not room.valid_token(env['CTR_ONLINE_ROOM_TOKEN']):
+        sys.exit('CTRPort: invalid CTR_ONLINE_ROOM_TOKEN.')
     # The project server's public key replaces the auth3 traffic key in the eboot
     # (ctrport/online_traffic_key.hpp); fetch it from the server this run will use.
     import urllib.request
@@ -129,6 +130,17 @@ if use_online:
     env['CTR_ONLINE_TRAFFIC_KEY'] = str(key_path)
 if '--mute' in sys.argv:
     env['CTR_AUDIO_MUTE'] = '1'
+# Split screen: each controller (or the keyboard) that holds a button joins as the next local
+# player, up to four (ctrport/pad_backend.hpp). --no-keyboard leaves the keyboard out.
+use_split_screen = '--split-screen' in sys.argv or os.environ.get('CTR_SPLIT_SCREEN') == '1'
+env.pop('CTR_SPLIT_SCREEN', None)
+if use_split_screen:
+    env['CTR_SPLIT_SCREEN'] = '1'
+if '--no-keyboard' in sys.argv:
+    env['CTR_KEYBOARD'] = '0'
+for i, arg in enumerate(sys.argv):
+    if arg == '--keyboard-map' and i + 1 < len(sys.argv):
+        env['CTR_KEYBOARD_MAP'] = str(Path(sys.argv[i + 1]).resolve())
 fullscreen = '--fullscreen' in sys.argv or os.environ.get('CTR_GPU_FULLSCREEN') == '1'
 if fullscreen:
     env['CTR_GPU_FULLSCREEN'] = '1'
@@ -172,7 +184,7 @@ if not runtime_executable.is_file():
 command = [str(runtime_executable), '--entry-after-libc-init-images', str(eboot)] + \
           [str(p) for p in sorted((game / 'sce_module').glob('*.prx'))]
 res_info = 'fullscreen' if fullscreen else f'{width or 1280}x{height or 720}'
-print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, scene_height={scene_height or "legacy"}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, display={res_info}): close window to quit. Logs:', log, flush=True)
+print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, scene_height={scene_height or "legacy"}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, split_screen={use_split_screen}, display={res_info}): close window to quit. Logs:', log, flush=True)
 with (instance_lock(workdir) if instance_name else lane_lock('shared', 'claude', timeout=600)), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
     print('CTRPort: pre-run save backup:', backup_savedata(user_root, 'before_launch'), flush=True)
     child = subprocess.Popen(command, cwd=workdir, env=env, stdout=out, stderr=err)

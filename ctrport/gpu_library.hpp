@@ -14,6 +14,7 @@
 #include "missing_import.hpp"
 #include "gpu_hooks.hpp"
 #include "kernel_file.hpp"
+#include "common_dialog.hpp"
 
 namespace ctrport {
 struct CtrGpuConfigV1 {
@@ -123,6 +124,13 @@ inline void route_hle_imports(const std::vector<ImageMetadata>& metadata,std::ve
         [](const char* point)->int{kernel_files.unmount(point);return 0;}};
     const auto set_host=reinterpret_cast<int(*)(const CtrHleHostV1*)>(GetProcAddress(hle_library,"ctr_hle_set_host"));
     if(!set_host || set_host(&host))throw std::runtime_error("ctr_hle host services rejected");
+    const auto set_invitation_owner = reinterpret_cast<void(*)(int(*)(int))>(GetProcAddress(hle_library,"ctr_hle_invitation_set_owner"));
+    if (set_invitation_owner) set_invitation_owner([](int op)->int {
+        if (op == 0) return common_dialog.ready();
+        if (op == 1) return common_dialog.claim();
+        if (op == 2) { common_dialog.release(); return 1; }
+        return 0;
+    });
     unsigned routed=0,replaced=0;std::vector<std::string> seen;
     for(const auto& image:metadata)for(const auto& symbol:image.imports){
         if(symbol.type!=2)continue;

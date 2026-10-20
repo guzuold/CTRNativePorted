@@ -19,6 +19,7 @@
 #include <cstring>
 #include <fstream>
 #include <functional>
+#include <map>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -172,6 +173,8 @@ struct DhtService::Impl {
     Bytes announce_hash_;
     std::uint16_t announce_port_ = 0;
     std::chrono::steady_clock::time_point last_announce_{};
+    struct ExtraAnnounce { std::uint16_t port = 0; std::chrono::steady_clock::time_point last{}; bool due = true; };
+    std::map<Bytes, ExtraAnnounce> extra_announces_;
 
     std::shared_ptr<ActiveSearch> current_search_;
     std::shared_ptr<BootstrapContext> bootstrap_ctx_;
@@ -264,6 +267,9 @@ struct DhtService::Impl {
 
         // Resolve and ping bootstrap nodes asynchronously to prevent blocking worker startup or shutdown
         std::thread([ctx = bootstrap_ctx_, extra_nodes = extra_nodes_] {
+            // Its own Winsock reference: the service may be destroyed (WSACleanup) while this
+            // detached thread is still inside getaddrinfo, which crashed in the RPC runtime.
+            WsaInit wsa;
             if (!ctx) return;
             auto deliver = [&](const sockaddr_in& sin) {
                 if (ctx->stop_requested) return;
@@ -299,6 +305,7 @@ struct DhtService::Impl {
             std::vector<sockaddr_in> pings;
             std::shared_ptr<ActiveSearch> search_copy;
             bool announce_now = false;
+            std::vector<std::pair<Bytes, std::uint16_t>> extra_due;
             Bytes announce_h;
             std::uint16_t announce_p = 0;
 
@@ -316,6 +323,12 @@ struct DhtService::Impl {
                     announce_p = announce_port_;
                     last_announce_ = now;
                 }
+                for (auto& [hash, extra] : extra_announces_) {
+                    if (!extra.due && now - extra.last < std::chrono::minutes(15)) continue;
+                    extra.due = false;
+                    extra.last = now;
+                    extra_due.emplace_back(hash, extra.port);
+                }
             }
 
             for (const auto& sin : pings) {
@@ -325,6 +338,7 @@ struct DhtService::Impl {
             if (announce_now && announce_h.size() == 20) {
                 dht_search(announce_h.data(), static_cast<int>(announce_p), AF_INET, nullptr, nullptr);
             }
+            for (const auto& [hash, port] : extra_due) dht_search(hash.data(), static_cast<int>(port), AF_INET, nullptr, nullptr);
 
             if (search_copy) {
                 bool trigger = false;
@@ -487,6 +501,22 @@ void DhtService::set_announce(const Bytes& info_hash_20, std::uint16_t contact_t
         impl_->announce_changed_ = true;
     }
     impl_->wake();
+}
+
+void DhtService::add_announce(const Bytes& info_hash_20, std::uint16_t contact_tcp_port) {
+    if (info_hash_20.size() != 20) return;
+    {
+        std::lock_guard<std::mutex> lock(impl_->cmd_mutex_);
+        auto& extra = impl_->extra_announces_[info_hash_20];
+        extra.port = contact_tcp_port;
+        extra.due = true;
+    }
+    impl_->wake();
+}
+
+void DhtService::remove_announce(const Bytes& info_hash_20) {
+    std::lock_guard<std::mutex> lock(impl_->cmd_mutex_);
+    impl_->extra_announces_.erase(info_hash_20);
 }
 
 void DhtService::clear_announce() {

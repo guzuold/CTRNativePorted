@@ -139,8 +139,9 @@ endif()
 
 # ctr_hle: system library functions written in the guest SysV ABI (ctrport/hle).
 file(GLOB HLE_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../hle/*.cpp)
-add_library(ctr_hle SHARED ${HLE_SOURCES})
+add_library(ctr_hle SHARED ${HLE_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/../online_server/json.cpp)
 target_compile_definitions(ctr_hle PRIVATE CTR_HLE_BUILD)
+target_link_libraries(ctr_hle PRIVATE user32 gdi32)
 target_compile_options(ctr_hle PRIVATE -Wno-unused-command-line-argument)
 if (CLANG_RT)
     target_link_libraries(ctr_hle PRIVATE ${CLANG_RT})

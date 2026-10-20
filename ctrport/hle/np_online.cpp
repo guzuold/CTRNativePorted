@@ -18,6 +18,7 @@
 #include "ctr_hle.h"
 #include "online_config.h"
 
+namespace ctr_hle::online { void dispatch_webapi_push(); }
 namespace {
 constexpr int kLocalUser = 1;
 constexpr int kInvalidArgument = static_cast<int>(0x80550003u);
@@ -479,6 +480,7 @@ CTR_HLE_REGISTER_ONLINE("Ec63y59l9tw", "libSceNpManager", sceNpSetNpTitleId);
 
 CTR_SYSV int sceNpCheckCallback() {
     dispatch_state_events();
+    ctr_hle::online::dispatch_webapi_push();
     return 0;
 }
 CTR_HLE_REGISTER_ONLINE("3Zl8BePTh9Y", "libSceNpManager", sceNpCheckCallback);
@@ -487,6 +489,7 @@ CTR_HLE_REGISTER_ONLINE("3Zl8BePTh9Y", "libSceNpManager", sceNpCheckCallback);
 
 CTR_SYSV int sceNpCheckCallbackForLib() {
     dispatch_state_events();
+    ctr_hle::online::dispatch_webapi_push();
     return 0;
 }
 CTR_HLE_REGISTER_ONLINE("JELHf4xPufo", "libSceNpManagerForToolkit", sceNpCheckCallbackForLib);

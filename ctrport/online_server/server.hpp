@@ -13,16 +13,25 @@
 // - recorders for other TCP/UDP ports.
 // It never connects anywhere itself.
 #pragma once
+#include "friend_network.hpp"
 #include "json.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace ctr_online {
+// The service whose public matchmaking a player uses (phase 2: one hub elected among the
+// players' own services).
+struct MatchHub {
+    std::string code, ip;
+    std::uint16_t port = 8780;
+};
+
 struct ServerConfig {
     std::string host = "0.0.0.0";
     std::uint16_t http_port = 8780;
@@ -41,6 +50,16 @@ struct ServerConfig {
     std::filesystem::path log_path;   // runtime/user/logs/online_server_<time>.jsonl
     bool party_enabled = false; // launcher-managed membership and admission
     std::filesystem::path identity_path; // optional custom path for host_identity.json
+    // Friend network (phase 2): answer the signed POST /ctr/v1/peer of the friends in
+    // state_dir/friends.json and poll their services for presence (friend_network.hpp).
+    bool friend_network = false;
+    std::string local_name; // online ID of this PC's player; else the first connected game
+    FriendWatcher::Resolver friend_resolver; // empty: the rubrica's last verified endpoint
+    std::chrono::milliseconds friend_poll_period{5000};
+    // Public matchmaking across PCs: the hub to use, asked when a player of this service starts
+    // a public search (145/2, 145/3, 145/15, 145/18); nullopt or this service's own code: match
+    // here. The hub then stays fixed for that player until its game disconnects or the hub fails.
+    std::function<std::optional<MatchHub>()> match_hub;
     // Called with each event's one-line summary (also written to stdout by the standalone server).
     std::function<void(const std::string&)> on_event;
 };
@@ -61,6 +80,9 @@ public:
     std::size_t connected_players() const;
     std::string friend_code() const;
     const HostIdentity* host_identity() const;
+    // Friends of the rubrica with their last presence (empty without friend_network).
+    std::vector<FriendState> friends() const;
+    void poll_friends(); // one synchronous presence round
 
 private:
     struct Impl;

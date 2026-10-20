@@ -12,7 +12,7 @@ original code from your dump.
 
 ## Status
 
-Latest release: **v0.3.2** (experimental).
+Latest release: **v0.4.0** (experimental).
 
 ## How it works
 
@@ -201,3 +201,7 @@ Game saves are copied before launch and after exit. Updated hosts also provide s
 ## v0.3.2
 
 The right-side drawer is the room lobby. Retail fonts are loaded from your own dump. Host migration is experimental and disabled by default; see [status and limitations](tools/online/HOST_MIGRATION.md).
+
+## v0.4.0
+
+Friends list by code in the launcher, the same friends in the game with invite and join, and public matchmaking between all players through an automatically elected hub. No shared server: each game talks to its own launcher service. See the [changelog](CHANGELOG.md) for limits.

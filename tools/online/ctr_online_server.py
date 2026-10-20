@@ -34,7 +34,7 @@ On the same PC as the game without --public-host, the server's UDP 3074 needs it
 address: start the game with --online-server 127.0.0.2. State: runtime/user/online/ (server key). Log:
 runtime/user/logs/online_server_<time>.jsonl, one JSON object per event.
 """
-import argparse, asyncio, base64, datetime, json, re, secrets, socket, struct, sys, time
+import argparse, asyncio, base64, datetime, json, os, re, secrets, socket, struct, sys, time
 from urllib.parse import parse_qs
 from pathlib import Path
 
@@ -52,6 +52,7 @@ friends_store = None
 session_store = None
 live_clients = {}
 pending_lobbies = {}
+game_presence = {}
 
 
 async def send_lobby(client, payload, payload_type):
@@ -155,16 +156,60 @@ def room_addresses(room_token):
     return found
 
 
+def friend_page(requester, offset, limit):
+    if offset < 0 or not 1 <= limit <= 500:
+        raise ValueError('invalid friend pagination')
+    if os.environ.get('CTR_ONLINE_EXPERIMENT_FRIENDS') != '1':
+        return friends_store.page(demonware_auth3.user_id(requester),offset,limit)
+    online={client['user']['online_id'] for client in live_clients.values()}
+    fixed=os.environ.get('CTR_ONLINE_EXPERIMENT_FRIEND_NAMES','')
+    names=sorted(set(fixed.split(',')) - {'',requester}) if fixed else sorted(online-{requester})
+    rows=[]
+    for name in names[offset:offset+limit]:
+        account=demonware_auth3.user_id(name)
+        presence={'onlineStatus':'online' if name in online else 'offline','platform':'PS4'}
+        if name in online:
+            presence['incontextInfoList']=[{'gameStatus':'','gameData':'',**game_presence.get(account,{}),
+                'gameTitleInfo':{'npTitleId':'CUSA14876_00','titleName':'Crash Team Racing Nitro-Fueled'}}]
+        rows.append({'user':{'accountId':str(account),'onlineId':name},'avatarUrl':'','region':'it',
+                     'isOfficiallyVerified':False,'personalDetail':{'displayName':name},'presence':presence})
+    return {'start':offset,'size':len(rows),'totalResults':len(names),'friendList':rows}
+
+
 def http_answer(method, target, headers, body):
     """Returns (status, extra headers, body bytes, event name, extra event fields)."""
     host = headers.get('host', '').split(':')[0].lower()
     online_id = headers.get('x-ctr-online-id', '')
+    if target == '/ctr/v1/session-invitations' or target.startswith('/ctr/v1/session-invitations/'):
+        if not online_id:
+            return 403, {}, b'{"error":"identity required"}', 'game_invitation', {}
+        try:
+            account, now = demonware_auth3.user_id(online_id), int(time.time())
+            if target == '/ctr/v1/session-invitations' and method == 'GET':
+                payload = session_store.invitations(account,now)
+                return 200, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'game_invitation_poll', {}
+            if target == '/ctr/v1/session-invitations' and method == 'POST':
+                request=json.loads(body)
+                if not isinstance(request,dict) or set(request) != {'sessionId','recipients'} or not isinstance(request['recipients'],list):
+                    raise ValueError('invalid invitation request')
+                payload=session_store.invite(account,online_id,request['sessionId'],request['recipients'],now)
+                return 201, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'game_invitation_send', {}
+            invitation=target.removeprefix('/ctr/v1/session-invitations/')
+            if method == 'PUT':
+                payload=session_store.accept(account,invitation,now)
+                return 200, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'game_invitation_accept', {}
+            if method == 'DELETE':
+                session_store.dismiss(account,invitation,now)
+                return 204, {}, b'', 'game_invitation_dismiss', {}
+            return 405, {}, b'{"error":"unsupported invitation operation"}', 'game_invitation', {}
+        except (ValueError,KeyError,TypeError,OverflowError) as error:
+            return 400, {}, b'{"error":"invalid invitation request"}', 'game_invitation', {'reason':str(error)}
     if method == 'GET' and target == '/ctr/v1/config':
         payload = {'discovery_port': internet['discovery_port'], 'public_host': internet['public_host']}
         return 200, {'Content-Type': 'application/json'}, json.dumps(payload).encode(), 'config', {}
     if method == 'GET' and target.startswith('/ctr/v1/peer-allowed?'):
         ip = parse_qs(target.partition('?')[2]).get('ip', [''])[0]
-        room_token = headers.get('x-ctr-room-token', '')
+        room_token = room.request_token(headers.get('x-ctr-room-token', ''))
         requester = live_clients.get(demonware_auth3.user_id(online_id)) if online_id else None
         allowed = bool(requester and room.valid_token(room_token) and
                        requester['user'].get('room_token') == room_token and
@@ -175,9 +220,9 @@ def http_answer(method, target, headers, body):
         return 200, {'Content-Type': 'application/octet-stream'}, \
             rsa_pss.spki_der(server_key['n'], server_key['e']), 'traffic_key', {}
     if method == 'POST' and target.startswith('/auth/') and '-auth3.' in host:
-        room_token = headers.get('x-ctr-room-token','')
+        room_token = room.request_token(headers.get('x-ctr-room-token',''))
         if not room.valid_token(room_token):
-            return 400, {}, b'{"error":"project room password required"}', 'auth3_room_rejected', {}
+            return 400, {}, b'{"error":"invalid project room token"}', 'auth3_room_rejected', {}
         try:
             request = json.loads(body)
         except ValueError:
@@ -214,12 +259,158 @@ def http_answer(method, target, headers, body):
             try:
                 account = demonware_auth3.user_id(online_id)
                 payload = session_store.create(account, headers.get('content-type',''), body)
+                session_store.join(account,online_id,payload['sessionId'])
             except (ValueError, KeyError, UnicodeError) as error:
                 capture = log_path.with_suffix('.session_rejected.bin')
                 if len(body) <= 2*1024*1024:
                     capture.write_bytes(body)
                 return 400, {}, b'{"error":{"message":"invalid project session"}}', 'webapi_session_create', {'reason':str(error),'content_type':headers.get('content-type',''),'body_length':len(body),'capture':str(capture)}
             return 201, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'webapi_session_create', {'account':account,'reply':payload}
+        session_update = re.fullmatch(r'sdk:sessionInvitation/v1/sessions/([^/]+)', path)
+        if method == 'PUT' and session_update:
+            if not online_id:
+                return 403, {}, b'{"error":{"message":"project identity required"}}', 'webapi_session_update', {}
+            try:
+                session_store.update(demonware_auth3.user_id(online_id),session_update[1],body)
+            except (ValueError,KeyError,UnicodeError,TypeError) as error:
+                return 400, {}, b'{"error":{"message":"invalid session update"}}', 'webapi_session_update', {'reason':str(error)}
+            return 204, {}, b'', 'webapi_session_update', {'session':session_update[1]}
+        route=path.split('?',1)[0]
+        if method == 'GET' and route in ('sdk:sessionInvitation/v1/users/me/invitations',
+                                        'sdk:sessionInvitation/v1/users/me/friends/sessions'):
+            if not online_id:
+                return 403, {}, b'{"error":"identity required"}', 'webapi_sessions', {}
+            try:
+                account,now=demonware_auth3.user_id(online_id),int(time.time())
+                if route.endswith('/invitations'):
+                    rows=[session_store.invitation(account,row['invitationId'],now) for row in session_store.invitations(account,now)]
+                    payload={'size':len(rows),'invitations':rows}
+                else:
+                    query=parse_qs(path.partition('?')[2])
+                    offset,limit=int(query.get('offset',['0'])[0]),int(query.get('limit',['100'])[0])
+                    if offset<0 or not 1<=limit<=500:
+                        raise ValueError('invalid pagination')
+                    found={}
+                    for friend in friend_page(online_id,0,500)['friendList']:
+                        user=friend['user']
+                        for row in session_store.user_sessions(account,int(user['accountId'])):
+                            session=row['sessionId']
+                            if session not in found:
+                                found[session]={**row,'friends':[]}
+                            found[session]['friends'].append(user)
+                    rows=[found[key] for key in sorted(found)][offset:offset+limit]
+                    payload={'size':len(rows),'sessions':rows}
+                return 200, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'webapi_sessions', {}
+            except (ValueError,KeyError,TypeError,NotImplementedError) as error:
+                return 400, {}, b'{"error":"invalid session list"}', 'webapi_sessions', {'reason':str(error)}
+        prefix='sdk:sessionInvitation/v1/sessions/'
+        invite_prefix='sdk:sessionInvitation/v1/users/me/invitations/'
+        if route.startswith(prefix) or route.startswith(invite_prefix) or route == 'sdk:sessionInvitation/v1/users/@users/sessions':
+            if not online_id:
+                return 403, {}, b'{"error":"identity required"}', 'webapi_session', {}
+            try:
+                account,now=demonware_auth3.user_id(online_id),int(time.time())
+                if method == 'GET' and route == 'sdk:sessionInvitation/v1/users/@users/sessions':
+                    accounts=parse_qs(path.partition('?')[2]).get('accountIds',[''])[0].split(',')
+                    if len(accounts)>100 or any(not a.isascii() or not a.isdigit() or not 0<=int(a)<2**64 for a in accounts):
+                        raise ValueError('invalid session accounts')
+                    payload={'users':[{'accountId':str(int(a)),'sessions':session_store.user_sessions(account,int(a))} for a in accounts]}
+                    return 200, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'webapi_sessions', {}
+                if route.startswith(invite_prefix):
+                    invitation=route.removeprefix(invite_prefix)
+                    if method == 'GET' and invitation.endswith('/invitationData'):
+                        session_store.invitation(account,invitation[:-15],now)
+                        return 200, {'Content-Type':'application/octet-stream'}, b'', 'webapi_invitation_data', {}
+                    if method == 'GET':
+                        payload=session_store.invitation(account,invitation,now)
+                        return 200, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'webapi_invitation', {}
+                    if method == 'PUT':
+                        request=json.loads(body)
+                        if not isinstance(request,dict) or set(request) != {'usedFlag'} or request['usedFlag'] is not True:
+                            raise ValueError('invalid invitation update')
+                        session_store.accept(account,invitation,now)
+                        return 204, {}, b'', 'webapi_invitation_used', {}
+                    if method == 'DELETE':
+                        session_store.dismiss(account,invitation,now)
+                        return 204, {}, b'', 'webapi_invitation_dismiss', {}
+                else:
+                    session,_,suffix=route.removeprefix(prefix).partition('/')
+                    if method == 'GET' and not suffix:
+                        payload=session_store.describe(account,session)
+                        return 200, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'webapi_session_details', {}
+                    attachments={'sessionData':'session-data','changeableSessionData':'changeable-session-data','sessionImage':'session-image'}
+                    if method == 'GET' and suffix in attachments:
+                        media,data=session_store.attachment(account,session,attachments[suffix])
+                        return 200, {'Content-Type':media}, data, 'webapi_session_attachment', {}
+                    if method == 'PUT' and suffix in ('changeableSessionData','sessionImage'):
+                        session_store.replace_attachment(account,session,attachments[suffix],headers.get('content-type',''),body)
+                        return 204, {}, b'', 'webapi_session_attachment_update', {}
+                    if method == 'POST' and suffix == 'members':
+                        priority=int(parse_qs(path.partition('?')[2]).get('priority',['0'])[0])
+                        if not 0 <= priority <= 0xffffffff:
+                            raise ValueError('invalid priority')
+                        session_store.join(account,online_id,session)
+                        session_store.member_priority(account,session,priority)
+                        return 204, {}, b'', 'webapi_session_join', {}
+                    if method == 'PUT' and suffix == 'members/me':
+                        request=json.loads(body)
+                        if not isinstance(request,dict) or set(request) != {'priority'}:
+                            raise ValueError('invalid member update')
+                        session_store.member_priority(account,session,request['priority'])
+                        return 204, {}, b'', 'webapi_session_priority', {}
+                    if method == 'DELETE' and suffix == 'members/me':
+                        session_store.leave(account,session)
+                        return 204, {}, b'', 'webapi_session_leave', {}
+                    if method == 'DELETE' and not suffix:
+                        session_store.erase(account,session)
+                        return 204, {}, b'', 'webapi_session_delete', {}
+            except (ValueError,KeyError,TypeError,OverflowError) as error:
+                return 400, {}, b'{"error":"invalid session operation"}', 'webapi_session', {'reason':str(error)}
+        presence_route=re.fullmatch(r'sdk:userProfile/v1/users/([0-9]+)/presence(/inGamePresence|/gameData|/gameStatus)?',route)
+        if presence_route:
+            if not online_id:
+                return 403, {}, b'{"error":"identity required"}', 'webapi_presence', {}
+            try:
+                account,suffix=int(presence_route[1]),presence_route[2] or ''
+                if not 0 <= account < 2**64:
+                    raise ValueError('invalid presence account')
+                if method == 'PUT' and suffix:
+                    if account != demonware_auth3.user_id(online_id):
+                        raise ValueError('presence owner mismatch')
+                    change=json.loads(body)
+                    if not isinstance(change,dict) or not change:
+                        raise ValueError('invalid presence body')
+                    for key,value in change.items():
+                        if key == 'gameData':
+                            if not isinstance(value,str) or len(value)>172 or len(base64.b64decode(value,validate=True))>128:
+                                raise ValueError('invalid gameData')
+                        elif key == 'gameStatus':
+                            if not isinstance(value,str) or len(value.encode())>191:
+                                raise ValueError('invalid gameStatus')
+                        elif key == 'localizedGameStatus':
+                            if not isinstance(value,list) or len(value)>30:
+                                raise ValueError('invalid localized status')
+                            for localized in value:
+                                if (not isinstance(localized['npLanguage'],str) or len(localized['npLanguage'])>8 or
+                                    not isinstance(localized['gameStatus'],str) or len(localized['gameStatus'].encode())>191):
+                                    raise ValueError('invalid localized entry')
+                        else:
+                            raise ValueError('unsupported presence field')
+                        if (suffix == '/gameData' and key != 'gameData') or (suffix == '/gameStatus' and key == 'gameData'):
+                            raise ValueError('presence field does not match endpoint')
+                    game_presence.setdefault(account,{}).update(change)
+                    return 204, {}, b'', 'webapi_presence_update', {}
+                if method == 'GET':
+                    context={'gameStatus':'','gameData':'',**game_presence.get(account,{})}
+                    if suffix in ('/gameData','/gameStatus'):
+                        payload={suffix[1:]:context[suffix[1:]]}
+                    else:
+                        context['gameTitleInfo']={'npTitleId':'CUSA14876_00','titleName':'Crash Team Racing Nitro-Fueled'}
+                        payload={'presence':{'onlineStatus':'online' if account in live_clients else 'offline','platform':'PS4',
+                                             'incontextInfoList':[context] if account in live_clients else []}}
+                    return 200, {'Content-Type':'application/json'}, json.dumps(payload).encode(), 'webapi_presence', {}
+            except (ValueError,KeyError,TypeError,OverflowError) as error:
+                return 400, {}, b'{"error":"invalid presence operation"}', 'webapi_presence', {'reason':str(error)}
         # The API group contains a colon: split the query without interpreting a scheme.
         friend_route = re.fullmatch(r'sdk:userProfile/v1/users/([0-9]+)/friendList', path.split('?', 1)[0])
         if method == 'GET' and friend_route:
@@ -228,7 +419,7 @@ def http_answer(method, target, headers, body):
                 return 403, {}, b'{"error":{"message":"project identity mismatch"}}', 'webapi_friends', {}
             try:
                 query = parse_qs(path.partition('?')[2])
-                payload = friends_store.page(account, int(query.get('offset', ['0'])[0]),
+                payload = friend_page(online_id, int(query.get('offset', ['0'])[0]),
                                             int(query.get('limit', ['500'])[0]))
             except (ValueError, AttributeError):
                 return 400, {}, b'{"error":{"message":"invalid friend request"}}', 'webapi_friends', {}
@@ -372,6 +563,7 @@ async def handle_lobby(reader, writer):
     except ValueError as error:
         record(event='lobby_error', peer=peer, error=str(error))
     if client and live_clients.get(client['user']['user_id']) is client:
+        game_presence.pop(client['user']['user_id'],None)
         del live_clients[client['user']['user_id']]
         with demonware_tasks.matchmaking_store.database:
             demonware_tasks.matchmaking_store.database.execute('UPDATE searches SET status=? '

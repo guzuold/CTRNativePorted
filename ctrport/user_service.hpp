@@ -8,20 +8,43 @@
 #include <memory>
 #include <stdexcept>
 #include <array>
+#include <deque>
 #include <string>
 #include "kernel_time.hpp"
 namespace ctrport {
+// Local split-screen players 2..4 (controller ports 1..3) are further local users with fixed
+// identities 101..103, logged in and out by the pad backend as their controllers join and
+// leave. Event layout {type,user}: type 0 login, 1 logout (pinned shadPS4 userservice.h
+// OrbisUserServiceEventType). The primary user's login stays the first event.
 class UserService {
-    struct Session {int local_user_id;bool login_pending=true;std::string name;}; // Runtime-owned identity, no external account.
+    struct Event {std::int32_t type,user;};
+    struct Session {int local_user_id;bool login_pending=true;std::string name;std::array<bool,4> extra{};std::deque<Event> events;}; // Runtime-owned identity, no external account.
     int next_local_user_id=1;
     std::mutex lock;
     std::unique_ptr<Session> session;
+    static constexpr int extra_base=100;
+    static int port_of(int id){return id>extra_base && id<=extra_base+3?id-extra_base:0;}
 public:
+    static constexpr int extra_user_id(int port){return extra_base+port;}
+    // Logs the local player of controller port 1..3 in or out; false when nothing changed.
+    bool set_extra_user(int port,bool login){
+        if(port<1 || port>3)throw std::runtime_error("Local user port out of range");
+        std::lock_guard<std::mutex> guard(lock);
+        if(!session || session->extra[port]==login)return false;
+        session->extra[port]=login;session->events.push_back({login?0:1,extra_user_id(port)});return true;
+    }
+    // Controller port of a logged-in local user: 0 primary, 1..3 split-screen players, -1 none.
+    int port_of_user(int id){
+        std::lock_guard<std::mutex> guard(lock);
+        if(!session)return -1;
+        if(id==session->local_user_id)return 0;
+        const int port=port_of(id);return port && session->extra[port]?port:-1;
+    }
     int initialize(const void* params) {
         if(params) throw std::runtime_error("User service priority parameters unsupported");
         std::lock_guard<std::mutex> guard(lock);
         if(session) return static_cast<int>(0x80960003U);
-        if(next_local_user_id==std::numeric_limits<int>::max())throw std::runtime_error("Local user identity space exhausted");
+        if(next_local_user_id>extra_base)throw std::runtime_error("Local user identity space exhausted");
         char configured[17]{};
         const DWORD length=GetEnvironmentVariableA("CTR_ONLINE_ID",configured,sizeof(configured));
         const std::string name=length>=3 && length<=16 ? std::string(configured,length) : std::string{};
@@ -33,7 +56,9 @@ public:
         require_time_output(output,4*sizeof(*output));
         std::lock_guard<std::mutex> guard(lock);
         if(!session)return static_cast<int>(0x80960002U);
-        const std::array<std::int32_t,4> ids{session->local_user_id,-1,-1,-1};
+        std::array<std::int32_t,4> ids{session->local_user_id,-1,-1,-1};
+        std::size_t count=1;
+        for(int port=1;port<=3;++port)if(session->extra[port])ids[count++]=extra_user_id(port);
         std::memcpy(output,ids.data(),sizeof(ids));return 0;
     }
     // Public ABI/null behavior: pinned userservice.cpp513; identity comes from
@@ -50,25 +75,31 @@ public:
         require_time_output(output,2*sizeof(*output));
         std::lock_guard<std::mutex> guard(lock);
         if(!session)return static_cast<int>(0x80960002U);
-        if(!session->login_pending)return static_cast<int>(0x80960007U);
-        const std::array<std::int32_t,2> event{0,session->local_user_id};
-        std::memcpy(output,event.data(),sizeof(event));session->login_pending=false;return 0;
+        if(session->login_pending){
+            const std::array<std::int32_t,2> event{0,session->local_user_id};
+            std::memcpy(output,event.data(),sizeof(event));session->login_pending=false;return 0;
+        }
+        if(session->events.empty())return static_cast<int>(0x80960007U);
+        const std::array<std::int32_t,2> event{session->events.front().type,session->events.front().user};
+        std::memcpy(output,event.data(),sizeof(event));session->events.pop_front();return 0;
     }
     int get_name(int id,char* output,size_t size) {
         if(id==-1 || !output)return static_cast<int>(0x80960005U);
         std::lock_guard<std::mutex> guard(lock);
         if(!session)return static_cast<int>(0x80960002U);
-        if(id!=session->local_user_id)return static_cast<int>(0x80960009U);
-        const auto bytes=session->name.size()+1;
+        const int port=port_of(id);
+        if(id!=session->local_user_id && !(port && session->extra[port]))return static_cast<int>(0x80960009U);
+        const std::string name=id==session->local_user_id?session->name:"Player "+std::to_string(port+1);
+        const auto bytes=name.size()+1;
         if(size<bytes)return static_cast<int>(0x8096000aU);
-        require_time_output(output,bytes);std::memcpy(output,session->name.c_str(),bytes);return 0;
+        require_time_output(output,bytes);std::memcpy(output,name.c_str(),bytes);return 0;
     }
     int terminate() {
         std::lock_guard<std::mutex> guard(lock);
         if(!session) return static_cast<int>(0x80960002U);
         session.reset();return 0;
     }
-    bool has_user(int id){std::lock_guard<std::mutex> guard(lock);return session && session->local_user_id==id;}
+    bool has_user(int id){return port_of_user(id)>=0;}
     bool initialized() {std::lock_guard<std::mutex> guard(lock);return bool(session);}
 };
 inline UserService user_service;
@@ -124,6 +155,20 @@ extern "C" int ctr_user_event(std::int32_t* output,uint64_t caller){
  }catch(const std::exception& e){std::fprintf(stderr,"NID=yH17Q6NWtVg library=libSceUserService caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_user_event();
+// Split-screen players on an initialized service whose primary user is 2 and whose initial
+// login was consumed: queued login/logout of fixed identities, listed after the primary user.
+inline int split_user_control(UserService& service){
+ std::array<int32_t,4> result{71,72,73,74},list{};char name[16]{};
+ if(service.set_extra_user(2,true)!=true || service.set_extra_user(2,true)!=false || service.set_extra_user(1,true)!=true)return 2;
+ if(service.get_event(result.data()+1) || result!=std::array<int32_t,4>{71,0,102,74} || service.get_event(result.data()+1) || result[2]!=101)return 3;
+ if(service.login_user_list(list.data()) || list!=std::array<int32_t,4>{2,101,102,-1})return 4;
+ if(service.get_name(102,name,sizeof(name)) || std::strcmp(name,"Player 3") || service.get_name(103,name,sizeof(name))!=static_cast<int>(0x80960009U))return 5;
+ if(service.port_of_user(2)!=0 || service.port_of_user(101)!=1 || service.port_of_user(103)!=-1 || !service.has_user(102))return 6;
+ if(service.set_extra_user(2,false)!=true || service.get_event(result.data()+1) || result!=std::array<int32_t,4>{71,1,102,74} || service.has_user(102))return 7;
+ if(service.get_event(result.data()+1)!=static_cast<int>(0x80960007U) || service.login_user_list(list.data()) || list!=std::array<int32_t,4>{2,101,-1,-1})return 8;
+ bool rejected=false;try{service.set_extra_user(4,true);}catch(const std::runtime_error&){rejected=true;}
+ return rejected?0:9;
+}
 inline int user_event_control(){
  UserService service;std::array<int32_t,4> result{71,72,73,74};
  if(service.get_event(result.data()+1)!=static_cast<int>(0x80960002U) || result[1]!=72)return 1;
@@ -133,7 +178,8 @@ inline int user_event_control(){
  if(!rejected || service.get_event(result.data()+1) || result!=std::array<int32_t,4>{71,0,1,74})return 1;
  if(service.get_event(result.data()+1)!=static_cast<int>(0x80960007U) || result!=std::array<int32_t,4>{71,0,1,74})return 1;
  if(service.terminate() || service.initialize(nullptr) || service.get_event(result.data()+1) || result[2]!=2)return 1;
- std::cout<<"{\"scope\":\"owned_user_login_event_queue\",\"passed\":true,\"consume_once\":true,\"failed_write_preserves_event\":true,\"external_accounts\":false}\n";return 0;
+ if(const int failed=split_user_control(service))return failed;
+ std::cout<<"{\"scope\":\"owned_user_login_event_queue\",\"passed\":true,\"consume_once\":true,\"failed_write_preserves_event\":true,\"split_screen_users\":true,\"external_accounts\":false}\n";return 0;
 }
 extern "C" int ctr_user_initial(std::int32_t* output,uint64_t caller){
  try{const int result=user_service.initial_user(output);std::printf("{\"scope\":\"original_UserServiceGetInitialUser_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);return result;

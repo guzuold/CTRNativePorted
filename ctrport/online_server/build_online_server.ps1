@@ -16,7 +16,7 @@ $common=@('/nologo','/O2','/W4','/WX','/EHsc','/utf-8','/std:c++20','/DWIN32_LEA
 $dhtDir=Join-Path (Split-Path -Parent $PSScriptRoot) 'dht'
 & $cl /nologo /c /O2 /W3 /wd4244 /wd4267 /D_CRT_SECURE_NO_WARNINGS /DWIN32_LEAN_AND_MEAN /DNOMINMAX (Join-Path $dhtDir 'dht.c') "/Fo$obj/dht.obj" *> "$out/online_server_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/online_server_build.log" -Tail 40;throw 'dht.c build failed'}
-$sources=@('json.cpp','crypto.cpp','protocol.cpp','stores.cpp','relay.cpp','server.cpp','upnp.cpp','launcher_online.cpp','friend_identity.cpp','dht_service.cpp','friend_verifier.cpp','friend_store.cpp','party_lobby.cpp') | ForEach-Object { Join-Path $PSScriptRoot $_ }
+$sources=@('json.cpp','crypto.cpp','protocol.cpp','stores.cpp','relay.cpp','server.cpp','upnp.cpp','launcher_online.cpp','friend_identity.cpp','dht_service.cpp','friend_verifier.cpp','friend_store.cpp','party_lobby.cpp','friend_network.cpp') | ForEach-Object { Join-Path $PSScriptRoot $_ }
 & $cl @common @sources (Join-Path $obj 'dht.obj') (Join-Path $PSScriptRoot 'server_main.cpp') "/Fe$out/ctr_online_server.exe" /link /SUBSYSTEM:CONSOLE *> "$out/online_server_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/online_server_build.log" -Tail 40;throw 'online server build failed'}
 & $cl @common @sources (Join-Path $obj 'dht.obj') (Join-Path $PSScriptRoot 'server_test.cpp') "/Fe$out/ctr_online_server_test.exe" /link /SUBSYSTEM:CONSOLE *> "$out/online_server_test_build.log"

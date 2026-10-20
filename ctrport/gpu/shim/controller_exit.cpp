@@ -17,6 +17,7 @@ std::mutex pad_lock;
 std::vector<SDL_Gamepad*> pads;
 CtrGpuGamepad pad_snapshot{};
 int pad_count=0;
+std::vector<CtrGpuGamepadEntry> pad_entries; // one per connected controller, for split screen
 // Every SDL gamepad except Xbox ones, which the runtime already reads through XInput:
 // compatible DualShock 4 pads often report another vendor ID and an SDL type other than PS4.
 // A controller seen both ways would only be merged with itself.
@@ -96,6 +97,20 @@ extern "C" CTR_GPU_API void ctr_gpu_gamepad_rumble(uint16_t low_frequency,uint16
     // The game sets a level and keeps it until it sets another; SDL needs a duration.
     for(auto* pad:pads)SDL_RumbleGamepad(pad,low_frequency,high_frequency,(low_frequency||high_frequency)?10000:0);
 }
+extern "C" CTR_GPU_API int ctr_gpu_gamepad_list(CtrGpuGamepadEntry* out,int capacity){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    int written=0;
+    for(const auto& entry:pad_entries){if(!out || written>=capacity)break;out[written++]=entry;}
+    return written;
+}
+extern "C" CTR_GPU_API void ctr_gpu_gamepad_rumble_one(uint32_t id,uint16_t low_frequency,uint16_t high_frequency){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    for(auto* pad:pads)if(SDL_GetGamepadID(pad)==id)SDL_RumbleGamepad(pad,low_frequency,high_frequency,(low_frequency||high_frequency)?10000:0);
+}
+extern "C" CTR_GPU_API void ctr_gpu_gamepad_light(uint32_t id,uint8_t red,uint8_t green,uint8_t blue){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    for(auto* pad:pads)if(SDL_GetGamepadID(pad)==id)SDL_SetGamepadLED(pad,red,green,blue);
+}
 namespace Frontend {
 void InitGamepads(){
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");
@@ -122,8 +137,11 @@ void GamepadEvent(const SDL_Event& event){
 }
 void UpdateGamepads(){
     std::lock_guard<std::mutex> guard(pad_lock);
-    CtrGpuGamepad merged{};int count=0;
-    for(auto* pad:pads)if(SDL_GamepadConnected(pad)){merge(merged,read_pad(pad));++count;}
+    CtrGpuGamepad merged{};int count=0;pad_entries.clear();
+    for(auto* pad:pads)if(SDL_GamepadConnected(pad)){
+        const CtrGpuGamepad state=read_pad(pad);merge(merged,state);++count;
+        pad_entries.push_back({static_cast<uint32_t>(SDL_GetGamepadID(pad)),state});
+    }
     pad_snapshot=merged;pad_count=count;
 }
 bool PollControllerExit(SDL_Window* window){

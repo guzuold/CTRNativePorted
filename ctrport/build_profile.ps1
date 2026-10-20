@@ -4,10 +4,11 @@
 # bridges are assembled from source; the pinned video library and the audio/font
 # backends come from the last infra build. Output goes to build/CTRPort-dev and
 # never replaces build/CTRPort-infra/ctrport.exe.
+param([string]$OutputDirectory = 'build/CTRPort-dev')
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path -Parent $PSScriptRoot
 $infra=Join-Path $taskRoot 'build/CTRPort-infra'
-$out=Join-Path $taskRoot 'build/CTRPort-dev'
+$out=Join-Path $taskRoot $OutputDirectory
 New-Item -ItemType Directory -Force $out | Out-Null
 $env:PATH="$env:PATH;C:\Program Files (x86)\Microsoft Visual Studio\Installer"
 $taskVc='C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars64.bat'
