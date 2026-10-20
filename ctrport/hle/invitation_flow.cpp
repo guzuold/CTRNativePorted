@@ -27,6 +27,7 @@ static_assert(sizeof(Event) == 8196);
 std::mutex service_mutex, events_mutex;
 std::deque<Event> events;
 std::deque<std::string> delivered;
+std::set<std::string> notified; // Under service_mutex; cleared when no longer pending.
 std::future<std::vector<Pending>> polling;
 std::future<Outcome> notice;
 std::atomic<unsigned long> notice_thread{0};
@@ -45,8 +46,10 @@ bool safe_id(const std::string& id, std::size_t maximum) {
 }
 Json exchange(const std::string& method, const std::string& path, const std::string& body, int expected) {
     online::HttpResponse response;
-    if (!online::http_exchange(method, path, {{"Content-Type", "application/json"}}, body, &response) ||
-        response.status != expected) throw std::runtime_error("invitation HTTP operation refused");
+    if (!online::http_exchange(method, path, {{"Content-Type", "application/json"}}, body, &response))
+        throw std::runtime_error(method + " " + path + ": servizio locale non raggiungibile");
+    if (response.status != expected)
+        throw std::runtime_error(method + " " + path + ": HTTP " + std::to_string(response.status));
     return response.body.empty() ? Json::null() : ctr_online::parse_json(response.body);
 }
 std::vector<Pending> fetch() {
@@ -171,8 +174,18 @@ void tick() {
         const auto now = std::chrono::steady_clock::now();
         if (polling.valid() && polling.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             const auto pending = polling.get();
-            if (!pending.empty() && owner && owner(0) && owner(1)) {
-                const auto entry = pending.front();
+            for (auto it = notified.begin(); it != notified.end();) {
+                const bool present = std::any_of(pending.begin(), pending.end(),
+                    [&](const Pending& entry) { return entry.id == *it; });
+                it = present ? std::next(it) : notified.erase(it);
+            }
+            const auto candidate = std::find_if(pending.begin(), pending.end(), [&](const Pending& entry) {
+                if (notified.count(entry.id)) return false;
+                std::scoped_lock event_lock{events_mutex};
+                return std::find(delivered.begin(), delivered.end(), entry.id) == delivered.end();
+            });
+            if (candidate != pending.end() && owner && owner(0) && owner(1)) {
+                const auto entry = *candidate;
                 try {
                     notice = std::async(std::launch::async, [entry] {
                         try {
@@ -181,13 +194,29 @@ void tick() {
                             const int choice = MessageBoxW(nullptr, message.c_str(), title, MB_YESNO | MB_ICONQUESTION);
                             notice_thread = 0;
                             if (!choice) throw std::runtime_error("invitation prompt unavailable");
-                            if (choice == IDYES) return accept(entry);
-                            exchange("DELETE", "/ctr/v1/session-invitations/" + entry.id, "", 204);
-                            return Outcome{};
+                            for (;;) {
+                                try {
+                                    if (choice == IDYES) return accept(entry);
+                                    exchange("DELETE", "/ctr/v1/session-invitations/" + entry.id, "", 204);
+                                    return Outcome{};
+                                } catch (const std::exception& error) {
+                                    log_failure(error);
+                                    const auto message = std::wstring(choice == IDYES
+                                        ? L"Impossibile accettare l'invito. Non sei entrato nella sessione.\n\n"
+                                        : L"Impossibile rifiutare l'invito.\n\n") + wide(error.what()) +
+                                        L"\n\nRiprova per ripetere l'operazione. Annulla interrompe gli avvisi automatici per questo invito.";
+                                    notice_thread = GetCurrentThreadId();
+                                    const int retry = MessageBoxW(nullptr, message.c_str(), L"CTR - Errore invito",
+                                                                  MB_RETRYCANCEL | MB_ICONERROR);
+                                    notice_thread = 0;
+                                    if (retry != IDRETRY) { Outcome result; result.error = failure; return result; }
+                                }
+                            }
                         } catch (const std::exception& error) {
                             notice_thread = 0; log_failure(error); Outcome result; result.error = failure; return result;
                         }
                     });
+                    notified.insert(entry.id);
                 } catch (...) { owner(2); throw; }
             }
         }

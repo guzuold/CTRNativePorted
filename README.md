@@ -1,3 +1,5 @@
+> **v0.4.1:** friend presence/restart and invitation recovery fixes. Upgrade both PCs; see [CHANGELOG.md](CHANGELOG.md) and [FIRST_UPDATE.md](FIRST_UPDATE.md). Internet party joining still needs two-PC validation.
+
 # CTRNativePorted
 
 A native Windows runtime for **Crash Team Racing Nitro-Fueled** (PS4), in the style of

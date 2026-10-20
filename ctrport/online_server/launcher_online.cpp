@@ -84,6 +84,8 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
             const auto known = verify_candidate_endpoint(entry.last_endpoint, code, 1000);
             if (known.status == VerifyStatus::Verified) return std::make_pair(known.ip, known.port);
         }
+        DhtService* shared = dht();
+        if (!shared || !shared->is_running()) return std::nullopt;
         {
             std::lock_guard<std::mutex> lock(attempts->first);
             auto& last = attempts->second[code];
@@ -91,8 +93,6 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
             if (last && now - last < 60) return std::nullopt;
             last = now;
         }
-        DhtService* shared = dht();
-        if (!shared) return std::nullopt;
         const auto found = find_friend_server(root, code, 6000, 2000, {}, shared);
         if (found.status != VerifyStatus::Verified) return std::nullopt;
         FriendStore(friends_path).update_endpoint(code, found.ip + ":" + std::to_string(found.port), "Server verificato");
@@ -318,7 +318,7 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
                 ", altri nodi noti: " + std::to_string(lookup_stats.dubious_nodes) +
                 "). Verifica che il launcher remoto sia online e riprova: l'annuncio potrebbe non essere ancora disponibile.";
         }
-        store.update_endpoint(info.code, "", result.detail);
+        store.update_status(info.code, result.detail);
         return result;
     }
 
@@ -337,7 +337,7 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
 
     result.status = VerifyStatus::NoResponse;
     result.detail = "Candidates contacted but none responded or verified successfully";
-    store.update_endpoint(info.code, "", "Nessuna risposta dai candidati");
+    store.update_status(info.code, "Nessuna risposta dai candidati");
     return result;
 }
 

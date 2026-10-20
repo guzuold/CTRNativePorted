@@ -554,7 +554,17 @@ struct Server::Impl {
                 it = it->second.expires <= now ? remote_invitations.erase(it) : std::next(it);
             if (remote_invitations.size() >= 64 && !remote_invitations.count(invitation))
                 throw std::runtime_error("Troppi inviti in attesa");
-            remote_invitations[invitation] = RemoteInvitation{session, sender, caller, recipient->as_u64(), now + 300, false};
+            // Retrying delivery must not turn an accepted invitation back into a pending one.
+            const auto existing = remote_invitations.find(invitation);
+            if (existing != remote_invitations.end()) {
+                const auto& previous = existing->second;
+                if (previous.session != session || previous.sender != sender || previous.origin != caller ||
+                    previous.recipient != recipient->as_u64())
+                    throw std::runtime_error("Identificativo invito gia utilizzato");
+            } else {
+                remote_invitations.emplace(invitation,
+                    RemoteInvitation{session, sender, caller, recipient->as_u64(), now + 300, false});
+            }
             remote_sessions[session] = caller;
             response.set("delivered", Json::of(true));
             return response;

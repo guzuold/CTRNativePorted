@@ -31,6 +31,8 @@ public:
     bool add_or_update(const std::string& code_str, const std::string& nickname, std::string* error_msg = nullptr);
     bool remove(const std::string& code_str);
     bool update_endpoint(const std::string& code_str, const std::string& endpoint, const std::string& status);
+    // A failed lookup changes diagnostics, not the last known address or successful contact time.
+    bool update_status(const std::string& code_str, const std::string& status);
 
     const std::filesystem::path& path() const { return path_; }
 

@@ -37,6 +37,7 @@ namespace Gdiplus { using std::min; using std::max; }
 #include <gdiplus.h>
 #include "xbox_prepare.hpp"
 #include "launcher_font.hpp"
+#include "launcher_update.hpp"
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "gdiplus.lib")
@@ -358,6 +359,121 @@ struct App {
     LaneLock lock;
 } g;
 
+constexpr int ID_CHECK_UPDATE = 906;
+HWND update_button = nullptr;
+HANDLE update_install_lock = INVALID_HANDLE_VALUE;
+std::future<ctr_online::Json> update_job;
+ctr_online::Json update_offer;
+fs::path update_result;
+bool update_preparing = false, update_manual = false, update_handoff = false;
+std::wstring update_label = L"Check updates";
+
+void set_update_label(const wchar_t* label) {
+    update_label = label;
+    if (update_button) {
+        g.controls.at(update_button).label = update_label.c_str();
+        SetWindowTextW(update_button, update_label.c_str());
+        InvalidateRect(update_button, nullptr, FALSE);
+    }
+}
+bool update_session_busy() {
+    return g.process || g.host_busy || g.xbox_busy || g.cfg.online || g.host.running();
+}
+void check_launcher_update(bool manual) {
+    if (update_job.valid()) return;
+    const auto script = g.exe_dir / "launcher_update.ps1";
+    if (!fs::exists(script)) {
+        if (manual) MessageBoxW(g.window, L"Manca launcher_update.ps1 accanto al launcher.", L"Aggiornamenti", MB_ICONERROR);
+        return;
+    }
+    try {
+        const auto dir = g.root / "runtime/user/updates";
+        ctr_update::assert_plain_path(dir);
+        fs::create_directories(dir);
+        update_result = dir / (L"check-" + std::to_wstring(GetCurrentProcessId()) + L".json");
+        ctr_update::assert_plain_path(update_result);
+        std::error_code ignored;
+        fs::remove(update_result, ignored);
+        update_manual = manual;
+        update_preparing = false;
+        set_update_label(L"Checking...");
+        EnableWindow(update_button, FALSE);
+        update_job = std::async(std::launch::async, [root=g.root, script, result=update_result] {
+            return ctr_update::run(root, script, result, false);
+        });
+    } catch (const std::exception& e) {
+        EnableWindow(update_button, TRUE);
+        set_update_label(L"Check updates");
+        if (manual) MessageBoxW(g.window, ctr_update::wide(e.what()).c_str(), L"Aggiornamenti", MB_ICONERROR);
+    }
+}
+void offer_launcher_update() {
+    if (update_job.valid() || !update_offer.is_object()) return;
+    if (!ctr_update::portable(g.root, g.exe_dir)) {
+        MessageBoxW(g.window, L"L'installazione automatica e disponibile nella cartella della release portatile, non nella copia di sviluppo.",
+                    L"Aggiornamenti", MB_ICONINFORMATION); return;
+    }
+    if (update_session_busy()) {
+        MessageBoxW(g.window, L"Chiudi il gioco e disattiva Multiplayer Online prima di installare l'aggiornamento.",
+                    L"Aggiornamenti", MB_ICONINFORMATION); return;
+    }
+    const auto error = update_offer.at("error").text;
+    if (!error.empty()) {
+        MessageBoxW(g.window, ctr_update::wide(error).c_str(), L"Release non installabile", MB_ICONERROR);
+        update_offer = {}; set_update_label(L"Check updates"); return;
+    }
+    const std::wstring prompt = L"Versione installata: " + ctr_update::wide(ctr_update::version) +
+        L"\nNuova versione: " + ctr_update::wide(update_offer.at("version").text) +
+        (update_offer.at("prerelease").boolean ? L" (prerelease)" : L"") +
+        L"\n\n" + ctr_update::wide(update_offer.at("notes").text).substr(0, 1800) +
+        L"\n\nScaricare e installare? Il launcher si chiudera e ripartira automaticamente.\n"
+        L"Salvataggi, impostazioni e dump saranno conservati.\n\nSi = Scarica e installa     No = Piu tardi";
+    if (MessageBoxW(g.window, prompt.c_str(), L"Aggiornamento disponibile", MB_YESNO | MB_ICONINFORMATION | MB_DEFBUTTON2) != IDYES) return;
+    update_preparing = true;
+    set_update_label(L"Downloading...");
+    EnableWindow(g.window, FALSE);
+    update_job = std::async(std::launch::async, [root=g.root, script=g.exe_dir / "launcher_update.ps1", result=update_result] {
+        return ctr_update::run(root, script, result, true);
+    });
+}
+void poll_launcher_update() {
+    if (!update_job.valid() || update_job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    const bool preparing = update_preparing;
+    update_preparing = false;
+    EnableWindow(g.window, TRUE);
+    EnableWindow(update_button, TRUE);
+    try {
+        auto response = update_job.get();
+        if (!response.at("ok").boolean) {
+            set_update_label(L"Check updates");
+            update_offer = {};
+            if (preparing || update_manual)
+                MessageBoxW(g.window, ctr_update::wide(response.at("error").text).c_str(), L"Aggiornamento non riuscito", MB_ICONERROR);
+            return;
+        }
+        if (preparing) {
+            if (update_session_busy()) throw std::runtime_error("Close the game and disable Online, then retry.");
+            const fs::path txn = ctr_update::wide(response.at("transaction").text);
+            ctr_update::launch_apply(g.root, txn / "apply.ps1", txn);
+            update_handoff = true;
+            SendMessageW(g.window, WM_CLOSE, 0, 0);
+            return;
+        }
+        if (!response.at("available").boolean) {
+            set_update_label(L"Check updates");
+            if (update_manual) MessageBoxW(g.window, L"Nessuna versione piu recente disponibile.", L"Aggiornamenti", MB_ICONINFORMATION);
+            return;
+        }
+        update_offer = response.at("offer");
+        set_update_label(L"Update available");
+        if (update_manual || !update_session_busy()) offer_launcher_update();
+    } catch (const std::exception& e) {
+        update_offer = {};
+        set_update_label(L"Check updates");
+        MessageBoxW(g.window, ctr_update::wide(e.what()).c_str(), L"Aggiornamento non riuscito", MB_ICONERROR);
+    }
+}
+
 int px(float logical) { return static_cast<int>(std::lround(logical * g.scale)); }
 RectF rect(float x, float y, float w, float h) { return RectF(x, y, w, h); }
 
@@ -581,6 +697,8 @@ void render_base_layer() {
         text(gr, L"NATIVE PORTED", 1, 12, FontStyleBold, rect(28, 120, 188, 28), kArcadeDark, StringAlignmentCenter);
         }
 
+        text(gr, L"Launcher " + ctr_update::wide(ctr_update::version), 1, 11.5f, FontStyleRegular,
+             rect(24, 474, 210, 24), kTextMuted);
         // Aside bottom tag (slanted -8 deg)
         draw_slanted_box(gr, rect(24, kHeight - 50, 80, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeCyan)), kArcadeDark, 2.0f);
         text(gr, L"V1.21", 1, 11.5f, FontStyleBold, rect(24, kHeight - 50, 80, 26), kArcadeDark, StringAlignmentCenter);
@@ -1579,6 +1697,7 @@ void xbox_prompts_ready(std::wstring* raw_error) {
 }
 
 void launch_game() {
+    if (update_preparing || update_handoff) return;
     validate();
     if (!g.can_launch || g.process || g.xbox_busy) return;
     if (g.cfg.upscaler == L"dlss" &&
@@ -1793,6 +1912,7 @@ void create_controls() {
 
     add_button(ID_MINIMIZE, Kind::ActionBtn, rect(948, 14, 32, 32), L"–", nullptr, -1, -1);
     add_button(ID_CLOSE, Kind::ActionBtn, rect(988, 14, 32, 32), L"×", nullptr, -1, -1);
+    update_button = add_button(ID_CHECK_UPDATE, Kind::ActionBtn, rect(24, 510, 204, 34), update_label.c_str(), nullptr, -1, -1);
 
     // --- TAB 0: HOME ---
     // The giant PLAY! button in the bottom right of the stage
@@ -1886,6 +2006,8 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         select_resolution(g.resolution);
         if (g.cfg.online) host_toggled(true);
         SetFocus(IsWindowEnabled(g.launch) ? g.launch : g.window);
+        SetTimer(window, 31, 250, nullptr);
+        if (ctr_update::portable(g.root, g.exe_dir)) check_launcher_update(false);
         return 0;
     }
     case WM_NCHITTEST: {
@@ -1916,6 +2038,10 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     }
     case WM_COMMAND: {
         const int id = LOWORD(wparam), code = HIWORD(wparam);
+        if (id == ID_CHECK_UPDATE) {
+            if (update_offer.is_object()) offer_launcher_update(); else check_launcher_update(true);
+            return 0;
+        }
         if(id==IDOK && GetFocus()==g.friend_code_edit){friend_action(111);return 0;}
         if(id==IDCANCEL && g.friends_open){animate_friends(false);return 0;}
         if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) { launch_game(); return 0; }
@@ -2016,6 +2142,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 0;
     }
     case WM_TIMER:
+        if(wparam==31) poll_launcher_update();
         if(wparam==20) {
             reload_friends();
             if(g.friends_open) InvalidateRect(g.friends_drawer,nullptr,FALSE);
@@ -2032,9 +2159,10 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         xbox_prompts_ready(reinterpret_cast<std::wstring*>(lparam));
         return 0;
     case WM_CLOSE:
-        if (g.process || g.host_busy || g.xbox_busy) return 0;
+        if (g.process || g.host_busy || g.xbox_busy || update_preparing) return 0;
         save_config();
         KillTimer(window,20);
+        KillTimer(window,31);
         g.host.stop(); // closes the router ports opened for hosting
         DestroyWindow(window);
         return 0;
@@ -2068,6 +2196,29 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     GetModuleFileNameW(nullptr, module, static_cast<DWORD>(std::size(module)));
     g.exe_dir = fs::path(module).parent_path();
     g.root = find_root(g.exe_dir);
+    if (ctr_update::portable(g.root, g.exe_dir)) {
+        try {
+            update_install_lock = ctr_update::acquire_install_lock(g.root);
+            if (update_install_lock == INVALID_HANDLE_VALUE)
+                throw std::runtime_error("Another launcher or updater is using this installation.");
+            const auto pending = g.root / "runtime/user/updates/pending.json";
+            if (fs::exists(pending)) {
+                const fs::path txn = ctr_update::wide(ctr_update::read(pending).at("transaction").text);
+                const auto name = txn.filename().wstring();
+                if (txn.parent_path() != pending.parent_path() || name.size() != 36 || name.substr(0,4) != L"txn-" ||
+                    name.substr(4).find_first_not_of(L"0123456789abcdef") != std::wstring::npos)
+                    throw std::runtime_error("Invalid update recovery path.");
+                ctr_update::assert_plain_path(txn / "apply.ps1");
+                ctr_update::launch_apply(g.root, txn / "apply.ps1", txn, true);
+                CloseHandle(update_install_lock);
+                return 0;
+            }
+        } catch (const std::exception& e) {
+            MessageBoxW(nullptr, ctr_update::wide(e.what()).c_str(), L"CTRNativePorted update", MB_ICONERROR);
+            if (update_install_lock != INVALID_HANDLE_VALUE) CloseHandle(update_install_lock);
+            return 1;
+        }
+    }
     std::error_code ec;
     if (fs::exists(g.exe_dir / "ctrport.exe", ec)) {
         g.runtime_exe = g.exe_dir / "ctrport.exe";
@@ -2119,5 +2270,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     for (auto& cached : family_cache) cached.reset();
     GdiplusShutdown(gdiplus);
     CoUninitialize();
+    if (update_job.valid()) update_job.wait();
+    if (update_install_lock != INVALID_HANDLE_VALUE) CloseHandle(update_install_lock);
     return 0;
 }

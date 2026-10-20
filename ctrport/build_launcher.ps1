@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Builds the native launcher (ctrport/launcher.cpp) as build/CTRPort-dev/CTRNativePorted.exe,
 # next to the ctrport.exe it starts. Only Windows system libraries (Win32, GDI+, COM, DWM, Winsock, CNG).
-param([string]$OutputDirectory = 'build/CTRPort-dev')
+param([string]$OutputDirectory = 'build/CTRPort-dev',
+      [string]$Version = (Get-Content (Join-Path $PSScriptRoot 'launcher_version.txt') -Raw).Trim())
 $ErrorActionPreference='Stop'
+if($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'){throw 'Version must be major.minor.patch'}
 $taskRoot=Split-Path -Parent $PSScriptRoot
 $out=Join-Path $taskRoot $OutputDirectory
 New-Item -ItemType Directory -Force $out | Out-Null
@@ -24,9 +26,11 @@ $objects=@($server | ForEach-Object { Join-Path $obj ([IO.Path]::GetFileNameWith
 & rc.exe /nologo "/I$PSScriptRoot" "/fo$out/launcher.res" "$PSScriptRoot/launcher.rc" *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){throw 'launcher logo resource build failed'}
 $objects += @("$out/launcher.res")
-& $cl /nologo /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DUNICODE /D_UNICODE "$PSScriptRoot/launcher.cpp" @objects "/Fo$out/launcher.obj" "/Fe$out/launcher.exe" /link /SUBSYSTEM:WINDOWS *>> "$out/launcher_build.log"
+& $cl /nologo /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DUNICODE /D_UNICODE "/DCTR_LAUNCHER_VERSION=`"$Version`"" "$PSScriptRoot/launcher.cpp" @objects "/Fo$out/launcher.obj" "/Fe$out/launcher.exe" /link /SUBSYSTEM:WINDOWS *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher build failed'}
 New-Item -ItemType Directory -Force "$out/assets/launcher" | Out-Null
 Copy-Item "$PSScriptRoot/assets/launcher/logo.png" "$out/assets/launcher/logo.png" -Force
 Copy-Item "$out/launcher.exe" "$out/CTRNativePorted.exe" -Force
+Copy-Item "$PSScriptRoot/launcher_update.ps1" "$out/launcher_update.ps1" -Force
+@{version=$Version; repository='guzuold/CTRNativePorted'; channel='prerelease'} | ConvertTo-Json | Set-Content "$out/update-version.json" -Encoding UTF8
 Write-Output "launcher build ok: $out/launcher.exe"

@@ -2,6 +2,7 @@
 // SysV lifecycle + actual native confirmation UI; transport is a mock, no recipients contacted.
 #include "../hle/ctr_hle.h"
 #include "../hle/invitation_types.h"
+#include "../hle/invitation_flow.h"
 #include "../hle/online_http.h"
 #include "../online_server/json.hpp"
 #include <windows.h>
@@ -14,6 +15,7 @@ using namespace ctr_hle::invitation;
 namespace {
 std::atomic<int> failures{0};
 bool used = false;
+std::atomic<int> notice_prompts{0}, accept_attempts{0}, fixture_phase{0};
 int response_status = 201;
 std::atomic<int> requests{0};
 std::string request_body;
@@ -32,9 +34,12 @@ BOOL CALLBACK answer(HWND window, LPARAM button) {
     DWORD pid = 0; GetWindowThreadProcessId(window, &pid);
     wchar_t title[64]{}; GetWindowTextW(window, title, 64);
     if (pid == GetCurrentProcessId() && !std::wcscmp(title, L"CTR - Invito")) {
+        if (button == IDYES) ++notice_prompts;
         if (button == IDOK && GetDlgItem(window, 100)) SendDlgItemMessageW(window, 100, LB_SETSEL, TRUE, 0);
         PostMessageW(window, WM_COMMAND, static_cast<WPARAM>(button), 0);
     }
+    if (pid == GetCurrentProcessId() && !std::wcscmp(title, L"CTR - Errore invito"))
+        PostMessageW(window, WM_COMMAND, IDCANCEL, 0);
     return TRUE;
 }
 }
@@ -51,12 +56,16 @@ bool http_exchange(const std::string& method, const std::string& path,
     if (method == "GET" && path == "/ctr/v1/session-invitations") {
         response->status = 200;
         response->body = R"([{"invitationId":"receive-fixture","sessionId":"0123456789abcdef0123456789abcdef","onlineId":"FixtureHost"}])";
+        if (fixture_phase == 1) response->body = R"([{"invitationId":"failed-fixture","sessionId":"0123456789abcdef0123456789abcdef","onlineId":"FixtureHost"}])";
         return true;
     }
     if (method == "PUT" && path == "/ctr/v1/session-invitations/receive-fixture") {
         response->status = 200;
         response->body = R"({"invitationId":"receive-fixture","sessionId":"0123456789abcdef0123456789abcdef"})";
         return true;
+    }
+    if (method == "PUT" && path == "/ctr/v1/session-invitations/failed-fixture") {
+        ++accept_attempts; response->status=502;response->body="{}";return true;
     }
     check(method == "POST" && path == "/ctr/v1/session-invitations", "project invitation route");
     request_body = body; ++requests; response->status = response_status;
@@ -149,6 +158,19 @@ int main() {
     check(ctr_hle_invitation_load(common) == 0 && init() == 0 && used,
           "invitation module reloads for the next invite");
     check(term() == 0 && unload(0xa2) == 0 && !used, "reloaded module releases ownership");
+    set_owner(common);
+    auto drive=[](int milliseconds) {
+        const auto end=std::chrono::steady_clock::now()+std::chrono::milliseconds(milliseconds);
+        while(std::chrono::steady_clock::now()<end) {
+            tick();EnumWindows(answer,IDYES);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    };
+    drive(3500);
+    check(notice_prompts==0,"accepted invitation is not prompted again by stale poll");
+    fixture_phase=1;notice_prompts=0;
+    drive(7000);
+    check(accept_attempts==1,"failed automatic acceptance is not silently retried in a popup loop");
     std::printf("invitation_dialog_test failures=%d\n", failures.load());
     return failures ? 1 : 0;
 }
