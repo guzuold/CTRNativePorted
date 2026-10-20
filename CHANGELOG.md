@@ -1,3 +1,15 @@
+## v0.4.4 — 2026-10-20
+
+Fix JOIN from the in-game friends list across separate launchers.
+
+- JOIN reads the friend's Delta record (138/14) and contacts the friend immediately, before any session request names the friend's session. v0.4.3 therefore refused those packets (`blocked_by_policy`, peer-allowed 403 right after 138/14 in the two-PC log), and the join ended with an error.
+- The joining player's service now remembers, for two minutes, the friends whose Delta record its game received, and asks their service as a joining friend. The host's service admits that verified friend for one minute and answers with its own players' addresses, so both directions are authorized.
+- Only mutual, verified friends who are in game are admitted this way. Strangers and unknown addresses stay blocked; public matchmaking authorization is unchanged.
+
+Validation: two separate services with encrypted synthetic game clients, 16 checks; v0.4.3 fails the new Delta check, v0.4.4 passes. Server suite 237, friend network 34, public hub, invitation and room tests pass. These are local protocol tests: a retail race over the Internet, NAT/UDP reachability and relay remain to be verified on the two PCs.
+
+Update both PCs, close the game before installation, then try JOIN from the friends list in both directions. Keep `runtime/user` and the existing identities. See FIRST_UPDATE.md.
+
 ## v0.4.3 — 2026-10-20
 
 Fix gameplay packets rejected as `blocked_by_policy` when joining across separate launchers.
