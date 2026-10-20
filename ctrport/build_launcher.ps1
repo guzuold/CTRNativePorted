@@ -17,7 +17,7 @@ New-Item -ItemType Directory -Force $obj | Out-Null
 $dhtDir=Join-Path $PSScriptRoot 'dht'
 & $cl /nologo /c /O2 /W3 /wd4244 /wd4267 /D_CRT_SECURE_NO_WARNINGS /DWIN32_LEAN_AND_MEAN /DNOMINMAX (Join-Path $dhtDir 'dht.c') "/Fo$obj/dht.obj" *> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher dht build failed'}
-$server=@('json.cpp','crypto.cpp','protocol.cpp','stores.cpp','relay.cpp','server.cpp','upnp.cpp','launcher_online.cpp','friend_identity.cpp','dht_service.cpp','friend_verifier.cpp','friend_store.cpp','party_lobby.cpp') | ForEach-Object { Join-Path $PSScriptRoot "online_server/$_" }
+$server=@('json.cpp','crypto.cpp','protocol.cpp','stores.cpp','relay.cpp','server.cpp','upnp.cpp','launcher_online.cpp','friend_identity.cpp','dht_service.cpp','friend_verifier.cpp','friend_store.cpp','party_lobby.cpp','friend_network.cpp') | ForEach-Object { Join-Path $PSScriptRoot "online_server/$_" }
 & $cl /nologo /c /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DWIN32_LEAN_AND_MEAN /DNOMINMAX @server "/Fo$obj/" *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher online server build failed'}
 $objects=@($server | ForEach-Object { Join-Path $obj ([IO.Path]::GetFileNameWithoutExtension($_)+'.obj') }) + @(Join-Path $obj 'dht.obj')

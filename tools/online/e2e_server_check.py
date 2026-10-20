@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 HOST, HTTP, DISCOVERY, PUBLIC = '127.0.0.1', 18780, 13078, '192.0.2.10'
 SERVERS = {
     'python': [sys.executable, '-B', str(ROOT / 'tools/online/ctr_online_server.py')],
-    'cpp': [str(ROOT / 'build/CTRPort-claude/ctr_online_server.exe')],
+    'cpp': [str(Path(os.environ.get('CTR_TEST_SERVER_EXE', ROOT / 'build/CTRPort-claude/ctr_online_server.exe')).resolve())],
 }
 ARGS = ['--host', HOST, '--http', str(HTTP), '--tcp', '', '--udp', '', '--public-host', PUBLIC,
         '--discovery-port', str(DISCOVERY)]
@@ -94,7 +94,9 @@ def normalize(value, now):
     if isinstance(value, list):
         return [normalize(v, now) for v in value]
     if isinstance(value, dict):
-        return {k if not k.isdigit() else sym('n', int(k)): normalize(v, now) for k, v in value.items()}
+        # ctr_migration: host-migration routes, a C++-only extension of the lobby document.
+        return {k if not k.isdigit() else sym('n', int(k)): normalize(v, now) for k, v in value.items()
+                if k != 'ctr_migration'}
     if isinstance(value, str):
         if value.startswith('ctr.') and len(value) == 47:
             return 'ACCESS_TOKEN'
@@ -248,7 +250,9 @@ def scenario():
                                client[0x61:0x79] == server[:24], server[24:32] == struct.pack('<Q', user)])
         players[name] = {'key': server[:24], 'server_ticket': server, 'user': user, 'selector': selector}
     request = json.dumps({'auth_task': '46'}).encode()
-    note('auth3 without room', http('POST', '/auth/', 'a-auth3.b', {'X-CTR-Online-ID': 'x'}, request)[1:4:2])
+    # Without a room token the player is admitted to public matchmaking (the reply holds random tickets).
+    status, line, fields, body = http('POST', '/auth/', 'a-auth3.b', {'X-CTR-Online-ID': 'x'}, request)
+    note('auth3 without room', [line, sorted(json.loads(body))])
     note('auth3 bad json', http('POST', '/auth/', 'a-auth3.b', {'X-CTR-Room-Token': password}, b'{')[1:4:2])
     note('auth3 other task', http('POST', '/auth/', 'a-auth3.b', {'X-CTR-Room-Token': password},
                                   json.dumps({'auth_task': '12'}).encode())[1:4:2])

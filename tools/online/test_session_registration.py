@@ -20,7 +20,7 @@ class RegistrationTests(unittest.TestCase):
             self.assertEqual(store.database.execute('SELECT owner FROM match_sessions WHERE id=?',(session,)).fetchone(),('42',))
             update=[[16,'Delta'],[19,session.hex()],[8,1]]+params[1:]
             self.assertEqual(tasks.Reader(tasks.handle(138,12,update,user)).values()[1][1],0)
-            self.assertEqual(store.database.execute('SELECT custom FROM match_session_players WHERE session=?',(session,)).fetchone(),(b'\x12\x34',))
+            self.assertEqual(store.database.execute('SELECT custom,players FROM match_sessions WHERE id=?',(session,)).fetchone(),(b'\x12\x34',1))
             for invalid_user in ({'user_id':43,'room_token':user['room_token']},
                                  {'user_id':42,'room_token':room.token('other')}):
                 self.assertEqual(tasks.Reader(tasks.handle(138,12,update,invalid_user)).values()[1][1],1)

@@ -18,7 +18,10 @@
 #include "party_lobby.hpp"
 #include "party_migration.hpp"
 #include "room_invite.hpp"
+#include "friend_network.hpp"
 #include "../dht/dht.h"
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <wincrypt.h>
 #include <bcrypt.h>
@@ -136,7 +139,7 @@ void test_invitation_pull() {
     check(ttl.apply(b,req("invitations"),false,now+901).at("invitations").items.empty(),"unclaimed invitations expire after fifteen minutes");
     bool rejected=false;try {ttl.apply(b,join,false,now+901);}catch(...) {rejected=true;}
     check(rejected,"expired invitation no longer authorizes joining");
-    std::filesystem::remove_all(root);
+    std::error_code ignored;std::filesystem::remove_all(root,ignored); // the servers' logs close at scope exit
 }
 
 void test_room_invite() {
@@ -263,7 +266,223 @@ void test_party_migration_http() {
     std::printf("{\"scope\":\"party_migration_http\",\"failures\":%d}\n",failures);
 }
 
+namespace ctr_online {
+int http_request(const std::string& ipv4, std::uint16_t port, const std::string& path, const std::string& payload,
+                 std::string& body, int timeout_ms); // launcher_online.cpp
+}
+// A request as the game sends it to its local service (identity header, port 8780).
+int game_http(const std::string& ip, const std::string& method, const std::string& path, const std::string& online_id,
+              const std::string& body, std::string& answer, const std::string& content_type = "application/json") {
+    answer.clear();
+    const SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(8780);
+    inet_pton(AF_INET, ip.c_str(), &address.sin_addr);
+    if (connect(s, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) { closesocket(s); return 0; }
+    const std::string request = method + " " + path + " HTTP/1.1\r\nHost: " + ip + "\r\nConnection: close\r\nX-Ctr-Online-Id: " +
+        online_id + "\r\nContent-Type: " + content_type + "\r\nContent-Length: " + std::to_string(body.size()) + "\r\n\r\n" + body;
+    send(s, request.data(), static_cast<int>(request.size()), 0);
+    std::string raw;
+    char buffer[8192];
+    for (int n; (n = recv(s, buffer, sizeof(buffer), 0)) > 0;) raw.append(buffer, static_cast<std::size_t>(n));
+    closesocket(s);
+    const auto end = raw.find("\r\n\r\n");
+    if (end == std::string::npos || raw.size() < 12) return 0;
+    answer = raw.substr(end + 4);
+    return std::atoi(raw.c_str() + 9);
+}
+// Phase 2: three local services on separate addresses. A and B have each other in their
+// rubrica; C has A in its own but A does not know C.
+void test_peer_channel() {
+    const auto root=std::filesystem::temp_directory_path()/("ctr_peer_"+hex(random_bytes(8)));
+    const auto aroot=root/"a",broot=root/"b",croot=root/"c";
+    const auto a=local_friend_code(aroot),b=local_friend_code(broot),c=local_friend_code(croot);
+    FriendStore(aroot/"runtime/user/online/friends.json").add_or_update(b,"Bruno");
+    FriendStore(broot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
+    FriendStore(croot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
+    const std::map<std::string,std::string> address{{a,"127.0.0.2"},{b,"127.0.0.3"},{c,"127.0.0.4"}};
+    auto config=[&](const std::filesystem::path& folder,const std::string& ip,const char* name) {
+        ServerConfig x;x.host=ip;x.public_host=ip;x.relay_port=0;x.tcp_record_ports={};x.udp_record_ports={};
+        x.state_dir=folder/"runtime/user/online";x.log_path=folder/"runtime/user/logs/peer.jsonl";
+        x.friend_network=true;x.local_name=name;x.friend_poll_period=std::chrono::hours(1);
+        x.friend_resolver=[address](const std::string& code)->std::optional<std::pair<std::string,std::uint16_t>> {
+            const auto it=address.find(code);
+            if(it==address.end()) return std::nullopt;
+            return std::make_pair(it->second,std::uint16_t(8780));
+        };
+        return x;
+    };
+    Server sa(config(aroot,"127.0.0.2","PeerAnna")),sb(config(broot,"127.0.0.3","PeerBruno")),sc(config(croot,"127.0.0.4","PeerCarla"));
+    sa.start();sb.start();sc.start();
+    sa.poll_friends();sb.poll_friends();sc.poll_friends();
+    const auto af=sa.friends(),bf=sb.friends(),cf=sc.friends();
+    check(af.size()==1 && af[0].code==b && af[0].online && af[0].name=="PeerBruno" && af[0].nickname=="Bruno" &&
+          af[0].account==user_id("PeerBruno") && !af[0].in_game,"peer presence: friend's service reports its player");
+    check(bf.size()==1 && bf[0].online && bf[0].name=="PeerAnna","peer presence: both directions");
+    check(cf.size()==1 && !cf[0].online && cf[0].name.empty(),"peer presence: service refuses a caller outside its rubrica");
+    const auto cid=HostIdentity::load_or_create(croot/"runtime/user/identity/host_identity.json");
+    const auto bid=HostIdentity::load_or_create(broot/"runtime/user/identity/host_identity.json");
+    auto presence=[]{Json j=Json::object();j.set("action",Json::of("presence"));return j;};
+    std::string reason;
+    try{peer_request(cid,"127.0.0.2",8780,a,presence());}catch(const std::exception& e){reason=e.what();}
+    check(reason=="Non e nella lista amici","peer channel: stranger gets the rubrica refusal");
+    Json payload=presence();payload.set("nonce",Json::of(hex(random_bytes(16))));payload.set("to",Json::of(a));
+    const std::string packet=dump_json(sign_peer_message(bid,payload));
+    std::string first,second;
+    const int s1=http_request("127.0.0.2",8780,"/ctr/v1/peer",packet,first,3000);
+    const int s2=http_request("127.0.0.2",8780,"/ctr/v1/peer",packet,second,3000);
+    check(s1==200 && s2==403 && second.find("duplicato")!=std::string::npos,"peer channel: replayed packet refused");
+    Json elsewhere=presence();elsewhere.set("nonce",Json::of(hex(random_bytes(16))));elsewhere.set("to",Json::of(c));
+    std::string misdirected;
+    check(http_request("127.0.0.2",8780,"/ctr/v1/peer",dump_json(sign_peer_message(bid,elsewhere)),misdirected,3000)==403 &&
+          misdirected.find("altro servizio")!=std::string::npos,"peer channel: packet addressed to another service refused");
+    Json forged=sign_peer_message(bid,payload);forged.set("code",Json::of(c));
+    std::string third;
+    check(http_request("127.0.0.3",8780,"/ctr/v1/peer",dump_json(forged),third,3000)==403,
+          "peer channel: claimed sender must match the signature");
+    Json unknown=Json::object();unknown.set("action",Json::of("format_disk"));
+    reason.clear();
+    try{peer_request(bid,"127.0.0.2",8780,a,unknown);}catch(const std::exception& e){reason=e.what();}
+    check(reason.find("Azione non supportata")==0,"peer channel: unknown action refused");
+    std::string learned;
+    const auto identified=identify_endpoint("127.0.0.3:8780",learned,2000);
+    check(identified.status==VerifyStatus::Verified && learned==b && identified.ip=="127.0.0.3",
+          "public matchmaking: a service's code is learned and verified from its identity answer");
+    learned.clear();
+    check(identify_endpoint("127.0.0.9:8780",learned,500).status!=VerifyStatus::Verified && learned.empty(),
+          "public matchmaking: an endpoint without a service is not a candidate");
+    const MatchHub self{"CTR1-M",""},low{"CTR1-A","10.0.0.1"},high{"CTR1-Z","10.0.0.2"};
+    check(choose_hub(self,true,{high,low})->code=="CTR1-A" && choose_hub(self,true,{high})->code=="CTR1-M" &&
+          choose_hub(self,false,{high})->code=="CTR1-Z" && !choose_hub(self,false,{}) && choose_hub(self,true,{})->code=="CTR1-M",
+          "public matchmaking: hub is the lowest code among reachable services, never an unreachable self");
+    const auto anna=std::to_string(user_id("PeerAnna")),bruno=std::to_string(user_id("PeerBruno"));
+    std::string answer;
+    check(game_http("127.0.0.3","PUT","/webapi/sdk:userProfile/v1/users/"+bruno+"/presence/gameStatus","PeerBruno",
+                    R"({"gameStatus":"In gara"})",answer)==204,"peer presence: game status stored on the friend's own service");
+    sa.poll_friends();
+    const auto reported=sa.friends();
+    check(reported.size()==1 && reported[0].report.at("game_presence").at("gameStatus").text=="In gara",
+          "peer presence: friend's game status reaches this service");
+    const auto list_route="/webapi/sdk:userProfile/v1/users/"+anna+"/friendList?offset=0&limit=100";
+    check(game_http("127.0.0.2","GET",list_route,"PeerAnna","",answer)==200 &&
+          answer.find("\"onlineId\": \"PeerBruno\"")!=std::string::npos && answer.find("\"accountId\": \""+bruno+"\"")!=std::string::npos &&
+          answer.find("\"onlineStatus\": \"offline\"")!=std::string::npos && answer.find("PeerCarla")==std::string::npos,
+          "in-game friendList is the rubrica; friend without a running game is offline");
+    FriendStore(broot/"runtime/user/online/friends.json").remove(a);
+    sa.poll_friends();
+    const auto after=sa.friends();
+    check(after.size()==1 && !after[0].online && after[0].name=="PeerBruno",
+          "peer presence: removal takes effect at once, offline friend keeps its last name");
+    sa.stop();
+    {
+        Server restarted(config(aroot,"127.0.0.2","PeerAnna"));restarted.start();
+        check(game_http("127.0.0.2","GET",list_route,"PeerAnna","",answer)==200 &&
+              answer.find("\"onlineId\": \"PeerBruno\"")!=std::string::npos,
+              "in-game friendList keeps an offline friend after a restart");
+        restarted.stop();
+    }
+    FriendStore(aroot/"runtime/user/online/friends.json").remove(b);
+    {
+        Server restarted(config(aroot,"127.0.0.2","PeerAnna"));restarted.start();
+        check(game_http("127.0.0.2","GET",list_route,"PeerAnna","",answer)==200 &&
+              answer.find("PeerBruno")==std::string::npos,"friend removed from the rubrica leaves the in-game list");
+        restarted.stop();
+    }
+    sb.stop();sc.stop();
+    std::error_code ignored;std::filesystem::remove_all(root,ignored);
+    std::printf("{\"scope\":\"peer_channel\",\"failures\":%d}\n",failures);
+}
+
+// Phase 2: a player invites a friend whose game is connected to another PC's service. The
+// session stays on the host's service; the guest's service forwards accept, details and join.
+void test_friend_invitation() {
+    const auto root=std::filesystem::temp_directory_path()/("ctr_invite_"+hex(random_bytes(8)));
+    const auto aroot=root/"a",broot=root/"b",croot=root/"c";
+    const auto a=local_friend_code(aroot),b=local_friend_code(broot),c=local_friend_code(croot);
+    FriendStore(aroot/"runtime/user/online/friends.json").add_or_update(b,"Bruno");
+    FriendStore(broot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
+    FriendStore(croot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
+    const std::map<std::string,std::string> address{{a,"127.0.0.2"},{b,"127.0.0.3"},{c,"127.0.0.4"}};
+    auto config=[&](const std::filesystem::path& folder,const std::string& ip,const char* name) {
+        ServerConfig x;x.host=ip;x.public_host=ip;x.relay_port=0;x.tcp_record_ports={};x.udp_record_ports={};
+        x.state_dir=folder/"runtime/user/online";x.log_path=folder/"runtime/user/logs/invite.jsonl";
+        x.friend_network=true;x.local_name=name;x.friend_poll_period=std::chrono::hours(1);
+        x.friend_resolver=[address](const std::string& code)->std::optional<std::pair<std::string,std::uint16_t>> {
+            const auto it=address.find(code);
+            if(it==address.end()) return std::nullopt;
+            return std::make_pair(it->second,std::uint16_t(8780));
+        };
+        return x;
+    };
+    Server sa(config(aroot,"127.0.0.2","HostAnna")),sb(config(broot,"127.0.0.3","GuestBruno")),sc(config(croot,"127.0.0.4","OtherCarla"));
+    sa.start();sb.start();sc.start();
+    sa.poll_friends();sb.poll_friends();
+    const std::string meta=R"({"sessionPrivacy":"private","sessionMaxUser":8,"sessionName":"x","availablePlatforms":["PS4"]})";
+    const std::string body="--B\r\nContent-Type: application/json\r\nContent-Description: session-request\r\nContent-Length: "+
+        std::to_string(meta.size())+"\r\n\r\n"+meta+"\r\n--B\r\nContent-Type: application/octet-stream\r\n"
+        "Content-Description: changeable-session-data\r\nContent-Length: 2\r\n\r\nab";
+    std::string answer;
+    check(game_http("127.0.0.2","POST","/webapi/sdk:sessionInvitation/v1/sessions","HostAnna",body,answer,"multipart/mixed; boundary=B")==201,
+          "cross invite: host creates a private session on its own service");
+    const auto session=parse_json(answer).at("sessionId").text;
+    const auto guest=user_id("GuestBruno");
+    check(game_http("127.0.0.2","POST","/ctr/v1/session-invitations","HostAnna",
+                    R"({"sessionId":")"+session+R"(","recipients":[)"+std::to_string(guest)+"]}",answer)==201,
+          "cross invite: host sends the invitation");
+    const auto invitation=parse_json(answer).items.at(0).at("invitationId").text;
+    check(game_http("127.0.0.3","GET","/ctr/v1/session-invitations","GuestBruno","",answer)==200 &&
+          answer.find(invitation)!=std::string::npos && answer.find(session)!=std::string::npos &&
+          answer.find("\"onlineId\":\"HostAnna\"")!=std::string::npos,
+          "cross invite: guest's own service delivers it to the guest's game");
+    check(game_http("127.0.0.4","GET","/ctr/v1/session-invitations","OtherCarla","",answer)==200 && answer=="[]",
+          "cross invite: another PC's player does not receive it");
+    check(game_http("127.0.0.3","GET","/webapi/sdk:sessionInvitation/v1/users/me/invitations","GuestBruno","",answer)==200 &&
+          answer.find("\"size\":1")!=std::string::npos && answer.find("\"sessionCreator\"")!=std::string::npos,
+          "cross invite: PSN invitation list carries the session details from the host's service");
+    check(game_http("127.0.0.3","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session+"?fields=@default,members","GuestBruno","",answer)==200 &&
+          answer.find("HostAnna")!=std::string::npos,"cross invite: invited guest reads the host's private session");
+    check(game_http("127.0.0.3","PUT","/ctr/v1/session-invitations/"+invitation,"GuestBruno","",answer)==200 &&
+          answer.find(session)!=std::string::npos,"cross invite: acceptance reaches the host's service");
+    check(game_http("127.0.0.3","GET","/ctr/v1/session-invitations","GuestBruno","",answer)==200 && answer=="[]",
+          "cross invite: an accepted invitation is no longer pending");
+    check(game_http("127.0.0.3","POST","/webapi/sdk:sessionInvitation/v1/sessions/"+session+"/members?index=0&priority=49","GuestBruno","",answer)==204,
+          "cross invite: guest joins the host's session from its own service");
+    check(game_http("127.0.0.2","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session,"HostAnna","",answer)==200 &&
+          answer.find("GuestBruno")!=std::string::npos,"cross invite: the host's service lists the guest as a member");
+    sb.poll_friends();
+    check(game_http("127.0.0.3","GET","/webapi/sdk:sessionInvitation/v1/users/me/friends/sessions?offset=0&limit=100","GuestBruno","",answer)==200 &&
+          answer.find(session)!=std::string::npos,"cross invite: friend sessions on the guest's service include the host's session");
+    check(game_http("127.0.0.3","GET","/webapi/sdk:sessionInvitation/v1/users/@users/sessions?accountIds="+std::to_string(user_id("HostAnna")),
+                    "GuestBruno","",answer)==200 && answer.find(session)!=std::string::npos,
+          "cross invite: the host's sessions by account come from the host's report");
+    const auto bid=HostIdentity::load_or_create(broot/"runtime/user/identity/host_identity.json");
+    const auto cid=HostIdentity::load_or_create(croot/"runtime/user/identity/host_identity.json");
+    auto webapi=[&](const std::string& name,const std::string& method,const std::string& target) {
+        Json j=Json::object();j.set("action",Json::of("webapi"));j.set("method",Json::of(method));j.set("target",Json::of(target));
+        j.set("name",Json::of(name));j.set("content_type",Json::of(""));j.set("body",Json::of(""));return j;
+    };
+    std::string reason;
+    try{peer_request(bid,"127.0.0.2",8780,a,webapi("HostAnna","DELETE","/webapi/sdk:sessionInvitation/v1/sessions/"+session));}
+    catch(const std::exception& e){reason=e.what();}
+    check(!reason.empty(),"cross invite: a friend's service cannot act as the host's own player");
+    reason.clear();
+    try{peer_request(bid,"127.0.0.2",8780,a,webapi("GuestBruno","GET","/ctr/v1/config"));}catch(const std::exception& e){reason=e.what();}
+    check(reason=="Richiesta non inoltrabile","cross invite: only session and invitation routes are forwarded");
+    reason.clear();
+    try{peer_request(cid,"127.0.0.2",8780,a,webapi("OtherCarla","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session));}
+    catch(const std::exception& e){reason=e.what();}
+    check(reason=="Non e nella lista amici","cross invite: a stranger's service cannot read the session");
+    check(game_http("127.0.0.3","DELETE","/webapi/sdk:sessionInvitation/v1/sessions/"+session+"/members/me","GuestBruno","",answer)==204 &&
+          game_http("127.0.0.2","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session,"HostAnna","",answer)==200 &&
+          answer.find("GuestBruno")==std::string::npos,"cross invite: guest leaves the host's session through its own service");
+    sa.stop();sb.stop();sc.stop();
+    std::error_code ignored;std::filesystem::remove_all(root,ignored);
+    std::printf("{\"scope\":\"friend_invitation\",\"failures\":%d}\n",failures);
+}
+
 int run_tests(int argc, char* argv[]) {
+    if(argc>=2 && std::string(argv[1])=="--peer-only") {test_peer_channel();test_friend_invitation();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--party-migration-only") {test_party_migration_http();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--room-invite-only") {test_room_invite();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--invite-pull-only") {test_invitation_pull();return failures ? 1 : 0;}
@@ -576,6 +795,35 @@ int run_tests(int argc, char* argv[]) {
         _putenv("CTR_ONLINE_MIN_PLAYERS=");
     }
 
+    // Public matchmaking (no room token): players of the same game playlist are paired with each
+    // other, never with another playlist or with a private room choosing the same playlist.
+    {
+        const std::string& pub = public_room_token();
+        check(pub == "57b9a23ab919f9933c4617830fcc991c2c519db7daa92ab333f6527eb39dcda0" && valid_room_token(pub) &&
+              pub != room_token("ctr-public-room-v1") && pub != room_token("public"), "public selector as room.py, distinct from passwords");
+        MatchmakingStore store;
+        const std::string info = R"({"listen_server":{"local_address":")" + base64_encode(Bytes(67, 0)) + R"(","security_id":")" +
+                                 base64_encode(Bytes(8, 0)) + R"(","security_key":")" + base64_encode(Bytes(16, 0)) +
+                                 R"(","nat":1},"dedicated_server":{"build_name":"synthetic"}})";
+        const std::string private_room = room_token("friends only");
+        const std::map<std::uint64_t, std::pair<std::string, int>> players{
+            {201, {pub, 0}}, {202, {pub, 3}}, {203, {private_room, 0}}, {204, {pub, 0}}};
+        std::map<std::uint64_t, std::string> available;
+        for (const auto& [account, choice] : players) {
+            store.advertise({param(typed::STRING, Json::of(info))}, account, choice.first);
+            const std::string doc = R"({"members":[)" + std::to_string(account) + R"(],"tokens":[)" + std::to_string(store.player_token(account)) +
+                                    R"(],"lobby_slots":{"min":2,"max":8},"dedicated_server":{"request_level":"not_needed"},"team_balance":{"num_teams":0},)"
+                                    R"("ruleset_payload":{"filter":{"matchmaking_version":200,"playlist_id":)" + std::to_string(choice.second) +
+                                    R"(}},"player_id_to_slots":{")" + std::to_string(account) + R"(":0},"performance":{"game_type":1}})";
+            store.start_search({param(typed::STRING, Json::of(doc))}, account, choice.first);
+            available[account] = choice.first;
+        }
+        const auto plans = store.match_ready(available);
+        bool paired = plans.size() == 1 && plans[0].players.size() == 2 && plans[0].selector == pub;
+        if (paired) for (const auto& p : plans[0].players) paired = paired && (p.account == 201 || p.account == 204);
+        check(paired, "public: same playlist paired, other playlist and private room left waiting");
+    }
+
     // Relay (relay.hpp): tokens, bindings, forwarding within one room, addresses shown, refusals.
     {
         RelayLimits limits;
@@ -666,6 +914,55 @@ int run_tests(int argc, char* argv[]) {
         bool bad = false;
         try { sessions.create(42, "multipart/mixed; boundary=B", bytes_of(body + "x")); } catch (const std::exception&) { bad = true; }
         check(bad, "data after the final part refused");
+        // Project transport: synthetic invitations, independent of a retail join.
+        const auto sender = user_id("InviteHost");
+        const auto session = sessions.create(sender, "multipart/mixed; boundary=B", bytes_of(body)).at("sessionId").text;
+        const auto sent = sessions.invite(sender, "InviteHost", session, {43,44}, 1000);
+        check(sent.items.size() == 2 && sessions.invitations(43, 1001).items.size() == 1 &&
+              sessions.invitations(45, 1001).items.empty(), "invitation: batch delivery isolated to recipients");
+        check(sessions.invite(sender, "InviteHost", session, {43}, 1002).items[0].at("invitationId") ==
+              sent.items[0].at("invitationId"), "invitation: send retry reuses outstanding ID");
+        const auto refused = [](auto action) { try { action(); return false; } catch (const std::exception&) { return true; } };
+        check(refused([&] { sessions.invite(43, "Other", session, {44}, 1003); }) &&
+              refused([&] { sessions.invite(sender, "InviteHost", session, {45,45}, 1003); }) &&
+              sessions.invitations(45,1003).items.empty(), "invitation: nonowner and duplicate batch rejected without delivery");
+        check(refused([&] { sessions.dismiss(44, sent.items[0].at("invitationId").text, 1003); }),
+              "invitation: another recipient cannot consume invite");
+        check(sessions.invitations(43,1004).items.size() == 1, "invitation: polling does not consume");
+        sessions.dismiss(43, sent.items[0].at("invitationId").text, 1005);
+        check(sessions.invitations(43,1006).items.empty() && sessions.invitations(44,1006).items.size() == 1,
+              "invitation: dismissal affects only selected recipient");
+        check(sessions.invitations(44,1300).items.empty(), "invitation: stale session invitations expire");
+    }
+
+    // Synthetic Delta lifecycle. A reservation must not masquerade as a published lobby.
+    {
+        MatchmakingStore store;
+        const auto text = [](const std::string& s) { return param(typed::STRING, Json::of(s)); };
+        const auto blob = [](const Bytes& b) { return param(typed::BLOB, Json::of(hex(b))); };
+        const auto number = [](int n) { return param(typed::UINT32, Json::of(n)); };
+        const auto refused = [](auto action) { try { action(); return false; } catch (const std::exception&) { return true; } };
+        const auto selector = room_token("delta-fixture");
+        check(refused([&] { store.reserve_session({text("Delta")}, 42, ""); }), "Delta: invalid reservation selector refused");
+        const auto id = store.reserve_session({text("Delta")}, 42, selector);
+        check(store.friend_sessions("Delta", {42}, 43).empty(), "Delta: reservation hidden before initialization");
+        const std::vector<Param> update{text("Delta"), blob(id), blob(Bytes(67, 0)), number(8), number(8), blob(Bytes{1,2,3})};
+        check(refused([&] { store.update_session(update, 43, true); }), "Delta: other account cannot initialize");
+        store.update_session(update, 42, true);
+        auto players = update;
+        players.insert(players.begin() + 2, number(2));
+        store.update_session_players(players, 42, selector);
+        const auto rows = store.friend_sessions("Delta", {42}, 43);
+        check(rows.size() == 1 && rows[0].id == id && rows[0].players == 2 && rows[0].custom == Bytes({1,2,3}),
+              "Delta: two players use one info block");
+        players.push_back(number(9));
+        check(refused([&] { store.update_session_players(players, 42, selector); }) &&
+              store.friend_sessions("Delta", {42}, 43)[0].players == 2, "Delta: malformed update preserves published state");
+        check(store.friend_sessions("Delta", {42}, 42).empty() &&
+              store.friend_sessions("Other", {42}, 43).empty(), "Delta: self and other context excluded");
+        check(refused([&] { store.delete_session({text("Delta"), blob(id)}, 43); }), "Delta: other account cannot delete");
+        store.delete_session({text("Delta"), blob(id)}, 42);
+        check(store.friend_sessions("Delta", {42}, 43).empty(), "Delta: deletion removes friend session");
     }
 
     // Pit Stop and Wumpa Challenges: exact retail v01.21 requests of

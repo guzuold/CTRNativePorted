@@ -2622,6 +2622,9 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     if(initialize_libc_only) services.push_back({"nKWi-N2HBV4","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_kernel_pwrite)});
     if(initialize_libc_only) services.push_back({"oib76F-12fk","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_kernel_lseek)});
     if(initialize_libc_only) services.push_back({"yFVnOdGxvZY","libScePad","libScePad",reinterpret_cast<const void*>(&ctr_sysv_pad_set_vibration)});
+    if(initialize_libc_only) services.push_back({"6ncge5+l5Qs","libScePad","libScePad",reinterpret_cast<const void*>(&ctr_sysv_pad_close)});
+    if(initialize_libc_only) services.push_back({"RR4novUEENY","libScePad","libScePad",reinterpret_cast<const void*>(&ctr_sysv_pad_set_light_bar)});
+    if(initialize_libc_only) services.push_back({"DscD1i9HX1w","libScePad","libScePad",reinterpret_cast<const void*>(&ctr_sysv_pad_reset_light_bar)});
     if(initialize_libc_only) {services.push_back({"ltCfaGr2JGE","libScePosix","libkernel",reinterpret_cast<const void*>(&ctr_sysv_posix_mutex_destroy)});services.push_back({"ltCfaGr2JGE","libkernel","libkernel",reinterpret_cast<const void*>(&ctr_sysv_posix_mutex_destroy)});}
     if(initialize_libc_only) services.push_back({"Nn7zKwnA5q0","libScePlayGo","libScePlayGo",reinterpret_cast<const void*>(&ctr_sysv_playgo_get_todo)});
     if(initialize_libc_only) services.push_back({"gUPGiOQ1tmQ","libScePlayGo","libScePlayGo",reinterpret_cast<const void*>(&ctr_sysv_playgo_todo)});
@@ -2704,6 +2707,30 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
                 std::cout<<"{\"scope\":\"original_mspace_alias_binding\",\"nid\":"<<std::quoted(symbol.nid)<<",\"target_offset\":"<<symbol.address<<",\"original_code\":true,\"engine_replacements\":0}\n"<<std::flush;
             }
             if(matches!=1)throw std::runtime_error("Original mspace export missing or ambiguous");
+        }
+        // libSceNpToolkit2.prx (SHA 480a769d...e5c9c) imports these from libSceLibcInternal; the
+        // original libc.prx exports the same NIDs (the eboot binds them there). A nonempty friend
+        // list reaches Toolkit code that calls them: observed 2026-10-20 _Stoul at Toolkit offset
+        // 121235 (decimal accountId strings), then strcmp at 121878. Each import is aliased to the
+        // original libc code; names from shadPS4's public NID list.
+        struct LibcAliasPin{const char* nid;uint64_t offset;};
+        for(const auto& pin_alias:{LibcAliasPin{"zlfEH8FmyUA",300912} /*_Stoul*/,LibcAliasPin{"Ovb2dSJOAuE",748384} /*strcmp*/,
+                                   LibcAliasPin{"7pNKcscKrf8",299792} /*_Stoll*/,LibcAliasPin{"DfivPArhucg",748016} /*memcmp*/,
+                                   LibcAliasPin{"+P6FRGH4LfA",321936} /*memmove*/,LibcAliasPin{"aesyjrHVWy4",324832} /*strncmp*/,
+                                   LibcAliasPin{"viiwFMaNamA",274240} /*strstr*/,LibcAliasPin{"sUP1hBaouOw",286848} /*_Getpctype*/,
+                                   LibcAliasPin{"z+P+xCnWLBk",694576} /*operator delete*/,LibcAliasPin{"zr094EQ39Ww",190128} /*__cxa_pure_virtual*/,
+                                   LibcAliasPin{"L1SBTkC+Cvw",359056} /*abort*/,LibcAliasPin{"W6SiVSiCDtI",404240} /*sceLibcMspaceDestroy*/,
+                                   LibcAliasPin{"k04jLXu3+Ic",405488} /*sceLibcMspaceMallocStatsFast*/}){
+            unsigned matches=0;
+            for(std::size_t i=0;i<metadata.size();++i)for(const auto& symbol:metadata[i].exports){
+                if(symbol.nid!=pin_alias.nid || symbol.library!="libc" || symbol.module!="libc" || symbol.type!=2)continue;
+                if(metadata[i].sha256!="1936f5700cc590877d9bf493c6a6bb7714e84003dfd6d74a7d77b1869f71d816" || symbol.address!=pin_alias.offset)throw std::runtime_error("Original libc export pin differs");
+                bool executable_extent=false;for(const auto& span:metadata[i].executable_spans)if(symbol.address>=span.first && symbol.address<span.second && symbol.size<=span.second-symbol.address)executable_extent=true;
+                if(!executable_extent)throw std::runtime_error("Original libc export outside executable span");
+                services.push_back({symbol.nid,"libSceLibcInternal","libSceLibcInternal",images[i].get()+symbol.address});++matches;
+                std::cout<<"{\"scope\":\"original_libc_alias_binding\",\"nid\":"<<std::quoted(symbol.nid)<<",\"target_offset\":"<<symbol.address<<",\"size\":"<<symbol.size<<",\"original_code\":true,\"engine_replacements\":0}\n"<<std::flush;
+            }
+            if(matches!=1)throw std::runtime_error("Original libc export missing or ambiguous");
         }
     }
     if(initialize_libc_only && gpu_library_requested()){

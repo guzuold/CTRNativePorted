@@ -24,6 +24,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <thread>
 #pragma comment(lib, "ws2_32.lib")
 
@@ -197,17 +198,39 @@ struct Server::Impl {
     std::unique_ptr<PartyLobby> party;
     std::mutex party_requests_mutex;
     std::map<std::string, std::uint64_t> party_nonces;
+    std::unique_ptr<FriendWatcher> friend_watcher;
+    PeerNonces peer_nonces;
+    // Players of this PC whose public matchmaking runs on another service (the hub), under
+    // `state`; hub_leaving: players whose game disconnected, to be signed off at the hub.
+    struct HubLeave { std::string name; MatchHub hub; };
+    std::map<std::uint64_t, MatchHub> hub_seats;
+    std::vector<HubLeave> hub_leaving;
+    std::thread hub_poller;
+    // Invitations a friend's service delivered to this PC's player. Their session stays on that
+    // service (the origin), where accepting, dismissing and the session routes are forwarded.
+    struct RemoteInvitation {
+        std::string session, sender, origin;
+        std::uint64_t recipient = 0, expires = 0;
+        bool accepted = false;
+    };
+    std::map<std::string, RemoteInvitation> remote_invitations; // under `state`
+    std::map<std::string, std::string> remote_sessions;         // PSN session ID -> origin code, under `state`
     std::vector<std::string> listening, failed;
 
     // State shared by connections (the reference server's module globals), under `state`.
     std::mutex state;
     std::vector<AuthSession> sessions; // auth3 logins, in order
     struct Client {
-        SOCKET socket;
+        SOCKET socket = INVALID_SOCKET;
         std::mutex send_mutex;
         std::unique_ptr<LobbySession> crypto;
         AuthSession user;
         std::string ip;
+        // A player of another PC matching on this hub: no socket; its service (friend code
+        // hub_origin) collects the pushed events from the outbox (peer action mm_poll).
+        std::string hub_origin;
+        std::vector<Bytes> outbox;
+        std::uint64_t last_seen = 0;
     };
     std::map<std::uint64_t, std::shared_ptr<Client>> live_clients;
     std::map<std::uint64_t, LobbyPlan> pending_lobbies;
@@ -215,6 +238,7 @@ struct Server::Impl {
     std::unique_ptr<MarketplaceStore> marketplace;
     std::unique_ptr<AchievementStore> achievements;
     SessionStore session_store;
+    std::map<std::uint64_t, Json> game_presence;
     MatchmakingStore matchmaking;
     DiscoveryLayout discovery;
     std::map<std::string, SOCKET> discovery_sockets; // advertised endpoint text -> socket
@@ -334,6 +358,108 @@ struct Server::Impl {
         return members;
     }
 
+    // Experiment only (CTR_ONLINE_EXPERIMENT_FRIENDS=1): every other player connected to this
+    // server is listed as an online friend. It exists to record what the game sends next
+    // (Delta lookups, join); it is not a friend graph. With friend_network the list is the
+    // rubrica instead.
+    static bool experiment_friends() {
+        static const bool on = [] {char v[4]{}; return GetEnvironmentVariableA("CTR_ONLINE_EXPERIMENT_FRIENDS", v, sizeof(v)) == 1 && v[0] == '1';}();
+        return on;
+    }
+    bool friends_listed() const { return friend_watcher || experiment_friends(); }
+    struct ListedFriend {
+        std::string name;
+        bool online = false;
+        Json context = Json::object(); // stored gameStatus/gameData
+    };
+    // Friends of `requester` for the in-game list. friend_network: the rubrica's friends whose
+    // online ID is known, online while their game is connected to their own service.
+    std::vector<ListedFriend> listed_friends(const std::string& requester) {
+        std::vector<ListedFriend> result;
+        if (friend_watcher) {
+            for (const auto& known : friend_watcher->friends()) {
+                if (known.name.empty() || known.name == requester) continue;
+                ListedFriend row;
+                row.name = known.name;
+                row.online = known.online && known.in_game;
+                if (const Json* saved = known.report.find("game_presence"); saved && saved->is_object()) row.context = *saved;
+                result.push_back(std::move(row));
+            }
+            return result;
+        }
+        // CTR_ONLINE_EXPERIMENT_FRIEND_NAMES (comma separated) gives a fixed, persistent list in which
+        // connected players are online and the others offline; without it, connected players only.
+        std::vector<std::string> names;
+        std::set<std::string> online;
+        std::map<std::uint64_t, Json> presence_snapshot;
+        {
+            std::lock_guard<std::mutex> lock(state);
+            for (const auto& [account, client] : live_clients) online.insert(client->user.online_id);
+            presence_snapshot = game_presence;
+        }
+        char fixed[512]{};
+        const DWORD fixed_length = GetEnvironmentVariableA("CTR_ONLINE_EXPERIMENT_FRIEND_NAMES", fixed, sizeof(fixed));
+        if (fixed_length && fixed_length < sizeof(fixed)) {
+            std::stringstream list(fixed);
+            for (std::string name; std::getline(list, name, ',');) if (!name.empty() && name != requester) names.push_back(name);
+        } else {
+            for (const auto& name : online) if (name != requester) names.push_back(name);
+        }
+        std::sort(names.begin(), names.end());
+        for (const auto& name : names) {
+            ListedFriend row;
+            row.name = name;
+            row.online = online.count(name) > 0;
+            if (const auto saved = presence_snapshot.find(user_id(name)); saved != presence_snapshot.end()) row.context = saved->second;
+            result.push_back(std::move(row));
+        }
+        return result;
+    }
+    // The friend page in the shape read by the retail NpToolkit2 module (key names next to its
+    // friendList request template).
+    Json listed_friend_page(const std::string& requester, std::int64_t offset, std::int64_t limit) {
+        if (offset < 0 || limit < 1 || limit > 500) throw std::invalid_argument("invalid friend pagination");
+        const auto rows = listed_friends(requester);
+        Json list = Json::array();
+        for (std::size_t i = static_cast<std::size_t>(offset); i < rows.size() && list.items.size() < static_cast<std::size_t>(limit); ++i) {
+            const auto& row = rows[i];
+            Json user = Json::object();
+            user.set("accountId", Json::of(std::to_string(user_id(row.name))));
+            user.set("onlineId", Json::of(row.name));
+            Json detail = Json::object();
+            detail.set("displayName", Json::of(row.name));
+            Json title = Json::object();
+            title.set("npTitleId", Json::of("CUSA14876_00"));
+            title.set("titleName", Json::of("Crash Team Racing Nitro-Fueled"));
+            Json context = Json::object();
+            context.set("gameStatus", Json::of(""));
+            context.set("gameData", Json::of(""));
+            for (const auto& [field_name, value] : row.context.members) context.set(field_name, value);
+            context.set("gameTitleInfo", title);
+            Json contexts = Json::array();
+            contexts.items.push_back(context);
+            Json presence = Json::object();
+            const bool is_online = row.online;
+            presence.set("onlineStatus", Json::of(is_online ? "online" : "offline"));
+            presence.set("platform", Json::of("PS4"));
+            if (is_online) presence.set("incontextInfoList", contexts);
+            Json entry = Json::object();
+            entry.set("user", user);
+            entry.set("avatarUrl", Json::of(""));
+            entry.set("region", Json::of("it"));
+            entry.set("isOfficiallyVerified", Json::of(false));
+            entry.set("personalDetail", detail);
+            entry.set("presence", presence);
+            list.items.push_back(entry);
+        }
+        Json page = Json::object();
+        page.set("start", Json::of(static_cast<std::uint64_t>(offset)));
+        page.set("size", Json::of(static_cast<std::uint64_t>(list.items.size())));
+        page.set("totalResults", Json::of(static_cast<std::uint64_t>(rows.size())));
+        page.set("friendList", list);
+        return page;
+    }
+
     // --- HTTP -------------------------------------------------------------------------
     struct HttpAnswer {
         int status;
@@ -347,6 +473,415 @@ struct Server::Impl {
         if (typed) a.headers.emplace_back("Content-Type", "application/json");
         return a;
     }
+    // A game connected to this service itself (not a player of another PC matching on this hub).
+    bool is_local(std::uint64_t account) const {
+        const auto it = live_clients.find(account);
+        return it != live_clients.end() && it->second->hub_origin.empty();
+    }
+    bool any_local() const {
+        for (const auto& [account, client] : live_clients) if (client->hub_origin.empty()) return true;
+        return false;
+    }
+    // Online ID this service reports to friends: the configured one, else the first game connected.
+    std::string local_player_name() {
+        if (!config.local_name.empty()) return config.local_name;
+        std::lock_guard<std::mutex> lock(state);
+        for (const auto& [account, client] : live_clients) if (client->hub_origin.empty()) return client->user.online_id;
+        return {};
+    }
+    static std::string text_field(const Json& object, const char* key) {
+        const Json* value = object.find(key);
+        return value && value->is_string() ? value->text : std::string();
+    }
+    static bool lower_hex(const std::string& text, std::size_t size) {
+        return text.size() == size && text.find_first_not_of("0123456789abcdef") == std::string::npos;
+    }
+    // A friend's player as its own service names it; never a player of this PC.
+    void check_friend_player(const std::string& caller, const std::string& name) {
+        if (name.empty() || name.size() > 32) throw std::runtime_error("Giocatore amico non indicato");
+        if (const auto known = friend_watcher->by_code(caller); known && !known->name.empty() && known->name != name)
+            throw std::runtime_error("Giocatore amico non corrispondente");
+        if (name == local_player_name()) throw std::runtime_error("Giocatore di questo PC");
+        std::lock_guard<std::mutex> lock(state);
+        if (is_local(user_id(name))) throw std::runtime_error("Giocatore di questo PC");
+    }
+    // Actions a friend's service may ask for (POST /ctr/v1/peer, already authenticated).
+    // presence: this PC's player, whether its game is connected, its game status, the PSN
+    //   sessions it is in that the caller's player may see, and its published Delta sessions;
+    // invitation: a friend's player invites this PC's player to a session on the friend's service;
+    // webapi: a session or invitation request of the caller's player for a session kept here.
+    Json peer_action(const std::string& caller, const std::string& action, const Json& request) {
+        Json response = Json::object();
+        if (action == "presence") {
+            const std::string name = local_player_name(), viewer = text_field(request, "name");
+            std::lock_guard<std::mutex> lock(state);
+            response.set("name", Json::of(name));
+            response.set("in_game", Json::of(any_local()));
+            const auto account = name.empty() ? 0 : user_id(name);
+            const auto saved = account ? game_presence.find(account) : game_presence.end();
+            response.set("game_presence", saved == game_presence.end() ? Json::object() : saved->second);
+            Json delta = Json::array();
+            if (account) {
+                for (const auto& [context, session] : matchmaking.owned_sessions(account)) {
+                    Json row = Json::object();
+                    row.set("context", Json::of(context));
+                    row.set("address", Json::of(hex(session.address)));
+                    row.set("id", Json::of(hex(session.id)));
+                    row.set("game_type", Json::of(session.game_type));
+                    row.set("max_players", Json::of(session.max_players));
+                    row.set("players", Json::of(session.players));
+                    row.set("custom", Json::of(hex(session.custom)));
+                    delta.items.push_back(std::move(row));
+                }
+            }
+            response.set("sessions", account && !viewer.empty() ? session_store.user_sessions(user_id(viewer), account) : Json::array());
+            response.set("delta", std::move(delta));
+            return response;
+        }
+        if (action == "invitation") {
+            const std::string invitation = text_field(request, "invitation"), session = text_field(request, "session"),
+                              sender = text_field(request, "sender");
+            const Json* recipient = request.find("recipient");
+            if (!lower_hex(invitation, 32) || !lower_hex(session, 32) || !recipient || !recipient->is_unsigned())
+                throw std::runtime_error("Invito non valido");
+            check_friend_player(caller, sender);
+            const std::string local = local_player_name();
+            const auto now = static_cast<std::uint64_t>(std::time(nullptr));
+            std::lock_guard<std::mutex> lock(state);
+            if (!is_local(recipient->as_u64()) && (local.empty() || user_id(local) != recipient->as_u64()))
+                throw std::runtime_error("Destinatario non presente su questo PC");
+            for (auto it = remote_invitations.begin(); it != remote_invitations.end();)
+                it = it->second.expires <= now ? remote_invitations.erase(it) : std::next(it);
+            if (remote_invitations.size() >= 64 && !remote_invitations.count(invitation))
+                throw std::runtime_error("Troppi inviti in attesa");
+            remote_invitations[invitation] = RemoteInvitation{session, sender, caller, recipient->as_u64(), now + 300, false};
+            remote_sessions[session] = caller;
+            response.set("delivered", Json::of(true));
+            return response;
+        }
+        if (action == "mm_task" || action == "mm_poll" || action == "mm_leave") return hub_action(caller, action, request);
+        if (action == "webapi") {
+            const std::string method = text_field(request, "method"), target = text_field(request, "target"),
+                              name = text_field(request, "name");
+            const bool allowed_target = starts_with(target, "/webapi/sdk:sessionInvitation/v1/sessions/") ||
+                                        starts_with(target, "/webapi/sdk:sessionInvitation/v1/users/me/invitations/") ||
+                                        starts_with(target, "/ctr/v1/session-invitations/");
+            if (!allowed_target || (method != "GET" && method != "PUT" && method != "POST" && method != "DELETE"))
+                throw std::runtime_error("Richiesta non inoltrabile");
+            check_friend_player(caller, name);
+            std::map<std::string, std::string> headers{{"host", "ctr-online"}, {"x-ctr-online-id", name}};
+            if (const auto type = text_field(request, "content_type"); !type.empty()) headers.emplace("content-type", type);
+            const HttpAnswer answer = http_answer(method, target, headers, base64_decode(text_field(request, "body")), "peer:" + caller);
+            std::string type;
+            for (const auto& [header_name, value] : answer.headers) if (lower(header_name) == "content-type") type = value;
+            response.set("status", Json::of(answer.status));
+            response.set("content_type", Json::of(type));
+            response.set("body", Json::of(base64_encode(Bytes(answer.body.begin(), answer.body.end()))));
+            return response;
+        }
+        throw std::runtime_error("Azione non supportata: " + action);
+    }
+    // --- public matchmaking hub ---------------------------------------------------------
+    // Hub side: players of other PCs, identified by their service's signed code, run their
+    // public search here. Only the matchmaking tasks are accepted; no friendship is required.
+    Json hub_action(const std::string& caller, const std::string& action, const Json& request) {
+        const std::string name = text_field(request, "name");
+        if (name.empty() || name.size() > 32) throw std::runtime_error("Giocatore non indicato");
+        const auto account = user_id(name);
+        const auto now = static_cast<std::uint64_t>(std::time(nullptr));
+        Json response = Json::object();
+        std::lock_guard<std::mutex> lock(state);
+        expire_hub_clients(now);
+        auto found = live_clients.find(account);
+        if (found != live_clients.end() && found->second->hub_origin != caller)
+            throw std::runtime_error("Giocatore gia presente su questo servizio");
+        if (action == "mm_leave") {
+            if (found != live_clients.end()) forget_client(account, "left");
+            response.set("left", Json::of(true));
+            return response;
+        }
+        if (action == "mm_poll") {
+            if (found == live_clients.end()) throw std::runtime_error("Giocatore non presente");
+            found->second->last_seen = now;
+            Json events = Json::array();
+            for (const Bytes& event : found->second->outbox) events.items.push_back(Json::of(base64_encode(event)));
+            found->second->outbox.clear();
+            response.set("events", std::move(events));
+            return response;
+        }
+        const TaskRequest task = parse_task_request(base64_decode(text_field(request, "task")));
+        if (task.service != 145 || (task.task != 2 && task.task != 3 && task.task != 15 && task.task != 18))
+            throw std::runtime_error("Task di matchmaking non ammesso");
+        if (found == live_clients.end()) {
+            std::size_t from_caller = 0, remote = 0;
+            for (const auto& [id, client] : live_clients) {
+                if (client->hub_origin.empty()) continue;
+                ++remote;
+                if (client->hub_origin == caller) ++from_caller;
+            }
+            if (from_caller >= 4 || remote >= 64) throw std::runtime_error("Hub pieno");
+            auto client = std::make_shared<Client>();
+            client->user.online_id = name;
+            client->user.user_id = account;
+            client->user.room_token = public_room_token();
+            client->hub_origin = caller;
+            found = live_clients.emplace(account, std::move(client)).first;
+            Json f = Json::object();
+            f.set("online_id", Json::of(name));
+            f.set("origin", Json::of(caller));
+            record("hub_player_joined", std::move(f));
+        }
+        const auto client = found->second;
+        client->last_seen = now;
+        bool synced = false;
+        const Bytes answer = handle_task(task, client->user, synced);
+        Json f = Json::object();
+        f.set("online_id", Json::of(name));
+        f.set("origin", Json::of(caller));
+        f.set("service", Json::of(task.service));
+        f.set("task", Json::of(task.task));
+        f.set("params", task.params_json());
+        f.set("reply", Json::of(hex(answer)));
+        record("hub_task", std::move(f));
+        if (task.task == 18) create_ready_lobbies();
+        else if (task.task == 15 && synced) publish_host_document(task.params[0].value.as_u64());
+        response.set("reply", Json::of(base64_encode(answer)));
+        return response;
+    }
+    // Players of other PCs whose service stopped polling (`state` held).
+    void expire_hub_clients(std::uint64_t now) {
+        std::vector<std::uint64_t> gone;
+        for (const auto& [account, client] : live_clients)
+            if (!client->hub_origin.empty() && now > client->last_seen + 20) gone.push_back(account);
+        for (const auto account : gone) forget_client(account, "expired");
+    }
+    // Member side: a public matchmaking task of a local player, answered by the hub when one is
+    // in use. nullopt: handle it here (no hub, this service is the hub, or the hub failed).
+    std::optional<Bytes> hub_task(const TaskRequest& request, const Bytes& payload, const AuthSession& user) {
+        if (!config.match_hub || request.service != 145 || user.room_token != public_room_token() ||
+            (request.task != 2 && request.task != 3 && request.task != 15 && request.task != 18))
+            return std::nullopt;
+        std::optional<MatchHub> hub;
+        {
+            std::lock_guard<std::mutex> lock(state);
+            if (const auto seat = hub_seats.find(user.user_id); seat != hub_seats.end()) hub = seat->second;
+        }
+        if (!hub) hub = config.match_hub();
+        if (!hub || hub->code == host_identity->friend_code()) return std::nullopt;
+        Json message = Json::object();
+        message.set("action", Json::of("mm_task"));
+        message.set("name", Json::of(user.online_id));
+        message.set("task", Json::of(base64_encode(payload)));
+        Json f = Json::object();
+        f.set("online_id", Json::of(user.online_id));
+        f.set("hub", Json::of(hub->code));
+        f.set("service", Json::of(request.service));
+        f.set("task", Json::of(request.task));
+        try {
+            const Json reply = peer_request(*host_identity, hub->ip, hub->port, hub->code, std::move(message), 5000);
+            {
+                std::lock_guard<std::mutex> lock(state);
+                hub_seats[user.user_id] = *hub;
+            }
+            record("hub_task_forwarded", std::move(f));
+            return base64_decode(text_field(reply, "reply"));
+        } catch (const std::exception& error) {
+            {
+                std::lock_guard<std::mutex> lock(state);
+                hub_seats.erase(user.user_id);
+            }
+            f.set("reason", Json::of(error.what()));
+            record("hub_unreachable", std::move(f));
+            return std::nullopt;
+        }
+    }
+    // Member side: delivers the events the hub pushed for this PC's players, and signs off
+    // players whose game disconnected.
+    void hub_poll_loop() {
+        std::map<std::uint64_t, unsigned> failures;
+        while (!stopping) {
+            std::map<std::uint64_t, MatchHub> seats;
+            std::vector<HubLeave> leaving;
+            {
+                std::lock_guard<std::mutex> lock(state);
+                seats = hub_seats;
+                leaving.swap(hub_leaving);
+            }
+            for (const auto& leave : leaving) {
+                Json message = Json::object();
+                message.set("action", Json::of("mm_leave"));
+                message.set("name", Json::of(leave.name));
+                try { peer_request(*host_identity, leave.hub.ip, leave.hub.port, leave.hub.code, std::move(message), 3000); } catch (...) {}
+            }
+            for (const auto& [account, hub] : seats) {
+                std::string name;
+                {
+                    std::lock_guard<std::mutex> lock(state);
+                    if (const auto it = live_clients.find(account); it != live_clients.end()) name = it->second->user.online_id;
+                }
+                if (name.empty()) continue;
+                Json message = Json::object();
+                message.set("action", Json::of("mm_poll"));
+                message.set("name", Json::of(name));
+                try {
+                    const Json reply = peer_request(*host_identity, hub.ip, hub.port, hub.code, std::move(message), 3000);
+                    failures.erase(account);
+                    std::lock_guard<std::mutex> lock(state);
+                    const auto it = live_clients.find(account);
+                    if (it == live_clients.end()) continue;
+                    for (const auto& event : reply.at("events").items) {
+                        push(it->second, base64_decode(event.text));
+                        Json f = Json::object();
+                        f.set("online_id", Json::of(name));
+                        f.set("hub", Json::of(hub.code));
+                        record("hub_event_delivered", std::move(f));
+                    }
+                } catch (const std::exception& error) {
+                    if (++failures[account] < 25) continue;
+                    failures.erase(account);
+                    std::lock_guard<std::mutex> lock(state);
+                    hub_seats.erase(account);
+                    Json f = Json::object();
+                    f.set("online_id", Json::of(name));
+                    f.set("hub", Json::of(hub.code));
+                    f.set("reason", Json::of(error.what()));
+                    record("hub_lost", std::move(f));
+                }
+            }
+            for (int i = 0; i < 4 && !stopping; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+    // A player leaves this service: connection closed, hub sign-off or expiry (`state` held).
+    void forget_client(std::uint64_t account, const char* why) {
+        const auto it = live_clients.find(account);
+        if (it == live_clients.end()) return;
+        const auto client = it->second;
+        game_presence.erase(account);
+        live_clients.erase(it);
+        // Paired with the opt-in retail live-session adapter. Older clients
+        // retain their original behavior until the full failover is ready.
+        char migration[2]{};
+        if (GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",migration,2)==1 && migration[0]=='1') {
+            std::map<std::uint64_t,std::string> remaining;
+            for(const auto& [other,live]:live_clients)remaining[other]=live->user.room_token;
+            for(const auto& promoted:matchmaking.promote_disconnected(account,remaining)) {
+                auto pending=pending_lobbies.find(promoted.lobby_id);
+                if(pending!=pending_lobbies.end())pending->second.host=promoted.host;
+                publish_host_document(promoted.lobby_id);
+                Json evidence=Json::object();
+                evidence.set("lobby",Json::of(promoted.lobby_id));
+                evidence.set("host",Json::of(promoted.host));
+                record("race_host_promoted",std::move(evidence));
+            }
+        }
+        matchmaking.cancel_pending(account, client->user.room_token);
+        relay.forget(account);
+        if (const auto seat = hub_seats.find(account); seat != hub_seats.end()) {
+            hub_leaving.push_back(HubLeave{client->user.online_id, seat->second});
+            hub_seats.erase(seat);
+        }
+        if (!client->hub_origin.empty()) {
+            Json f = Json::object();
+            f.set("online_id", Json::of(client->user.online_id));
+            f.set("origin", Json::of(client->hub_origin));
+            f.set("reason", Json::of(why));
+            record("hub_player_left", std::move(f));
+        }
+    }
+    // A request of this PC's player about an invitation or a PSN session kept on a friend's
+    // service: forwarded there with the player's name. nullopt when the target is local.
+    std::optional<HttpAnswer> forward_to_origin(const std::string& method, const std::string& target,
+                                                const std::string& content_type, const Bytes& body, const std::string& online_id) {
+        if (!friend_watcher || online_id.empty()) return std::nullopt;
+        const std::string path = target.substr(0, target.find('?'));
+        const auto id_after = [&](const std::string& prefix) {
+            if (!starts_with(path, prefix)) return std::string();
+            const auto end = path.find('/', prefix.size());
+            return path.substr(prefix.size(), end == std::string::npos ? std::string::npos : end - prefix.size());
+        };
+        std::string origin, invitation;
+        {
+            std::lock_guard<std::mutex> lock(state);
+            const auto account = user_id(online_id);
+            std::string id = id_after("/ctr/v1/session-invitations/");
+            if (id.empty()) id = id_after("/webapi/sdk:sessionInvitation/v1/users/me/invitations/");
+            if (!id.empty()) {
+                const auto it = remote_invitations.find(id);
+                if (it != remote_invitations.end() && it->second.recipient == account) { origin = it->second.origin; invitation = id; }
+            } else if (const auto session = id_after("/webapi/sdk:sessionInvitation/v1/sessions/");
+                       !session.empty() && !session_store.contains(session)) {
+                if (const auto it = remote_sessions.find(session); it != remote_sessions.end()) origin = it->second;
+                // A session ID the game found in a friend's Delta record (138/14): the friend
+                // whose service reported that session.
+                else for (const auto& known : friend_watcher->friends()) {
+                    const Json* reported = known.online ? known.report.find("sessions") : nullptr;
+                    if (!reported || !reported->is_array()) continue;
+                    for (const auto& row : reported->items)
+                        if (text_field(row, "sessionId") == session) origin = known.code;
+                    if (!origin.empty()) { remote_sessions[session] = origin; break; }
+                }
+            }
+        }
+        if (origin.empty()) return std::nullopt;
+        Json request = Json::object();
+        request.set("action", Json::of("webapi"));
+        request.set("method", Json::of(method));
+        request.set("target", Json::of(target));
+        request.set("name", Json::of(online_id));
+        request.set("content_type", Json::of(content_type));
+        request.set("body", Json::of(base64_encode(body)));
+        try {
+            const Json reply = friend_watcher->request(origin, request, 4000);
+            const auto status = static_cast<int>(reply.at("status").as_u64());
+            const Bytes data = base64_decode(text_field(reply, "body"));
+            HttpAnswer answer{status, {}, std::string(data.begin(), data.end()), "peer_forward"};
+            if (const auto type = text_field(reply, "content_type"); !type.empty()) answer.headers.emplace_back("Content-Type", type);
+            answer.fields.set("origin", Json::of(origin));
+            answer.fields.set("target", Json::of(target));
+            if (!invitation.empty() && status < 300 && (method == "PUT" || method == "DELETE")) {
+                std::lock_guard<std::mutex> lock(state);
+                if (method == "DELETE") remote_invitations.erase(invitation);
+                else if (const auto it = remote_invitations.find(invitation); it != remote_invitations.end()) it->second.accepted = true;
+            }
+            return answer;
+        } catch (const std::exception& error) {
+            HttpAnswer answer = json_answer(502, R"({"error":"friend service unreachable"})", "peer_forward", false);
+            answer.fields.set("origin", Json::of(origin));
+            answer.fields.set("target", Json::of(target));
+            answer.fields.set("reason", Json::of(error.what()));
+            return answer;
+        }
+    }
+    // Remote invitations of `account` in the project poll format (`state` held).
+    void append_remote_invitations(Json& rows, std::uint64_t account, std::uint64_t now) {
+        for (auto it = remote_invitations.begin(); it != remote_invitations.end();)
+            it = it->second.expires <= now ? remote_invitations.erase(it) : std::next(it);
+        for (const auto& [id, invite] : remote_invitations) {
+            if (invite.recipient != account || invite.accepted) continue;
+            Json row = Json::object();
+            row.set("invitationId", Json::of(id));
+            row.set("sessionId", Json::of(invite.session));
+            row.set("onlineId", Json::of(invite.sender));
+            row.set("accountId", Json::of(std::to_string(user_id(invite.sender))));
+            rows.items.push_back(std::move(row));
+        }
+    }
+    // PSN sessions a remote friend reported for this PC's player; registers them as remote.
+    Json remote_user_sessions(std::uint64_t account) {
+        Json rows = Json::array();
+        if (!friend_watcher || is_local(account)) return rows;
+        const auto known = friend_watcher->by_account(account);
+        if (!known || !known->online) return rows;
+        if (const Json* reported = known->report.find("sessions"); reported && reported->is_array()) {
+            for (const auto& row : reported->items) {
+                const auto id = text_field(row, "sessionId");
+                if (!lower_hex(id, 32) || session_store.contains(id)) continue;
+                remote_sessions[id] = known->code;
+                rows.items.push_back(row);
+            }
+        }
+        return rows;
+    }
     HttpAnswer http_answer(const std::string& method, const std::string& target,
                            const std::map<std::string, std::string>& headers, const Bytes& body,
                            const std::string& peer_address) {
@@ -356,6 +891,77 @@ struct Server::Impl {
         };
         const std::string host = lower(header("host").substr(0, header("host").find(':')));
         const std::string online_id = header("x-ctr-online-id");
+        // Without a room token the player uses public matchmaking.
+        const std::string request_room = header("x-ctr-room-token").empty() ? public_room_token() : header("x-ctr-room-token");
+        // A request a friend's service forwarded here is answered here, never forwarded again.
+        if (!starts_with(peer_address, "peer:"))
+            if (auto forwarded = forward_to_origin(method, target, header("content-type"), body, online_id)) return *forwarded;
+        if (target == "/ctr/v1/session-invitations" ||
+            starts_with(target, "/ctr/v1/session-invitations/")) {
+            if (online_id.empty()) return json_answer(403, R"({"error":"project identity required"})", "game_invitation", false);
+            try {
+                const auto account = user_id(online_id);
+                const auto now = static_cast<std::uint64_t>(std::time(nullptr));
+                std::unique_lock<std::mutex> lock(state);
+                if (target == "/ctr/v1/session-invitations" && method == "GET") {
+                    Json rows = session_store.invitations(account, now);
+                    append_remote_invitations(rows, account, now);
+                    return json_answer(200, dump_json(rows), "game_invitation_poll");
+                }
+                if (target == "/ctr/v1/session-invitations" && method == "POST") {
+                    const auto request = parse_json(std::string(body.begin(), body.end()));
+                    if (!request.is_object() || request.members.size() != 2 ||
+                        !request.at("sessionId").is_string() || !request.at("recipients").is_array())
+                        throw std::invalid_argument("invalid invitation request");
+                    std::vector<std::uint64_t> recipients;
+                    for (const auto& value : request.at("recipients").items) {
+                        if (!value.is_unsigned()) throw std::invalid_argument("recipient must be an account ID");
+                        recipients.push_back(value.as_u64());
+                    }
+                    const auto session = request.at("sessionId").text;
+                    const Json sent = session_store.invite(account, online_id, session, recipients, now);
+                    // Recipients playing on a friend's PC get the invitation through that PC's service.
+                    std::vector<std::pair<std::string, Json>> deliveries;
+                    for (const auto& row : sent.items) {
+                        const auto recipient = std::stoull(row.at("accountId").text);
+                        if (!friend_watcher || is_local(recipient)) continue;
+                        const auto known = friend_watcher->by_account(recipient);
+                        if (!known) continue;
+                        Json notice = Json::object();
+                        notice.set("action", Json::of("invitation"));
+                        notice.set("invitation", row.at("invitationId"));
+                        notice.set("session", Json::of(session));
+                        notice.set("sender", Json::of(online_id));
+                        notice.set("recipient", Json::of(recipient));
+                        deliveries.emplace_back(known->code, std::move(notice));
+                    }
+                    lock.unlock();
+                    HttpAnswer answer = json_answer(201, dump_json(sent), "game_invitation_send");
+                    Json delivered = Json::array();
+                    for (auto& [code, notice] : deliveries) {
+                        Json result = Json::object();
+                        result.set("friend", Json::of(code));
+                        try { friend_watcher->request(code, std::move(notice), 4000); result.set("ok", Json::of(true)); }
+                        catch (const std::exception& error) { result.set("ok", Json::of(false)); result.set("reason", Json::of(error.what())); }
+                        delivered.items.push_back(std::move(result));
+                    }
+                    if (!delivered.items.empty()) answer.fields.set("delivered", std::move(delivered));
+                    return answer;
+                }
+                if (starts_with(target, "/ctr/v1/session-invitations/") && method == "PUT")
+                    return json_answer(200, dump_json(session_store.accept(account,
+                        target.substr(std::string("/ctr/v1/session-invitations/").size()), now)), "game_invitation_accept");
+                if (starts_with(target, "/ctr/v1/session-invitations/") && method == "DELETE") {
+                    session_store.dismiss(account, target.substr(std::string("/ctr/v1/session-invitations/").size()), now);
+                    return HttpAnswer{204, {}, "", "game_invitation_dismiss"};
+                }
+                return json_answer(405, R"({"error":"unsupported invitation operation"})", "game_invitation", false);
+            } catch (const std::exception& error) {
+                HttpAnswer answer = json_answer(400, R"({"error":"invalid invitation request"})", "game_invitation", false);
+                answer.fields.set("reason", Json::of(error.what()));
+                return answer;
+            }
+        }
         if (method == "GET" && target == "/ctr/v1/config") {
             Json payload = Json::object();
             payload.set("discovery_port", Json::of(static_cast<unsigned>(config.discovery_port)));
@@ -364,7 +970,7 @@ struct Server::Impl {
         }
         if (method == "GET" && starts_with(target, "/ctr/v1/peer-allowed?")) {
             const std::string ip = query_value(target.substr(target.find('?') + 1), "ip", "");
-            const std::string room = header("x-ctr-room-token");
+            const std::string& room = request_room;
             bool allowed = false;
             {
                 std::lock_guard<std::mutex> lock(state);
@@ -381,7 +987,7 @@ struct Server::Impl {
         }
         if (method == "POST" && target == "/ctr/v1/relay-session" && relay_socket != INVALID_SOCKET) {
             // Relay token for a player online in the lobby, asked from the lobby connection's IP.
-            const std::string room = header("x-ctr-room-token");
+            const std::string& room = request_room;
             std::uint64_t account = 0;
             std::string refusal;
             {
@@ -407,6 +1013,38 @@ struct Server::Impl {
             HttpAnswer a = json_answer(200, dump_json_spaced(payload), "relay_session");
             a.fields.set("account", Json::of(account));
             return a;
+        }
+        if (method == "POST" && target == "/ctr/v1/peer") {
+            try {
+                if (body.size() > 65536) throw std::runtime_error("Messaggio troppo grande");
+                const Json packet = parse_json(std::string(body.begin(), body.end()));
+                const std::string caller = peer_message_sender(packet);
+                const auto now = party_now();
+                const Json request = verify_peer_message(packet, caller, now);
+                const Json* to = request.find("to");
+                if (!to || to->text != host_identity->friend_code()) throw std::runtime_error("Messaggio per un altro servizio");
+                const Json* nonce = request.find("nonce");
+                if (!nonce || !peer_nonces.fresh(caller, nonce->text, now)) throw std::runtime_error("Messaggio duplicato");
+                const Json* action = request.find("action");
+                const std::string name = action ? action->text : std::string();
+                // Public matchmaking (mm_*) is open to every signed service; the rest to friends.
+                if (name.rfind("mm_", 0) != 0) {
+                    if (!friend_watcher) throw std::runtime_error("Rete amici non attiva");
+                    if (!friend_watcher->is_friend(caller)) throw std::runtime_error("Non e nella lista amici");
+                }
+                Json response = peer_action(caller, name, request);
+                response.set("nonce", Json::of(nonce->text));
+                response.set("to", Json::of(caller));
+                HttpAnswer a = json_answer(200, dump_json(sign_peer_message(*host_identity, response)), "peer_" + name);
+                a.fields.set("from", Json::of(caller));
+                return a;
+            } catch (const std::exception& error) {
+                Json response = Json::object();
+                response.set("error", Json::of(error.what()));
+                HttpAnswer a = json_answer(403, dump_json(response), "peer_rejected");
+                a.fields.set("reason", Json::of(error.what()));
+                return a;
+            }
         }
         if (method == "POST" && target == "/ctr/v1/party") {
             if (!party) return json_answer(404, R"({"error":"Lobby launcher non disponibile"})", "party_unavailable");
@@ -477,9 +1115,10 @@ struct Server::Impl {
             return a;
         }
         if (method == "POST" && starts_with(target, "/auth/") && host.find("-auth3.") != std::string::npos) {
-            const std::string room = header("x-ctr-room-token");
-            if (!valid_room_token(room)) return json_answer(400, R"({"error":"project room password required"})", "auth3_room_rejected", false);
-            if (party && !party->admits(room,online_id)) return json_answer(403, R"({"error":"Join a launcher lobby first"})", "auth3_membership_rejected");
+            const std::string& room = request_room;
+            if (!valid_room_token(room)) return json_answer(400, R"({"error":"invalid project room token"})", "auth3_room_rejected", false);
+            if (party && room != public_room_token() && !party->admits(room,online_id))
+                return json_answer(403, R"({"error":"Join a launcher lobby first"})", "auth3_membership_rejected");
             Json request;
             try { request = parse_json(std::string(body.begin(), body.end())); } catch (const std::exception&) {
                 return json_answer(400, R"({"error":"bad json"})", "auth3", false);
@@ -555,6 +1194,7 @@ struct Server::Impl {
                 try {
                     std::lock_guard<std::mutex> lock(state);
                     payload = session_store.create(account, header("content-type"), body);
+                    session_store.join(account, online_id, payload.at("sessionId").text);
                 } catch (const std::exception& error) {
                     fs::path capture = config.log_path;
                     capture.replace_extension(".session_rejected.bin");
@@ -572,9 +1212,250 @@ struct Server::Impl {
                 a.fields.set("reply", payload);
                 return a;
             }
+            if (method == "PUT" && starts_with(path, "sdk:sessionInvitation/v1/sessions/") &&
+                path.find('/', std::string("sdk:sessionInvitation/v1/sessions/").size()) == std::string::npos) {
+                if (online_id.empty()) return json_answer(403, R"({"error":{"message":"project identity required"}})", "webapi_session_update", false);
+                const std::string id = path.substr(std::string("sdk:sessionInvitation/v1/sessions/").size());
+                try {
+                    std::lock_guard<std::mutex> lock(state);
+                    session_store.update(user_id(online_id), id, body);
+                } catch (const std::exception& error) {
+                    HttpAnswer a = json_answer(400, R"({"error":{"message":"invalid session update"}})", "webapi_session_update", false);
+                    a.fields.set("reason", Json::of(error.what()));
+                    return a;
+                }
+                HttpAnswer a{204, {}, "", "webapi_session_update"};
+                a.fields.set("session", Json::of(id));
+                return a;
+            }
+            // Original Toolkit request templates use these routes for invitation-driven joining.
+            const std::string session_route = path.substr(0, path.find('?'));
+            const std::string session_prefix = "sdk:sessionInvitation/v1/sessions/";
+            const std::string invite_prefix = "sdk:sessionInvitation/v1/users/me/invitations/";
+            if (method == "GET" && session_route == "sdk:sessionInvitation/v1/users/me/invitations") {
+                if (online_id.empty()) return json_answer(403, R"({"error":"identity required"})", "webapi_invitations", false);
+                try {
+                    const auto account = user_id(online_id), now = static_cast<std::uint64_t>(std::time(nullptr));
+                    Json rows = Json::array(), result = Json::object(), remote = Json::array();
+                    {
+                        std::lock_guard<std::mutex> lock(state);
+                        const auto pending = session_store.invitations(account, now);
+                        for (const auto& row : pending.items)
+                            rows.items.push_back(session_store.invitation(account, row.at("invitationId").text, now));
+                        append_remote_invitations(remote, account, now);
+                    }
+                    // Invitations kept on a friend's service: their details come from there.
+                    for (const auto& row : remote.items) {
+                        const auto reply = forward_to_origin("GET", "/webapi/sdk:sessionInvitation/v1/users/me/invitations/" +
+                                                             row.at("invitationId").text, "", {}, online_id);
+                        if (reply && reply->status == 200) rows.items.push_back(parse_json(reply->body));
+                    }
+                    result.set("size", Json::of(static_cast<unsigned>(rows.items.size())));
+                    result.set("invitations", rows);
+                    return json_answer(200, dump_json(result), "webapi_invitations");
+                } catch (const std::exception&) {
+                    return json_answer(400, R"({"error":"invalid invitation list"})", "webapi_invitations", false);
+                }
+            }
+            if (method == "GET" && session_route == "sdk:sessionInvitation/v1/users/me/friends/sessions") {
+                if (online_id.empty()) return json_answer(403, R"({"error":"identity required"})", "webapi_friend_sessions", false);
+                try {
+                    const auto query = path.find('?') == std::string::npos ? "" : path.substr(path.find('?') + 1);
+                    const auto offset = python_int(query_value(query, "offset", "0"));
+                    const auto limit = python_int(query_value(query, "limit", "100"));
+                    if (!offset || !limit || *offset < 0 || *limit < 1 || *limit > 500)
+                        throw std::invalid_argument("invalid pagination");
+                    const auto friends = friends_listed() ? listed_friend_page(online_id, 0, 500) : friend_page(0, 500);
+                    std::map<std::string, Json> found;
+                    std::lock_guard<std::mutex> lock(state);
+                    for (const auto& entry : friends.at("friendList").items) {
+                        const auto& user = entry.at("user");
+                        const auto friend_account = std::stoull(user.at("accountId").text);
+                        Json listed = session_store.user_sessions(user_id(online_id), friend_account);
+                        for (auto& row : remote_user_sessions(friend_account).items) listed.items.push_back(std::move(row));
+                        for (auto row : listed.items) {
+                            const auto id = row.at("sessionId").text;
+                            if (!found.count(id)) { row.set("friends", Json::array()); found.emplace(id, row); }
+                            found.at(id).find("friends")->items.push_back(user);
+                        }
+                    }
+                    Json rows = Json::array(), result = Json::object();
+                    std::int64_t index = 0;
+                    for (const auto& [id, row] : found)
+                        if (index++ >= *offset && rows.items.size() < static_cast<std::size_t>(*limit)) rows.items.push_back(row);
+                    result.set("size", Json::of(static_cast<unsigned>(rows.items.size())));
+                    result.set("sessions", rows);
+                    return json_answer(200, dump_json(result), "webapi_friend_sessions");
+                } catch (const std::exception&) {
+                    return json_answer(400, R"({"error":"invalid friend session list"})", "webapi_friend_sessions", false);
+                }
+            }
+            if (method == "GET" && session_route == "sdk:sessionInvitation/v1/users/@users/sessions") {
+                if (online_id.empty()) return json_answer(403, R"({"error":"identity required"})", "webapi_sessions", false);
+                try {
+                    const auto query = path.find('?') == std::string::npos ? "" : path.substr(path.find('?') + 1);
+                    std::stringstream accounts(query_value(query, "accountIds", ""));
+                    Json users = Json::array();
+                    std::lock_guard<std::mutex> lock(state);
+                    for (std::string text; std::getline(accounts, text, ',');) {
+                        if (text.empty() || text.find_first_not_of("0123456789") != std::string::npos || users.items.size() >= 100)
+                            throw std::invalid_argument("invalid session accounts");
+                        const auto account = std::stoull(text);
+                        Json row = Json::object();
+                        row.set("accountId", Json::of(std::to_string(account)));
+                        Json listed = session_store.user_sessions(user_id(online_id), account);
+                        for (auto& remote : remote_user_sessions(account).items) listed.items.push_back(std::move(remote));
+                        row.set("sessions", std::move(listed));
+                        users.items.push_back(row);
+                    }
+                    Json result = Json::object(); result.set("users", users);
+                    return json_answer(200, dump_json(result), "webapi_sessions");
+                } catch (const std::exception&) {
+                    return json_answer(400, R"({"error":"invalid session accounts"})", "webapi_sessions", false);
+                }
+            }
+            if (starts_with(session_route, session_prefix) || starts_with(session_route, invite_prefix)) {
+                if (online_id.empty()) return json_answer(403, R"({"error":"identity required"})", "webapi_session", false);
+                try {
+                    std::lock_guard<std::mutex> lock(state);
+                    const auto account = user_id(online_id);
+                    if (starts_with(session_route, invite_prefix)) {
+                        const auto id = session_route.substr(invite_prefix.size());
+                        if (method == "GET" && id.ends_with("/invitationData")) {
+                            session_store.invitation(account, id.substr(0, id.size() - 15),
+                                static_cast<std::uint64_t>(std::time(nullptr)));
+                            // Project dialog sends no invitation attachment. The actual payload is empty.
+                            return HttpAnswer{200, {{"Content-Type", "application/octet-stream"}}, "", "webapi_invitation_data"};
+                        }
+                        if (method == "GET") return json_answer(200, dump_json(session_store.invitation(
+                            account, id, static_cast<std::uint64_t>(std::time(nullptr)))), "webapi_invitation");
+                        if (method == "PUT") {
+                            const auto request = parse_json(std::string(body.begin(), body.end()));
+                            if (request.members.size() != 1 || !request.at("usedFlag").is_bool() || !request.at("usedFlag").boolean)
+                                throw std::invalid_argument("invalid invitation update");
+                            session_store.accept(account, id, static_cast<std::uint64_t>(std::time(nullptr)));
+                            return HttpAnswer{204, {}, "", "webapi_invitation_used"};
+                        }
+                        if (method == "DELETE") {
+                            session_store.dismiss(account, id, static_cast<std::uint64_t>(std::time(nullptr)));
+                            return HttpAnswer{204, {}, "", "webapi_invitation_dismiss"};
+                        }
+                    } else {
+                        const auto tail = session_route.substr(session_prefix.size());
+                        const auto slash = tail.find('/');
+                        const auto id = tail.substr(0, slash);
+                        const auto suffix = slash == std::string::npos ? "" : tail.substr(slash + 1);
+                        if (method == "GET" && suffix.empty())
+                            return json_answer(200, dump_json(session_store.describe(account, id)), "webapi_session_details");
+                        if (method == "GET" && (suffix == "sessionData" || suffix == "changeableSessionData" || suffix == "sessionImage")) {
+                            const auto part = session_store.attachment(account, id, suffix == "sessionData" ? "session-data" :
+                                suffix == "changeableSessionData" ? "changeable-session-data" : "session-image");
+                            return HttpAnswer{200, {{"Content-Type", part.media}}, std::string(part.data.begin(), part.data.end()), "webapi_session_attachment"};
+                        }
+                        if (method == "PUT" && (suffix == "changeableSessionData" || suffix == "sessionImage")) {
+                            session_store.replace_attachment(account, id, Part{
+                                suffix == "changeableSessionData" ? "changeable-session-data" : "session-image",
+                                header("content-type"), body});
+                            return HttpAnswer{204, {}, "", "webapi_session_attachment_update"};
+                        }
+                        if (method == "POST" && suffix == "members") {
+                            const auto query = path.find('?') == std::string::npos ? "" : path.substr(path.find('?') + 1);
+                            const auto priority = python_int(query_value(query, "priority", "0"));
+                            if (!priority || *priority < 0 || *priority > UINT32_MAX) throw std::invalid_argument("invalid member priority");
+                            session_store.join(account, online_id, id);
+                            session_store.member_priority(account, id, static_cast<std::uint64_t>(*priority));
+                            return HttpAnswer{204, {}, "", "webapi_session_join"};
+                        }
+                        if (method == "PUT" && suffix == "members/me") {
+                            const auto request = parse_json(std::string(body.begin(), body.end()));
+                            if (request.members.size() != 1) throw std::invalid_argument("invalid member update");
+                            session_store.member_priority(account, id, request.at("priority").as_u64());
+                            return HttpAnswer{204, {}, "", "webapi_session_priority"};
+                        }
+                        if (method == "DELETE" && suffix == "members/me") {
+                            session_store.leave(account, id);
+                            return HttpAnswer{204, {}, "", "webapi_session_leave"};
+                        }
+                        if (method == "DELETE" && suffix.empty()) {
+                            session_store.erase(account, id);
+                            return HttpAnswer{204, {}, "", "webapi_session_delete"};
+                        }
+                    }
+                } catch (const std::exception& error) {
+                    auto answer = json_answer(400, R"({"error":"invalid session operation"})", "webapi_session", false);
+                    answer.fields.set("reason", Json::of(error.what()));
+                    return answer;
+                }
+            }
             // The API group contains a colon: split the query without interpreting a scheme.
             const std::string route = path.substr(0, path.find('?'));
             const std::string prefix = "sdk:userProfile/v1/users/", suffix = "/friendList";
+            const auto presence_at = route.find("/presence", prefix.size());
+            if (starts_with(route, prefix) && presence_at != std::string::npos) {
+                if (online_id.empty()) return json_answer(403, R"({"error":"identity required"})", "webapi_presence", false);
+                try {
+                    const auto digits = route.substr(prefix.size(), presence_at - prefix.size());
+                    if (digits.empty() || digits.find_first_not_of("0123456789") != std::string::npos)
+                        throw std::invalid_argument("invalid presence account");
+                    const auto account = std::stoull(digits);
+                    const auto suffix_path = route.substr(presence_at + 9);
+                    if (suffix_path != "" && suffix_path != "/inGamePresence" && suffix_path != "/gameData" && suffix_path != "/gameStatus")
+                        throw std::invalid_argument("unsupported presence route");
+                    std::lock_guard<std::mutex> lock(state);
+                    if (method == "PUT" && !suffix_path.empty()) {
+                        if (account != user_id(online_id)) throw std::invalid_argument("presence owner mismatch");
+                        const auto value = parse_json(std::string(body.begin(), body.end()));
+                        if (!value.is_object() || value.members.empty()) throw std::invalid_argument("invalid presence body");
+                        for (const auto& [field_name, data] : value.members) {
+                            if (field_name == "gameData") {
+                                if (!data.is_string() || data.text.size() > 172 || base64_decode(data.text).size() > 128)
+                                    throw std::invalid_argument("invalid gameData");
+                            } else if (field_name == "gameStatus") {
+                                if (!data.is_string() || data.text.size() > 191) throw std::invalid_argument("invalid gameStatus");
+                            } else if (field_name == "localizedGameStatus") {
+                                if (!data.is_array() || data.items.size() > 30) throw std::invalid_argument("invalid localized status");
+                                for (const auto& localized : data.items)
+                                    if (!localized.at("npLanguage").is_string() || localized.at("npLanguage").text.size() > 8 ||
+                                        !localized.at("gameStatus").is_string() || localized.at("gameStatus").text.size() > 191)
+                                        throw std::invalid_argument("invalid localized status entry");
+                            } else throw std::invalid_argument("unsupported presence field");
+                            if ((suffix_path == "/gameData" && field_name != "gameData") || (suffix_path == "/gameStatus" && field_name == "gameData"))
+                                throw std::invalid_argument("presence field does not match endpoint");
+                        }
+                        auto& stored = game_presence[account];
+                        if (!stored.is_object()) stored = Json::object();
+                        for (const auto& [field_name, data] : value.members) stored.set(field_name, data);
+                        return HttpAnswer{204, {}, "", "webapi_presence_update"};
+                    }
+                    if (method == "GET") {
+                        Json context = Json::object();
+                        context.set("gameStatus", Json::of("")); context.set("gameData", Json::of(""));
+                        if (game_presence.count(account)) for (const auto& [field_name, value] : game_presence.at(account).members) context.set(field_name, value);
+                        // A friend on another PC: presence as its own service last reported it.
+                        std::optional<FriendState> remote;
+                        if (friend_watcher && !is_local(account)) remote = friend_watcher->by_account(account);
+                        if (remote)
+                            if (const Json* saved = remote->report.find("game_presence"); saved && saved->is_object())
+                                for (const auto& [field_name, value] : saved->members) context.set(field_name, value);
+                        if (suffix_path == "/gameData" || suffix_path == "/gameStatus") {
+                            Json result = Json::object(); const auto field_name = suffix_path.substr(1);
+                            result.set(field_name, context.at(field_name)); return json_answer(200, dump_json(result), "webapi_presence_data");
+                        }
+                        Json title = Json::object(); title.set("npTitleId", Json::of("CUSA14876_00"));
+                        title.set("titleName", Json::of("Crash Team Racing Nitro-Fueled")); context.set("gameTitleInfo", title);
+                        Json presence = Json::object(), contexts = Json::array(), result = Json::object();
+                        const bool active = is_local(account) || (remote && remote->online && remote->in_game);
+                        presence.set("onlineStatus", Json::of(active ? "online" : "offline")); presence.set("platform", Json::of("PS4"));
+                        if (active) contexts.items.push_back(context);
+                        presence.set("incontextInfoList", contexts); result.set("presence", presence);
+                        return json_answer(200, dump_json(result), "webapi_presence");
+                    }
+                } catch (const std::exception& error) {
+                    auto answer = json_answer(400, R"({"error":"invalid presence operation"})", "webapi_presence", false);
+                    answer.fields.set("reason", Json::of(error.what())); return answer;
+                }
+            }
+
             if (method == "GET" && route.size() > prefix.size() + suffix.size() && starts_with(route, prefix) &&
                 route.compare(route.size() - suffix.size(), suffix.size(), suffix) == 0) {
                 const std::string digits = route.substr(prefix.size(), route.size() - prefix.size() - suffix.size());
@@ -588,7 +1469,7 @@ struct Server::Impl {
                     Json payload;
                     try {
                         if (!offset || !limit) throw std::invalid_argument("invalid friend request");
-                        payload = friend_page(*offset, *limit);
+                        payload = friends_listed() ? listed_friend_page(online_id, *offset, *limit) : friend_page(*offset, *limit);
                     } catch (const std::exception&) {
                         return json_answer(400, R"({"error":{"message":"invalid friend request"}})", "webapi_friends", false);
                     }
@@ -667,6 +1548,10 @@ struct Server::Impl {
     }
     // Pushes to other players: a broken connection there must not end this one.
     void push(const std::shared_ptr<Client>& client, const Bytes& payload) {
+        if (!client->hub_origin.empty()) {
+            if (client->outbox.size() < 64) client->outbox.push_back(payload);
+            return;
+        }
         try { send_lobby(*client, payload, PUSH_RECORD); } catch (const std::exception& error) {
             Json f = Json::object();
             f.set("online_id", Json::of(client->user.online_id));
@@ -677,7 +1562,8 @@ struct Server::Impl {
     void create_ready_lobbies() { // state held
         std::map<std::uint64_t, std::string> available;
         for (const auto& [account, client] : live_clients)
-            if (!party || party->admits(client->user.room_token,client->user.online_id)) available[account] = client->user.room_token;
+            if (!party || client->user.room_token == public_room_token() || party->admits(client->user.room_token,client->user.online_id))
+                available[account] = client->user.room_token;
         for (LobbyPlan& plan : matchmaking.match_ready(available, party ? party->expected_players() : std::map<std::string, std::size_t>{})) {
             const Json advertisement = parse_json(*matchmaking.player_info(plan.host));
             const auto [host_doc, backend_doc] = lobby_documents(plan, advertisement, static_cast<std::uint64_t>(std::time(nullptr)));
@@ -743,6 +1629,72 @@ struct Server::Impl {
             w.u32(1).u32(1).u32(static_cast<std::uint32_t>(std::time(nullptr)));
             return task_reply(task, &w);
         }
+        if (service == 12 && task == 10 && !params.empty() && params[0].kind == typed::UINT32 &&
+            params.size() == 1 + params[0].value.as_u64()) {
+            // getUserIDs: online IDs to account IDs, asked by the retail client for the friends of
+            // its friend list (observed 2026-10-20: [u32 1][string "FriendA"]). One result per
+            // name: u64 account, string online ID (layout as documented for the other port's
+            // server, 12/9 and 12/10). Accounts are user_id(online_id), also for offline friends.
+            return guarded([&] {
+                Writer w;
+                const auto count = static_cast<std::uint32_t>(params.size() - 1);
+                w.u32(count).u32(count);
+                for (std::size_t i = 1; i < params.size(); ++i) {
+                    if (params[i].kind != typed::STRING || params[i].value.text.empty()) throw std::invalid_argument("online ID expected");
+                    w.u64(user_id(params[i].value.text)).string(params[i].value.text);
+                }
+                return task_reply(task, &w);
+            });
+        }
+        if (service == 138 && task == 14 && !params.empty() && params[0].kind == typed::STRING) {
+            // Friends' sessions of a context ("Delta"): the friend list page asks it with the
+            // friends' account IDs. Record per session: blob 67-byte host address, blob 8-byte
+            // session ID, u32 game type, u32 maximum players, u32 players, then the attribute
+            // fields from the 138/1 attribute blob, without another blob wrapper.
+            // Retail 1.21 0x401a00 reads the base record then an 8-byte security ID
+            // at 0x401a7c, a 16-byte key, and the remaining typed fields directly.
+            return guarded([&] {
+                std::vector<std::uint64_t> accounts;
+                for (std::size_t i = 1; i < params.size(); ++i) {
+                    if (params[i].kind == typed::UINT64) accounts.push_back(params[i].value.as_u64());
+                    else if (params[i].kind == typed::UNPARSED) {
+                        // Typed u64 array: tag 110, typed u32 byte size, raw u32 count, raw u64 values.
+                        const Bytes raw = from_hex(params[i].value.text);
+                        if (raw.size() < 10 || raw[0] != 110 || raw[1] != typed::UINT32) throw std::invalid_argument("unsupported friend ID list");
+                        std::size_t at = 6;
+                        const std::uint32_t n = raw[at] | raw[at + 1] << 8 | raw[at + 2] << 16 | static_cast<std::uint32_t>(raw[at + 3]) << 24;
+                        at += 4;
+                        if (n > 500 || raw.size() < at + std::size_t{n} * 8) throw std::invalid_argument("friend ID list truncated");
+                        for (std::uint32_t k = 0; k < n; ++k, at += 8) {
+                            std::uint64_t v = 0;
+                            for (int b = 7; b >= 0; --b) v = v << 8 | raw[at + static_cast<std::size_t>(b)];
+                            accounts.push_back(v);
+                        }
+                    } else throw std::invalid_argument("unsupported friend ID parameter");
+                }
+                auto sessions = matchmaking.friend_sessions(params[0].value.text, accounts, user.user_id);
+                // Friends playing on another PC: the Delta sessions their own service reported.
+                for (const std::uint64_t account : accounts) {
+                    if (!friend_watcher || account == user.user_id || is_local(account)) continue;
+                    const auto known = friend_watcher->by_account(account);
+                    const Json* delta = known && known->online ? known->report.find("delta") : nullptr;
+                    if (!delta || !delta->is_array()) continue;
+                    for (const auto& row : delta->items) {
+                        if (text_field(row, "context") != params[0].value.text) continue;
+                        sessions.push_back({from_hex(text_field(row, "address")), from_hex(text_field(row, "id")),
+                                            static_cast<std::uint32_t>(row.at("game_type").as_u64()),
+                                            static_cast<std::uint32_t>(row.at("max_players").as_u64()),
+                                            static_cast<std::uint32_t>(row.at("players").as_u64()),
+                                            from_hex(text_field(row, "custom"))});
+                    }
+                }
+                Writer w;
+                w.u32(static_cast<std::uint32_t>(sessions.size())).u32(static_cast<std::uint32_t>(sessions.size()));
+                for (const auto& s : sessions)
+                    w.blob(s.address).blob(s.id).u32(s.game_type).u32(s.max_players).u32(s.players).raw(s.custom);
+                return task_reply(task, &w);
+            });
+        }
         if (auto answer = pitstop_task(request, user.user_id, *marketplace, *achievements, user.wumpa_multiplier)) return *answer;
         if (service == 4 && task == 1) return guarded([&] { stats->write(params, user.user_id); return task_reply(task); });
         if (service == 145 && task == 2)
@@ -751,6 +1703,12 @@ struct Server::Impl {
             return guarded([&] { Writer w; w.u32(1).u32(1).u64(matchmaking.player_token(user.user_id)); return task_reply(task, &w); });
         if (service == 138 && task == 1)
             return guarded([&] { Writer w; w.u32(1).u32(1).blob(matchmaking.register_session(params, user.user_id, user.room_token)); return task_reply(task, &w); });
+        if (service == 138 && task == 19)
+            return guarded([&] { Writer w; w.u32(1).u32(1).blob(matchmaking.reserve_session(params, user.user_id, user.room_token)); return task_reply(task, &w); });
+        if (service == 138 && (task == 20 || task == 2))
+            return guarded([&] { matchmaking.update_session(params, user.user_id, task == 20); return task_reply(task); });
+        if (service == 138 && task == 3)
+            return guarded([&] { matchmaking.delete_session(params, user.user_id); return task_reply(task); });
         if (service == 138 && task == 12)
             return guarded([&] { matchmaking.update_session_players(params, user.user_id, user.room_token); return task_reply(task); });
         if (service == 145 && task == 18)
@@ -861,6 +1819,10 @@ struct Server::Impl {
                     continue;
                 }
                 const TaskRequest request = parse_task_request(payload);
+                if (const auto forwarded = hub_task(request, payload, user)) {
+                    send_lobby(*client, *forwarded, LSG_TASK_REPLY);
+                    continue;
+                }
                 std::lock_guard<std::mutex> lock(state);
                 bool synced = false;
                 const Bytes answer = handle_task(request, user, synced);
@@ -895,27 +1857,7 @@ struct Server::Impl {
         if (client) {
             std::lock_guard<std::mutex> lock(state);
             const auto it = live_clients.find(client->user.user_id);
-            if (it != live_clients.end() && it->second == client) {
-                live_clients.erase(it);
-                // Paired with the opt-in retail live-session adapter. Older clients
-                // retain their original behavior until the full failover is ready.
-                char migration[2]{};
-                if (GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",migration,2)==1 && migration[0]=='1') {
-                    std::map<std::uint64_t,std::string> remaining;
-                    for(const auto& [account,live]:live_clients)remaining[account]=live->user.room_token;
-                    for(const auto& promoted:matchmaking.promote_disconnected(client->user.user_id,remaining)) {
-                        auto pending=pending_lobbies.find(promoted.lobby_id);
-                        if(pending!=pending_lobbies.end())pending->second.host=promoted.host;
-                        publish_host_document(promoted.lobby_id);
-                        Json evidence=Json::object();
-                        evidence.set("lobby",Json::of(promoted.lobby_id));
-                        evidence.set("host",Json::of(promoted.host));
-                        record("race_host_promoted",std::move(evidence));
-                    }
-                }
-                matchmaking.cancel_pending(client->user.user_id, client->user.room_token);
-                relay.forget(client->user.user_id);
-            }
+            if (it != live_clients.end() && it->second == client) forget_client(client->user.user_id, "closed");
         }
     }
 
@@ -1109,10 +2051,20 @@ struct Server::Impl {
         f.set("relay_port", relay_socket == INVALID_SOCKET ? Json::null() : Json::of(static_cast<unsigned>(config.relay_port)));
         f.set("implementation", Json::of("c++"));
         record("listening", std::move(f));
+        if (config.friend_network) {
+            const fs::path friends_path = config.state_dir / "friends.json";
+            friend_watcher = std::make_unique<FriendWatcher>(*host_identity, friends_path,
+                config.friend_resolver ? config.friend_resolver : rubrica_resolver(friends_path), config.friend_poll_period);
+            friend_watcher->local_name = [this] { return local_player_name(); };
+            friend_watcher->start();
+        }
+        if (config.match_hub) hub_poller = std::thread([this] { hub_poll_loop(); });
         return listening;
     }
     void stop() {
         if (stopping.exchange(true)) return;
+        if (friend_watcher) friend_watcher->stop();
+        if (hub_poller.joinable()) hub_poller.join();
         for (const SOCKET s : listeners) closesocket(s);
         {
             std::lock_guard<std::mutex> lock(workers_mutex);
@@ -1143,10 +2095,18 @@ const std::vector<std::string>& Server::failures() const { return impl_->failed;
 fs::path Server::traffic_key_path() const { return impl_->config.state_dir / "server_key.der"; }
 std::size_t Server::connected_players() const {
     std::lock_guard<std::mutex> lock(impl_->state);
-    return impl_->live_clients.size();
+    std::size_t count = 0;
+    for (const auto& [account, client] : impl_->live_clients) if (client->hub_origin.empty()) ++count;
+    return count;
 }
 std::string Server::friend_code() const {
     return impl_->host_identity ? impl_->host_identity->friend_code() : std::string();
+}
+std::vector<FriendState> Server::friends() const {
+    return impl_->friend_watcher ? impl_->friend_watcher->friends() : std::vector<FriendState>{};
+}
+void Server::poll_friends() {
+    if (impl_->friend_watcher) impl_->friend_watcher->poll_now();
 }
 const HostIdentity* Server::host_identity() const {
     return impl_->host_identity.get();

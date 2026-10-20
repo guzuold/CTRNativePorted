@@ -10,6 +10,7 @@
 //       Retail v01.21 currencies: 10 Wumpa Coins, 11 Nitro Boost, 12 Free Nitro Boost.
 // Stop with Ctrl+C (the router mappings opened with --upnp are removed).
 #include "server.hpp"
+#include "friend_store.hpp"
 #include "stores.hpp"
 #include "launcher_online.hpp"
 #include "upnp.hpp"
@@ -38,8 +39,11 @@ void usage() {
               "                         [--peer-host 127.0.0.2] [--stun-secondary-host 127.0.0.3] [--stun-alternate-port 3076]\n"
               "                         [--public-host IPv4 | --auto-public] [--discovery-port 3078] [--relay-port 3082 (0: off)]\n"
               "                         [--upnp] [--upnp-probe] [--upnp-check]\n"
-              "                         [--upnp-location URL] [--root DIR]\n"
-              "       ctr_online_server --set-balance <account|online ID> <currency> <amount> [--root DIR]");
+              "                         [--upnp-location URL] [--root DIR] [--match-hub CODE@IPv4[:PORT]]\n"
+              "                         [--friend-network [--local-name ONLINE_ID]]\n"
+              "       ctr_online_server --set-balance <account|online ID> <currency> <amount> [--root DIR]\n"
+              "       ctr_online_server --friend-code [--root DIR]\n"
+              "       ctr_online_server --add-friend <code> <IPv4:port> [--root DIR]");
 }
 } // namespace
 
@@ -49,6 +53,8 @@ int main(int argc, char** argv) {
     bool upnp = false, auto_public = false, probe = false, check = false;
     std::string location;
     std::vector<std::string> balance; // --set-balance account currency amount
+    std::vector<std::string> add_friend; // --add-friend code endpoint
+    bool show_code = false;              // --friend-code
     std::filesystem::path root;
     try {
         for (int i = 1; i < argc; ++i) {
@@ -58,6 +64,19 @@ int main(int argc, char** argv) {
                 return argv[++i];
             };
             if (arg == "--host") config.host = next();
+            // Friends of runtime/user/online/friends.json, reached at their saved endpoints.
+            else if (arg == "--friend-network") config.friend_network = true;
+            else if (arg == "--local-name") config.local_name = next();
+            else if (arg == "--match-hub") {
+                // Public matchmaking on another service (CODE@IPv4[:PORT]), as the launcher's
+                // hub election would choose it.
+                const std::string value = next();
+                const auto at = value.find('@'), colon = value.find(':', value.find('@'));
+                if (at == std::string::npos) throw std::invalid_argument("--match-hub expects CODE@IPv4[:PORT]");
+                MatchHub hub{value.substr(0, at), value.substr(at + 1, colon == std::string::npos ? std::string::npos : colon - at - 1)};
+                if (colon != std::string::npos) hub.port = static_cast<std::uint16_t>(std::stoi(value.substr(colon + 1)));
+                config.match_hub = [hub] { return std::optional<MatchHub>(hub); };
+            }
             else if (arg == "--http") config.http_port = static_cast<std::uint16_t>(std::stoi(next()));
             else if (arg == "--tcp") config.tcp_record_ports = port_list(next());
             else if (arg == "--udp") config.udp_record_ports = port_list(next());
@@ -74,6 +93,8 @@ int main(int argc, char** argv) {
             else if (arg == "--upnp-location") location = next();
             else if (arg == "--root") root = next();
             else if (arg == "--set-balance") { balance.push_back(next()); balance.push_back(next()); balance.push_back(next()); }
+            else if (arg == "--friend-code") show_code = true;
+            else if (arg == "--add-friend") { add_friend.push_back(next()); add_friend.push_back(next()); }
             else if (arg == "--help" || arg == "-h") { usage(); return 0; }
             else throw std::invalid_argument("unknown option " + arg);
         }
@@ -104,6 +125,25 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "set-balance: %s\n", error.what());
             return 2;
         }
+    }
+    if (show_code) {
+        const auto code = local_friend_code(root);
+        std::printf("%s\n", code.c_str());
+        return code.empty() ? 2 : 0;
+    }
+    if (!add_friend.empty()) {
+        // Testing and manual setup: what the launcher's AMICI panel does, plus the endpoint
+        // the friend's service is reached at (its friend network finds it there).
+        std::string error;
+        FriendStore store(config.state_dir / "friends.json");
+        FriendCodeInfo info;
+        if (parse_friend_code(add_friend[0], info) != CodeParseError::Ok || !store.add_or_update(info.code, "", &error) ||
+            !store.update_endpoint(info.code, add_friend[1], "Aggiunto da riga di comando")) {
+            std::fprintf(stderr, "add-friend: %s\n", error.empty() ? "invalid friend code" : error.c_str());
+            return 2;
+        }
+        std::printf("{\"event\": \"friend_added\", \"endpoint\": \"%s\"}\n", add_friend[1].c_str());
+        return 0;
     }
     config.log_path = default_log_path(root);
     std::mutex out;

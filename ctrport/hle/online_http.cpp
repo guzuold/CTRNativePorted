@@ -49,14 +49,15 @@ std::string json_escape(const std::string& text) {
 bool http_exchange(const std::string& method, const std::string& target,
                    const std::vector<std::pair<std::string, std::string>>& headers,
                    const std::string& body, HttpResponse* response) {
-    WSADATA data{};
-    WSAStartup(MAKEWORD(2, 2), &data);
+    static const int startup = [] { WSADATA data{}; return WSAStartup(MAKEWORD(2, 2), &data); }();
+    if (startup) return false;
     const SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (s == INVALID_SOCKET) {
         return false;
     }
     const DWORD timeout = 15000;
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
     sockaddr_in server{};
     server.sin_family = AF_INET;
     server.sin_port = htons(static_cast<u_short>(http_port()));

@@ -90,9 +90,36 @@ class SessionStore {
 public:
     // Returns {"sessionId": ...}.
     Json create(std::uint64_t account, const std::string& content_type, const Bytes& body);
+    // PUT /v1/sessions/{id} by the session's owner (observed: {"sessionPrivacy":"public"}).
+    void update(std::uint64_t account, const std::string& id, const Bytes& body);
+    // Project-owned invitation transport; polling does not accept or consume an invite.
+    Json invite(std::uint64_t account, const std::string& sender, const std::string& session,
+                const std::vector<std::uint64_t>& recipients, std::uint64_t now);
+    Json invitations(std::uint64_t recipient, std::uint64_t now);
+    void dismiss(std::uint64_t recipient, const std::string& invitation, std::uint64_t now);
+    Json accept(std::uint64_t recipient, const std::string& invitation, std::uint64_t now);
+    Json invitation(std::uint64_t recipient, const std::string& id, std::uint64_t now);
+    Json describe(std::uint64_t account, const std::string& id) const;
+    Part attachment(std::uint64_t account, const std::string& id, const std::string& name) const;
+    void join(std::uint64_t account, const std::string& name, const std::string& id);
+    void leave(std::uint64_t account, const std::string& id);
+    void erase(std::uint64_t account, const std::string& id);
+    void replace_attachment(std::uint64_t account, const std::string& id, Part part);
+    Json user_sessions(std::uint64_t requester, std::uint64_t account) const;
+    void member_priority(std::uint64_t account, const std::string& id, std::uint64_t priority);
+    bool contains(const std::string& id) const { return sessions_.count(id) > 0; }
 private:
-    struct Session { std::uint64_t owner; Json metadata; std::vector<Part> parts; };
+    struct Session {
+        std::uint64_t owner; Json metadata; std::vector<Part> parts;
+        std::map<std::uint64_t, std::string> members;
+        std::set<std::uint64_t> admitted;
+        std::map<std::uint64_t, std::uint64_t> priorities;
+    };
     std::map<std::string, Session> sessions_;
+    struct Invitation { std::string session, sender; std::uint64_t account, recipient, expires; bool accepted = false; };
+    std::map<std::string, Invitation> invitations_;
+    void expire_invitations(std::uint64_t now);
+    const Session& readable(std::uint64_t account, const std::string& id) const;
 };
 
 struct PlanPlayer { std::uint64_t account; std::uint64_t search_id; Json search; };
@@ -111,6 +138,20 @@ public:
     std::uint64_t player_token(std::uint64_t account);
     Bytes register_session(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
     void update_session_players(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
+    // 138/19 reserves a session ID in a context (observed: a private lobby being created);
+    // 138/20 initializes it and 138/2 updates it with host address, type, size and attributes;
+    // 138/3 deletes it. Only the owner may change or delete a session.
+    Bytes reserve_session(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
+    void update_session(const std::vector<Param>& params, std::uint64_t account, bool initialize);
+    void delete_session(const std::vector<Param>& params, std::uint64_t account);
+    // 138/14: the sessions that the given friends registered in a context (e.g. "Delta"),
+    // other than the requester's own. Any room: friends may play public or private games.
+    struct FriendSession { Bytes address, id; std::uint32_t game_type, max_players, players; Bytes custom; };
+    std::vector<FriendSession> friend_sessions(const std::string& context, const std::vector<std::uint64_t>& accounts,
+                                               std::uint64_t requester) const;
+    // The published (not reserved) sessions of one account, with their context, for the
+    // presence a friend's service caches and answers 138/14 from.
+    std::vector<std::pair<std::string, FriendSession>> owned_sessions(std::uint64_t account) const;
     std::uint64_t start_search(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
     // Selects connected pending players with equal room and retail filters.
     std::vector<LobbyPlan> match_ready(const std::map<std::uint64_t, std::string>& available,
@@ -130,8 +171,9 @@ private:
     struct MatchSession {
         std::string selector, context;
         std::uint64_t owner;
-        MatchPlayer self;
-        std::vector<MatchPlayer> players;
+        MatchPlayer self;               // host address, game type (a), maximum players (b), attributes
+        std::uint32_t players = 1;
+        bool reserved = false;          // ID handed out by 138/19, no game published yet
     };
     struct Search {
         std::uint64_t id, account;

@@ -30,6 +30,10 @@ class Store:
                               'session BLOB NOT NULL, position INTEGER NOT NULL, address BLOB NOT NULL, '
                               'field_a INTEGER NOT NULL, field_b INTEGER NOT NULL, custom BLOB NOT NULL, '
                               'PRIMARY KEY(session,position))')
+        columns = {row[1] for row in self.database.execute('PRAGMA table_info(match_sessions)')}
+        for name, default in (('players', 1), ('reserved', 0)):
+            if name not in columns:
+                self.database.execute(f'ALTER TABLE match_sessions ADD COLUMN {name} INTEGER NOT NULL DEFAULT {default}')
         self.database.execute('CREATE TABLE IF NOT EXISTS searches ('
                               'id TEXT PRIMARY KEY, account TEXT NOT NULL, selector TEXT NOT NULL, '
                               'compatibility TEXT NOT NULL, document TEXT NOT NULL, '
@@ -96,11 +100,14 @@ class Store:
         if len(address) != 67 or not 1 <= len(custom) <= 65535 or any(type(v) is not int or not 0 <= v <= 0xffffffff for v in (a,b)):
             raise ValueError('invalid session fields')
         with self.database:
+            self.database.execute('DELETE FROM match_session_players WHERE session IN '
+                                  '(SELECT id FROM match_sessions WHERE owner=? AND context=?)', (str(account), context))
+            self.database.execute('DELETE FROM match_sessions WHERE owner=? AND context=?', (str(account), context))
             while True:
                 session = secrets.token_bytes(8)
                 if any(session) and not self.database.execute('SELECT 1 FROM match_sessions WHERE id=?',(session,)).fetchone():
-                    self.database.execute('INSERT INTO match_sessions VALUES (?,?,?,?,?,?,?,?)',
-                                          (session,selector,str(account),context,address,a,b,custom))
+                    self.database.execute('INSERT INTO match_sessions VALUES (?,?,?,?,?,?,?,?,?,?)',
+                                          (session,selector,str(account),context,address,a,b,custom,1,0))
                     return session
 
     def update_session_players(self, params, account, selector):
@@ -108,25 +115,80 @@ class Store:
             raise ValueError('invalid session player header')
         context,session,count = [p[1] for p in params[:3]]
         session = bytes.fromhex(session)
-        if type(count) is not int or not 1 <= count <= 8 or len(params) != 3+count*4 or len(session) != 8:
+        if type(count) is not int or not 1 <= count <= 8 or len(params) != 7 or len(session) != 8:
             raise ValueError('invalid session player count')
         if not self.database.execute('SELECT 1 FROM match_sessions WHERE id=? AND owner=? '
                                      'AND selector=? AND context=?',
                                      (session,str(account),selector,context)).fetchone():
             raise ValueError('session owner or room mismatch')
-        rows=[]
-        for position in range(count):
-            fields=params[3+position*4:7+position*4]
-            if [p[0] for p in fields] != [19,8,8,19]:
-                raise ValueError('invalid session player fields')
-            address,a,b,custom=[p[1] for p in fields]
-            address,custom=bytes.fromhex(address),bytes.fromhex(custom)
-            if len(address) != 67 or not 1 <= len(custom) <= 65535 or any(type(v) is not int or not 0 <= v <= 0xffffffff for v in (a,b)):
-                raise ValueError('invalid session player values')
-            rows.append((session,position,address,a,b,custom))
+        address,a,b,custom = self._session_info(params[3:])
         with self.database:
             self.database.execute('DELETE FROM match_session_players WHERE session=?',(session,))
-            self.database.executemany('INSERT INTO match_session_players VALUES (?,?,?,?,?,?)',rows)
+            self.database.execute('UPDATE match_sessions SET address=?,field_a=?,field_b=?,custom=?,players=? WHERE id=?',
+                                  (address,a,b,custom,count,session))
+
+    @staticmethod
+    def _session_info(params):
+        if len(params) != 4 or [p[0] for p in params] != [19,8,8,19]:
+            raise ValueError('invalid session fields')
+        address,a,b,custom = [p[1] for p in params]
+        address,custom = bytes.fromhex(address),bytes.fromhex(custom)
+        if len(address) != 67 or not 1 <= len(custom) <= 65535 or any(
+                type(v) is not int or not 0 <= v <= 0xffffffff for v in (a,b)):
+            raise ValueError('invalid session values')
+        return address,a,b,custom
+
+    def reserve_session(self, params, account, selector):
+        if not room.valid_token(selector) or len(params) != 1 or params[0][0] != 16:
+            raise ValueError('invalid session reservation')
+        context = params[0][1]
+        if not isinstance(context,str) or not 1 <= len(context.encode('utf8')) <= 16:
+            raise ValueError('invalid session context')
+        with self.database:
+            self.database.execute('DELETE FROM match_sessions WHERE owner=? AND context=? AND reserved=1',
+                                  (str(account),context))
+            while True:
+                session = secrets.token_bytes(8)
+                if any(session) and not self.database.execute('SELECT 1 FROM match_sessions WHERE id=?',(session,)).fetchone():
+                    self.database.execute('INSERT INTO match_sessions VALUES (?,?,?,?,?,?,?,?,?,?)',
+                                          (session,selector,str(account),context,b'',0,0,b'',0,1))
+                    return session
+
+    def _owned_session(self, params, account):
+        if len(params) != 2 or [p[0] for p in params] != [16,19]:
+            raise ValueError('invalid session identity')
+        context,session = params[0][1],bytes.fromhex(params[1][1])
+        if not self.database.execute('SELECT 1 FROM match_sessions WHERE id=? AND context=? AND owner=?',
+                                     (session,context,str(account))).fetchone():
+            raise ValueError('unknown session or not its owner')
+        return session
+
+    def update_session(self, params, account, initialize=False):
+        if len(params) != 6:
+            raise ValueError('invalid session update')
+        session = self._owned_session(params[:2], account)
+        address,a,b,custom = self._session_info(params[2:])
+        with self.database:
+            self.database.execute('UPDATE match_sessions SET address=?,field_a=?,field_b=?,custom=? WHERE id=?',
+                                  (address,a,b,custom,session))
+            if initialize:
+                self.database.execute('UPDATE match_sessions SET reserved=0,players=1 WHERE id=?',(session,))
+
+    def delete_session(self, params, account):
+        session = self._owned_session(params,account)
+        with self.database:
+            self.database.execute('DELETE FROM match_session_players WHERE session=?',(session,))
+            self.database.execute('DELETE FROM match_sessions WHERE id=?',(session,))
+
+    def friend_sessions(self, context, accounts, requester):
+        result = []
+        for account in accounts:
+            if account == requester:
+                continue
+            result.extend(self.database.execute(
+                'SELECT address,id,field_a,field_b,players,custom FROM match_sessions '
+                'WHERE owner=? AND context=? AND reserved=0 ORDER BY id',(str(account),context)).fetchall())
+        return result
 
     def room_players(self, account, selector):
         if not room.valid_token(selector) or not self.database.execute(
@@ -157,7 +219,7 @@ class Store:
             raise ValueError('unsupported dedicated server, team or guest schema')
         filters = document['ruleset_payload']
         performance = document['performance']
-        if not isinstance(filters,dict) or set(filters) != {'filter'} or not isinstance(filters['filter'],dict) or set(filters['filter']) != {'matchmaking_version','playlist_id'} or any(type(v) is not int or v < 0 for v in filters['filter'].values()) or performance != {'game_type':1}:
+        if not isinstance(filters,dict) or set(filters) != {'filter'} or not isinstance(filters['filter'],dict) or set(filters['filter']) != {'matchmaking_version','playlist_id'} or any(type(v) is not int or v < 0 for v in filters['filter'].values()) or (not isinstance(performance,dict) or set(performance) != {'game_type'} or type(performance['game_type']) is not int or not 0 <= performance['game_type'] <= 0xffffffff):
             raise ValueError('unsupported search filters')
         compatibility = json.dumps([slots,filters,performance],sort_keys=True,separators=(',',':'))
         text=json.dumps(document,separators=(',',':'))

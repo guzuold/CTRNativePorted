@@ -16,12 +16,12 @@ The synthetic router:
 Run from the project root after build_online_server.ps1:
     python -B tools/online/test_upnp_client.py
 """
-import json, re, subprocess, sys, threading
+import json, os, re, subprocess, sys, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-EXE = ROOT / 'build/CTRPort-claude/ctr_online_server.exe'
+EXE = Path(os.environ.get('CTR_TEST_SERVER_EXE', ROOT / 'build/CTRPort-claude/ctr_online_server.exe')).resolve()
 failures = 0
 calls = []
 mappings = {('TCP', '3074'): '192.168.1.77', ('UDP', '3078'): '127.0.0.1'}
@@ -126,14 +126,14 @@ check(all(c['args']['NewInternalClient'] == '127.0.0.1' and c['args']['NewIntern
           and c['args']['NewRemoteHost'] == '' and c['args']['NewEnabled'] == '1' for c in adds),
       'mapping to this PC, same internal and external port, any remote host')
 check({(c['args']['NewProtocol'], c['args']['NewExternalPort']) for c in adds} ==
-      {('TCP', '8780'), ('TCP', '3074'), ('UDP', '3174'), ('UDP', '3078'), ('UDP', '3079'), ('UDP', '3080'), ('UDP', '3081'), ('UDP', '3082')},
-      'the eight host ports requested (with the relay)')
+      {('TCP', '8780'), ('TCP', '3074'), ('UDP', '3174'), ('UDP', '3078'), ('UDP', '3079'), ('UDP', '3080'), ('UDP', '3081'), ('UDP', '3082'), ('UDP', '8788')},
+      'the nine host ports requested (with relay and DHT)')
 deletes = [(c['args']['NewProtocol'], c['args']['NewExternalPort']) for c in calls if c['action'] == 'DeletePortMapping']
 check(deletes.count(('UDP', '3078')) == 2, 'own stale UDP 3078 mapping deleted, mapped again, deleted at close')
 check(('TCP', '3074') not in deletes and mappings == {('TCP', '3074'): '192.168.1.77'},
       'other device\'s TCP 3074 left alone; every mapping made was removed at close')
-check(result.returncode == 1 and 'upnp-check: 7/8 porte aperte, indirizzo esterno 203.0.113.50' in output,
-      'report: 7 of 8 ports, external address')
-check("porta gia' inoltrata a un altro dispositivo (192.168.1.77)" in output, 'conflict with another device explained')
+check(result.returncode == 1 and 'upnp-check: 8/9 porte aperte, indirizzo esterno 203.0.113.50' in output,
+      'report: 8 of 9 ports, external address')
+check("port already forwarded to another device (192.168.1.77)" in output, 'conflict with another device explained')
 print(json.dumps({'scope': 'upnp_client_test', 'passed': failures == 0, 'failures': failures}))
 sys.exit(1 if failures else 0)

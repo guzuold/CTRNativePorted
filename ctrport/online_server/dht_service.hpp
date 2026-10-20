@@ -47,6 +47,11 @@ public:
     // Clears active announce.
     void clear_announce();
 
+    // Further keys announced alongside the main one (e.g. the public matchmaking key), each
+    // renewed every 15 minutes; remove_announce stops renewing one.
+    void add_announce(const Bytes& info_hash_20, std::uint16_t contact_tcp_port);
+    void remove_announce(const Bytes& info_hash_20);
+
     // Searches the DHT for info_hash_20, collecting candidate "ip:port" values.
     // Blocks the caller until search completes or timeout_ms expires. Call off UI thread.
     std::vector<std::string> search(const Bytes& info_hash_20, int timeout_ms = 8000);

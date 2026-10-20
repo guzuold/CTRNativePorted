@@ -1,3 +1,35 @@
+# v0.4.0 — Friends and public matchmaking without a shared server
+
+Each player's game now talks only to the service running inside their own launcher. The services find each other and cooperate directly; nobody has to host a room or run a server for the others.
+
+- **Friends list (AMICI).** The launcher's right-side drawer is a friends list, in the style of game clients: copy your code, add a friend by code, remove a friend. Friends must add each other. The same friends appear in the game's own friend list, with live status (in game, launcher open, offline). Offline friends stay listed.
+- **Invite and join from the game.** Invite a friend from the in-game friends list, or JOIN a friend whose game is joinable. The session stays on the host's service; the friend's service relays the requests to it, signed. Inviting sends at once; the recipient accepts in game.
+- **Public matchmaking.** Online > Matchmaking pairs every player using the client. Services that can be reached from the internet announce themselves on the DHT; the hub is elected automatically (lowest friend code among the reachable services). Players behind NAT join through their own service, which forwards the matchmaking to the hub.
+- **Split screen up to four players and keyboard input**, with a launcher toggle.
+- The launcher's room lobby and the public-server field are gone: friends and matchmaking replace them.
+- Fixed a crash in the DHT bootstrap at shutdown (Winsock torn down under a running name lookup).
+
+## Verified
+
+Two retail EU 1.21 instances on one PC, each connected only to its own service (different loopback addresses): friends shown JOINABLE both ways, JOIN into the same lobby and a Crash Cove race; public matchmaking through the hub into the same lobby and a Polar Pass race. Server suites: 237 checks, friend network and cross-service invitations 33 checks, cross-service matchmaking at protocol level, C++/Python comparison 57 steps with no differences, invitation dialog 34 checks.
+
+## Limits
+
+- Not yet tested between two separate PCs or over the internet.
+- No relay between services yet: players behind strict NAT may not reach each other directly (planned next).
+- Public matchmaking needs at least one service reachable from the internet (UPnP or a manual public address); two PCs on a LAN without UPnP do not find each other for public matchmaking.
+- Full online support (R8) is not claimed. Reconstruction: zero new verified replacements; compatibility registry unchanged.
+
+## Installation
+
+Close the game and launcher, extract the ZIP and run launcher.exe. Preserve your existing runtime/user folder when upgrading. All players should update: v0.4.0 services do not interoperate with the v0.3.x room lobby. Supply your own base dump and v01.21 update; game data, saves and credentials are not included.
+
+## Credits
+
+GPL-2.0 project, shadPS4 and bbport references, jech/dht, Julio Cacko Xbox icons (CC0-1.0), user-supplied branding. Implementation and review assisted by Claude (Anthropic) and OpenAI Codex.
+
+---
+
 # v0.3.2 — Client lobby and experimental host migration
 
 - The right-side drawer is now the room lobby, with complete invitations, participant management and a visible scrollbar for the eight-player list. Common room actions stay inside the client.

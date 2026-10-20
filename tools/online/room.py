@@ -11,5 +11,14 @@ def token(password):
     return hashlib.sha256(b'ctr-room-v1\0' + encoded).hexdigest()
 
 
+# Public matchmaking: players that send no room token search with everyone on the server.
+# A distinct prefix keeps it apart from every password-derived token.
+PUBLIC_TOKEN = hashlib.sha256(b'ctr-public-room-v1').hexdigest()
+
+
+def request_token(header_value):
+    return header_value or PUBLIC_TOKEN
+
+
 def valid_token(value):
     return isinstance(value, str) and re.fullmatch('[0-9a-f]{64}', value) is not None

@@ -57,6 +57,16 @@ typedef struct CtrGpuGamepad {
 CTR_GPU_API int ctr_gpu_gamepad_state(CtrGpuGamepad* out);
 /* Rumble on every connected PlayStation controller (0 stops it). */
 CTR_GPU_API void ctr_gpu_gamepad_rumble(uint16_t low_frequency, uint16_t high_frequency);
+/* Each connected PlayStation controller on its own, for split screen: the SDL joystick id
+ * (stable while connected) and its snapshot. Returns how many entries were written. */
+typedef struct CtrGpuGamepadEntry {
+    uint32_t id;
+    CtrGpuGamepad state;
+} CtrGpuGamepadEntry;
+CTR_GPU_API int ctr_gpu_gamepad_list(CtrGpuGamepadEntry* out, int capacity);
+/* Rumble and light bar of one PlayStation controller by id; unknown ids are ignored. */
+CTR_GPU_API void ctr_gpu_gamepad_rumble_one(uint32_t id, uint16_t low_frequency, uint16_t high_frequency);
+CTR_GPU_API void ctr_gpu_gamepad_light(uint32_t id, uint8_t red, uint8_t green, uint8_t blue);
 
 #ifdef __cplusplus
 }

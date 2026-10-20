@@ -40,4 +40,9 @@ VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint,
                                        const std::string& friend_code,
                                        int timeout_ms = 4000);
 
+// A service whose code is not known in advance (public matchmaking candidates): the code the
+// identity answer states, verified against that same answer's signature of a fresh nonce.
+// `code` is set only when the result is Verified.
+VerifyResult identify_endpoint(const std::string& candidate_endpoint, std::string& code, int timeout_ms = 2000);
+
 } // namespace ctr_online

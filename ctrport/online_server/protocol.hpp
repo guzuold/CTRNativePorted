@@ -102,6 +102,7 @@ const char* task_name(unsigned service, std::uint64_t task);
 // Room selector: SHA-256 of "ctr-room-v1\0" + password, hex.
 std::string room_token(const std::string& password);
 bool valid_room_token(const std::string& value);
+const std::string& public_room_token();
 
 // auth3.
 std::uint64_t user_id(const std::string& online_id); // FNV-1a 64, as the runtime reports it

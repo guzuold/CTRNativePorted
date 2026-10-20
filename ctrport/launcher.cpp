@@ -11,7 +11,7 @@
 #include <windows.h>
 #include "online_server/launcher_online.hpp"
 #include "online_server/local_backup.hpp"
-#include "online_server/lobby_actions.hpp"
+#include "online_server/friend_store.hpp"
 #include "online_server/friend_store.hpp"
 #include <commctrl.h>
 #include <dwmapi.h>
@@ -107,7 +107,7 @@ int game_language_index(const std::wstring& code) {
 }
 
 enum : int {
-    ID_GAME_LANGUAGE = 193,
+    ID_GAME_LANGUAGE = 193, ID_SPLIT_SCREEN = 194,
     ID_MINIMIZE = 191, ID_CLOSE,
     ID_XBOX_PROMPTS = 190,
     ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
@@ -134,9 +134,12 @@ struct Config {
     bool online = false;
     bool wumpa_x100 = false;
     bool xbox_prompts = true;
+    bool split_screen = false;
     std::wstring online_id = L"CTRPlayer";
     std::wstring online_server = L"127.0.0.1";
     std::wstring online_friend_code;
+    // Friend code of the server used for public matchmaking; empty: this launcher's own server.
+    std::wstring public_server;
     // Hosting: the project server runs inside the launcher; online_public_ip overrides the
     // address found with UPnP (empty: automatic).
     bool online_host = false;
@@ -312,27 +315,21 @@ struct App {
     HWND upscaler_combo = nullptr;
     HWND patch_browse = nullptr, fps_toggle = nullptr, launch = nullptr, hot = nullptr;
     HWND online_toggle = nullptr, online_id_edit = nullptr;
+    // Friends drawer: the rubrica (runtime/user/online/friends.json) with each friend's presence
+    // from the local service; 110 copies the own code, 111 adds the code typed in 113, 109 removes.
     HWND friends_drawer = nullptr, friends_manage = nullptr;
-    HWND lobby_invite = nullptr, lobby_join = nullptr, lobby_leave = nullptr;
-    std::future<ctr_online::LobbyActionResult> lobby_action;
-    bool lobby_busy = false, lobby_notice_error = false;
-    std::wstring lobby_notice;
-    std::uint64_t lobby_revision = 0, poll_revision = 0;
+    HWND friend_code_edit = nullptr, friend_add = nullptr, friend_remove = nullptr;
+    std::wstring friends_notice;
+    bool friends_notice_error = false;
     bool friends_open = false, friends_animating = false;
     float friends_reveal = 0, friends_from = 0;
     ULONGLONG friends_started = 0;
-    int friends_scroll = 0;
+    int friends_scroll = 0, friends_selected = -1;
     bool lobby_scroll_drag = false;
     float lobby_scroll_grab = 0;
     int lobby_wheel_delta = 0;
-    std::vector<ctr_online::FriendEntry> friends;
+    std::vector<ctr_online::FriendState> friends;
     ctr_online::Host host;
-    ctr_online::PartySelection party;
-    std::future<ctr_online::Json> party_poll;
-    std::string party_poll_owner, party_poll_room;
-    std::wstring party_error;
-    unsigned party_failures = 0;
-    unsigned invite_count = 0;
     bool host_busy = false;           // server starting or stopping in the background
     bool xbox_busy = false;           // Xbox prompt archives being prepared in the background
     bool xbox_ready = false;          // prepared for the launch that requested them
@@ -400,8 +397,9 @@ void load_config() {
             text(L"custom_w", g.cfg.custom_w); text(L"custom_h", g.cfg.custom_h);
             text(L"online_id", g.cfg.online_id); text(L"online_server", g.cfg.online_server); text(L"online_friend_code", g.cfg.online_friend_code);
             text(L"online_public_ip", g.cfg.online_public_ip); flag(L"online_host", g.cfg.online_host);
+            text(L"public_server", g.cfg.public_server);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
-            flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
+            flag(L"split_screen", g.cfg.split_screen); flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
             g.cfg.scene_height = g.cfg.native_4k ? L"2160" : (g.cfg.ps4_pro ? L"1440" : L"1080");
             text(L"scene_height", g.cfg.scene_height);
             text(L"upscaler", g.cfg.upscaler);
@@ -436,7 +434,7 @@ void save_config() {
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
     const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"scene_height\": " + json_string(g.cfg.scene_height) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
-        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) +
+        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) +
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
         ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) + ",\n  \"game_language\": " + json_string(g.cfg.game_language) +
         ",\n  \"online\": " + flag(g.cfg.online) +
@@ -444,6 +442,7 @@ void save_config() {
         ",\n  \"online_id\": " + json_string(g.cfg.online_id) +
         ",\n  \"online_server\": " + json_string(g.cfg.online_server) +
         ",\n  \"online_friend_code\": " + json_string(g.cfg.online_friend_code) +
+        ",\n  \"public_server\": " + json_string(g.cfg.public_server) +
         ",\n  \"online_host\": " + flag(g.cfg.online_host) +
         ",\n  \"online_public_ip\": " + json_string(g.cfg.online_public_ip) + "\n}";
     std::error_code ec;
@@ -657,34 +656,38 @@ void draw_field(Graphics& gr, const RectF& r, HWND edit) {
     stroke_round(gr, r, 10, focused ? kArcadeGold : kArcadeDark, focused ? 3.0f : 2.5f);
 }
 
-// Right-edge lobby drawer: render only the last authenticated host roster.
-// A failed refresh is labelled explicitly; the address book is not presence.
+// Right-edge friends drawer: every friend of the rubrica, with the presence the local service
+// last received from that friend's own service (offline while Online is off).
+fs::path friends_path() { return g.root / "runtime/user/online/friends.json"; }
 void reload_friends() {
-    g.friends.clear();
-    if (const auto* members=g.party.snapshot.find("members")) {
-        for (const auto& member:members->items) {
-            ctr_online::FriendEntry entry;
-            entry.friend_code=member.at("code").text;
-            entry.nickname=member.at("name").text;
-            entry.last_status=entry.friend_code==g.party.owner ? "Host" : "Partecipante";
-            if(entry.friend_code==g.host_status.friend_code) entry.last_status+=" (tu)";
-            g.friends.push_back(entry);
-        }
+    const auto live = g.host.friends();
+    std::vector<ctr_online::FriendState> rows;
+    for (const auto& entry : ctr_online::FriendStore(friends_path()).entries()) {
+        ctr_online::FriendState row;
+        for (const auto& state : live) if (state.code == entry.friend_code) row = state;
+        row.code = entry.friend_code;
+        row.nickname = entry.nickname;
+        rows.push_back(std::move(row));
     }
-    std::stable_sort(g.friends.begin(),g.friends.end(),[](const auto& a,const auto& b) {
-        const auto rank=[](const auto& entry) {
-            return entry.friend_code==g.party.owner ? 0 : entry.friend_code==g.host_status.friend_code ? 1 : 2;
-        };
-        return rank(a)!=rank(b) ? rank(a)<rank(b) : a.nickname<b.nickname;
+    std::stable_sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+        const auto rank = [](const auto& row) { return row.in_game ? 0 : row.online ? 1 : 2; };
+        return rank(a) < rank(b);
     });
+    const std::string selected = g.friends_selected >= 0 && g.friends_selected < static_cast<int>(g.friends.size())
+        ? g.friends[g.friends_selected].code : std::string();
+    g.friends = std::move(rows);
+    g.friends_selected = -1;
+    for (int i = 0; i < static_cast<int>(g.friends.size()); ++i) if (g.friends[i].code == selected) g.friends_selected = i;
     g.friends_scroll = std::clamp(g.friends_scroll, 0, std::max(0, static_cast<int>(g.friends.size()) - 4));
+}
+std::wstring friend_label(const ctr_online::FriendState& row) {
+    return widen(row.name.empty() ? row.nickname : row.name);
 }
 void paint_window(HDC target);
 constexpr UINT_PTR kFriendsTimer = 1;
 constexpr float kFriendsTravel = 320.f;
-void begin_lobby_action(int action);
-void finish_lobby_action();
-void update_lobby_controls();
+void friend_action(int action);
+void update_friend_controls();
 
 RectF lobby_scroll_thumb() {
     const auto count=static_cast<int>(g.friends.size());
@@ -702,15 +705,11 @@ void drag_lobby_scroll(HWND window,float y) {
     }
 }
 
-void update_lobby_controls() {
-    const bool idle=!g.lobby_busy && !g.host_busy && !g.process;
-    const bool ready=g.cfg.online && g.host_status.running && !g.party.room.empty();
-    EnableWindow(g.friends_manage,idle && (!g.cfg.online || (ready && g.party.owner==g.host_status.friend_code)));
-    EnableWindow(g.lobby_join,idle && ready);
-    EnableWindow(g.lobby_leave,idle && ready && g.party.owner!=g.host_status.friend_code);
-    EnableWindow(g.lobby_invite,!g.lobby_busy);
-    SetWindowTextW(g.friends_manage,!g.cfg.online ? L"ATTIVA ONLINE" : L"COPIA INVITO");
-    for(HWND control:{g.friends_manage,g.lobby_join,g.lobby_leave})InvalidateRect(control,nullptr,FALSE);
+void update_friend_controls() {
+    EnableWindow(g.friends_manage, TRUE);
+    EnableWindow(g.friend_add, !g.process);
+    EnableWindow(g.friend_remove, !g.process && g.friends_selected >= 0);
+    for (HWND control : {g.friends_manage, g.friend_add, g.friend_remove}) InvalidateRect(control, nullptr, FALSE);
 }
 constexpr float kFriendsDuration = 320.f;
 
@@ -732,9 +731,9 @@ void position_friends() {
                  px(370), px(530), SWP_NOACTIVATE | SWP_NOCOPYBITS);
     ShowWindow(g.friends_drawer, g.current_tab == TAB_HOME ? SW_SHOWNA : SW_HIDE);
     const bool show=g.current_tab==TAB_HOME && g.friends_open && !g.friends_animating;
-    for(HWND control:{g.friends_manage,g.lobby_invite,g.lobby_join,g.lobby_leave})
+    for(HWND control:{g.friends_manage,g.friend_code_edit,g.friend_add,g.friend_remove})
         ShowWindow(control,show ? SW_SHOWNA : SW_HIDE);
-    update_lobby_controls();
+    update_friend_controls();
     RedrawWindow(g.window, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
 void animate_friends(bool open) {
@@ -761,20 +760,19 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
             return CreateWindowExW(0,L"BUTTON",title,WS_CHILD|WS_TABSTOP|BS_OWNERDRAW,
                 px(x),px(y),px(w),px(32),window,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),nullptr,nullptr);
         };
-        g.friends_manage=button(110,L"COPIA INVITO",50,272,290);
-        g.lobby_invite=CreateWindowExW(0,L"EDIT",L"",WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL,
+        g.friends_manage=button(110,L"COPIA IL MIO CODICE",50,256,290);
+        g.friend_code_edit=CreateWindowExW(0,L"EDIT",L"",WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL,
             px(60),px(330),px(270),px(20),window,reinterpret_cast<HMENU>(113),nullptr,nullptr);
-        SendMessageW(g.lobby_invite,WM_SETFONT,reinterpret_cast<WPARAM>(g.edit_font),FALSE);
-        SendMessageW(g.lobby_invite,EM_SETLIMITTEXT,512,0);
-        SendMessageW(g.lobby_invite,EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(L"Incolla l'invito completo"));
-        g.lobby_join=button(111,L"ENTRA",50,366,140);
-        g.lobby_leave=button(109,L"ESCI",200,366,140);
-        SetTimer(window,2,100,nullptr);
+        SendMessageW(g.friend_code_edit,WM_SETFONT,reinterpret_cast<WPARAM>(g.edit_font),FALSE);
+        SendMessageW(g.friend_code_edit,EM_SETLIMITTEXT,512,0);
+        SendMessageW(g.friend_code_edit,EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(L"Incolla il codice di un amico"));
+        g.friend_add=button(111,L"AGGIUNGI",50,366,140);
+        g.friend_remove=button(109,L"RIMUOVI",200,366,140);
         return 0;
     }
     case WM_COMMAND:
         if(HIWORD(wp)==BN_CLICKED && (LOWORD(wp)==110 || LOWORD(wp)==111 || LOWORD(wp)==109))
-            begin_lobby_action(LOWORD(wp));
+            friend_action(LOWORD(wp));
         if(HIWORD(wp)==EN_SETFOCUS || HIWORD(wp)==EN_KILLFOCUS)InvalidateRect(window,nullptr,FALSE);
         return 0;
     case WM_CTLCOLOREDIT: {
@@ -790,8 +788,7 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
         const bool enabled=(item->itemState & ODS_DISABLED)==0;
         const auto color=!enabled ? kArcadeCardSub : item->CtlID==109 ? kArcadePink : kArcadeCyan;
         fill_round(gr,rect(0,0,width,32),9,SolidBrush(Color(color)));
-        const auto label=item->CtlID==110 ? (!g.cfg.online ? L"ATTIVA ONLINE" : L"COPIA INVITO") :
-            item->CtlID==111 ? L"ENTRA" : L"ESCI";
+        const auto label=item->CtlID==110 ? L"COPIA IL MIO CODICE" : item->CtlID==111 ? L"AGGIUNGI" : L"RIMUOVI";
         text(gr,label,1,12,FontStyleBold,rect(0,0,width,32),enabled ? kArcadeDark : kTextMuted,StringAlignmentCenter);
         if(item->itemState & (ODS_FOCUS|ODS_SELECTED))stroke_round(gr,rect(2,2,width-4,28),7,kArcadeGold,2);
         return TRUE;
@@ -799,7 +796,6 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
     case WM_ERASEBKGND:
         return 1;
     case WM_TIMER:
-        if(wp==2){finish_lobby_action();return 0;}
         if (wp == kFriendsTimer && g.friends_animating) {
             const float elapsed = static_cast<float>(GetTickCount64() - g.friends_started);
             const float progress = std::min(1.f, elapsed / kFriendsDuration);
@@ -821,7 +817,7 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
         break;
     }
     case WM_DESTROY:
-        KillTimer(window, kFriendsTimer);KillTimer(window,2);
+        KillTimer(window, kFriendsTimer);
         return 0;
     case WM_PAINT: {
         PAINTSTRUCT ps{};
@@ -847,7 +843,7 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
             const auto saved = gr.Save();
             gr.TranslateTransform(4,154);
             gr.RotateTransform(-90);
-            text(gr,L"LOBBY",0,16,FontStyleBold,rect(0,0,102,30),kArcadeDark,StringAlignmentCenter);
+            text(gr,L"AMICI",0,16,FontStyleBold,rect(0,0,102,30),kArcadeDark,StringAlignmentCenter);
             gr.Restore(saved);
             if (g.friends_reveal > 0) {
                 fill_round(gr,rect(33,7,330,520),16,SolidBrush(Color(kArcadeDark)));
@@ -855,37 +851,42 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
                 stroke_round(gr,rect(39,2,320,518),16,kArcadeDark,3);
                 Pen highlight(Color(0xFF473B91), 1.f);
                 gr.DrawLine(&highlight, 57.f, 6.f, 346.f, 6.f);
-                text(gr,L"LOBBY",0,22,FontStyleBold,rect(50,14,145,30),kArcadeGold);
-                fill_round(gr,rect(296,18,40,24),6,SolidBrush(Color(kArcadeLime)));
-                text(gr,std::to_wstring(g.friends.size()),1,12,FontStyleBold,rect(296,18,40,24),kArcadeDark,StringAlignmentCenter);
-                const std::wstring lobby_label=!g.cfg.online ? L"Offline" : g.host_busy ? L"Connessione..." :
-                    !g.party_error.empty() ? L"Lobby non raggiungibile" :
-                    g.party.snapshot.find("count") ? L"Lobby "+std::to_wstring(g.party.snapshot.at("count").as_u64())+L"/8" : L"Online non pronto";
-                text(gr,lobby_label,1,11,FontStyleRegular,rect(50,47,290,22),kTextMuted);
+                text(gr,L"AMICI",0,22,FontStyleBold,rect(50,14,145,30),kArcadeGold);
+                std::size_t playing=0;
+                for(const auto& f:g.friends) if(f.online) ++playing;
+                fill_round(gr,rect(286,18,50,24),6,SolidBrush(Color(kArcadeLime)));
+                text(gr,std::to_wstring(playing)+L"/"+std::to_wstring(g.friends.size()),1,12,FontStyleBold,rect(286,18,50,24),kArcadeDark,StringAlignmentCenter);
+                const std::wstring service_label=!g.cfg.online ? L"Online disattivato: amici non raggiungibili" :
+                    g.host_busy ? L"Connessione..." : !g.host_status.running ? L"Servizio online non avviato" :
+                    L"Online. Lo stato si aggiorna da solo.";
+                text(gr,service_label,1,11,FontStyleRegular,rect(50,47,290,22),kTextMuted);
                 if (g.friends.empty()) {
-                    text(gr,L"La tua prossima griglia.\nAttiva Online, condividi un invito\no incolla quello dell'host.",1,13,FontStyleRegular,rect(54,100,280,100),kTextMuted);
+                    text(gr,L"Nessun amico ancora.\nCopia il tuo codice e mandalo a un amico,\npoi incolla qui sotto il suo.",1,13,FontStyleRegular,rect(54,100,280,100),kTextMuted);
                 }
                 for (int row=0; row<4 && row+g.friends_scroll<static_cast<int>(g.friends.size()); ++row) {
-                    const auto& f=g.friends[row+g.friends_scroll];
+                    const int index=row+g.friends_scroll;
+                    const auto& f=g.friends[index];
                     const float y=78.f+row*42.f;
-                    fill_round(gr,rect(49,y,g.friends.size()>4 ? 272.f : 291.f,38),10,SolidBrush(Color(kArcadeBg)));
-                    fill_round(gr,rect(57,y+5,28,28),9,SolidBrush(Color(row%2 ? kArcadeCyan : kArcadeGold)));
-                    const auto name=widen(f.nickname);
+                    const float width=g.friends.size()>4 ? 272.f : 291.f;
+                    fill_round(gr,rect(49,y,width,38),10,SolidBrush(Color(kArcadeBg)));
+                    if(index==g.friends_selected) stroke_round(gr,rect(49,y,width,38),10,kArcadeGold,2);
+                    const auto dot=f.in_game ? kArcadeLime : f.online ? kArcadeCyan : kTextOff;
+                    fill_round(gr,rect(57,y+5,28,28),9,SolidBrush(Color(dot)));
+                    const auto name=friend_label(f);
                     text(gr,name.substr(0,1),0,17,FontStyleBold,rect(57,y+5,28,28),kArcadeDark,StringAlignmentCenter);
                     text(gr,name,1,13,FontStyleBold,rect(96,y+1,215,20),kTextLight);
-                    text(gr,f.last_status.empty() ? L"Mai contattato" : widen(f.last_status),1,10,FontStyleRegular,rect(96,y+20,215,16),kTextMuted);
+                    const std::wstring status=f.in_game ? L"In gioco" : f.online ? L"Online (gioco chiuso)" :
+                        f.name.empty() && g.host_status.running ? L"Offline \u00b7 deve aggiungere il tuo codice" : L"Offline";
+                    text(gr,status,1,10,FontStyleRegular,rect(96,y+20,215,16),f.in_game ? kArcadeLime : kTextMuted);
                 }
                 if(g.friends.size()>4) {
                     fill_round(gr,rect(327,76,14,168),7,SolidBrush(Color(kArcadeDark)));
                     fill_round(gr,lobby_scroll_thumb(),5,SolidBrush(Color(g.lobby_scroll_drag ? kArcadeGold : kArcadeCyan)));
                 }
-                text(gr,L"INVITO STANZA",1,10,FontStyleBold,rect(52,307,288,16),kTextMuted);
-                draw_field(gr,rect(50,324,290,32),g.lobby_invite);
-                const std::wstring feedback=g.lobby_busy ? L"Collegamento in corso..." :
-                    !g.party_error.empty() ? L"Ultimo elenco ricevuto. "+g.party_error : g.lobby_notice;
-                text(gr,feedback,1,11,FontStyleRegular,rect(52,410,286,54),
-                     !g.party_error.empty() || g.lobby_notice_error ? kArcadePink : kArcadeLime);
-                text(gr,L"Nel gioco: Online > Matchmaking\n> Go to Lobby. Restate nella stessa stanza.",1,10,FontStyleRegular,rect(52,474,286,34),kTextMuted);
+                text(gr,L"AGGIUNGI UN AMICO",1,10,FontStyleBold,rect(52,307,288,16),kTextMuted);
+                draw_field(gr,rect(50,324,290,32),g.friend_code_edit);
+                text(gr,g.friends_notice,1,11,FontStyleRegular,rect(52,410,286,54),g.friends_notice_error ? kArcadePink : kArcadeLime);
+                text(gr,L"Gli amici compaiono nella lista amici del gioco:\ninvitali dal menu Online del gioco.",1,10,FontStyleRegular,rect(52,474,286,34),kTextMuted);
             }
         }
         BitBlt(target,0,0,px(370),px(530),dc,0,0,SRCCOPY);
@@ -898,6 +899,14 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
     case WM_LBUTTONDOWN: {
         const float x=static_cast<float>(static_cast<short>(LOWORD(lp)))/g.scale;
         const float y=static_cast<float>(static_cast<short>(HIWORD(lp)))/g.scale;
+        if(g.friends_open && !g.friends_animating && x>=49 && x<(g.friends.size()>4 ? 321.f : 340.f) && y>=78 && y<246) {
+            const int row=static_cast<int>((y-78.f)/42.f);
+            const int index=row+g.friends_scroll;
+            if(row<4 && std::fmod(y-78.f,42.f)<38.f && index<static_cast<int>(g.friends.size())) {
+                g.friends_selected=index==g.friends_selected ? -1 : index;
+                update_friend_controls();InvalidateRect(window,nullptr,FALSE);return 0;
+            }
+        }
         if(g.friends_open && !g.friends_animating && g.friends.size()>4 && x>=324 && x<=344 && y>=76 && y<=244) {
             const auto thumb=lobby_scroll_thumb();
             g.lobby_scroll_grab=y>=thumb.Y && y<=thumb.GetBottom() ? y-thumb.Y : thumb.Height/2;
@@ -1035,12 +1044,13 @@ void paint_window(HDC target) {
                 draw_field(gr, rect(548, 252, 190, 32), g.online_id_edit);
                 text(gr, L"Name displayed in races\n(3–16 characters)", 1, 10.0f, FontStyleRegular, rect(548, 288, 190, 28), kTextMuted);
 
-                text(gr,L"Home > LOBBY.\nEntrate nella stessa stanza,\npoi Matchmaking nel gioco.\nMassimo 8 giocatori.",1,12,FontStyleRegular,rect(548,334,190,90),kTextMuted);
+                text(gr, L"Friends:", 1, 11.5f, FontStyleBold, rect(548, 326, 190, 18), kTextMuted);
+                text(gr,L"Add them in Home > AMICI by code.\nInvite them from the game's\nOnline menu.",1,10,FontStyleRegular,rect(548,348,190,44),kTextMuted);
                 text(gr,L"Rewards: next game launch",1,10,FontStyleRegular,rect(548,458,190,22),kTextMuted);
                 text(gr,g.cfg.online ? L"ONLINE" : L"OFFLINE",0,18,FontStyleBold,rect(548,490,190,28),g.cfg.online ? kArcadeLime : kTextMuted);
 
                 // Card 3: CONTROLLER & AUDIO
-                const RectF c_card = rect(768, 126, 222, 142);
+                const RectF c_card = rect(768, 126, 222, 166);
                 fill_round(gr, c_card, 18, SolidBrush(Color(kArcadeCard)));
                 stroke_round(gr, c_card, 18, kArcadeDark, 3.0f);
                 text(gr, L"CONTROLLER", 0, 18.0f, FontStyleBold, rect(784, 142, 190, 24), kArcadePink);
@@ -1048,14 +1058,14 @@ void paint_window(HDC target) {
                 text(gr, L"XInput / SDL controller\nConfigure controls in the game", 1, 11.0f, FontStyleRegular, rect(784, 196, 190, 36), kTextLight);
 
 
-                fill_round(gr, rect(768, 282, 222, 294), 18, SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr, rect(768, 282, 222, 294), 18, kArcadeDark, 3);
+                fill_round(gr, rect(768, 302, 222, 274), 18, SolidBrush(Color(kArcadeCard)));
+                stroke_round(gr, rect(768, 302, 222, 274), 18, kArcadeDark, 3);
 
                 text(gr, L"Game language (next launch):", 1, 11, FontStyleBold, rect(784, 410, 190, 20), kTextMuted);
-                text(gr, L"AUDIO", 0, 18.0f, FontStyleBold, rect(784, 288, 190, 24), kArcadeLime);
-                text(gr, L"Adjust volume in the game", 1, 11.0f, FontStyleRegular, rect(784, 318, 190, 18), kTextLight);
+                text(gr, L"AUDIO", 0, 18.0f, FontStyleBold, rect(784, 308, 190, 24), kArcadeLime);
+                text(gr, L"Adjust volume in the game", 1, 11.0f, FontStyleRegular, rect(784, 334, 190, 18), kTextLight);
                 text(gr, L"Exit: View + Menu (1.2 s)\nThen A: exit / B: cancel", 1, 10.0f, FontStyleRegular, rect(784, 480, 190, 44), kTextLight);
-                text(gr, L"Test: Windows system sound", 1, 11.0f, FontStyleRegular, rect(784, 340, 190, 18), kTextLight);
+                text(gr, L"Test: Windows system sound", 1, 11.0f, FontStyleRegular, rect(784, 350, 190, 18), kTextLight);
             } else if (g.current_tab == TAB_ADVANCED) {
                 text(gr, L"ADVANCED", 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
 
@@ -1330,13 +1340,12 @@ void validate() {
         if (g.cfg.online) {
             const std::wstring id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
             summary += L" · Online (" + (id.empty() ? L"CTRPlayer" : id) + L")";
-            if (g.party.snapshot.find("count")) summary += L" · Lobby " + std::to_wstring(g.party.snapshot.at("count").as_u64()) + L"/8";
         }
         g.global = {summary, 1};
     }
-    EnableWindow(g.online_toggle,!g.process && !g.host_busy && !g.lobby_busy);
+    EnableWindow(g.online_toggle,!g.process && !g.host_busy);
     EnableWindow(g.online_id_edit,!g.process);
-    EnableWindow(g.launch, g.can_launch && !g.lobby_busy);
+    EnableWindow(g.launch, g.can_launch);
     refresh_artwork();
     InvalidateRect(g.window, nullptr, FALSE);
 }
@@ -1444,20 +1453,14 @@ bool copy_to_clipboard(const std::wstring& value) {
     CloseClipboard();if(!ok)GlobalFree(memory);return ok;
 }
 
-ctr_online::Json party_command(const char* action) {
-    auto request=ctr_online::Json::object();request.set("action",ctr_online::Json::of(action));return request;
-}
 void host_toggled(bool = false) {
-    if(g.host_busy || g.lobby_busy) return;
-    ++g.lobby_revision;g.lobby_notice.clear();
+    if(g.host_busy) return;
     g.host_busy=true;
     g.cfg.online_host=g.cfg.online;
-    g.party={};g.party_error.clear();g.invite_count=0;
+    g.friends_notice.clear();
     EnableWindow(g.online_toggle,FALSE);
-    std::thread([start=g.cfg.online,root=g.root,window=g.window] {
-        // Drain the previous room request before stopping or restarting the local service.
-        if(g.party_poll.valid()) g.party_poll.wait();
-        if(start) g.host.start(root,{},true); else g.host.stop();
+    std::thread([start=g.cfg.online,root=g.root,window=g.window,name=narrow(g.cfg.online_id)] {
+        if(start) g.host.start(root,{},true,name); else g.host.stop();
         PostMessageW(window,WM_APP_HOST_READY,start ? 1 : 0,0);
     }).detach();
     validate();
@@ -1465,99 +1468,45 @@ void host_toggled(bool = false) {
 void host_ready(bool started) {
     g.host_busy=false;EnableWindow(g.online_toggle,TRUE);
     g.host_status=g.host.status();
-    if(started && g.host_status.running) {
-        try {
-            auto req=party_command("configure");req.set("name",ctr_online::Json::of(narrow(g.cfg.online_id)));
-            auto response=ctr_online::party_request(g.root,"127.0.0.1",g.host_status.friend_code,req);
-            g.party={"127.0.0.1",g.host_status.friend_code,response.at("room").text,response};
-            SetTimer(g.window,20,1000,nullptr);
-        } catch(const std::exception& e) {g.party_error=widen(e.what());}
-    } else if(started) g.party_error=widen(g.host_status.error);
-    if(!g.party_error.empty() && g.current_tab==TAB_HOME)animate_friends(true);
-    update_lobby_controls();
-    reload_friends();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
-}
-void begin_lobby_action(int action) {
-    if(g.lobby_busy || g.host_busy || g.process)return;
-    if(!g.cfg.online) {
-        if(action==110){g.cfg.online=true;host_toggled(true);update_lobby_controls();}
-        return;
+    if(started && !g.host_status.running) {
+        g.friends_notice=widen(g.host_status.error);g.friends_notice_error=true;
+        if(g.current_tab==TAB_HOME)animate_friends(true);
     }
-    if(!g.host_status.running || g.party.room.empty()) {
-        g.lobby_notice=L"Online non pronto. Disattiva e riattiva Online in Settings.";
-        g.lobby_notice_error=true;InvalidateRect(g.friends_drawer,nullptr,FALSE);return;
-    }
-    g.lobby_busy=true;g.lobby_notice.clear();g.lobby_notice_error=false;++g.lobby_revision;
-    const auto invitation=narrow(window_text(g.lobby_invite));
-    g.lobby_action=std::async(std::launch::async,[root=g.root,self=g.host_status.friend_code,
-        name=narrow(g.cfg.online_id),ip=g.host_status.public_ip,selection=g.party,invitation,action] {
-        return ctr_online::lobby_action(root,self,name,ip,selection,invitation,action);
-    });
-    update_lobby_controls();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
+    reload_friends();update_friend_controls();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
 }
-void finish_lobby_action() {
-    if(!g.lobby_busy || !g.lobby_action.valid() ||
-       g.lobby_action.wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;
-    const auto result=g.lobby_action.get();g.lobby_busy=false;
-    if(!result.ok){g.lobby_notice=widen(result.detail);g.lobby_notice_error=true;}
-    else if(result.action==110) {
-        SetWindowTextW(g.lobby_invite,widen(result.detail).c_str());
-        const bool copied=copy_to_clipboard(widen(result.detail));g.lobby_notice_error=!copied;
-        g.lobby_notice=copied ? L"Invito copiato! Valido 15 minuti. Un nuovo invito revoca il precedente." :
-            L"Appunti occupati. Copia l'invito dal campo sopra.";
-    } else {
-        g.party=result.party;g.party_error.clear();g.party_failures=0;reload_friends();
-        SetWindowTextW(g.lobby_invite,L"");
-        g.lobby_notice=result.action==109 ? L"Sei nella tua stanza. Condividi un invito per riunire i giocatori." :
-            L"Sei nella lobby. Quando siete pronti, avviate il gioco.";
-    }
-    update_lobby_controls();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
-}
-void poll_party() {
-    if(g.host_busy || g.lobby_busy || !g.cfg.online || !g.host_status.running || g.party.owner.empty()) return;
-    if(g.party_poll.valid()) {
-        if(g.party_poll.wait_for(std::chrono::seconds(0))!=std::future_status::ready) return;
-        try {
-            auto response=g.party_poll.get();
-            if(g.poll_revision!=g.lobby_revision || g.party_poll_owner!=g.party.owner || g.party_poll_room!=g.party.room) return;
-            g.party.snapshot=response.at("party");
-            if(const auto* recovered=response.find("recovered_owner")) {
-                g.party.owner=recovered->text;g.party.ip=response.at("recovered_ip").text;
-                ++g.lobby_revision;
-                g.lobby_notice=L"Stanza trasferita automaticamente a un partecipante.";
-                g.lobby_notice_error=false;update_lobby_controls();validate();
-            }
-            g.party_failures=0;
-            reload_friends();
-            g.party_error.clear();
-            if (const auto* error = g.party.snapshot.find("backup_error")) g.party_error = widen(error->text);
-        } catch(const std::exception& e) {
-            if(g.poll_revision==g.lobby_revision && g.party_poll_owner==g.party.owner && g.party_poll_room==g.party.room) {
-                g.party_error=widen(e.what());if(g.party_failures<3)++g.party_failures;
-            }
+// 110: copy the own friend code; 111: add the code typed in the drawer; 109: remove the selected friend.
+void friend_action(int action) {
+    g.friends_notice_error=false;
+    if(action==110) {
+        const auto own=g.host_status.friend_code.empty() ? ctr_online::local_friend_code(g.root) : g.host_status.friend_code;
+        const bool copied=!own.empty() && copy_to_clipboard(widen(own));
+        g.friends_notice=copied ? L"Codice copiato. Mandalo al tuo amico: dovete aggiungervi a vicenda." :
+            L"Impossibile copiare il codice. Riprova.";
+        g.friends_notice_error=!copied;
+    } else if(action==111) {
+        auto code=narrow(window_text(g.friend_code_edit));
+        code.erase(0,code.find_first_not_of(" \t\r\n"));code.erase(code.find_last_not_of(" \t\r\n")+1);
+        ctr_online::FriendCodeInfo info;
+        std::string error;
+        if(ctr_online::parse_friend_code(code,info)!=ctr_online::CodeParseError::Ok) {
+            g.friends_notice=L"Codice amico non valido.";g.friends_notice_error=true;
+        } else if(info.code==ctr_online::local_friend_code(g.root)) {
+            g.friends_notice=L"Questo e il tuo codice.";g.friends_notice_error=true;
+        } else if(!ctr_online::FriendStore(friends_path()).add_or_update(info.code,"",&error)) {
+            g.friends_notice=widen(error);g.friends_notice_error=true;
+        } else {
+            SetWindowTextW(g.friend_code_edit,L"");
+            g.friends_notice=L"Amico aggiunto. Lo vedrai online quando anche lui avra aggiunto il tuo codice.";
         }
-        InvalidateRect(g.friends_drawer,nullptr,FALSE);
-        return;
+    } else if(action==109 && g.friends_selected>=0 && g.friends_selected<static_cast<int>(g.friends.size())) {
+        const auto row=g.friends[g.friends_selected];
+        const auto question=L"Rimuovere "+friend_label(row)+L" dagli amici?";
+        if(MessageBoxW(g.window,question.c_str(),kTitle,MB_YESNO|MB_ICONQUESTION)!=IDYES) return;
+        ctr_online::FriendStore(friends_path()).remove(row.code);
+        g.friends_selected=-1;
+        g.friends_notice=friend_label(row)+L" rimosso dagli amici.";
     }
-    static ULONGLONG last=0;
-    if(GetTickCount64()-last<3000) return;
-    last=GetTickCount64();
-    g.poll_revision=g.lobby_revision;
-    g.party_poll_owner=g.party.owner;g.party_poll_room=g.party.room;
-    char option[2]{};
-    const bool migration=GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",option,2)==1 && option[0]=='1';
-    g.party_poll=std::async(std::launch::async,[root=g.root,selection=g.party,failures=g.party_failures,migration] {
-        auto response=ctr_online::Json::object();
-        try {response.set("party",ctr_online::party_request(root,selection.ip,selection.owner,party_command("heartbeat")));}
-        catch(const std::exception&) {
-            if(!migration || failures<2)throw;
-            const auto recovered=ctr_online::recover_party(root,selection);
-            response.set("party",recovered.snapshot);
-            response.set("recovered_owner",ctr_online::Json::of(recovered.owner));
-            response.set("recovered_ip",ctr_online::Json::of(recovered.ip));
-        }
-        return response;
-    });
+    reload_friends();update_friend_controls();InvalidateRect(g.friends_drawer,nullptr,FALSE);
 }
 
 // Launching ctrport.exe
@@ -1631,7 +1580,7 @@ void xbox_prompts_ready(std::wstring* raw_error) {
 
 void launch_game() {
     validate();
-    if (!g.can_launch || g.process || g.xbox_busy || g.lobby_busy) return;
+    if (!g.can_launch || g.process || g.xbox_busy) return;
     if (g.cfg.upscaler == L"dlss" &&
         (!fs::exists(g.runtime_exe.parent_path() / "ctr_dlss.dll") ||
          !fs::exists(g.runtime_exe.parent_path() / "nvngx_dlss.dll"))) {
@@ -1665,6 +1614,7 @@ void launch_game() {
     std::map<std::wstring, std::wstring> set{{L"CTR_GPU_LIBRARY", L"1"}, {L"CTR_TLS_PATCH", L"1"}, {L"CTR_GPU_LOG", L"error"},
                                              {L"CTR_NO_FRAME_OBSERVATION", L"1"}, {L"CTR_BASE_DIR", base.wstring()}};
     set[L"CTR_SYSTEM_LANGUAGE"] = std::to_wstring(kGameLanguages[game_language_index(g.cfg.game_language)].system_id);
+    set[L"CTR_SPLIT_SCREEN"] = g.cfg.split_screen ? L"1" : L"0";
     set[L"CTR_XBOX_PROMPTS"] = g.cfg.xbox_prompts ? L"1" : L"0";
     set[L"CTR_WUMPA_MULTIPLIER"] = g.cfg.wumpa_x100 ? L"100" : L"1";
     set[L"CTR_ONLINE_ID"] = g.cfg.online_id; // Display name applies to offline sessions too.
@@ -1678,18 +1628,16 @@ void launch_game() {
     if (g.cfg.fullscreen) set[L"CTR_GPU_FULLSCREEN"] = L"1";
     else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
     if (g.cfg.online) {
-        if(g.host_busy || !g.host_status.running || g.party.room.empty()) {
-            g.lock.release();g.lobby_notice=L"Attendi la connessione Online prima di avviare il gioco.";
-            g.lobby_notice_error=true;animate_friends(true);return;
+        if(g.host_busy || !g.host_status.running) {
+            g.lock.release();g.friends_notice=L"Attendi la connessione Online prima di avviare il gioco.";
+            g.friends_notice_error=true;animate_friends(true);return;
         }
         try {
-            // Fresh membership and signed server identity before retail authentication.
-            auto req=party_command(g.party.owner==g.host_status.friend_code ? "configure" : "join");
-            req.set("name",ctr_online::Json::of(narrow(g.cfg.online_id)));
-            auto response=ctr_online::party_request(g.root,g.party.ip,g.party.owner,req);
-            g.party.room=response.at("room").text;g.party.snapshot=response;
-            const auto verified=ctr_online::verify_candidate_endpoint(g.party.ip+":8780",g.party.owner);
-            if(verified.status!=ctr_online::VerifyStatus::Verified) throw std::runtime_error("Identita del server non verificata");
+            // The game always talks to this PC's own service, which reaches friends' services
+            // and the public matchmaking by itself.
+            const std::string server_ip="127.0.0.1";
+            const auto verified=ctr_online::verify_candidate_endpoint(server_ip+":8780",g.host_status.friend_code);
+            if(verified.status!=ctr_online::VerifyStatus::Verified) throw std::runtime_error("Identita del servizio locale non verificata");
             const auto online_dir=g.root / "runtime/user/online";
             fs::create_directories(online_dir);
             const auto key_path=online_dir / "party_traffic_key.der";
@@ -1697,12 +1645,11 @@ void launch_game() {
             key.write(reinterpret_cast<const char*>(verified.traffic_key.data()),static_cast<std::streamsize>(verified.traffic_key.size()));
             key.close();if(!key) throw std::runtime_error("Impossibile salvare la chiave della lobby");
             set[L"CTR_ONLINE"]=L"1";
-            set[L"CTR_ONLINE_ROOM_TOKEN"]=widen(g.party.room);
-            set[L"CTR_ONLINE_SERVER"]=widen(g.party.ip);
+            set[L"CTR_ONLINE_SERVER"]=widen(server_ip);
             set[L"CTR_ONLINE_TRAFFIC_KEY"]=key_path.wstring();
             set[L"CTR_ONLINE_PORT_OFFSET"]=std::to_wstring(ctr_online::kHostGamePortOffset);
         } catch(const std::exception& e) {
-            g.lock.release();g.lobby_notice=widen(e.what());g.lobby_notice_error=true;
+            g.lock.release();g.friends_notice=widen(e.what());g.friends_notice_error=true;
             animate_friends(true);return;
         }
     }
@@ -1739,16 +1686,12 @@ void launch_game() {
     g.process = info.hProcess;
     InvalidateRect(g.launch, nullptr, FALSE);
     ShowWindow(g.window, SW_HIDE);
-    std::thread([process = info.hProcess, window = g.window, root = g.root, selection = g.party, online = g.cfg.online] {
+    std::thread([process = info.hProcess, window = g.window, root = g.root] {
         WaitForSingleObject(process, INFINITE);
         DWORD code = 0;
         GetExitCodeProcess(process, &code);
         try {
             ctr_online::backup_savedata(root, "after_exit");
-            if (online) {
-                auto response = ctr_online::party_request(root, selection.ip, selection.owner, party_command("heartbeat"));
-                if (const auto* error = response.find("backup_error")) throw std::runtime_error(error->text);
-            }
         } catch (const std::exception& error) {
             MessageBoxW(window, (L"Local backup incomplete:\n" + widen(error.what())).c_str(), kTitle, MB_ICONWARNING);
         }
@@ -1897,6 +1840,7 @@ void create_controls() {
 
     // Controller & Audio (Card 3)
     add_button(ID_XBOX_PROMPTS, Kind::Toggle, rect(784, 234, 190, 26), L"Colored Xbox icons", &g.cfg.xbox_prompts, -1, TAB_SETTINGS);
+    add_button(ID_SPLIT_SCREEN, Kind::Toggle, rect(784, 262, 190, 26), L"Split screen (2-4)", &g.cfg.split_screen, -1, TAB_SETTINGS);
     add_button(ID_AUDIO_TEST, Kind::ActionBtn, rect(784, 372, 190, 34), L"Test audio", nullptr, -1, TAB_SETTINGS);
 
     g.language_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
@@ -1933,8 +1877,10 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         friends_class.lpszClassName = L"CTRFriendsDrawer";
         friends_class.hCursor = LoadCursorW(nullptr, IDC_HAND);
         RegisterClassW(&friends_class);
-        g.friends_drawer = CreateWindowExW(WS_EX_CONTROLPARENT, friends_class.lpszClassName, L"Lobby: apri o chiudi partecipanti",
+        g.friends_drawer = CreateWindowExW(WS_EX_CONTROLPARENT, friends_class.lpszClassName, L"Amici: apri o chiudi la lista",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,0,0,0,0,window,nullptr,friends_class.hInstance,nullptr);
+        SetTimer(window,20,1000,nullptr); // friends' presence, fonts
+        reload_friends();
         position_friends();
         select_tab(TAB_HOME);
         select_resolution(g.resolution);
@@ -1970,7 +1916,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     }
     case WM_COMMAND: {
         const int id = LOWORD(wparam), code = HIWORD(wparam);
-        if(id==IDOK && GetFocus()==g.lobby_invite){begin_lobby_action(111);return 0;}
+        if(id==IDOK && GetFocus()==g.friend_code_edit){friend_action(111);return 0;}
         if(id==IDCANCEL && g.friends_open){animate_friends(false);return 0;}
         if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) { launch_game(); return 0; }
         if (id == ID_SCENE_RES && code == CBN_SELCHANGE) {
@@ -2070,7 +2016,11 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 0;
     }
     case WM_TIMER:
-        if(wparam==20) { poll_party(); poll_fonts(); }
+        if(wparam==20) {
+            reload_friends();
+            if(g.friends_open) InvalidateRect(g.friends_drawer,nullptr,FALSE);
+            poll_fonts();
+        }
         return 0;
     case WM_APP_FINISHED:
         game_finished(static_cast<DWORD>(wparam));
@@ -2082,10 +2032,9 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         xbox_prompts_ready(reinterpret_cast<std::wstring*>(lparam));
         return 0;
     case WM_CLOSE:
-        if (g.process || g.host_busy || g.xbox_busy || g.lobby_busy) return 0;
+        if (g.process || g.host_busy || g.xbox_busy) return 0;
         save_config();
         KillTimer(window,20);
-        if(g.party_poll.valid()) g.party_poll.wait();
         g.host.stop(); // closes the router ports opened for hosting
         DestroyWindow(window);
         return 0;

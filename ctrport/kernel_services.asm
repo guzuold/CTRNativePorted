@@ -2620,6 +2620,37 @@ ctr_sysv_pad_set_vibration PROC
     add rsp, 40
     ret
 ctr_sysv_pad_set_vibration ENDP
+EXTERN ctr_pad_set_light_bar:PROC
+PUBLIC ctr_sysv_pad_set_light_bar
+ctr_sysv_pad_set_light_bar PROC
+    mov r8, [rsp]
+    mov rdx, rsi
+    mov ecx, edi
+    sub rsp, 40
+    call ctr_pad_set_light_bar
+    add rsp, 40
+    ret
+ctr_sysv_pad_set_light_bar ENDP
+EXTERN ctr_pad_close:PROC
+PUBLIC ctr_sysv_pad_close
+ctr_sysv_pad_close PROC
+    mov rdx, [rsp]
+    mov ecx, edi
+    sub rsp, 40
+    call ctr_pad_close
+    add rsp, 40
+    ret
+ctr_sysv_pad_close ENDP
+EXTERN ctr_pad_reset_light_bar:PROC
+PUBLIC ctr_sysv_pad_reset_light_bar
+ctr_sysv_pad_reset_light_bar PROC
+    mov rdx, [rsp]
+    mov ecx, edi
+    sub rsp, 40
+    call ctr_pad_reset_light_bar
+    add rsp, 40
+    ret
+ctr_sysv_pad_reset_light_bar ENDP
 
 EXTERN ctr_condition_destroy:PROC
 PUBLIC ctr_sysv_condition_destroy

@@ -38,7 +38,8 @@ std::vector<PortRequest> host_ports(std::uint16_t http_port, std::uint16_t disco
 Host::Host() = default;
 Host::~Host() { stop(); }
 
-HostStatus Host::start(const std::filesystem::path& root, const std::string& manual_public_ip, bool use_upnp) {
+HostStatus Host::start(const std::filesystem::path& root, const std::string& manual_public_ip, bool use_upnp,
+                       const std::string& local_name) {
     stop();
     HostStatus status;
     status.lan_ip = local_lan_address();
@@ -69,6 +70,34 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
     config.state_dir = root / "runtime" / "user" / "online";
     config.log_path = default_log_path(root);
     config.identity_path = root / "runtime" / "user" / "identity" / "host_identity.json";
+    config.friend_network = true;
+    config.local_name = local_name;
+    config.match_hub = [this] { return match_hub(); };
+    // A friend's service: its last verified endpoint, else a DHT lookup (at most once a minute per
+    // friend, so offline friends do not keep the DHT busy). A found endpoint is saved in the rubrica.
+    const fs::path friends_path = config.state_dir / "friends.json";
+    auto attempts = std::make_shared<std::pair<std::mutex, std::map<std::string, std::uint64_t>>>();
+    config.friend_resolver = [this, root, friends_path, attempts](const std::string& code)
+        -> std::optional<std::pair<std::string, std::uint16_t>> {
+        for (const auto& entry : FriendStore(friends_path).entries()) {
+            if (entry.friend_code != code || entry.last_endpoint.empty()) continue;
+            const auto known = verify_candidate_endpoint(entry.last_endpoint, code, 1000);
+            if (known.status == VerifyStatus::Verified) return std::make_pair(known.ip, known.port);
+        }
+        {
+            std::lock_guard<std::mutex> lock(attempts->first);
+            auto& last = attempts->second[code];
+            const auto now = party_now();
+            if (last && now - last < 60) return std::nullopt;
+            last = now;
+        }
+        DhtService* shared = dht();
+        if (!shared) return std::nullopt;
+        const auto found = find_friend_server(root, code, 6000, 2000, {}, shared);
+        if (found.status != VerifyStatus::Verified) return std::nullopt;
+        FriendStore(friends_path).update_endpoint(code, found.ip + ":" + std::to_string(found.port), "Server verificato");
+        return std::make_pair(found.ip, found.port);
+    };
     status.log = config.log_path;
     auto server = std::make_unique<Server>(config);
     auto dht = std::make_unique<DhtService>();
@@ -97,6 +126,8 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
             if (const auto* ident = server->host_identity()) {
                 dht->set_announce(ident->dht_info_hash(), 8780);
             }
+            // Only a service the internet can reach may host public matchmaking for others.
+            if (status.address_source != "lan") dht->add_announce(public_matchmaking_key(), 8780);
         }
         status.running = true;
     } catch (const std::exception& error) {
@@ -106,15 +137,78 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
         status_ = status;
         return status;
     }
-    std::lock_guard<std::mutex> lock(mutex_);
-    server_ = std::move(server);
-    mapper_ = std::move(mapper);
-    dht_ = std::move(dht);
-    status_ = status;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        server_ = std::move(server);
+        mapper_ = std::move(mapper);
+        dht_ = std::move(dht);
+        status_ = status;
+    }
+    {
+        std::lock_guard<std::mutex> lock(hub_mutex_);
+        hub_stop_ = false;
+        hub_.reset();
+    }
+    hub_thread_ = std::thread([this, root, self = MatchHub{status.friend_code, status.public_ip, 8780},
+                               reachable = status.address_source != "lan"] { elect_hubs(root, self, reachable); });
     return status;
 }
 
+Bytes public_matchmaking_key() {
+    const Bytes digest = sha256(bytes_of("ctr-public-matchmaking-v1"));
+    return Bytes(digest.begin(), digest.begin() + 20);
+}
+
+std::optional<MatchHub> choose_hub(const MatchHub& self, bool self_reachable, const std::vector<MatchHub>& verified) {
+    std::optional<MatchHub> best;
+    if (self_reachable) best = self;
+    for (const MatchHub& candidate : verified)
+        if (candidate.code != self.code && (!best || candidate.code < best->code)) best = candidate;
+    return best;
+}
+
+std::optional<MatchHub> Host::match_hub() const {
+    std::lock_guard<std::mutex> lock(hub_mutex_);
+    return hub_;
+}
+
+// Every minute (sooner while no hub is known): the services announced on the public
+// matchmaking key, each verified by its own identity answer, and the elected hub.
+void Host::elect_hubs(std::filesystem::path root, MatchHub self, bool self_reachable) {
+    (void)root;
+    auto wait = std::chrono::seconds(3);
+    while (true) {
+        {
+            std::unique_lock<std::mutex> lock(hub_mutex_);
+            if (hub_wake_.wait_for(lock, wait, [this] { return hub_stop_; })) return;
+        }
+        std::vector<MatchHub> verified;
+        // Short timeouts with a stop check per candidate: the launcher stops the host on its UI thread.
+        const auto stopping = [this] { std::lock_guard<std::mutex> lock(hub_mutex_); return hub_stop_; };
+        if (DhtService* shared = dht()) {
+            const auto endpoints = shared->search(public_matchmaking_key(), 3000);
+            for (std::size_t i = 0; i < endpoints.size() && i < 16 && !stopping(); ++i) {
+                std::string code;
+                const VerifyResult result = identify_endpoint(endpoints[i], code, 1500);
+                if (result.status == VerifyStatus::Verified) verified.push_back(MatchHub{code, result.ip, result.port});
+            }
+        }
+        const auto chosen = choose_hub(self, self_reachable, verified);
+        {
+            std::lock_guard<std::mutex> lock(hub_mutex_);
+            hub_ = chosen;
+        }
+        wait = chosen ? std::chrono::seconds(60) : std::chrono::seconds(20);
+    }
+}
+
 void Host::stop() {
+    {
+        std::lock_guard<std::mutex> lock(hub_mutex_);
+        hub_stop_ = true;
+    }
+    hub_wake_.notify_all();
+    if (hub_thread_.joinable()) hub_thread_.join();
     std::unique_ptr<Server> server;
     std::unique_ptr<PortMapper> mapper;
     std::unique_ptr<DhtService> dht;
@@ -125,12 +219,13 @@ void Host::stop() {
         dht = std::move(dht_);
         status_.running = false;
     }
+    // The server first: its friend watcher may be using the DHT for a lookup.
+    if (server) {
+        server->stop();
+    }
     if (dht) {
         dht->clear_announce();
         dht->stop();
-    }
-    if (server) {
-        server->stop();
     }
     if (mapper) mapper->close();
 }
@@ -150,6 +245,10 @@ std::size_t Host::players() const {
 DhtService* Host::dht() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return dht_.get();
+}
+std::vector<FriendState> Host::friends() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return server_ ? server_->friends() : std::vector<FriendState>{};
 }
 
 std::string local_friend_code(const std::filesystem::path& root) {

@@ -176,4 +176,35 @@ VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint,
     return verify_candidate_endpoint(candidate_endpoint, info, timeout_ms);
 }
 
+VerifyResult identify_endpoint(const std::string& candidate_endpoint, std::string& code, int timeout_ms) {
+    VerifyResult res;
+    res.ip = candidate_endpoint;
+    res.port = 8780;
+    const std::size_t colon = candidate_endpoint.rfind(':');
+    if (colon != std::string::npos) {
+        res.ip = candidate_endpoint.substr(0, colon);
+        const int p = std::atoi(candidate_endpoint.substr(colon + 1).c_str());
+        if (p > 0 && p <= 65535) res.port = static_cast<std::uint16_t>(p);
+    }
+    const std::string nonce_hex = hex(random_bytes(16));
+    std::string body;
+    if (http_get(res.ip, res.port, "/ctr/v1/identity?nonce=" + nonce_hex, body, timeout_ms) != 200 || body.empty()) {
+        res.detail = "HTTP GET /ctr/v1/identity failed or timed out";
+        return res;
+    }
+    FriendCodeInfo info;
+    try {
+        if (parse_friend_code(parse_json(body).at("friend_code").text, info) != CodeParseError::Ok) throw std::runtime_error("code");
+    } catch (const std::exception&) {
+        res.status = VerifyStatus::MalformedResponse;
+        res.detail = "Identity answer without a valid friend code";
+        return res;
+    }
+    VerifyResult verified = verify_friend_document(body, info, nonce_hex);
+    verified.ip = res.ip;
+    verified.port = res.port;
+    if (verified.status == VerifyStatus::Verified) code = info.code;
+    return verified;
+}
+
 } // namespace ctr_online
