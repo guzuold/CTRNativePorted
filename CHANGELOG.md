@@ -1,3 +1,17 @@
+## v0.4.2 — 2026-10-20
+
+Automatic friend discovery and presence recovery:
+- Retain DHT searches and late replies by key after a caller times out, including while other keys are being searched. The cache is bounded and expires after two minutes.
+- Preserve announcements when looking up the same matchmaking key; renew announcements every two minutes. A lookup must not change publication into lookup-only mode.
+- Poll discovery again promptly and verify every candidate's identity; an unrelated candidate does not hide a later matching one.
+- Learn a return-address hint from an authenticated friend's incoming presence request. The hint uses the observed source IP and signed contact port; it is saved only after a fresh signed presence response from the expected friend. It does not bypass authentication or require either game to be running.
+- Isolate discovery failures to the affected friend instead of aborting the entire presence round.
+- Serialize and atomically save address-book changes, reloading current entries before mutation so a stale lookup cannot resurrect a removed friend or overwrite a newer update.
+- Log friend_presence_failed and friend_presence_changed for diagnosis.
+
+Upgrade both PCs through Check updates, or follow FIRST_UPDATE.md. Manual IP entry/restoration is not part of the normal recovery flow. Keep runtime/user and existing friend codes. Public DHT bootstrap may take time; the launcher continues collecting results rather than dropping them at the first timeout.
+
+Validation: separate local DHT processes test late results after timeout and publication through a third node; real local peer services test asymmetric discovery, reverse identity verification and remove/re-add recovery. Existing peer signatures, invitation/session and restart checks are also rerun. These checks do not constitute a retail Internet race or prove every NAT/UDP configuration works; UDP gameplay relay is unchanged.
 ## v0.4.1 — 2026-10-20
 
 Friend presence and invitation recovery fixes, including the launcher updater.

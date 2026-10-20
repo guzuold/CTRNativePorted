@@ -1,4 +1,4 @@
-> **v0.4.1:** friend presence/restart and invitation recovery fixes. Upgrade both PCs; see [CHANGELOG.md](CHANGELOG.md) and [FIRST_UPDATE.md](FIRST_UPDATE.md). Internet party joining still needs two-PC validation.
+> **v0.4.2:** automatic DHT and friend-presence recovery, including after remove/re-add. Upgrade both PCs. See CHANGELOG.md and FIRST_UPDATE.md. No manual address restoration is needed in the normal recovery flow.
 
 # CTRNativePorted
 

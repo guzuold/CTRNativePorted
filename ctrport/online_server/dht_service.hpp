@@ -48,7 +48,7 @@ public:
     void clear_announce();
 
     // Further keys announced alongside the main one (e.g. the public matchmaking key), each
-    // renewed every 15 minutes; remove_announce stops renewing one.
+    // renewed every two minutes; remove_announce stops renewing one.
     void add_announce(const Bytes& info_hash_20, std::uint16_t contact_tcp_port);
     void remove_announce(const Bytes& info_hash_20);
 

@@ -73,7 +73,7 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
     config.friend_network = true;
     config.local_name = local_name;
     config.match_hub = [this] { return match_hub(); };
-    // A friend's service: its last verified endpoint, else a DHT lookup (at most once a minute per
+    // A friend's service: its last verified endpoint, else a DHT lookup (at most once per five seconds per
     // friend, so offline friends do not keep the DHT busy). A found endpoint is saved in the rubrica.
     const fs::path friends_path = config.state_dir / "friends.json";
     auto attempts = std::make_shared<std::pair<std::mutex, std::map<std::string, std::uint64_t>>>();
@@ -90,10 +90,10 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
             std::lock_guard<std::mutex> lock(attempts->first);
             auto& last = attempts->second[code];
             const auto now = party_now();
-            if (last && now - last < 60) return std::nullopt;
+            if (last && now - last < 5) return std::nullopt;
             last = now;
         }
-        const auto found = find_friend_server(root, code, 6000, 2000, {}, shared);
+        const auto found = find_friend_server(root, code, 1500, 1500, {}, shared);
         if (found.status != VerifyStatus::Verified) return std::nullopt;
         FriendStore(friends_path).update_endpoint(code, found.ip + ":" + std::to_string(found.port), "Server verificato");
         return std::make_pair(found.ip, found.port);
@@ -331,10 +331,11 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
         } else if (v.status == VerifyStatus::InvalidIdentity) {
             result = v;
             store.update_endpoint(info.code, "", "Identità non valida");
-            return result; // Security: identity mismatch must not be silently ignored
+            continue; // Reject this candidate, but verify the remaining DHT results.
         }
     }
 
+    if (result.status == VerifyStatus::InvalidIdentity) return result;
     result.status = VerifyStatus::NoResponse;
     result.detail = "Candidates contacted but none responded or verified successfully";
     store.update_status(info.code, "Nessuna risposta dai candidati");

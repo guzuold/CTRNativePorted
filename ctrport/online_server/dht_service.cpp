@@ -139,6 +139,7 @@ bool resolve_node(const std::string& endpoint, sockaddr_in& out) {
 
 struct ActiveSearch {
     Bytes info_hash;
+    std::chrono::steady_clock::time_point created = std::chrono::steady_clock::now();
     bool search_started = false;
     std::set<std::string> results;
     bool done = false;
@@ -176,7 +177,8 @@ struct DhtService::Impl {
     struct ExtraAnnounce { std::uint16_t port = 0; std::chrono::steady_clock::time_point last{}; bool due = true; };
     std::map<Bytes, ExtraAnnounce> extra_announces_;
 
-    std::shared_ptr<ActiveSearch> current_search_;
+
+    std::map<Bytes, std::shared_ptr<ActiveSearch>> searches_;
     std::shared_ptr<BootstrapContext> bootstrap_ctx_;
 
     void wake() {
@@ -192,11 +194,15 @@ struct DhtService::Impl {
 
     static void dht_callback(void* closure, int event, const unsigned char* info_hash,
                              const void* data, size_t data_len) {
-        auto* search = static_cast<ActiveSearch*>(closure);
-        if (!search) return;
-        if (!info_hash || search->info_hash.size() != 20 ||
-            std::memcmp(info_hash, search->info_hash.data(), 20) != 0) return;
-
+        auto* self = static_cast<Impl*>(closure);
+        if (!self || !info_hash) return;
+        std::shared_ptr<ActiveSearch> search;
+        {
+            std::lock_guard<std::mutex> lock(self->cmd_mutex_);
+            const auto it = self->searches_.find(Bytes(info_hash, info_hash + 20));
+            if (it == self->searches_.end()) return;
+            search = it->second;
+        }
         std::lock_guard<std::mutex> lock(search->mutex);
         if (event == DHT_EVENT_VALUES) {
             const auto* bytes = static_cast<const unsigned char*>(data);
@@ -303,7 +309,7 @@ struct DhtService::Impl {
         while (running_) {
             // Process pending pings
             std::vector<sockaddr_in> pings;
-            std::shared_ptr<ActiveSearch> search_copy;
+            std::vector<std::shared_ptr<ActiveSearch>> search_commands;
             bool announce_now = false;
             std::vector<std::pair<Bytes, std::uint16_t>> extra_due;
             Bytes announce_h;
@@ -313,10 +319,10 @@ struct DhtService::Impl {
                 std::lock_guard<std::mutex> lock(cmd_mutex_);
                 pings = std::move(pending_pings_);
                 pending_pings_.clear();
-                search_copy = current_search_;
+                for (const auto& item : searches_) search_commands.push_back(item.second);
 
                 const auto now = std::chrono::steady_clock::now();
-                if (have_announce_ && (announce_changed_ || now - last_announce_ > std::chrono::minutes(15))) {
+                if (have_announce_ && (announce_changed_ || now - last_announce_ > std::chrono::minutes(2))) {
                     announce_now = true;
                     announce_changed_ = false;
                     announce_h = announce_hash_;
@@ -324,7 +330,7 @@ struct DhtService::Impl {
                     last_announce_ = now;
                 }
                 for (auto& [hash, extra] : extra_announces_) {
-                    if (!extra.due && now - extra.last < std::chrono::minutes(15)) continue;
+                    if (!extra.due && now - extra.last < std::chrono::minutes(2)) continue;
                     extra.due = false;
                     extra.last = now;
                     extra_due.emplace_back(hash, extra.port);
@@ -340,7 +346,7 @@ struct DhtService::Impl {
             }
             for (const auto& [hash, port] : extra_due) dht_search(hash.data(), static_cast<int>(port), AF_INET, nullptr, nullptr);
 
-            if (search_copy) {
+            for (const auto& search_copy : search_commands) {
                 bool trigger = false;
                 {
                     std::lock_guard<std::mutex> slock(search_copy->mutex);
@@ -350,7 +356,14 @@ struct DhtService::Impl {
                     }
                 }
                 if (trigger) {
-                    dht_search(search_copy->info_hash.data(), 0, AF_INET, dht_callback, search_copy.get());
+                                        // Looking up an announced key must not cancel its publication.
+                    int port = 0;
+                    {
+                        std::lock_guard<std::mutex> lock(cmd_mutex_);
+                        if (have_announce_ && announce_hash_ == search_copy->info_hash) port = announce_port_;
+                        else if (const auto it = extra_announces_.find(search_copy->info_hash); it != extra_announces_.end()) port = it->second.port;
+                    }
+                    dht_search(search_copy->info_hash.data(), port, AF_INET, dht_callback, this);
                 }
             }
 
@@ -379,14 +392,14 @@ struct DhtService::Impl {
                 if (n > 1) { // >1 byte to filter out internal 1-byte wakeups
                     buf[n] = '\0';
                     dht_periodic(buf, static_cast<size_t>(n), reinterpret_cast<sockaddr*>(&from), fromlen,
-                                 &tosleep, search_copy ? dht_callback : nullptr, search_copy.get());
+                                 &tosleep, dht_callback, this);
                 } else {
                     dht_periodic(nullptr, 0, nullptr, 0, &tosleep,
-                                 search_copy ? dht_callback : nullptr, search_copy.get());
+                                 dht_callback, this);
                 }
             } else {
                 dht_periodic(nullptr, 0, nullptr, 0, &tosleep,
-                             search_copy ? dht_callback : nullptr, search_copy.get());
+                             dht_callback, this);
             }
         }
 
@@ -534,41 +547,40 @@ std::vector<std::string> DhtService::search(const Bytes& info_hash_20, int timeo
     std::lock_guard<std::mutex> serial(impl_->search_mutex_);
     if (!impl_->running_ || info_hash_20.size() != 20) return {};
 
-    auto active = std::make_shared<ActiveSearch>();
-    active->info_hash = info_hash_20;
-
+    std::shared_ptr<ActiveSearch> active;
     {
         std::lock_guard<std::mutex> lock(impl_->cmd_mutex_);
-        impl_->current_search_ = active;
-    }
+        const auto now = std::chrono::steady_clock::now();
+        for (auto it = impl_->searches_.begin(); it != impl_->searches_.end();)
+            it = now - it->second->created > std::chrono::minutes(2) ? impl_->searches_.erase(it) : std::next(it);
+        auto it = impl_->searches_.find(info_hash_20);
+        if (it != impl_->searches_.end()) {
+            const auto previous = it->second;
+            std::lock_guard<std::mutex> search_lock(previous->mutex);
+            if (previous->done && previous->results.empty() && now - previous->created > std::chrono::seconds(10))
+                impl_->searches_.erase(it);
+        }
+        if (!impl_->searches_.count(info_hash_20) && impl_->searches_.size() >= 128)
+            impl_->searches_.erase(impl_->searches_.begin());
+        auto& slot = impl_->searches_[info_hash_20];
+        if (!slot) { slot = std::make_shared<ActiveSearch>(); slot->info_hash = info_hash_20; }
+        active = slot;
 
-    // Trigger DHT search in worker thread by queueing an announce with port 0 (search-only)
-    // To ensure thread-safety of dht_search, we trigger worker to call dht_search
-    // We can do this by setting a ping or wake
-    // But dht_search can be invoked in worker_loop!
-    // Let's ensure the worker calls dht_search for the active search
+    }
+    // Timeout ends only the wait, not the search. Late results remain keyed by hash.
     impl_->wake();
 
     std::unique_lock<std::mutex> ulock(active->mutex);
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
 
-    // Initial search command inside worker: we wait a moment for worker to run dht_search
-    // Actually, worker_loop can call dht_search when a new search is set!
-    // Let's allow the worker to trigger dht_search directly.
-    while (!active->done) {
+    // The worker owns all dht_search calls; callers only wait on their own hash.
+    while (!active->done && active->results.empty()) {
         if (active->cv.wait_until(ulock, deadline) == std::cv_status::timeout) {
             break;
         }
         if (!active->results.empty()) {
             // Once we have candidates, we can either return or wait for more
             break;
-        }
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(impl_->cmd_mutex_);
-        if (impl_->current_search_ == active) {
-            impl_->current_search_.reset();
         }
     }
 

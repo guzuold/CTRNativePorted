@@ -1041,6 +1041,12 @@ struct Server::Impl {
                 if (name.rfind("mm_", 0) != 0) {
                     if (!friend_watcher) throw std::runtime_error("Rete amici non attiva");
                     if (!friend_watcher->is_friend(caller)) throw std::runtime_error("Non e nella lista amici");
+                    if (name == "presence") {
+                        const auto* port = request.find("contact_port");
+                        const auto contact = port && port->is_unsigned() ? port->as_u64() : 8780;
+                        if (contact > 0 && contact <= 65535)
+                            friend_watcher->observe_endpoint(caller, peer_address, static_cast<std::uint16_t>(contact));
+                    }
                 }
                 Json response = peer_action(caller, name, request);
                 response.set("nonce", Json::of(nonce->text));
@@ -2066,6 +2072,23 @@ struct Server::Impl {
             friend_watcher = std::make_unique<FriendWatcher>(*host_identity, friends_path,
                 config.friend_resolver ? config.friend_resolver : rubrica_resolver(friends_path), config.friend_poll_period);
             friend_watcher->local_name = [this] { return local_player_name(); };
+            friend_watcher->contact_port = config.http_port;
+            friend_watcher->on_failure = [this](const std::string& code, const std::string& reason) {
+                Json fields = Json::object();
+                fields.set("friend", Json::of(code)); fields.set("reason", Json::of(reason));
+                record("friend_presence_failed", std::move(fields));
+            };
+            friend_watcher->on_change = [this] {
+                Json fields = Json::object(), rows = Json::array();
+                for (const auto& known : friend_watcher->friends()) {
+                    Json row = Json::object();
+                    row.set("friend", Json::of(known.code)); row.set("online", Json::of(known.online));
+                    row.set("in_game", Json::of(known.in_game)); row.set("address", Json::of(known.ip));
+                    rows.items.push_back(std::move(row));
+                }
+                fields.set("friends", rows);
+                record("friend_presence_changed", std::move(fields));
+            };
             friend_watcher->start();
         }
         if (config.match_hub) hub_poller = std::thread([this] { hub_poll_loop(); });
