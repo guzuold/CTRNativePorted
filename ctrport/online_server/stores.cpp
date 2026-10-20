@@ -625,6 +625,7 @@ Json SessionStore::accept(std::uint64_t recipient, const std::string& id, std::u
     if (session == sessions_.end()) throw Rejected("session closed");
     if (const auto* locked = session->second.metadata.find("sessionLockFlag"); locked && locked->boolean)
         throw Rejected("session locked");
+    begin_connection(recipient, it->second.session, now);
     session->second.admitted.insert(recipient);
     it->second.accepted = true;
     Json result = Json::object();
@@ -680,7 +681,8 @@ void SessionStore::leave(std::uint64_t account, const std::string& id) {
     const auto it = sessions_.find(id);
     if (it == sessions_.end()) throw Rejected("unknown session");
     if (it->second.owner == account) { erase(account, id); return; }
-    if (!it->second.members.erase(account)) throw Rejected("not a session member");
+    const bool connecting = connecting_.erase({id, account}) != 0;
+    if (!it->second.members.erase(account) && !connecting) throw Rejected("not a session member");
     it->second.admitted.erase(account);
     it->second.priorities.erase(account);
 }
@@ -688,8 +690,42 @@ void SessionStore::erase(std::uint64_t account, const std::string& id) {
     const auto it = sessions_.find(id);
     if (it == sessions_.end() || it->second.owner != account) throw Rejected("not session owner");
     sessions_.erase(it);
+    for (auto pending = connecting_.begin(); pending != connecting_.end();)
+        pending = pending->first.first == id ? connecting_.erase(pending) : std::next(pending);
     for (auto invite = invitations_.begin(); invite != invitations_.end();)
         invite = invite->second.session == id ? invitations_.erase(invite) : std::next(invite);
+}
+void SessionStore::begin_connection(std::uint64_t account, const std::string& id, std::uint64_t now) {
+    const auto& session = readable(account, id);
+    if (session.members.count(account)) return;
+    if (const auto* locked = session.metadata.find("sessionLockFlag"); locked && locked->boolean)
+        throw Rejected("session locked");
+    if (session.members.size() >= session.metadata.at("sessionMaxUser").as_u64()) throw Rejected("session full");
+    for (auto it = connecting_.begin(); it != connecting_.end();)
+        it = it->second <= now ? connecting_.erase(it) : std::next(it);
+    connecting_[{id, account}] = now + 30;
+}
+std::set<std::uint64_t> SessionStore::connection_peers(std::uint64_t account, std::uint64_t now) const {
+    std::set<std::uint64_t> result;
+    for (const auto& [id, session] : sessions_) {
+        const auto pending = connecting_.find({id, account});
+        if (!session.members.count(account) && (pending == connecting_.end() || pending->second <= now)) continue;
+        for (const auto& [member, name] : session.members) result.insert(member);
+        for (const auto& [key, until] : connecting_)
+            if (key.first == id && until > now) result.insert(key.second);
+    }
+    result.erase(account);
+    return result;
+}
+std::set<std::uint64_t> MatchmakingStore::connection_peers(std::uint64_t account, const std::string& selector) const {
+    std::set<std::uint64_t> result;
+    for (const auto& [id, lobby] : lobbies_) {
+        if (lobby.selector != selector || lobby.departed.count(account) ||
+            std::find(lobby.members.begin(), lobby.members.end(), account) == lobby.members.end()) continue;
+        for (const auto member : lobby.members)
+            if (member != account && !lobby.departed.count(member)) result.insert(member);
+    }
+    return result;
 }
 void SessionStore::replace_attachment(std::uint64_t account, const std::string& id, Part part) {
     const auto it = sessions_.find(id);
@@ -897,6 +933,7 @@ std::uint64_t MatchmakingStore::start_search(const std::vector<Param>& params, s
     const std::string text = dump_json(document);
     for (const Search& s : searches_)
         if (s.account == account && s.selector == selector && s.document == text && s.status == "pending") return s.id;
+    for (auto& [id, lobby] : lobbies_) lobby.departed.insert(account);
     for (Search& s : searches_)
         if (s.account == account && s.status == "pending") s.status = "cancelled";
     while (true) {
@@ -1033,6 +1070,7 @@ bool MatchmakingStore::sync_document(const std::vector<Param>& params, std::uint
     return true;
 }
 void MatchmakingStore::cancel_pending(std::uint64_t account, const std::string& selector) {
+    for (auto& [id, lobby] : lobbies_) if (lobby.selector == selector) lobby.departed.insert(account);
     for (Search& s : searches_)
         if (s.account == account && s.selector == selector && s.status == "pending") s.status = "cancelled";
 }

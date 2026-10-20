@@ -9,7 +9,7 @@
 // Network policy (AGENTS.md, plan R8): the runtime never contacts Sony or Activision. The
 // resolver answers only *.demonware.net (with the project server) and numeric addresses;
 // connect/sendto reach only the project server, loopback, private/link-local/CGNAT ranges,
-// LAN multicast and addresses the project server has handed out (none yet). Everything else
+// LAN multicast and addresses authorized by the current session authority. Everything else
 // fails with EHOSTUNREACH and a log line.
 #pragma once
 #include <cstdint>
@@ -32,7 +32,8 @@ std::uint32_t local_address();
 bool resolve(const char* hostname, std::uint32_t* address, const char** reason);
 // Destination policy for connect/sendto (address in network order): the project server,
 // loopback, private/LAN ranges (unless CTR_ONLINE_STRICT_PEERS=1) and public addresses the
-// project server confirms as players of the same room (GET /ctr/v1/peer-allowed, cached).
+// project server confirms as assigned lobby/session peers (GET /ctr/v1/peer-allowed,
+// cached for at most one second; pending session joins have a short authority lease).
 bool destination_allowed(std::uint32_t address);
 // UDP port of the project server's discovery service. The game sends discovery to the
 // server on the fixed port 3074; when the server runs next to a game on the same PC that port

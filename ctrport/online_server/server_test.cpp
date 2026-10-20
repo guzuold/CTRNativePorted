@@ -272,9 +272,15 @@ int http_request(const std::string& ipv4, std::uint16_t port, const std::string&
 }
 // A request as the game sends it to its local service (identity header, port 28780).
 int game_http(const std::string& ip, const std::string& method, const std::string& path, const std::string& online_id,
-              const std::string& body, std::string& answer, const std::string& content_type = "application/json") {
+              const std::string& body, std::string& answer, const std::string& content_type = "application/json",
+              const std::string& source_ip = "") {
     answer.clear();
     const SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (!source_ip.empty()) {
+        sockaddr_in source{}; source.sin_family = AF_INET;
+        inet_pton(AF_INET, source_ip.c_str(), &source.sin_addr);
+        if (bind(s, reinterpret_cast<const sockaddr*>(&source), sizeof(source)) != 0) { closesocket(s); return 0; }
+    }
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(28780);
@@ -538,7 +544,89 @@ void test_friend_invitation() {
     std::printf("{\"scope\":\"friend_invitation\",\"failures\":%d}\n",failures);
 }
 
+void test_connection_policy() {
+    // Synthetic session contract: retail reads details before posting /members.
+    SessionStore sessions; const auto host = user_id("Host");
+    const std::string meta=R"({"sessionPrivacy":"private","sessionMaxUser":8,"sessionName":"test","availablePlatforms":["PS4"]})";
+    const auto body=bytes_of("--B\r\nContent-Type: application/json\r\nContent-Description: session-request\r\nContent-Length: "+
+        std::to_string(meta.size())+"\r\n\r\n"+meta+"\r\n--B--\r\n");
+    const auto id=sessions.create(host,"multipart/mixed; boundary=B",body).at("sessionId").text;
+    const auto now=party_now();
+    bool refused=false;
+    try {sessions.begin_connection(2,id,now);} catch(...) {refused=true;}
+    check(refused && sessions.connection_peers(2,now).empty(),"transport: private session rejects uninvited player");
+    auto invitation=sessions.invite(host,"Host",id,{2},now).items[0].at("invitationId").text;
+    sessions.accept(2,invitation,now);
+    check(sessions.connection_peers(host,now)==std::set<std::uint64_t>{2} && sessions.connection_peers(2,now)==std::set<std::uint64_t>{host},
+          "transport: accepted invite permits both directions before membership");
+    check(sessions.connection_peers(2,now+30).empty(),"transport: abandoned join expires after 30 seconds");
+    sessions.begin_connection(2,id,now+31);sessions.leave(2,id);
+    check(sessions.connection_peers(host,now+31).empty(),"transport: cancelling a pending join revokes it without member error");
+    sessions.update(host,id,bytes_of(R"({"sessionPrivacy":"public"})"));
+    sessions.begin_connection(3,id,now+32);
+    check(sessions.connection_peers(3,now+32).count(host)==1,"transport: public session join does not require friendship");
+    sessions.join(3,"Guest",id);
+    check(sessions.connection_peers(3,now+100).count(host)==1,"transport: joined member outlives provisional lease");
+    sessions.leave(3,id);
+    check(sessions.connection_peers(host,now+100).empty(),"transport: leaving removes connection authorization");
+    sessions.begin_connection(4,id,now+101);sessions.erase(host,id);
+    check(sessions.connection_peers(4,now+101).empty(),"transport: closing session removes pending authorization");
+
+    // Real signed HTTP requests from distinct loopback addresses; no friend graph.
+    const auto root=std::filesystem::temp_directory_path()/("ctr_transport_"+hex(random_bytes(8)));
+    ServerConfig config;config.host="127.0.0.2";config.http_port=28780;config.discovery_port=28781;
+    config.relay_port=0;config.tcp_record_ports={};config.udp_record_ports={};config.friend_network=true;
+    config.state_dir=root/"hub/runtime/user/online";config.log_path=root/"hub/runtime/user/logs/test.jsonl";
+    Server hub(config);hub.start();
+    auto a=HostIdentity::load_or_create(root/"a/identity.json"),b=HostIdentity::load_or_create(root/"b/identity.json"),
+         c=HostIdentity::load_or_create(root/"c/identity.json");
+    auto call=[&](const HostIdentity& who,const std::string& source,const std::string& name,const char* action,const Bytes& task=Bytes{}) {
+        Json request=Json::object();request.set("action",Json::of(action));request.set("name",Json::of(name));
+        request.set("nonce",Json::of(hex(random_bytes(16))));request.set("to",Json::of(hub.friend_code()));
+        if(!task.empty())request.set("task",Json::of(base64_encode(task)));
+        std::string answer;
+        const int status=game_http(config.host,"POST","/ctr/v1/peer","",dump_json(sign_peer_message(who,request)),answer,"application/json",source);
+        if(status!=200)throw std::runtime_error("hub refused request: "+answer);
+        return verify_peer_message(parse_json(answer),hub.friend_code(),party_now());
+    };
+    auto task=[](unsigned id,const std::string& document="") {
+        Writer w;w.raw(Bytes{145}).u8(id);if(!document.empty())w.string(document);return w.data();
+    };
+    const std::string info=R"({"listen_server":{"local_address":")"+base64_encode(Bytes(67,0))+R"(","security_id":")"+
+        base64_encode(Bytes(8,0))+R"(","security_key":")"+base64_encode(Bytes(16,0))+R"(","nat":1},"dedicated_server":{"build_name":"synthetic"}})";
+    auto enroll=[&](const HostIdentity& who,const std::string& source,const std::string& name,unsigned playlist) {
+        call(who,source,name,"mm_task",task(2,info));
+        const auto reply=base64_decode(call(who,source,name,"mm_task",task(3)).at("reply").text);
+        const auto token=Reader(reply).values().back().value.as_u64();const auto account=std::to_string(user_id(name));
+        const std::string search=R"({"members":[)"+account+R"(],"tokens":[)"+std::to_string(token)+
+            R"(],"lobby_slots":{"min":2,"max":8},"dedicated_server":{"request_level":"not_needed"},"team_balance":{"num_teams":0},"ruleset_payload":{"filter":{"matchmaking_version":200,"playlist_id":)"+
+            std::to_string(playlist)+R"(}},"player_id_to_slots":{")"+account+R"(":0},"performance":{"game_type":1}})";
+        call(who,source,name,"mm_task",task(18,search));
+    };
+    auto peers=[&](const HostIdentity& who,const std::string& source,const std::string& name) {
+        const auto reply=call(who,source,name,"mm_peers");std::set<std::string> ips;
+        for(const auto& ip:reply.at("peers").items)ips.insert(ip.text);return ips;
+    };
+    enroll(a,"127.0.0.21","PlayerA",0);
+    check(peers(a,"127.0.0.21","PlayerA")==std::set<std::string>{"127.0.0.21"},"transport: waiting public player has no remote permission");
+    enroll(c,"127.0.0.23","PlayerC",1);enroll(b,"127.0.0.22","PlayerB",0);
+    check(peers(a,"127.0.0.21","PlayerA")==std::set<std::string>{"127.0.0.21","127.0.0.22"},
+          "transport: assigned nonfriend is authorized before retail join; other playlist excluded");
+    check(peers(b,"127.0.0.22","PlayerB").count("127.0.0.21")==1,"transport: matchmaking authorization is reciprocal");
+    refused=false;try{peers(c,"127.0.0.23","PlayerA");}catch(...){refused=true;}
+    check(refused,"transport: different signed service cannot query another player's assignment");
+    peers(b,"127.0.0.24","PlayerB");
+    const auto moved=peers(a,"127.0.0.21","PlayerA");
+    check(moved.count("127.0.0.24")==1 && !moved.count("127.0.0.22"),"transport: verified source IP change replaces old address");
+    call(b,"127.0.0.24","PlayerB","mm_leave");
+    check(peers(a,"127.0.0.21","PlayerA")==std::set<std::string>{"127.0.0.21"},"transport: departure revokes remote address");
+    enroll(b,"127.0.0.24","PlayerB",1);
+    check(!peers(a,"127.0.0.21","PlayerA").count("127.0.0.24"),"transport: reconnect in another lobby cannot inherit old authorization");
+    hub.stop();std::error_code ignored;std::filesystem::remove_all(root,ignored);
+}
+
 int run_tests(int argc, char* argv[]) {
+    if(argc>=2 && std::string(argv[1])=="--connection-policy-only") {test_connection_policy();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--friend-restart-only") {test_friend_restart();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--peer-only") {test_peer_channel();test_friend_invitation();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--party-migration-only") {test_party_migration_http();return failures ? 1 : 0;}
