@@ -82,6 +82,10 @@ public:
     std::optional<FriendState> by_code(const std::string& code) const;
     std::optional<FriendState> by_account(std::uint64_t account) const;
     bool is_friend(const std::string& code) const;   // in the rubrica now
+    // Hint from a signed, authorized request; never marks the sender online.
+    void observe_endpoint(const std::string& code, const std::string& ip, std::uint16_t port);
+    std::uint16_t contact_port = 8780;
+    std::function<void(const std::string&, const std::string&)> on_failure;
     // Sends an action to a friend's service (endpoint from the last poll or the resolver).
     Json request(const std::string& code, Json payload, int timeout_ms = 3000);
     // Called after a round in which some friend's state changed.
@@ -100,6 +104,7 @@ private:
     std::mutex poll_mutex_;
     mutable std::mutex mutex_;
     std::map<std::string, FriendState> states_;
+    std::map<std::string, std::pair<std::string, std::uint16_t>> observed_;
     std::vector<std::string> order_;
     std::mutex wake_mutex_;
     std::condition_variable wake_;

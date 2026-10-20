@@ -134,8 +134,16 @@ std::optional<std::pair<std::string, std::uint16_t>> FriendWatcher::endpoint_of(
         const auto it = states_.find(code);
         if (it != states_.end() && it->second.online && !it->second.ip.empty())
             return std::make_pair(it->second.ip, it->second.port);
+        if (const auto observed = observed_.find(code); observed != observed_.end())
+            return observed->second;
     }
     return resolver_ ? resolver_(code) : std::nullopt;
+}
+
+void FriendWatcher::observe_endpoint(const std::string& code, const std::string& ip, std::uint16_t port) {
+    if (!port || ip.empty() || !is_friend(code)) return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    observed_[code] = {ip, port};
 }
 
 void FriendWatcher::poll_now() {
@@ -158,11 +166,12 @@ void FriendWatcher::poll_now() {
             }
         }
         if (stopping_) return;
-        if (const auto endpoint = endpoint_of(state.code)) {
-            try {
+        try {
+            if (const auto endpoint = endpoint_of(state.code)) {
                 Json request = Json::object();
                 request.set("action", Json::of("presence"));
                 request.set("name", Json::of(local_name ? local_name() : std::string()));
+                request.set("contact_port", Json::of(static_cast<unsigned>(contact_port)));
                 const Json report = peer_request(self_, endpoint->first, endpoint->second, state.code, request, 2000);
                 state.online = true;
                 state.in_game = report.find("in_game") && report.at("in_game").boolean;
@@ -172,8 +181,19 @@ void FriendWatcher::poll_now() {
                 state.port = endpoint->second;
                 state.seen = party_now();
                 state.report = report;
-            } catch (...) {
+                // Persist only after the expected friend signs a fresh presence response.
+                const std::string address = state.ip + ":" + std::to_string(state.port);
+                if (entry.last_endpoint != address)
+                    FriendStore(friends_path_).update_endpoint(state.code, address, "Server verificato");
+            } else if (on_failure) {
+                on_failure(state.code, "Indirizzo amico non ancora risolto");
             }
+        } catch (const std::exception& error) {
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                observed_.erase(state.code);
+            }
+            if (on_failure) on_failure(state.code, error.what());
         }
         next.push_back(std::move(state));
     }
@@ -193,6 +213,8 @@ void FriendWatcher::poll_now() {
         }
         if (order != order_) changed = renamed = true;
         states_ = std::move(states);
+        for (auto it = observed_.begin(); it != observed_.end();)
+            it = states_.count(it->first) ? std::next(it) : observed_.erase(it);
         order_ = std::move(order);
         if (renamed) {
             Json names = Json::object();

@@ -4,6 +4,8 @@
 #include "json.hpp"
 #include <fstream>
 #include <algorithm>
+#include <windows.h>
+namespace { std::recursive_mutex friend_store_io; }
 
 namespace ctr_online {
 
@@ -14,6 +16,7 @@ FriendStore::FriendStore(const std::filesystem::path& path) : path_(path) {
 }
 
 bool FriendStore::load(const std::filesystem::path& path) {
+    std::lock_guard<std::recursive_mutex> io(friend_store_io);
     std::lock_guard<std::mutex> lock(mutex_);
     path_ = path;
     entries_.clear();
@@ -43,6 +46,7 @@ bool FriendStore::load(const std::filesystem::path& path) {
 }
 
 bool FriendStore::save(const std::filesystem::path& path) const {
+    std::lock_guard<std::recursive_mutex> io(friend_store_io);
     std::lock_guard<std::mutex> lock(mutex_);
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
@@ -59,10 +63,13 @@ bool FriendStore::save(const std::filesystem::path& path) const {
         root.items.push_back(std::move(item));
     }
 
-    std::ofstream file(path, std::ios::trunc);
+    auto temporary = path; temporary += L".tmp";
+    std::ofstream file(temporary, std::ios::trunc);
     if (!file.is_open()) return false;
     file << dump_json_spaced(root) << '\n';
-    return static_cast<bool>(file);
+    file.close();
+    if (!file) return false;
+    return MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 }
 
 std::vector<FriendEntry> FriendStore::entries() const {
@@ -71,6 +78,8 @@ std::vector<FriendEntry> FriendStore::entries() const {
 }
 
 bool FriendStore::add_or_update(const std::string& code_str, const std::string& nickname, std::string* error_msg) {
+    std::lock_guard<std::recursive_mutex> io(friend_store_io);
+    if (!path_.empty()) load(path_);
     FriendCodeInfo info;
     const CodeParseError err = parse_friend_code(code_str, info);
     if (err != CodeParseError::Ok) {
@@ -105,6 +114,8 @@ bool FriendStore::add_or_update(const std::string& code_str, const std::string& 
 }
 
 bool FriendStore::remove(const std::string& code_str) {
+    std::lock_guard<std::recursive_mutex> io(friend_store_io);
+    if (!path_.empty()) load(path_);
     FriendCodeInfo info;
     const CodeParseError err = parse_friend_code(code_str, info);
     const std::string target = (err == CodeParseError::Ok) ? info.code : code_str;
@@ -125,6 +136,8 @@ bool FriendStore::remove(const std::string& code_str) {
 }
 
 bool FriendStore::update_status(const std::string& code_str, const std::string& status) {
+    std::lock_guard<std::recursive_mutex> io(friend_store_io);
+    if (!path_.empty()) load(path_);
     FriendCodeInfo info;
     const auto err = parse_friend_code(code_str, info);
     const auto target = err == CodeParseError::Ok ? info.code : code_str;
@@ -144,6 +157,8 @@ bool FriendStore::update_status(const std::string& code_str, const std::string& 
 }
 
 bool FriendStore::update_endpoint(const std::string& code_str, const std::string& endpoint, const std::string& status) {
+    std::lock_guard<std::recursive_mutex> io(friend_store_io);
+    if (!path_.empty()) load(path_);
     FriendCodeInfo info;
     const CodeParseError err = parse_friend_code(code_str, info);
     const std::string target = (err == CodeParseError::Ok) ? info.code : code_str;
