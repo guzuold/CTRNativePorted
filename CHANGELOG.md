@@ -1,3 +1,17 @@
+## v0.4.3 — 2026-10-20
+
+Fix gameplay packets rejected as `blocked_by_policy` when joining across separate launchers.
+
+- Authorize actual assigned matchmaking lobby peers, including players who are not friends. Sharing the public matchmaking queue alone does not authorize a destination.
+- A member service queries its selected matchmaking hub over the signed peer channel. The hub checks the caller's identity and uses observed source addresses, including address changes.
+- For invitations/session joins, authorize the connection before retail posts session membership. A readable, unlocked session grants a 30-second provisional connection; membership keeps it valid. Leaving or closing the session revokes it, and cancelling an uncompleted join no longer reports an invalid-member error.
+- Query the session's owning service for cross-PC session authorization. Friendship alone does not grant gameplay access. Failed authority queries stay denied.
+- Expire the runtime's positive authorization cache after one second (previously ten minutes), and its negative cache after 250 ms. Matchmaking departure/reassignment does not retain the previous lobby's authorization.
+
+Validation: 15 session and signed multi-service matchmaking checks, 4 runtime policy/cache checks, 34 existing peer/invitation checks, and 10 checks using two separate services with encrypted synthetic game clients. The last scenario reproduces the blocked connection on v0.4.2 and passes on v0.4.3. These are local protocol tests, not a retail Internet race or proof of NAT/UDP reachability. Relay behavior is unchanged.
+
+Update both PCs, including `ctr_hle.dll`, close the game before installation, then test both invitation directions and public matchmaking. Keep `runtime/user` and the existing identities. See FIRST_UPDATE.md.
+
 ## v0.4.2 — 2026-10-20
 
 Automatic friend discovery and presence recovery:

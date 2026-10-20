@@ -337,6 +337,26 @@ struct Server::Impl {
         return found;
     }
 
+    // Called under state. Membership comes from an assigned lobby or a readable session
+    // being joined, not from sharing the public matchmaking selector or a friend code.
+    std::set<std::string> connection_addresses(std::uint64_t account, const std::string& room) {
+        auto peers = matchmaking.connection_peers(account, room);
+        const auto session_peers = session_store.connection_peers(account, party_now());
+        peers.insert(session_peers.begin(), session_peers.end());
+        peers.insert(account); // discovery may contact our own public address
+        std::set<std::string> result;
+        for (const auto peer : peers) {
+            if (const auto it = live_clients.find(peer); it != live_clients.end()) {
+                if (!it->second->ip.empty()) result.insert(reachable_address(it->second->ip));
+            } else if (friend_watcher) {
+                const auto known = friend_watcher->by_account(peer);
+                if (known && known->online && known->in_game && friend_watcher->is_friend(known->code))
+                    result.insert(known->ip);
+            }
+        }
+        return result;
+    }
+
     // Players of a room online now, with the endpoints of their advertisement block
     // (local: bytes 0..5, public as seen by discovery: bytes 60..65).
     std::vector<RelayMember> relay_roster(const std::string& room) {
@@ -510,8 +530,19 @@ struct Server::Impl {
     //   sessions it is in that the caller's player may see, and its published Delta sessions;
     // invitation: a friend's player invites this PC's player to a session on the friend's service;
     // webapi: a session or invitation request of the caller's player for a session kept here.
-    Json peer_action(const std::string& caller, const std::string& action, const Json& request) {
+    Json peer_action(const std::string& caller, const std::string& action, const Json& request,
+                     const std::string& source_ip) {
         Json response = Json::object();
+        if (action == "connection_peers") {
+            const auto name = text_field(request, "name");
+            check_friend_player(caller, name);
+            std::lock_guard<std::mutex> lock(state);
+            // This action is a session authority query only; never forwards to another service.
+            Json peers = Json::array();
+            for (const auto& ip : connection_addresses(user_id(name), "")) peers.items.push_back(Json::of(ip));
+            response.set("peers", std::move(peers));
+            return response;
+        }
         if (action == "presence") {
             const std::string name = local_player_name(), viewer = text_field(request, "name");
             std::lock_guard<std::mutex> lock(state);
@@ -569,7 +600,8 @@ struct Server::Impl {
             response.set("delivered", Json::of(true));
             return response;
         }
-        if (action == "mm_task" || action == "mm_poll" || action == "mm_leave") return hub_action(caller, action, request);
+        if (action == "mm_task" || action == "mm_poll" || action == "mm_leave" || action == "mm_peers")
+            return hub_action(caller, action, request, source_ip);
         if (action == "webapi") {
             const std::string method = text_field(request, "method"), target = text_field(request, "target"),
                               name = text_field(request, "name");
@@ -594,7 +626,8 @@ struct Server::Impl {
     // --- public matchmaking hub ---------------------------------------------------------
     // Hub side: players of other PCs, identified by their service's signed code, run their
     // public search here. Only the matchmaking tasks are accepted; no friendship is required.
-    Json hub_action(const std::string& caller, const std::string& action, const Json& request) {
+    Json hub_action(const std::string& caller, const std::string& action, const Json& request,
+                    const std::string& source_ip) {
         const std::string name = text_field(request, "name");
         if (name.empty() || name.size() > 32) throw std::runtime_error("Giocatore non indicato");
         const auto account = user_id(name);
@@ -605,6 +638,14 @@ struct Server::Impl {
         auto found = live_clients.find(account);
         if (found != live_clients.end() && found->second->hub_origin != caller)
             throw std::runtime_error("Giocatore gia presente su questo servizio");
+        if (found != live_clients.end()) found->second->ip = source_ip;
+        if (action == "mm_peers") {
+            if (found == live_clients.end()) throw std::runtime_error("Giocatore non presente");
+            Json peers = Json::array();
+            for (const auto& ip : connection_addresses(account, public_room_token())) peers.items.push_back(Json::of(ip));
+            response.set("peers", std::move(peers));
+            return response;
+        }
         if (action == "mm_leave") {
             if (found != live_clients.end()) forget_client(account, "left");
             response.set("left", Json::of(true));
@@ -635,6 +676,7 @@ struct Server::Impl {
             client->user.user_id = account;
             client->user.room_token = public_room_token();
             client->hub_origin = caller;
+            client->ip = source_ip;
             found = live_clients.emplace(account, std::move(client)).first;
             Json f = Json::object();
             f.set("online_id", Json::of(name));
@@ -982,11 +1024,39 @@ struct Server::Impl {
             const std::string ip = query_value(target.substr(target.find('?') + 1), "ip", "");
             const std::string& room = request_room;
             bool allowed = false;
+            bool local = false;
+            std::optional<MatchHub> hub;
+            std::set<std::string> origins;
             {
                 std::lock_guard<std::mutex> lock(state);
                 const auto requester = online_id.empty() ? live_clients.end() : live_clients.find(user_id(online_id));
-                allowed = requester != live_clients.end() && valid_room_token(room) &&
-                          requester->second->user.room_token == room && room_addresses(room).count(ip);
+                local = requester != live_clients.end() && is_local(requester->first) && valid_room_token(room) &&
+                        requester->second->user.room_token == room;
+                if (local) {
+                    allowed = connection_addresses(requester->first, room).count(ip) != 0;
+                    if (const auto seat = hub_seats.find(requester->first); seat != hub_seats.end()) hub = seat->second;
+                    for (const auto& [session, origin] : remote_sessions) origins.insert(origin);
+                }
+            }
+            // Query the current authority outside state: no allow-all fallback on timeout.
+            auto permits = [&](const Json& reply) {
+                const auto* peers = reply.find("peers");
+                if (peers && peers->is_array()) for (const auto& entry : peers->items) if (entry.text == ip) return true;
+                return false;
+            };
+            if (local && !allowed && hub) {
+                Json request = Json::object(); request.set("action", Json::of("mm_peers"));
+                request.set("name", Json::of(online_id));
+                try { allowed = permits(peer_request(*host_identity, hub->ip, hub->port, hub->code, request, 1500)); }
+                catch (const std::exception&) {}
+            }
+            if (local && !allowed && friend_watcher) for (const auto& origin : origins) {
+                if (!friend_watcher->is_friend(origin)) continue;
+                Json request = Json::object(); request.set("action", Json::of("connection_peers"));
+                request.set("name", Json::of(online_id));
+                try { allowed = permits(friend_watcher->request(origin, request, 1500)); }
+                catch (const std::exception&) {}
+                if (allowed) break;
             }
             Json payload = Json::object();
             payload.set("allowed", Json::of(allowed));
@@ -1048,7 +1118,7 @@ struct Server::Impl {
                             friend_watcher->observe_endpoint(caller, peer_address, static_cast<std::uint16_t>(contact));
                     }
                 }
-                Json response = peer_action(caller, name, request);
+                Json response = peer_action(caller, name, request, peer_address);
                 response.set("nonce", Json::of(nonce->text));
                 response.set("to", Json::of(caller));
                 HttpAnswer a = json_answer(200, dump_json(sign_peer_message(*host_identity, response)), "peer_" + name);
@@ -1361,8 +1431,10 @@ struct Server::Impl {
                         const auto slash = tail.find('/');
                         const auto id = tail.substr(0, slash);
                         const auto suffix = slash == std::string::npos ? "" : tail.substr(slash + 1);
-                        if (method == "GET" && suffix.empty())
+                        if (method == "GET" && suffix.empty()) {
+                            session_store.begin_connection(account, id, party_now());
                             return json_answer(200, dump_json(session_store.describe(account, id)), "webapi_session_details");
+                        }
                         if (method == "GET" && (suffix == "sessionData" || suffix == "changeableSessionData" || suffix == "sessionImage")) {
                             const auto part = session_store.attachment(account, id, suffix == "sessionData" ? "session-data" :
                                 suffix == "changeableSessionData" ? "changeable-session-data" : "session-image");

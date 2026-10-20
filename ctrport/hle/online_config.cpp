@@ -159,8 +159,8 @@ bool strict_peers() {
     return value;
 }
 
-// Public peers: asked to the project server once, then cached (allowed 10 min, refused 5 s
-// so that a player who joins the room later becomes reachable).
+// Membership and addresses can change while the game runs. Keep this cache short so
+// a newly assigned peer is reachable and an old authorization expires promptly.
 bool peer_allowed(std::uint32_t address) {
     using clock = std::chrono::steady_clock;
     static std::mutex mutex;
@@ -178,7 +178,7 @@ bool peer_allowed(std::uint32_t address) {
     const bool allowed = reached && response.status == 200;
     {
         std::scoped_lock lock{mutex};
-        cache[address] = {allowed, clock::now() + std::chrono::seconds(allowed ? 600 : 5)};
+        cache[address] = {allowed, clock::now() + std::chrono::milliseconds(allowed ? 1000 : 250)};
     }
     ctr_hle::log_call("ctr_online", "peer_allowed", allowed ? 1 : 0,
                       (",\"address\":\"" + format_address(address) + "\",\"server_status\":" +

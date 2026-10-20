@@ -4,6 +4,7 @@
 #include "../hle/invitation_types.h"
 #include "../hle/invitation_flow.h"
 #include "../hle/online_http.h"
+#include "../hle/online_config.h"
 #include "../online_server/json.hpp"
 #include <windows.h>
 #include <atomic>
@@ -17,6 +18,7 @@ std::atomic<int> failures{0};
 bool used = false;
 std::atomic<int> notice_prompts{0}, accept_attempts{0}, fixture_phase{0};
 int response_status = 201;
+int peer_status = 403, peer_queries = 0;
 std::atomic<int> requests{0};
 std::string request_body;
 void check(bool ok, const char* what) { std::printf("%s %s\n", ok ? "PASS" : "FAIL", what); if (!ok) ++failures; }
@@ -48,6 +50,9 @@ std::string json_escape(const std::string& text) { return text; } // fixture use
 bool http_exchange(const std::string& method, const std::string& path,
                    const std::vector<std::pair<std::string,std::string>>&, const std::string& body,
                    HttpResponse* response) {
+    if (method == "GET" && path.find("/ctr/v1/peer-allowed?ip=") == 0) {
+        ++peer_queries;response->status=peer_status;return true;
+    }
     if (method == "GET" && path.find("/friendList?") != std::string::npos) {
         response->status = 200;
         response->body = R"({"friendList":[{"user":{"accountId":"43","onlineId":"FixtureFriend"}}]})";
@@ -81,9 +86,22 @@ bool http_exchange(const std::string& method, const std::string& path,
 }
 }
 extern "C" int ctr_hle_invitation_load(int(*)(int));
-int main() {
+int main(int argc, char** argv) {
     _putenv_s("CTR_ONLINE", "1");
     SetEnvironmentVariableA("CTR_ONLINE", "1");
+    if (argc > 1 && std::string(argv[1]) == "--connection-policy-only") {
+        // 203.0.113.10 in network byte order on Windows x64; no network is contacted.
+        const std::uint32_t address=0x0a7100cb;
+        check(!ctr_hle::online::destination_allowed(address),"unknown public peer denied");
+        peer_status=200;
+        check(!ctr_hle::online::destination_allowed(address) && peer_queries==1,"negative cache bounds request rate");
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        check(ctr_hle::online::destination_allowed(address),"new assignment becomes usable after short negative cache");
+        peer_status=403;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+        check(!ctr_hle::online::destination_allowed(address),"departed peer revoked within one second instead of ten minutes");
+        return failures ? 1 : 0;
+    }
     using Call = int(CTR_SYSV*)();
     auto init = bind<Call>("XvA5KS56wcs"), term = bind<Call>("B6HVJtDYxEE");
     auto update = bind<Call>("9+g9iOq+7kg");

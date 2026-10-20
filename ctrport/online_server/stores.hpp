@@ -108,6 +108,9 @@ public:
     Json user_sessions(std::uint64_t requester, std::uint64_t account) const;
     void member_priority(std::uint64_t account, const std::string& id, std::uint64_t priority);
     bool contains(const std::string& id) const { return sessions_.count(id) > 0; }
+    // A readable session may be contacted before retail posts /members.
+    void begin_connection(std::uint64_t account, const std::string& id, std::uint64_t now);
+    std::set<std::uint64_t> connection_peers(std::uint64_t account, std::uint64_t now) const;
 private:
     struct Session {
         std::uint64_t owner; Json metadata; std::vector<Part> parts;
@@ -116,6 +119,7 @@ private:
         std::map<std::uint64_t, std::uint64_t> priorities;
     };
     std::map<std::string, Session> sessions_;
+    std::map<std::pair<std::string, std::uint64_t>, std::uint64_t> connecting_;
     struct Invitation { std::string session, sender; std::uint64_t account, recipient, expires; bool accepted = false; };
     std::map<std::string, Invitation> invitations_;
     void expire_invitations(std::uint64_t now);
@@ -164,6 +168,7 @@ public:
     void cancel_pending(std::uint64_t account, const std::string& selector);
     const std::string* player_info(std::uint64_t account) const;
     const LobbyDocuments* documents(std::uint64_t lobby) const;
+    std::set<std::uint64_t> connection_peers(std::uint64_t account, const std::string& selector) const;
 
 private:
     std::string migration_routes(std::uint64_t lobby) const;

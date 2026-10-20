@@ -1,4 +1,4 @@
-> **v0.4.2:** automatic DHT and friend-presence recovery, including after remove/re-add. Upgrade both PCs. See CHANGELOG.md and FIRST_UPDATE.md. No manual address restoration is needed in the normal recovery flow.
+> **v0.4.3:** gameplay connection authorization follows the assigned matchmaking lobby or accepted/session join, including across separate launchers. Public matchmaking does not require friend codes. Upgrade both PCs; Internet gameplay still needs verification.
 
 # CTRNativePorted
 
@@ -14,7 +14,7 @@ original code from your dump.
 
 ## Status
 
-Latest release: **v0.4.0** (experimental).
+Latest release: **v0.4.3** (experimental).
 
 ## How it works
 
