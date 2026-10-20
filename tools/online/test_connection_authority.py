@@ -90,6 +90,18 @@ def main():
             check(http(1, 'DELETE', route)[0] == 204, 'failed join can leave without invalid-member error')
             check(allowed(1, addresses[0]) == 403 and allowed(0, addresses[1]) == 403,
                   'both local routes revoke the cancelled join')
+            # JOIN from the friends list: the game reads the host's Delta record (138/14) and
+            # contacts the host at once, before any session request names it.
+            clients[0].send_task(138, 1, wire.typed((wire.STRING, 'Delta'), (19, bytes(67)), (8, 1), (8, 2), (19, b'c')))
+            check(clients[0].receive()[0] == 1, 'host publishes its Delta session')
+            time.sleep(5.5)  # the guest's service receives it with the host's presence
+            check(allowed(1, addresses[0]) == 403, 'a published Delta session alone does not authorize')
+            clients[1].send_task(138, 14, wire.typed((wire.STRING, 'Delta'), (wire.UINT64, accounts[0])))
+            kind, payload = clients[1].receive()
+            check(kind == 1 and len(payload) > 40, "guest's game receives the host's Delta record")
+            check(allowed(1, addresses[0]) == 200, 'guest may contact the host after reading its Delta record')
+            check(allowed(0, addresses[1]) == 200, 'host accepts the joining friend announced by its service')
+            check(allowed(1, '203.0.113.99') == 403, 'unknown destination still blocked during a Delta join')
         finally:
             for client in clients:
                 client.close()

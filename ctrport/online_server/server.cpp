@@ -215,6 +215,12 @@ struct Server::Impl {
     };
     std::map<std::string, RemoteInvitation> remote_invitations; // under `state`
     std::map<std::string, std::string> remote_sessions;         // PSN session ID -> origin code, under `state`
+    // JOIN from the friends list goes through a friend's Delta record (138/14): the game
+    // contacts the friend right away, before any session request names it. Guest side:
+    // friends whose Delta record this PC's game received (code -> expiry); host side:
+    // friends' players announced as joining this PC's player (account -> expiry). Under `state`.
+    std::map<std::string, std::uint64_t> delta_offers;
+    std::map<std::uint64_t, std::uint64_t> delta_joiners;
     std::vector<std::string> listening, failed;
 
     // State shared by connections (the reference server's module globals), under `state`.
@@ -343,6 +349,8 @@ struct Server::Impl {
         auto peers = matchmaking.connection_peers(account, room);
         const auto session_peers = session_store.connection_peers(account, party_now());
         peers.insert(session_peers.begin(), session_peers.end());
+        if (is_local(account))
+            for (const auto& [joiner, until] : delta_joiners) if (until > party_now()) peers.insert(joiner);
         peers.insert(account); // discovery may contact our own public address
         std::set<std::string> result;
         for (const auto peer : peers) {
@@ -538,8 +546,19 @@ struct Server::Impl {
             check_friend_player(caller, name);
             std::lock_guard<std::mutex> lock(state);
             // This action is a session authority query only; never forwards to another service.
+            std::set<std::string> addresses = connection_addresses(user_id(name), "");
+            // A friend's player joining through this PC's Delta record: admitted for a minute,
+            // reaching this PC's players (it is a verified friend, see check_friend_player).
+            if (const Json* joining = request.find("joining"); joining && joining->is_bool() && joining->boolean) {
+                const auto now = party_now();
+                for (auto it = delta_joiners.begin(); it != delta_joiners.end();)
+                    it = it->second <= now ? delta_joiners.erase(it) : std::next(it);
+                delta_joiners[user_id(name)] = now + 60;
+                for (const auto& [account, client] : live_clients)
+                    if (client->hub_origin.empty() && !client->ip.empty()) addresses.insert(reachable_address(client->ip));
+            }
             Json peers = Json::array();
-            for (const auto& ip : connection_addresses(user_id(name), "")) peers.items.push_back(Json::of(ip));
+            for (const auto& ip : addresses) peers.items.push_back(Json::of(ip));
             response.set("peers", std::move(peers));
             return response;
         }
@@ -1026,7 +1045,7 @@ struct Server::Impl {
             bool allowed = false;
             bool local = false;
             std::optional<MatchHub> hub;
-            std::set<std::string> origins;
+            std::set<std::string> origins, joining;
             {
                 std::lock_guard<std::mutex> lock(state);
                 const auto requester = online_id.empty() ? live_clients.end() : live_clients.find(user_id(online_id));
@@ -1036,6 +1055,10 @@ struct Server::Impl {
                     allowed = connection_addresses(requester->first, room).count(ip) != 0;
                     if (const auto seat = hub_seats.find(requester->first); seat != hub_seats.end()) hub = seat->second;
                     for (const auto& [session, origin] : remote_sessions) origins.insert(origin);
+                    const auto now = party_now();
+                    for (auto it = delta_offers.begin(); it != delta_offers.end();)
+                        it = it->second <= now ? delta_offers.erase(it) : std::next(it);
+                    for (const auto& [code, until] : delta_offers) { origins.insert(code); joining.insert(code); }
                 }
             }
             // Query the current authority outside state: no allow-all fallback on timeout.
@@ -1054,6 +1077,7 @@ struct Server::Impl {
                 if (!friend_watcher->is_friend(origin)) continue;
                 Json request = Json::object(); request.set("action", Json::of("connection_peers"));
                 request.set("name", Json::of(online_id));
+                if (joining.count(origin)) request.set("joining", Json::of(true));
                 try { allowed = permits(friend_watcher->request(origin, request, 1500)); }
                 catch (const std::exception&) {}
                 if (allowed) break;
@@ -1769,6 +1793,7 @@ struct Server::Impl {
                     if (!delta || !delta->is_array()) continue;
                     for (const auto& row : delta->items) {
                         if (text_field(row, "context") != params[0].value.text) continue;
+                        delta_offers[known->code] = party_now() + 120;
                         sessions.push_back({from_hex(text_field(row, "address")), from_hex(text_field(row, "id")),
                                             static_cast<std::uint32_t>(row.at("game_type").as_u64()),
                                             static_cast<std::uint32_t>(row.at("max_players").as_u64()),
