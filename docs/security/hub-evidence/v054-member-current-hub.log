@@ -1,0 +1,4 @@
+{"mode": "assigned", "elapsed": 0.015}
+{"scope": "public_hub", "check": "waiting public task forwarded when election publishes hub", "ok": true}
+{"scope": "public_hub", "check": "public search task 145/18 forwarded to hub", "ok": true}
+{"scope": "public_hub", "check": "hub logs remote player arrival", "ok": true}

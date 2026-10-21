@@ -1,0 +1,12 @@
+FAIL intermittent DHT: known live hub survives four empty searches
+FAIL one direct failure retains hub
+FAIL two direct failures retain hub
+FAIL third direct failure selects remaining live hub
+FAIL partial views converge on lowest verified code
+PASS persist verified candidates
+FAIL restart directly verifies saved hub without DHT
+PASS saved unresponsive candidate is never elected
+PASS expired saved candidate ignored
+FAIL deduplicate IP before sixteen-address limit
+PASS reachable self immediately eligible
+failures=7

@@ -1,0 +1,8 @@
+﻿{"scope": "online_server_test", "check": "restart: launcher presence works without a running game", "ok": true}
+{"scope": "online_server_test", "check": "restart: stopped launcher is offline", "ok": true}
+{"scope": "online_server_test", "check": "restart: outage is not reported as verified", "ok": true}
+{"scope": "online_server_test", "check": "restart: outage retains last verified endpoint", "ok": true}
+{"scope": "online_server_test", "check": "restart: outage does not advance last seen", "ok": true}
+{"scope": "online_server_test", "check": "restart: friend recovers after restart without game or DHT", "ok": true}
+{"scope": "online_server_test", "check": "restart: cached address with another identity stays offline", "ok": true}
+{"scope": "online_server_test", "check": "restart: another identity is rejected", "ok": true}

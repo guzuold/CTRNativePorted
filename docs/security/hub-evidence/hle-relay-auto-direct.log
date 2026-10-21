@@ -1,0 +1,18 @@
+﻿{"scope":"hle_call","library":"libSceNet","function":"sceNetInit","result":0}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":1,"name":"game","family":2,"type":2,"protocol":0}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetBind","result":0,"socket":1,"address":"0.0.0.0:5174"}
+{"scope":"online_services_test","check":"relay: game socket bound on the peer port","ok":true}
+{"scope":"hle_call","library":"ctr_online","function":"relay_session","result":1,"server_status":200,"port":59305}
+{"scope":"online_services_test","check":"relay auto: registered with relay before sending","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSendto","result":12,"socket":1,"to":"127.0.0.9:59306","bytes":"6469726563745f70726f6265"}
+{"scope":"online_services_test","check":"relay auto: probe sent directly","ok":true}
+{"scope":"online_services_test","check":"relay auto: direct probe reached peer directly","ok":true}
+{"scope":"hle_call","library":"ctr_online","function":"relay_auto_direct_confirmed","result":1,"peer":"127.0.0.9:59306"}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetRecvfrom","result":10,"socket":1,"from":"127.0.0.9:59306","bytes":"6469726563745f61636b"}
+{"scope":"online_services_test","check":"relay auto: direct reply received, direct confirmed","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSendto","result":11,"socket":1,"to":"127.0.0.9:59306","bytes":"73747265616d5f64617461"}
+{"scope":"online_services_test","check":"relay auto: subsequent send after direct confirmed","ok":true}
+{"scope":"online_services_test","check":"relay auto: subsequent send delivered directly","ok":true}
+{"scope":"online_services_test","check":"relay auto: zero data packets sent to relay on confirmed direct path","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocketClose","result":0,"socket":1}
+{"scope":"online_services_test","mode":"relay-auto-direct","passed":true}

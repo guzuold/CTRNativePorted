@@ -1,0 +1,30 @@
+﻿{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":1,"name":"ingress","family":2,"type":2,"protocol":0}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetBind","result":0,"socket":1,"address":"0.0.0.0:0"}
+{"scope":"online_services_test","check":"ingress: bind","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetGetsockname","result":0,"socket":1,"address":"0.0.0.0:62737"}
+{"scope":"hle_call","library":"ctr_online","function":"incoming_blocked","result":1,"address":"192.168.1.13","log_address_limit":4096}
+{"scope":"online_services_test","check":"ingress: unauthorized oversized PEEK datagram dropped","ok":true}
+{"scope":"online_services_test","check":"ingress: rejected PEEK removed from queue","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetRecvfrom","result":2,"socket":1,"from":"192.168.1.13:62736","bytes":"6f6b"}
+{"scope":"online_services_test","check":"ingress: newly assigned peer accepted without outbound game traffic","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocketClose","result":0,"socket":1}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":2,"name":"ingress","family":2,"type":2,"protocol":0}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetBind","result":0,"socket":2,"address":"0.0.0.0:3074"}
+{"scope":"online_services_test","check":"ingress: bind","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetGetsockname","result":0,"socket":2,"address":"0.0.0.0:3074"}
+{"scope":"online_services_test","check":"ingress: unauthorized oversized PEEK datagram dropped","ok":true}
+{"scope":"online_services_test","check":"ingress: rejected PEEK removed from queue","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetRecvfrom","result":2,"socket":2,"from":"192.168.1.13:62736","bytes":"6f6b"}
+{"scope":"online_services_test","check":"ingress: newly assigned peer accepted without outbound game traffic","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocketClose","result":0,"socket":2}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":3,"name":"ingress-tcp","family":2,"type":1,"protocol":0}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetBind","result":0,"socket":3,"address":"0.0.0.0:0"}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetGetsockname","result":0,"socket":3,"address":"0.0.0.0:62166"}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetListen","result":0,"socket":3}
+{"scope":"online_services_test","check":"ingress: unauthorized TCP closed","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetAccept","result":4,"socket":3,"peer":"192.168.1.13:62169"}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocketClose","result":0,"socket":4}
+{"scope":"online_services_test","check":"ingress: authorized TCP accepted","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocketClose","result":0,"socket":3}
+{"scope":"online_services_test","check":"ingress: authorization requests rate limited","ok":true}
+ingress failures=0 requests=3

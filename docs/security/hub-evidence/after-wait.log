@@ -1,0 +1,9 @@
+{"mode": "appears", "elapsed": 0.156}
+{"scope": "public_hub", "check": "waiting public task forwarded when election publishes hub", "ok": true}
+{"scope": "public_hub", "check": "public search task 145/18 forwarded to hub", "ok": true}
+{"scope": "public_hub", "check": "hub logs remote player arrival", "ok": true}
+{"scope": "public_hub", "check": "task actually waited for delayed election", "ok": true}
+{"scope": "public_hub", "check": "hub_elected fields written to service log", "ok": true}
+{"mode": "absent", "elapsed": 2.0}
+{"scope": "public_hub", "check": "local fallback logs hub_none with unreachable/deadline fields", "ok": true}
+{"scope": "public_hub", "check": "two local tasks each wait the one-second budget", "ok": true}

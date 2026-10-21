@@ -1,0 +1,37 @@
+﻿{"scope":"hle_call","library":"libSceNet","function":"sceNetInit","result":0}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":1,"name":"game","family":2,"type":2,"protocol":0}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetBind","result":0,"socket":1,"address":"0.0.0.0:5174"}
+{"scope":"online_services_test","check":"relay: game socket bound on the peer port","ok":true}
+{"scope":"hle_call","library":"ctr_online","function":"relay_session","result":1,"server_status":200,"port":62740}
+{"scope":"online_services_test","check":"relay: HELLO with the token from the game socket before any game send","ok":true}
+{"scope":"hle_call","library":"ctr_online","function":"relay_first_send","result":9,"to":"127.0.0.9:62741","relay":"127.0.0.1:62740"}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSendto","result":9,"socket":1,"to":"127.0.0.9:62741","relayed":true,"bytes":"726163652064617461"}
+{"scope":"online_services_test","check":"relay: game send reported as sent","ok":true}
+{"scope":"online_services_test","check":"relay: SEND carries the game's destination and payload","ok":true}
+{"scope":"online_services_test","check":"relay: nothing sent directly to the peer","ok":true}
+{"scope":"online_services_test","check":"relay: session asked with identity and room token","ok":true}
+{"scope":"hle_call","library":"ctr_online","function":"relay_welcome","result":1,"seen_as":"127.0.0.1:5150"}
+{"scope":"hle_call","library":"ctr_online","function":"relay_first_deliver","result":9,"from":"198.51.100.7:3274"}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetRecvfrom","result":9,"socket":1,"from":"198.51.100.7:3274","relayed":true,"bytes":"66726f6d20686f7374"}
+{"scope":"online_services_test","check":"relay: WELCOME skipped, DELIVER unwrapped with the sender address from the relay","ok":true}
+{"scope":"hle_call","library":"ctr_online","function":"relay_refused","result":2,"destination":"127.0.0.9:62741"}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetRecvfrom","result":9,"socket":1,"from":"198.51.100.7:3274","relayed":true,"bytes":"66726f6d20686f7374"}
+{"scope":"online_services_test","check":"relay: REFUSED consumed before the next delivered datagram","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSendto","result":6,"socket":1,"to":"127.0.0.9:62741","bytes":"646972656374"}
+{"scope":"online_services_test","check":"relay: send after refusal","ok":true}
+{"scope":"online_services_test","check":"relay: refused destination reached directly","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSetsockopt","result":0,"socket":1,"level":65535,"option":4608}
+{"scope":"online_services_test","check":"relay: socket non-blocking","ok":true}
+{"scope":"online_services_test","check":"relay: control message alone gives EWOULDBLOCK","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSendto","result":3,"socket":1,"to":"127.0.0.1:62740","bytes":"726177"}
+{"scope":"online_services_test","check":"relay: send to a server port","ok":true}
+{"scope":"online_services_test","check":"relay: datagram to the server's own port sent as is","ok":true}
+{"scope":"hle_call","library":"ctr_online","function":"discovery_port","result":62740}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSendto","result":5,"socket":1,"to":"127.0.0.1:62740","bytes":"70726f6265"}
+{"scope":"online_services_test","check":"relay: discovery send","ok":true}
+{"scope":"online_services_test","check":"relay: discovery sent as is to the configured discovery port","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSendto","result":6,"socket":1,"to":"127.0.0.5:62740","bytes":"7075626c6963"}
+{"scope":"online_services_test","check":"relay: send to the public address","ok":true}
+{"scope":"online_services_test","check":"relay: server's public address with a service port not relayed","ok":true}
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocketClose","result":0,"socket":1}
+{"scope":"online_services_test","mode":"relay","passed":true}

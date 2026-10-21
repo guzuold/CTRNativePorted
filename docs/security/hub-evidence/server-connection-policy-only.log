@@ -1,0 +1,15 @@
+﻿{"scope": "online_server_test", "check": "transport: private session rejects uninvited player", "ok": true}
+{"scope": "online_server_test", "check": "transport: accepted invite permits both directions before membership", "ok": true}
+{"scope": "online_server_test", "check": "transport: abandoned join expires after 30 seconds", "ok": true}
+{"scope": "online_server_test", "check": "transport: cancelling a pending join revokes it without member error", "ok": true}
+{"scope": "online_server_test", "check": "transport: public session join does not require friendship", "ok": true}
+{"scope": "online_server_test", "check": "transport: joined member outlives provisional lease", "ok": true}
+{"scope": "online_server_test", "check": "transport: leaving removes connection authorization", "ok": true}
+{"scope": "online_server_test", "check": "transport: closing session removes pending authorization", "ok": true}
+{"scope": "online_server_test", "check": "transport: waiting public player has no remote permission", "ok": true}
+{"scope": "online_server_test", "check": "transport: assigned nonfriend is authorized before retail join; other playlist excluded", "ok": true}
+{"scope": "online_server_test", "check": "transport: matchmaking authorization is reciprocal", "ok": true}
+{"scope": "online_server_test", "check": "transport: different signed service cannot query another player's assignment", "ok": true}
+{"scope": "online_server_test", "check": "transport: verified source IP change replaces old address", "ok": true}
+{"scope": "online_server_test", "check": "transport: departure revokes remote address", "ok": true}
+{"scope": "online_server_test", "check": "transport: reconnect in another lobby cannot inherit old authorization", "ok": true}

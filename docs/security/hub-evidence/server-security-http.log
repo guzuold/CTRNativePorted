@@ -1,0 +1,29 @@
+﻿{"scope": "online_server_test", "check": "security: local invitations allowed", "ok": true}
+{"scope": "online_server_test", "check": "security: LAN invitations forbidden", "ok": true}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": true}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": true}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": true}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": true}
+{"scope": "online_server_test", "check": "security: peer route verifies unsigned request", "ok": true}
+{"scope": "online_server_test", "check": "security: LAN identity route remains public", "ok": true}
+{"scope": "online_server_test", "check": "security: signed peer route works from LAN", "ok": true}
+{"scope": "online_server_test", "check": "security: signed party route works from LAN", "ok": true}
+{"scope": "online_server_test", "check": "security: silent HTTP closed before six seconds", "ok": true}
+{"scope": "online_server_test", "check": "security: per-IP excess refused immediately", "ok": true}
+{"scope": "online_server_test", "check": "security: admitted connection remains served", "ok": true}
+{"scope": "online_server_test", "check": "security: global connection limit refuses immediately", "ok": true}
+{"scope": "online_server_test", "check": "security: global saturation preserves admitted client", "ok": true}
+{"scope": "online_server_test", "check": "security: incomplete HTTP body times out", "ok": true}
+{"scope": "online_server_test", "check": "security: header drip cannot reset absolute deadline", "ok": true}
+{"scope": "online_server_test", "check": "security: local lobby still reachable", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby not given HTTP idle timeout", "ok": true}
+{"scope": "online_server_test", "check": "security: deep JSON HTTP returns 403", "ok": true}
+{"scope": "online_server_test", "check": "security: HTTP service survives deep JSON", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}

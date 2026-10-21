@@ -1,0 +1,20 @@
+{
+  "implementation_commit": "98fce697cf9f15dd188126713c6ee97c78cde318",
+  "toolchain": "VS2022 MSVC C++20, existing clang-cl GPU build",
+  "files": {
+    "ctrport/online_server/launcher_online.cpp": "d5fbd08d1b584471361e7c8a705739308f59fbd000e100b3b115fffbc28118dd",
+    "ctrport/online_server/hub_election.hpp": "ea3df385bdcd391146fd589767f3bc8972ec9a88e92a9a22dcc1dd54ef0eafff",
+    "ctrport/online_server/hub_gate.hpp": "cb88948507e6a149b6fd02cc610ca3aa761b22ff4bbaf701e625945cdb8e967a",
+    "ctrport/online_server/server.cpp": "6dd74f81b3dc2aff89a46fa96aa3bc6f12e9f303203bfc17aeabecb49e55714e",
+    "ctrport/online_server/server.hpp": "afd6a5810c584d6b007fe35c919198542ffb02abd740a68b3a1c9078d7c3dcba",
+    "ctrport/online_server/hub_election_test.cpp": "cf8673cc810a75af706db10975e483d87a72eeeb28a995b71a3700fba0c35ed0",
+    "build/CTRPort-claude/launcher.exe": "2b9b9ae9cce4b97e52edb31d92050fe6dca7ea545cb4ef7f6d463bc6a827ff17",
+    "build/CTRPort-claude/ctr_online_server.exe": "95bbaab7ed7ae3c1c7d41eba60939557fd2c07ac1ffa7399fc9a4dab8003efd9",
+    "build/CTRPort-claude/ctr_online_server_test.exe": "51ebbfa9ffc836f0913b2f9e04962b68878396dd503b46cee51ed85dd96aff21",
+    "build/CTRPort-gpu/ctr_gpu.dll": "8caa17b49844bff39fd1642c913f3348c14c8510c85726e4814dd8d261e6ae5f",
+    "build/CTRPort-gpu/ctr_hle_online_test.exe": "e7488923d941a1dec862fc1b2bc9f6fb015a16f9e21aff8266a48ede7fbfb663",
+    "build/hub-test/hub_election_test.exe": "4be9782f191e13854eb66318e1b830e6bfa6afbeeae0995947e2a10fbdf12445",
+    "build/hub-baseline/hub_election_test.exe": "83c21be713865293b5a87379afdd33f10496c78bb5884966c26e4f6765db1549",
+    "build/hub-v054/hub_election_test.exe": "d186d9825da76d136c0f00668b1f97aa53c4fc03142cf65e3a4a76f0564d15e9"
+  }
+}
