@@ -1,3 +1,24 @@
+## v0.5.4 — 2026-10-21
+
+AMD FSR 3.1 upscaling, and friends keep their names while offline.
+
+- **AMD FSR 3.1** in Settings → Scene upscaling ("AMD FSR 3.1"; `CTR_UPSCALER=fsr3`).
+  - Temporal upscaling through FireBurn/FSR-Vulkan (MIT), fed with the same scene depth, motion and sub-pixel jitter as DLSS, before the HUD. It runs on any Vulkan GPU with the needed features (no RTX needed).
+  - Sharpening 0.3 by default; `CTR_FSR3_SHARPNESS` (0–1) changes it.
+  - The device enables `shaderStorageImageWriteWithoutFormat`, which FSR 3 needs.
+  - FSR-Vulkan is pinned by `tools/bootstrap.ps1` and built by `ctrport/gpu/build.ps1`. Four patches from GetLostIn's port are applied to it; one stops the FSR 3 upscaler from failing with "out of memory" when the memory visible to both CPU and GPU is full (no Resizable BAR).
+- **Friend list:** a friend who is offline keeps the last known name instead of becoming a generic "Friend"; the launcher reads it from `runtime/user/online/friend_names.json`. A default nickname is replaced by the real name as soon as it is known.
+- Launcher friend status texts: "Verified service" and "Never contacted".
+- AMD FSR 3.1.6 frame generation is in the renderer but set aside: it has no setting in this release, because moving images left visible trails in testing. `CTR_FRAMEGEN=1` turns it on for development only.
+
+Validation:
+- FSR 3.1 on retail 1.21: 1280×720 → 3840×2160 at the title with valid camera planes; the user confirmed no flicker after the dispatch fix.
+- The build was made from a fresh clone of this version, FSR-Vulkan included.
+
+Not tested: FSR 3.1 in a full race, and the friend-name fix on two PCs.
+
+Update with Check updates. `runtime/user` and `runtime/mods` are kept.
+
 ## v0.5.3 — 2026-10-21
 
 Trophies, and a controller for each player.
