@@ -151,9 +151,11 @@ t = t[:a] + blit + t[b:]
 t = '#include "upscaling/frame_evidence.h"\n' + t
 t = replace_once(t, '        DebugState.IncFlipFrameNum();', '        RecordGuestPresentation();\n        DebugState.IncFlipFrameNum();', 'guest presentation timestamps')
 
-# Frame generation (CTR_FRAMEGEN, upscaling/ctr_framegen.h): PrepareFrame records the
-# interpolation after post-processing; Present shows the generated frame first and the real one
-# half a game frame later (FIFO paces the two presents by itself).
+# Frame generation (CTR_FRAMEGEN, upscaling/ctr_framegen.h) fills only the gap between the
+# game's real frame rate and its target (60 with CTR_60FPS_PATCH, else 30): at the target it
+# stays idle. Below it, PrepareFrame records the interpolation after post-processing, and Present
+# shows a generated frame before as many real frames as the deficit needs (one per frame at half
+# the target), the real one half a frame later (FIFO paces the two presents by itself).
 t = '#include <thread>\n#include "upscaling/ctr_framegen.h"\n' + t
 t = replace_once(t, 'Presenter::Presenter(', '''namespace {
 std::unique_ptr<CtrFrameGen> ctr_framegen;
@@ -161,7 +163,16 @@ std::array<bool, CtrFrameGen::MaxSlots> fg_ready{};
 std::array<float, CtrFrameGen::MaxSlots> fg_interval{};
 std::chrono::steady_clock::time_point fg_last_prepare{}, fg_stats_since{};
 float fg_interval_ms = 33.3f;
+float fg_credit = 0.0f;   // generated frames owed to reach the target rate
+bool fg_recording = false;
 u64 fg_flips = 0, fg_presented = 0;
+float FrameGenTargetMs() {
+    static const float value = [] {
+        const char* v = std::getenv("CTR_60FPS_PATCH");
+        return v && std::strcmp(v, "1") == 0 ? 1000.0f / 60.0f : 1000.0f / 30.0f;
+    }();
+    return value;
+}
 } // namespace
 
 Presenter::Presenter(''', 'frame generation state')
@@ -186,6 +197,10 @@ t = replace_once(t, '    pp_pass.Render(cmdbuf, image_view, image_size, *frame, 
                 fg_interval_ms += (std::clamp(frame_ms, 2.0f, 50.0f) - fg_interval_ms) * 0.2f;
             }
             fg_interval[frame->id] = fg_interval_ms;
+            // Short of the target: generate (with a little hysteresis so it does not flap).
+            const float target = FrameGenTargetMs();
+            const bool needed = fg_interval_ms > target * (fg_recording ? 1.02f : 1.06f);
+            if (needed) {
             CtrFrameGen::Inputs in{};
             in.slot = frame->id;
             in.color = frame->image;
@@ -195,8 +210,10 @@ t = replace_once(t, '    pp_pass.Render(cmdbuf, image_view, image_size, *frame, 
             in.frame_ms = frame_ms;
             // A load, a pause or a hitch: interpolating across it would only smear two
             // unrelated frames, so the history starts over.
-            in.reset = frame_ms >= 100.0f;
+            in.reset = frame_ms >= 100.0f || !fg_recording;
             fg_ready[frame->id] = ctr_framegen->Record(in);
+            }
+            fg_recording = needed;
         }
     }
 ''', 'record frame generation')
@@ -206,7 +223,11 @@ t = replace_once(t, '''    if (!swapchain.AcquireNextImage()) {
                                  std::exchange(fg_ready[frame->id], false);
     if (!is_reusing_frame && ctr_framegen && ctr_framegen->Enabled()) {
         ++fg_flips;
-        const vk::Image generated = generated_ready ? ctr_framegen->OutputImage(frame->id) : vk::Image{};
+        // The share of this frame's time the target expects another frame in, at most one.
+        const float extra = std::clamp(fg_interval[frame->id] / FrameGenTargetMs() - 1.0f, 0.0f, 1.0f);
+        fg_credit = generated_ready ? std::min(fg_credit + extra, 1.5f) : 0.0f;
+        const bool owed = fg_credit >= 0.999f;
+        const vk::Image generated = generated_ready && owed ? ctr_framegen->OutputImage(frame->id) : vk::Image{};
         if (generated && window.GetWidth() != 0 && window.GetHeight() != 0 &&
             swapchain.AcquireNextImage()) {
             const vk::Image target = swapchain.Image();
@@ -287,6 +308,7 @@ t = replace_once(t, '''    if (!swapchain.AcquireNextImage()) {
                 }
             }
             ++fg_presented;
+            fg_credit -= 1.0f;
             if (EmulatorSettings.GetPresentMode() != "Fifo") {
                 std::this_thread::sleep_for(std::chrono::duration<float, std::milli>(
                     std::clamp(fg_interval[frame->id] * 0.5f, 0.0f, 25.0f)));
@@ -298,8 +320,9 @@ t = replace_once(t, '''    if (!swapchain.AcquireNextImage()) {
         } else if (now - fg_stats_since >= std::chrono::seconds(10)) {
             const auto& stats = ctr_framegen->GetStats();
             const float seconds = std::chrono::duration<float>(now - fg_stats_since).count();
-            std::fprintf(stderr, "CTR_FRAMEGEN %.1f game FPS -> %.1f shown; %llu generated, %llu history resets (%s)\\n",
+            std::fprintf(stderr, "CTR_FRAMEGEN %.1f game FPS -> %.1f shown (target %.0f); %llu generated, %llu history resets (%s)\\n",
                          float(fg_flips) / seconds, float(fg_flips + fg_presented) / seconds,
+                         1000.0f / FrameGenTargetMs(),
                          static_cast<unsigned long long>(stats.generated),
                          static_cast<unsigned long long>(stats.resets),
                          EmulatorSettings.GetPresentMode().c_str());
