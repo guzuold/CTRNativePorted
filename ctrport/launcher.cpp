@@ -41,6 +41,11 @@ namespace Gdiplus { using std::min; using std::max; }
 #include "launcher_update.hpp"
 #include "guest_patch_xml.hpp"
 #include "launcher_text.hpp"
+#include "trophy_data.hpp"
+#include <shlwapi.h>
+#include <setupapi.h>
+#include <hidsdi.h>
+#include <Xinput.h>
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "gdiplus.lib")
@@ -49,6 +54,9 @@ namespace Gdiplus { using std::min; using std::max; }
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "setupapi.lib")
+#pragma comment(lib, "hid.lib")
 #pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 namespace fs = std::filesystem;
@@ -80,6 +88,7 @@ constexpr ARGB kTextOff       = 0xFF5A5196;  // Disabled / toggle off
 enum Tab : int {
     TAB_HOME = 0,
     TAB_MODS,
+    TAB_TROPHIES,
     TAB_SETTINGS,
     TAB_ADVANCED,
     TAB_COUNT
@@ -88,6 +97,7 @@ enum Tab : int {
 const wchar_t* const kTabNames[TAB_COUNT] = {
     L"HOME",
     L"MODS",
+    L"TROPHIES",
     L"SETTINGS",
     L"ADVANCED"
 };
@@ -128,8 +138,13 @@ enum : int {
 constexpr int kModRows = 7;
 enum : int {
     ID_MODS_FILES = 200, ID_MODS_PATCHES, ID_MODS_MASTER, ID_MODS_REFRESH, ID_MODS_PREV, ID_MODS_NEXT,
-    ID_MOD_ROW_TOGGLE = 210, ID_MOD_ROW_UP = 220, ID_MOD_ROW_DOWN = 230
+    ID_MOD_ROW_TOGGLE = 210, ID_MOD_ROW_UP = 220, ID_MOD_ROW_DOWN = 230,
+    ID_TROPHY_KEY_EDIT = 240, ID_TROPHY_IMPORT,
+    ID_PLAYER_PAD = 250  // 250..253: the controller of players 1..4
 };
+// TROPHIES tab: a grid of the game's trophy icons.
+constexpr int kTrophyColumns = 12;
+constexpr float kTrophyLeft = 296, kTrophyTop = 124, kTrophyCell = 57, kTrophyIcon = 50;
 
 struct Config {
     std::wstring base_dir, patch_dir, resolution = L"2560x1440 (1440p)", custom_w = L"1920", custom_h = L"1080";
@@ -142,6 +157,9 @@ struct Config {
     bool xbox_prompts = true;
     bool split_screen = false;
     bool mods_enabled = true;
+    std::wstring trophy_key;  // the user's PS4 trophy key (32 hex digits), optional
+    // Controller of each player: "auto", "none", "keyboard", "xinput:N" or "hid:<device path>".
+    std::wstring player_pad[4] = {L"auto", L"auto", L"auto", L"auto"};
     std::wstring online_id = L"CTRPlayer";
     std::wstring online_server = L"127.0.0.1";
     std::wstring online_friend_code;
@@ -359,6 +377,19 @@ struct App {
     bool mod_row_on[kModRows]{};
     HWND mod_row_toggle[kModRows]{}, mod_row_up[kModRows]{}, mod_row_down[kModRows]{};
     HWND mods_prev = nullptr, mods_next = nullptr;
+    // TROPHIES tab (trophy_data.hpp)
+    ctr_trophy::Set trophy_set;
+    std::map<int, std::int64_t> trophy_unlocked;
+    std::vector<std::unique_ptr<Bitmap>> trophy_icons;
+    std::wstring trophy_notice;
+    bool trophy_notice_error = false;
+    int trophy_hot = -1;
+    HWND trophy_key_edit = nullptr;
+    // Controllers found on this PC, and the four player menus.
+    struct PadOption { std::wstring value, label; };
+    std::vector<PadOption> pads;
+    HWND player_combo[4]{};
+    std::vector<std::wstring> pad_values[4];  // the choice behind each menu entry
     float scale = 1.0f;
     fs::path exe_dir, root, runtime_exe;
     Config cfg;
@@ -534,6 +565,9 @@ void load_config() {
             g.cfg.scene_height = g.cfg.native_4k ? L"2160" : (g.cfg.ps4_pro ? L"1440" : L"1080");
             text(L"scene_height", g.cfg.scene_height);
             text(L"upscaler", g.cfg.upscaler);
+            text(L"trophy_key", g.cfg.trophy_key);
+            text(L"player1_pad", g.cfg.player_pad[0]); text(L"player2_pad", g.cfg.player_pad[1]);
+            text(L"player3_pad", g.cfg.player_pad[2]); text(L"player4_pad", g.cfg.player_pad[3]);
             flag(L"online", g.cfg.online); flag(L"wumpa_x100", g.cfg.wumpa_x100);
         }
     }
@@ -576,7 +610,10 @@ void save_config() {
         ",\n  \"online_friend_code\": " + json_string(g.cfg.online_friend_code) +
         ",\n  \"public_server\": " + json_string(g.cfg.public_server) +
         ",\n  \"online_host\": " + flag(g.cfg.online_host) +
-        ",\n  \"online_public_ip\": " + json_string(g.cfg.online_public_ip) + "\n}";
+        ",\n  \"online_public_ip\": " + json_string(g.cfg.online_public_ip) +
+        ",\n  \"trophy_key\": " + json_string(g.cfg.trophy_key) +
+        ",\n  \"player1_pad\": " + json_string(g.cfg.player_pad[0]) + ",\n  \"player2_pad\": " + json_string(g.cfg.player_pad[1]) +
+        ",\n  \"player3_pad\": " + json_string(g.cfg.player_pad[2]) + ",\n  \"player4_pad\": " + json_string(g.cfg.player_pad[3]) + "\n}";
     std::error_code ec;
     fs::create_directories(config_path().parent_path(), ec);
     std::ofstream(config_path(), std::ios::binary | std::ios::trunc) << json;
@@ -715,7 +752,7 @@ void render_base_layer() {
         }
 
         text(gr, L"Launcher " + ctr_update::wide(ctr_update::version), 1, 11.5f, FontStyleRegular,
-             rect(24, 474, 210, 24), kTextMuted);
+             rect(24, 550, 210, 24), kTextMuted);
         // Aside bottom tag (slanted -8 deg)
         draw_slanted_box(gr, rect(24, kHeight - 50, 80, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeCyan)), kArcadeDark, 2.0f);
         text(gr, L"V1.21", 1, 11.5f, FontStyleBold, rect(24, kHeight - 50, 80, 26), kArcadeDark, StringAlignmentCenter);
@@ -1158,6 +1195,60 @@ void paint_window(HDC target) {
                 const std::wstring notice = !g.mods_notice.empty() ? g.mods_notice
                     : g.mods_game.empty() ? std::wstring(tr(L"Game version unknown")) : trf(L"Game: {0}", g.mods_game);
                 text(gr, notice, 1, 11.0f, FontStyleRegular, rect(296, 582, 694, 22), g.mods_notice_error ? kArcadePink : kTextMuted, StringAlignmentCenter);
+            } else if (g.current_tab == TAB_TROPHIES) {
+                text(gr, tr(L"TROPHIES"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
+                const auto total = g.trophy_set.trophies.size();
+                draw_slanted_box(gr, rect(870, 84, 120, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
+                text(gr, std::to_wstring(g.trophy_unlocked.size()) + L" / " + std::to_wstring(total), 1, 11.0f, FontStyleBold,
+                     rect(870, 84, 120, 26), g.trophy_unlocked.empty() ? kTextMuted : kArcadeLime, StringAlignmentCenter);
+                ColorMatrix gray = {{{0.2f, 0.2f, 0.2f, 0, 0}, {0.4f, 0.4f, 0.4f, 0, 0}, {0.1f, 0.1f, 0.1f, 0, 0}, {0, 0, 0, 0.35f, 0}, {0, 0, 0, 0, 1}}};
+                ImageAttributes locked;
+                locked.SetColorMatrix(&gray);
+                for (std::size_t i = 0; i < total && i < g.trophy_icons.size(); ++i) {
+                    const float x = kTrophyLeft + (i % kTrophyColumns) * kTrophyCell, y = kTrophyTop + (i / kTrophyColumns) * kTrophyCell;
+                    const bool unlocked = g.trophy_unlocked.count(g.trophy_set.trophies[i].id) > 0;
+                    if (static_cast<int>(i) == g.trophy_hot) fill_round(gr, rect(x - 3, y - 3, kTrophyIcon + 6, kTrophyIcon + 6), 8, SolidBrush(Color(kArcadeGold)));
+                    if (Bitmap* icon = g.trophy_icons[i].get()) {
+                        const RectF r = rect(x, y, kTrophyIcon, kTrophyIcon);
+                        if (unlocked) gr.DrawImage(icon, r);
+                        else gr.DrawImage(icon, r, 0, 0, static_cast<REAL>(icon->GetWidth()), static_cast<REAL>(icon->GetHeight()), UnitPixel, &locked);
+                    } else {
+                        fill_round(gr, rect(x, y, kTrophyIcon, kTrophyIcon), 8, SolidBrush(Color(kArcadeCard)));
+                    }
+                }
+                if (total == 0) {
+                    text(gr, tr(L"No trophy file in the dump"), 1, 13.0f, FontStyleRegular, rect(296, 140, 694, 24), kTextMuted);
+                } else {
+                    const int shown = g.trophy_hot >= 0 && g.trophy_hot < static_cast<int>(total) ? g.trophy_hot : 0;
+                    const auto& t = g.trophy_set.trophies[static_cast<std::size_t>(shown)];
+                    const auto when = g.trophy_unlocked.find(t.id);
+                    const RectF card = rect(296, 362, 694, 100);
+                    fill_round(gr, card, 14, SolidBrush(Color(kArcadeCard)));
+                    stroke_round(gr, card, 14, kArcadeDark, 3.0f);
+                    if (static_cast<std::size_t>(shown) < g.trophy_icons.size() && g.trophy_icons[static_cast<std::size_t>(shown)])
+                        gr.DrawImage(g.trophy_icons[static_cast<std::size_t>(shown)].get(), rect(310, 372, 80, 80));
+                    std::wstring name = t.name.empty() ? trf(L"Trophy {0}", std::to_wstring(t.id)) : widen(t.name);
+                    std::wstring detail = widen(t.detail);
+                    if (t.hidden && when == g.trophy_unlocked.end() && g.trophy_set.texts) { name = tr(L"Hidden trophy"); detail.clear(); }
+                    const wchar_t* grade = t.grade == 'P' ? L"Platinum" : t.grade == 'G' ? L"Gold" : t.grade == 'S' ? L"Silver" : t.grade == 'B' ? L"Bronze" : nullptr;
+                    text(gr, name, 1, 15.0f, FontStyleBold, rect(404, 370, 440, 22), kTextLight);
+                    if (grade) text(gr, tr(grade), 1, 11.0f, FontStyleBold, rect(850, 372, 130, 18), kArcadeGold, StringAlignmentFar);
+                    text(gr, detail, 1, 11.5f, FontStyleRegular, rect(404, 394, 576, 34), kTextMuted);
+                    std::wstring state = tr(L"Locked");
+                    if (when != g.trophy_unlocked.end()) {
+                        const std::time_t at = static_cast<std::time_t>(when->second);
+                        std::tm local{};
+                        wchar_t date[32]{};
+                        if (!localtime_s(&local, &at)) std::wcsftime(date, 32, L"%Y-%m-%d %H:%M", &local);
+                        state = trf(L"Unlocked {0}", date);
+                    }
+                    text(gr, state, 1, 11.0f, FontStyleBold, rect(404, 432, 576, 20), when != g.trophy_unlocked.end() ? kArcadeLime : kTextMuted);
+                }
+                text(gr, tr(L"Trophy key (optional):"), 1, 11.5f, FontStyleBold, rect(296, 478, 520, 18), kTextMuted);
+                draw_field(gr, rect(296, 500, 520, 34), g.trophy_key_edit);
+                const std::wstring note = !g.trophy_notice.empty() ? g.trophy_notice
+                    : g.trophy_set.texts ? std::wstring() : std::wstring(tr(L"Names and descriptions need your PS4 trophy key."));
+                text(gr, note, 1, 11.0f, FontStyleRegular, rect(296, 544, 694, 22), g.trophy_notice_error ? kArcadePink : kTextMuted);
             } else if (g.current_tab == TAB_SETTINGS) {
                 text(gr, tr(L"SETTINGS"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
 
@@ -1190,17 +1281,18 @@ void paint_window(HDC target) {
                 text(gr,g.cfg.online ? L"ONLINE" : L"OFFLINE",0,18,FontStyleBold,rect(548,490,190,28),g.cfg.online ? kArcadeLime : kTextMuted);
 
                 // Card 3: CONTROLLER & AUDIO
-                const RectF c_card = rect(768, 126, 222, 166);
+                const RectF c_card = rect(768, 126, 222, 300);
                 fill_round(gr, c_card, 18, SolidBrush(Color(kArcadeCard)));
                 stroke_round(gr, c_card, 18, kArcadeDark, 3.0f);
                 text(gr, tr(L"CONTROLLER"), 0, 18.0f, FontStyleBold, rect(784, 142, 190, 24), kArcadePink);
+                for (int player = 0; player < 4; ++player)
+                    text(gr, trf(L"Player {0}", std::to_wstring(player + 1)), 1, 10.5f, FontStyleBold, rect(784, 168.f + player * 46.f, 190, 16), kTextMuted);
 
+                fill_round(gr, rect(768, 436, 222, 140), 18, SolidBrush(Color(kArcadeCard)));
+                stroke_round(gr, rect(768, 436, 222, 140), 18, kArcadeDark, 3);
 
-                fill_round(gr, rect(768, 302, 222, 274), 18, SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr, rect(768, 302, 222, 274), 18, kArcadeDark, 3);
-
-                text(gr, tr(L"Game language:"), 1, 11, FontStyleBold, rect(784, 410, 190, 20), kTextMuted);
-                text(gr, L"AUDIO", 0, 18.0f, FontStyleBold, rect(784, 308, 190, 24), kArcadeLime);
+                text(gr, tr(L"Game language:"), 1, 11, FontStyleBold, rect(784, 516, 190, 20), kTextMuted);
+                text(gr, L"AUDIO", 0, 18.0f, FontStyleBold, rect(784, 446, 100, 24), kArcadeLime);
             } else if (g.current_tab == TAB_ADVANCED) {
                 text(gr, tr(L"ADVANCED"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
 
@@ -1519,10 +1611,12 @@ void select_tab(int tab) {
     }
     sync_mod_rows();  // hides the unused rows of the MODS page
     ShowWindow(g.base_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
+    ShowWindow(g.trophy_key_edit, tab == TAB_TROPHIES ? SW_SHOW : SW_HIDE);
     ShowWindow(g.patch_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
 
     const bool show_settings = (tab == TAB_SETTINGS);
     ShowWindow(g.language_combo, show_settings ? SW_SHOW : SW_HIDE);
+    for (HWND combo : g.player_combo) if (combo) ShowWindow(combo, show_settings ? SW_SHOW : SW_HIDE);
     ShowWindow(g.scene_combo, show_settings ? SW_SHOW : SW_HIDE);
     ShowWindow(g.upscaler_combo, show_settings ? SW_SHOW : SW_HIDE);
     if (g.online_id_edit) ShowWindow(g.online_id_edit, show_settings ? SW_SHOW : SW_HIDE);
@@ -1736,6 +1830,153 @@ void reload_mods() {
     }
 }
 
+// --- Controllers ------------------------------------------------------------------------------
+// XInput slots (Xbox and compatible controllers) and the other HID gamepads, which the game
+// reads through SDL in ctr_gpu.dll: DualShock 4, DualSense and others.
+std::vector<App::PadOption> detect_pads() {
+    std::vector<App::PadOption> found;
+    using GetState = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
+    if (HMODULE xinput = LoadLibraryExW(L"xinput1_4.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)) {
+        if (auto get = reinterpret_cast<GetState>(GetProcAddress(xinput, "XInputGetState")))
+            for (DWORD slot = 0; slot < 4; ++slot) {
+                XINPUT_STATE state{};
+                if (get(slot, &state) == ERROR_SUCCESS)
+                    found.push_back({L"xinput:" + std::to_wstring(slot), trf(L"Xbox controller {0}", std::to_wstring(slot + 1))});
+            }
+        FreeLibrary(xinput);
+    }
+    GUID hid{};
+    HidD_GetHidGuid(&hid);
+    const HDEVINFO set = SetupDiGetClassDevsW(&hid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+    if (set != INVALID_HANDLE_VALUE) {
+        std::map<std::wstring, int> seen;
+        SP_DEVICE_INTERFACE_DATA item{sizeof(item)};
+        for (DWORD i = 0; SetupDiEnumDeviceInterfaces(set, nullptr, &hid, i, &item); ++i) {
+            DWORD size = 0;
+            SetupDiGetDeviceInterfaceDetailW(set, &item, nullptr, 0, &size, nullptr);
+            std::vector<unsigned char> buffer(size);
+            auto* detail = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA_W*>(buffer.data());
+            detail->cbSize = sizeof(*detail);
+            if (!size || !SetupDiGetDeviceInterfaceDetailW(set, &item, detail, size, nullptr, nullptr)) continue;
+            const std::wstring path = detail->DevicePath;
+            if (lower(path).find(L"ig_") != std::wstring::npos) continue;  // an XInput controller, listed above
+            const HANDLE device = CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+            if (device == INVALID_HANDLE_VALUE) continue;
+            HIDD_ATTRIBUTES attributes{sizeof(attributes)};
+            PHIDP_PREPARSED_DATA preparsed = nullptr;
+            HIDP_CAPS caps{};
+            const bool ok = HidD_GetAttributes(device, &attributes) && HidD_GetPreparsedData(device, &preparsed) &&
+                            HidP_GetCaps(preparsed, &caps) == HIDP_STATUS_SUCCESS;
+            if (preparsed) HidD_FreePreparsedData(preparsed);
+            wchar_t product[128]{};
+            if (ok) HidD_GetProductString(device, product, sizeof(product));
+            CloseHandle(device);
+            if (!ok || caps.UsagePage != 1 || (caps.Usage != 4 && caps.Usage != 5)) continue;
+            std::wstring label = product[0] ? product : L"Gamepad";
+            if (attributes.VendorID == 0x054C) {
+                if (attributes.ProductID == 0x0CE6) label = L"DualSense";
+                else if (attributes.ProductID == 0x0DF2) label = L"DualSense Edge";
+                else if (attributes.ProductID == 0x05C4 || attributes.ProductID == 0x09CC || attributes.ProductID == 0x0BA0) label = L"DualShock 4";
+            }
+            if (const int n = ++seen[label]; n > 1) label += L" (" + std::to_wstring(n) + L")";
+            found.push_back({L"hid:" + path, label});
+        }
+        SetupDiDestroyDeviceInfoList(set);
+    }
+    return found;
+}
+
+// Fills the four player menus: Auto, None (players 2-4), Keyboard, then the controllers found.
+// A saved controller that is not connected stays selectable as "not connected".
+void refresh_pads() {
+    if (!g.player_combo[0]) return;
+    g.pads = detect_pads();
+    for (int player = 0; player < 4; ++player) {
+        HWND combo = g.player_combo[player];
+        SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+        std::vector<std::wstring> values;
+        const auto add = [&](const std::wstring& value, const std::wstring& label) {
+            values.push_back(value);
+            SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+        };
+        add(L"auto", tr(L"Auto"));
+        if (player) add(L"none", tr(L"None"));
+        add(L"keyboard", tr(L"Keyboard"));
+        for (const auto& pad : g.pads) add(pad.value, pad.label);
+        const auto& chosen = g.cfg.player_pad[player];
+        auto at = std::find(values.begin(), values.end(), chosen);
+        if (at == values.end()) {
+            if (chosen.rfind(L"xinput:", 0) == 0 || chosen.rfind(L"hid:", 0) == 0) {
+                add(chosen, tr(L"Not connected"));
+                at = values.end() - 1;
+            } else {
+                at = values.begin();
+            }
+        }
+        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(at - values.begin()), 0);
+        g.pad_values[player] = values;
+    }
+}
+
+// --- TROPHIES tab -----------------------------------------------------------------------------
+void reload_trophies() {
+    g.trophy_set = {};
+    g.trophy_unlocked.clear();
+    g.trophy_icons.clear();
+    g.trophy_notice.clear();
+    g.trophy_notice_error = false;
+    try {
+        const int language = kGameLanguages[game_language_index(g.cfg.game_language)].system_id;
+        g.trophy_set = ctr_trophy::load({g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path(), resolve(g.cfg.base_dir)},
+                                        narrow(g.cfg.trophy_key), language);
+        const fs::path user = g.root / "runtime/user";
+        const auto file = ctr_trophy::unlock_file(user, g.trophy_set.np_comm_id);
+        ctr_trophy::import_jsonl(user, file);
+        g.trophy_unlocked = ctr_trophy::read_unlocks(file);
+        for (const auto& t : g.trophy_set.trophies) {
+            std::unique_ptr<Bitmap> image;
+            const auto png = ctr_trophy::icon(g.trophy_set, t.id);
+            if (!png.empty())
+                if (IStream* stream = SHCreateMemStream(png.data(), static_cast<UINT>(png.size()))) {
+                    image.reset(Bitmap::FromStream(stream));
+                    stream->Release();
+                    if (image && image->GetLastStatus() != Ok) image.reset();
+                }
+            g.trophy_icons.push_back(std::move(image));
+        }
+        if (!g.trophy_set.error.empty()) { g.trophy_notice = widen(g.trophy_set.error); g.trophy_notice_error = true; }
+    } catch (const std::exception&) {
+        g.trophy_set = {};
+    }
+    if (g.trophy_hot >= static_cast<int>(g.trophy_set.trophies.size())) g.trophy_hot = -1;
+}
+
+// The trophy key shadPS4 keeps in %APPDATA%/shadPS4/keys.json (TrophyKeySet.ReleaseTrophyKey).
+void import_trophy_key() {
+    wchar_t appdata[MAX_PATH]{};
+    std::string key;
+    if (GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH)) {
+        std::ifstream in(fs::path(appdata) / "shadPS4/keys.json", std::ios::binary);
+        if (in) {
+            std::stringstream buffer;
+            buffer << in.rdbuf();
+            try {
+                const auto keys = ctr_online::parse_json(buffer.str().rfind("\xEF\xBB\xBF", 0) == 0 ? buffer.str().substr(3) : buffer.str());
+                if (const auto* set = keys.find("TrophyKeySet"))
+                    if (const auto* value = set->find("ReleaseTrophyKey")) key = value->text;
+            } catch (const std::exception&) {}
+        }
+    }
+    unsigned char check[16];
+    if (!ctr_trophy::parse_key(key, check)) {
+        g.trophy_notice = tr(L"No trophy key in shadPS4's keys.json.");
+        g.trophy_notice_error = true;
+        InvalidateRect(g.window, nullptr, FALSE);
+        return;
+    }
+    SetWindowTextW(g.trophy_key_edit, widen(key).c_str());  // EN_CHANGE saves and reloads
+}
+
 void sync_mod_rows() {
     if (!g.mods_prev) return;
     const bool files = g.mods_view == 0;
@@ -1908,7 +2149,14 @@ void launch_game() {
     std::map<std::wstring, std::wstring> set{{L"CTR_GPU_LIBRARY", L"1"}, {L"CTR_TLS_PATCH", L"1"}, {L"CTR_GPU_LOG", L"error"},
                                              {L"CTR_NO_FRAME_OBSERVATION", L"1"}, {L"CTR_BASE_DIR", base.wstring()}};
     set[L"CTR_SYSTEM_LANGUAGE"] = std::to_wstring(kGameLanguages[game_language_index(g.cfg.game_language)].system_id);
-    set[L"CTR_SPLIT_SCREEN"] = g.cfg.split_screen ? L"1" : L"0";
+    bool fixed_guest = false;
+    std::wstring players;
+    for (int player = 0; player < 4; ++player) {
+        players += (player ? L"|" : L"") + g.cfg.player_pad[player];
+        if (player && g.cfg.player_pad[player] != L"auto" && g.cfg.player_pad[player] != L"none") fixed_guest = true;
+    }
+    set[L"CTR_PAD_PLAYERS"] = players;
+    set[L"CTR_SPLIT_SCREEN"] = g.cfg.split_screen || fixed_guest ? L"1" : L"0";
     set[L"CTR_XBOX_PROMPTS"] = g.cfg.xbox_prompts ? L"1" : L"0";
     set[L"CTR_WUMPA_MULTIPLIER"] = g.cfg.wumpa_x100 ? L"100" : L"1";
     set[L"CTR_ONLINE_ID"] = g.cfg.online_id; // Display name applies to offline sessions too.
@@ -1919,6 +2167,7 @@ void launch_game() {
     set[L"CTR_UPSCALER"] = g.cfg.upscaler;
     set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
+    if (!g.cfg.trophy_key.empty()) set[L"CTR_TROPHY_KEY"] = g.cfg.trophy_key;
     if (g.cfg.mods_enabled) {
         set[L"CTR_MODS_DIR"] = mods_dir().wstring();
         set[L"CTR_MODS_CONFIG"] = mods_config_path().wstring();
@@ -1960,7 +2209,7 @@ void launch_game() {
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION",
         L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
         L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT",
-        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG", L"CTR_ONLINE_ACCOUNT"});
+        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG", L"CTR_ONLINE_ACCOUNT", L"CTR_TROPHY_KEY", L"CTR_PAD_PLAYERS"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     const auto open_log = [&](const wchar_t* suffix) {
@@ -2117,6 +2366,11 @@ void create_controls() {
     g.mods_next = add_button(ID_MODS_NEXT, Kind::ActionBtn, rect(900, 544, 90, 30), L"▶", nullptr, -1, TAB_MODS);
     reload_mods();
 
+    // --- TROPHIES ---
+    g.trophy_key_edit = add_edit(ID_TROPHY_KEY_EDIT, rect(296, 500, 520, 34), g.cfg.trophy_key, ES_PASSWORD);
+    add_button(ID_TROPHY_IMPORT, Kind::ActionBtn, rect(830, 500, 160, 34), L"IMPORT FROM shadPS4", nullptr, -1, TAB_TROPHIES);
+    reload_trophies();
+
     // --- TAB 2: SETTINGS ---
     // Graphics: Resolution pills
     for (int i = 0; i < 5; ++i)
@@ -2152,12 +2406,18 @@ void create_controls() {
     add_button(ID_WUMPA_X100, Kind::Toggle, rect(548, 426, 190, 26), L"Wumpa Coins x100", &g.cfg.wumpa_x100, -1, TAB_SETTINGS);
 
     // Controller & Audio (Card 3)
-    add_button(ID_XBOX_PROMPTS, Kind::Toggle, rect(784, 234, 190, 26), L"Colored Xbox icons", &g.cfg.xbox_prompts, -1, TAB_SETTINGS);
-    add_button(ID_SPLIT_SCREEN, Kind::Toggle, rect(784, 262, 190, 26), L"Split screen (2-4)", &g.cfg.split_screen, -1, TAB_SETTINGS);
-    add_button(ID_AUDIO_TEST, Kind::ActionBtn, rect(784, 372, 190, 34), L"Test audio", nullptr, -1, TAB_SETTINGS);
+    for (int player = 0; player < 4; ++player) {
+        g.player_combo[player] = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+            px(784), px(185.f + player * 46.f), px(190), px(220), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_PLAYER_PAD + player)), nullptr, nullptr);
+        SendMessageW(g.player_combo[player], WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
+    }
+    refresh_pads();
+    add_button(ID_XBOX_PROMPTS, Kind::Toggle, rect(784, 362, 190, 26), L"Colored Xbox icons", &g.cfg.xbox_prompts, -1, TAB_SETTINGS);
+    add_button(ID_SPLIT_SCREEN, Kind::Toggle, rect(784, 392, 190, 26), L"Split screen (2-4)", &g.cfg.split_screen, -1, TAB_SETTINGS);
+    add_button(ID_AUDIO_TEST, Kind::ActionBtn, rect(850, 444, 126, 30), L"Test audio", nullptr, -1, TAB_SETTINGS);
 
     g.language_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(784), px(434), px(190), px(200), g.window, reinterpret_cast<HMENU>(ID_GAME_LANGUAGE), nullptr, nullptr);
+        px(784), px(538), px(190), px(200), g.window, reinterpret_cast<HMENU>(ID_GAME_LANGUAGE), nullptr, nullptr);
     SendMessageW(g.language_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
     for (const auto& language : kGameLanguages) SendMessageW(g.language_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(language.label));
     SendMessageW(g.language_combo, CB_SETCURSEL, game_language_index(g.cfg.game_language), 0);
@@ -2203,6 +2463,20 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         if (ctr_update::portable(g.root, g.exe_dir)) check_launcher_update(false);
         return 0;
     }
+    case WM_DEVICECHANGE:
+        if (wparam == 0x0007 /* DBT_DEVNODES_CHANGED */) refresh_pads();
+        break;
+    case WM_MOUSEMOVE:
+        if (g.current_tab == TAB_TROPHIES) {
+            const float x = static_cast<short>(LOWORD(lparam)) / g.scale - kTrophyLeft, y = static_cast<short>(HIWORD(lparam)) / g.scale - kTrophyTop;
+            int hot = -1;
+            if (x >= 0 && y >= 0 && std::fmod(x, kTrophyCell) < kTrophyIcon && std::fmod(y, kTrophyCell) < kTrophyIcon) {
+                const int index = static_cast<int>(y / kTrophyCell) * kTrophyColumns + static_cast<int>(x / kTrophyCell);
+                if (static_cast<int>(x / kTrophyCell) < kTrophyColumns && index < static_cast<int>(g.trophy_set.trophies.size())) hot = index;
+            }
+            if (hot >= 0 && hot != g.trophy_hot) { g.trophy_hot = hot; InvalidateRect(window, nullptr, FALSE); }
+        }
+        break;
     case WM_NCHITTEST: {
         POINT pt{static_cast<short>(LOWORD(lparam)), static_cast<short>(HIWORD(lparam))};
         ScreenToClient(window, &pt);
@@ -2250,12 +2524,37 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             validate();
             return 0;
         }
+        if (id >= ID_PLAYER_PAD && id < ID_PLAYER_PAD + 4 && code == CBN_SELCHANGE) {
+            const int player = id - ID_PLAYER_PAD;
+            const auto selected = SendMessageW(g.player_combo[player], CB_GETCURSEL, 0, 0);
+            if (selected >= 0 && static_cast<std::size_t>(selected) < g.pad_values[player].size()) {
+                const auto value = g.pad_values[player][static_cast<std::size_t>(selected)];
+                // A controller belongs to one player: it leaves the player that had it.
+                if (value != L"auto" && value != L"none")
+                    for (int other = 0; other < 4; ++other)
+                        if (other != player && g.cfg.player_pad[other] == value) g.cfg.player_pad[other] = L"auto";
+                g.cfg.player_pad[player] = value;
+                save_config();
+                refresh_pads();
+            }
+            return 0;
+        }
         if (id == ID_GAME_LANGUAGE && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.language_combo, CB_GETCURSEL, 0, 0);
             if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kGameLanguages)))
                 g.cfg.game_language = kGameLanguages[selected].code;
             launcher_text::set_language(g.cfg.game_language);
             refresh_language();
+            return 0;
+        }
+        if (id == ID_TROPHY_KEY_EDIT && code == EN_CHANGE) {
+            g.cfg.trophy_key = window_text(g.trophy_key_edit);
+            unsigned char check[16];
+            if (g.cfg.trophy_key.empty() || ctr_trophy::parse_key(narrow(g.cfg.trophy_key), check)) {
+                save_config();
+                reload_trophies();
+            }
+            InvalidateRect(window, nullptr, FALSE);
             return 0;
         }
         if (code == EN_CHANGE) {
@@ -2279,6 +2578,8 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         if (id >= ID_TAB_BASE && id < ID_TAB_BASE + static_cast<int>(TAB_COUNT)) {
             const int tab = id - ID_TAB_BASE;
             if (tab == TAB_MODS) reload_mods();  // folders may have changed outside the launcher
+            if (tab == TAB_TROPHIES) reload_trophies();  // the game may have unlocked trophies
+            if (tab == TAB_SETTINGS) refresh_pads();
             select_tab(tab);
             return 0;
         }
@@ -2308,6 +2609,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             return 0;
         }
         if (id == ID_MODS_REFRESH) { reload_mods(); sync_mod_rows(); return 0; }
+        if (id == ID_TROPHY_IMPORT) { import_trophy_key(); return 0; }
         if (id == ID_MODS_MASTER) {
             g.cfg.mods_enabled = !g.cfg.mods_enabled;
             save_config();

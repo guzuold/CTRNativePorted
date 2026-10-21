@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.5.2](https://github.com/guzuold/CTRNativePorted/releases)**
+**Latest release: [v0.5.3](https://github.com/guzuold/CTRNativePorted/releases)**
 (experimental pre-release). The game is playable from start to finish. Online races
 between two PCs over the Internet work and complete, in private matches and in public
 matchmaking; see the [limits](#online-status-and-limits).
@@ -58,6 +58,11 @@ matchmaking; see the [limits](#online-status-and-limits).
 - **PlayStation controllers:** DualShock 4 and DualSense, over USB or Bluetooth, with
   vibration and no DS4Windows needed.
 - **Keyboard input.**
+- **Controller per player:** Settings detects the connected controllers. It shows each
+  controller's type: Xbox controller on its XInput slot, DualShock 4, DualSense or another
+  gamepad. Each of players 1–4 gets a menu: Auto, None, Keyboard or one of the controllers.
+  Assigning a controller to players 2–4 turns split screen on. Players left on Auto join by
+  holding a button, as before.
 - **Colored Xbox button prompts** (optional). They are built from your own dump on the
   first launch. See [`ctrport/XBOX_PROMPTS.md`](ctrport/XBOX_PROMPTS.md).
 - **Quick exit from the controller:** hold View + Menu (Share + Options) for 1.2 seconds,
@@ -71,6 +76,16 @@ matchmaking; see the [limits](#online-status-and-limits).
   and patch files work in both.
 - **Game files are never modified.** Every patch is checked against the running executable
   before it is applied. See [`ctrport/MODS.md`](ctrport/MODS.md).
+
+### Trophies
+- **The game's 48 trophies unlock during play.** A notice with the trophy icon appears over
+  the game, and the platinum unlocks with the last base trophy.
+- **Unlocks are kept** in `runtime/user/trophies` and reported back to the game.
+- **TROPHIES tab** in the launcher: every trophy icon, unlocked or locked, with the unlock
+  date and the progress.
+- **Names and descriptions:** with your own PS4 trophy key, typed in the tab or imported
+  from shadPS4's `keys.json`, they are shown in the game language. Without the key,
+  trophies are shown by number.
 
 ### Wumpa Coins and Pit Stop
 - **Wumpa Coins** are earned in races, Adventure included, and kept by your own local

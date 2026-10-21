@@ -1,3 +1,34 @@
+## v0.5.3 — 2026-10-21
+
+Trophies, and a controller for each player.
+
+- **Trophies:** the game's 48 trophies now unlock.
+  - Earlier versions reported no trophies to the game, which then repeated the same unlock hundreds of times.
+  - Unlocks are kept in `runtime/user/trophies/<NP communication ID>.txt` and reported back to the game. Unlocks recorded by earlier versions are imported.
+  - Each unlock shows a notice over the game for five seconds, with the trophy icon. The platinum unlocks with the last base trophy.
+- **TROPHIES tab** in the launcher:
+  - every trophy icon, in color when unlocked and gray when locked, with the progress;
+  - name, grade and unlock date on hover;
+  - an optional field for your own PS4 trophy key, or IMPORT FROM shadPS4 (`keys.json`). With the key, names and descriptions are shown in the game language; without it, trophies are shown by number.
+- **Controllers in Settings:**
+  - the launcher detects the connected controllers and their type: Xbox controller on its XInput slot, DualShock 4, DualSense or another gamepad;
+  - each of players 1–4 has a menu: Auto, None, Keyboard or a controller;
+  - a controller fixed to a player is used only by that player and logs in when connected;
+  - assigning a controller to players 2–4 turns split screen on;
+  - players on Auto join by holding a button, as before;
+  - the list refreshes when a device is connected or removed.
+- `ctr_gpu.dll` gives the runtime the device path of each PlayStation controller (`ctr_gpu_gamepad_path`), so that the launcher's choice finds the same controller.
+- Launcher: the launcher version moved below Check updates, and a German Settings label was shortened.
+
+Validation:
+- The split screen control passes with new cases for fixed players, "None" and late connection. The mods and invitation tests pass.
+- The trophy file of the dump is read (48 trophies, icons), and a wrong key is rejected.
+- Launcher screens were checked by capture in Italian, German and French.
+
+Not tested in game: the trophy notice over the game, names with a real trophy key, and the controller assignment with real controllers in a race.
+
+Update with Check updates. `runtime/user` and `runtime/mods` are kept.
+
 ## v0.5.2 — 2026-10-21
 
 Players with the same name no longer collide online.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Texts of the runtime's own windows (invitation picker and prompts), in the game language
+// Texts of the runtime's own windows (invitation picker, prompts, trophy notice), in the game language
 // chosen in the launcher (CTR_SYSTEM_LANGUAGE: 1 English, 2 French, 3 Spanish, 4 German,
 // 5 Italian). Other languages use English. "{0}" is replaced by ui_format's argument.
 #pragma once
@@ -8,7 +8,7 @@
 #include <string>
 namespace ctr_ui {
 enum class Text { NoFriends, Send, InvitationFrom, NoInvitations, Accept, JoinQuestion, AcceptFailed,
-                  DeclineFailed, RetryHint, ErrorTitle, SelectRecipients, Cancel, Count };
+                  DeclineFailed, RetryHint, ErrorTitle, SelectRecipients, Cancel, TrophyUnlocked, Trophy, Count };
 // The picker window is found by this title (invitation_dialog.cpp), so it is not translated.
 inline constexpr const wchar_t* kInvitationTitle = L"CTR - Invitation";
 inline int ui_language() {
@@ -32,6 +32,8 @@ inline const wchar_t* ui_text(Text text) {
         {L"CTR - Invitation error", L"CTR - Erreur d'invitation", L"CTR - Errore invito", L"CTR - Einladungsfehler", L"CTR - Error de invitación"},
         {L"Select 1 to {0} recipients.", L"Sélectionnez de 1 à {0} destinataires.", L"Seleziona da 1 a {0} destinatari.", L"Wähle 1 bis {0} Empfänger.", L"Selecciona de 1 a {0} destinatarios."},
         {L"Cancel", L"Annuler", L"Annulla", L"Abbrechen", L"Cancelar"},
+        {L"Trophy unlocked", L"Trophée débloqué", L"Trofeo sbloccato", L"Trophäe freigeschaltet", L"Trofeo desbloqueado"},
+        {L"Trophy {0}", L"Trophée {0}", L"Trofeo {0}", L"Trophäe {0}", L"Trofeo {0}"},
     };
     return table[static_cast<int>(text)][ui_language()];
 }

@@ -12,7 +12,7 @@ foreach($line in (cmd /c "`"$taskVc`" >nul && set")){
 }
 $sources=@('hle_tests/invitation_dialog_test.cpp','hle/invitation_dialog.cpp','hle/ctr_hle.cpp','hle/invitation_flow.cpp','hle/invitation_ui.cpp','hle/online_config.cpp','online_server/json.cpp') |
     ForEach-Object {Join-Path (Join-Path $taskRoot 'ctrport') $_}
-& $Clang /nologo /std:c++20 /EHsc /DCTR_HLE_BUILD /DWIN32_LEAN_AND_MEAN /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS /W4 /WX @sources "/Fo$taskOut/" "/Fe$taskOut/invitation_dialog_test.exe" /link user32.lib gdi32.lib
+& $Clang /nologo /std:c++20 /EHsc /DCTR_HLE_BUILD /DWIN32_LEAN_AND_MEAN /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS /W4 /WX @sources "/Fo$taskOut/" "/Fe$taskOut/invitation_dialog_test.exe" /link user32.lib gdi32.lib gdiplus.lib shlwapi.lib bcrypt.lib
 if($LASTEXITCODE -ne 0){throw 'Invitation test build failed'}
 if($BuildRuntimeLibrary) {
     $taskObjects=Join-Path $taskOut 'hle_obj'
@@ -20,7 +20,7 @@ if($BuildRuntimeLibrary) {
     $taskSources=Get-ChildItem (Join-Path $taskRoot 'ctrport/hle') -Filter '*.cpp' | Select-Object -ExpandProperty FullName
     $taskSources += Join-Path $taskRoot 'ctrport/online_server/json.cpp'
     $taskBuiltins=Join-Path (Split-Path (Split-Path $Clang)) 'lib/clang/19/lib/windows/clang_rt.builtins-x86_64.lib'
-    & $Clang /nologo /LD /MD /O2 /std:c++latest /EHsc /DCTR_HLE_BUILD /DWIN32_LEAN_AND_MEAN /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS @taskSources "/Fo$taskObjects/" "/Fe$taskOut/ctr_hle.dll" /link user32.lib gdi32.lib $taskBuiltins *> (Join-Path $taskOut 'hle-build.log')
+    & $Clang /nologo /LD /MD /O2 /std:c++latest /EHsc /DCTR_HLE_BUILD /DWIN32_LEAN_AND_MEAN /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS @taskSources "/Fo$taskObjects/" "/Fe$taskOut/ctr_hle.dll" /link user32.lib gdi32.lib gdiplus.lib shlwapi.lib bcrypt.lib $taskBuiltins *> (Join-Path $taskOut 'hle-build.log')
     if($LASTEXITCODE -ne 0){Get-Content (Join-Path $taskOut 'hle-build.log') -Tail 30;throw 'HLE library build failed'}
 }
 
