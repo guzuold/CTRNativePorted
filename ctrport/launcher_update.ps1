@@ -278,7 +278,7 @@ try {
     } else {
         # Keep a recoverable journal and backups on any failure.
         Add-Type -AssemblyName System.Windows.Forms
-        [Windows.Forms.MessageBox]::Show("Aggiornamento non completato: $errorText`nI backup sono in runtime/user/updates.", 'CTRNativePorted update') | Out-Null
+        [Windows.Forms.MessageBox]::Show("Update not completed: $errorText`nBackups are in runtime/user/updates.", 'CTRNativePorted update') | Out-Null
         # Restart only after a verified complete rollback. An incomplete rollback
         # must remain pending for the next recovery attempt.
         if ($canRestart -and $Mode -eq 'Apply' -and $Transaction) {

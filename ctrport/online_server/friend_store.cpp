@@ -101,7 +101,7 @@ bool FriendStore::add_or_update(const std::string& code_str, const std::string& 
         }
 
         FriendEntry entry;
-        entry.nickname = nickname.empty() ? "Amico" : nickname;
+        entry.nickname = nickname.empty() ? "Friend" : nickname;
         entry.friend_code = info.code;
         entry.public_key = info.public_key;
         entry.last_status = "Mai contattato";

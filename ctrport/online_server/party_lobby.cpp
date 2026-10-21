@@ -20,14 +20,14 @@ Json sign_party_message(const HostIdentity& identity, const Json& payload) {
 Json verify_party_message(const Json& packet, const std::string& expected_code, std::uint64_t now) {
     FriendCodeInfo identity;
     if (parse_friend_code(expected_code, identity) != CodeParseError::Ok || packet.at("code").text != identity.code)
-        throw std::runtime_error("Identita lobby non valida");
+        throw std::runtime_error("Invalid lobby identity");
     const auto timestamp = packet.at("time").as_u64();
     if ((timestamp > now ? timestamp - now : now - timestamp) > 60)
         throw std::runtime_error("Messaggio lobby scaduto");
     const auto& body = packet.at("payload").text;
     if (!verify_friend_response(identity.public_key, "party-v1:" + hex(sha256(bytes_of(body))), {}, timestamp,
                                 from_hex(packet.at("signature").text)))
-        throw std::runtime_error("Firma lobby non valida");
+        throw std::runtime_error("Invalid lobby signature");
     return parse_json(body);
 }
 PartyLobby::PartyLobby(std::string owner) : owner_(std::move(owner)), room_(hex(random_bytes(32))), destination_(owner_) {}
@@ -80,9 +80,9 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
     const std::string action=request.at("action").text;
     const bool self=caller==owner_;
     if(action=="restore") {
-        if(!self || destination_==owner_)throw std::runtime_error("Ripristino non previsto per questa lobby");
+        if(!self || destination_==owner_)throw std::runtime_error("No recovery expected for this lobby");
         const auto recovery=verify_party_recovery(request.at("ticket"),destination_,room_,now);
-        if(recovery.successor!=owner_)throw std::runtime_error("Questo client non e il successore della lobby");
+        if(recovery.successor!=owner_)throw std::runtime_error("This client is not the lobby successor");
         std::map<std::string,Member> restored;
         for(const auto& member:recovery.members)restored.emplace(member.code,Member{member.name,now,member.endpoint});
         // Publish only after the entire signed checkpoint has been validated.
@@ -92,7 +92,7 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
     }
     if (action=="share") {
         if (!self || destination_!=owner_ || !members_.count(owner_))
-            throw std::runtime_error("Solo l'host della stanza puo creare un invito");
+            throw std::runtime_error("Only the room host can create an invitation");
         share_token_=hex(random_bytes(32)); share_created_=now;
         Json result=Json::object(); result.set("token",Json::of(share_token_));
         result.set("expires",Json::of(now+900)); return result;
@@ -112,33 +112,33 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
         result.set("invitations",invitations); return result;
     }
     if (!self && !friend_allowed && !members_.count(caller) && !invited_.count(caller) && !shared_join)
-        throw std::runtime_error("Invito assente, non valido o scaduto: chiedi un nuovo invito all'host");
+        throw std::runtime_error("Invitation missing, invalid or expired: ask the host for a new one");
     if (action=="configure" || action=="join") {
-        if (action=="configure" && !self) throw std::runtime_error("Solo il proprietario puo configurare la lobby");
-        if (destination_!=owner_) throw std::runtime_error("Questo amico e nella lobby di un altro host");
+        if (action=="configure" && !self) throw std::runtime_error("Only the owner can configure the lobby");
+        if (destination_!=owner_) throw std::runtime_error("This friend is in another host's lobby");
         const std::string name=request.at("name").text;
         if (name.size()<3 || name.size()>16 || name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")!=std::string::npos)
             throw std::runtime_error("Nome: 3-16 lettere, numeri, trattino o underscore");
         for (const auto& [code, member] : members_) if (code!=caller && member.name==name)
-            throw std::runtime_error("Nome gia usato nella lobby");
+            throw std::runtime_error("Name already used in the lobby");
         if (!members_.count(caller) && members_.size()>=8) throw std::runtime_error("Lobby piena (8/8)");
         const auto* supplied_endpoint=request.find("endpoint");
         const auto endpoint=supplied_endpoint ? supplied_endpoint->text : members_.count(caller) ? members_.at(caller).endpoint : std::string{};
-        if(!endpoint.empty() && !valid_party_endpoint(endpoint))throw std::runtime_error("Indirizzo host non valido");
+        if(!endpoint.empty() && !valid_party_endpoint(endpoint))throw std::runtime_error("Invalid host address");
         if(!members_.count(caller) || members_.at(caller).name!=name || members_.at(caller).endpoint!=endpoint)++generation_;
         members_[caller]={name,now,endpoint}; invited_.erase(caller);
     } else if (action=="heartbeat") {
         const auto it=members_.find(caller);
-        if (it==members_.end()) throw std::runtime_error("Non fai piu parte della lobby");
+        if (it==members_.end()) throw std::runtime_error("You are no longer in the lobby");
         it->second.seen=now;
     } else if (action=="leave") {
-        if (self) throw std::runtime_error("Usa nuova lobby per uscire come proprietario");
+        if (self) throw std::runtime_error("Use a new lobby to leave as the owner");
         if(members_.erase(caller))++generation_;
     } else if (action=="invite") {
-        if (!members_.count(caller) || destination_!=owner_) throw std::runtime_error("Entra in una lobby prima di invitare");
+        if (!members_.count(caller) || destination_!=owner_) throw std::runtime_error("Join a lobby before inviting");
         if (members_.size()>=8) throw std::runtime_error("Lobby piena (8/8)");
         FriendCodeInfo target;
-        if (parse_friend_code(request.at("target").text,target)!=CodeParseError::Ok) throw std::runtime_error("Codice invitato non valido");
+        if (parse_friend_code(request.at("target").text,target)!=CodeParseError::Ok) throw std::runtime_error("Invalid invited code");
         if (invited_.size()>=64 && !invited_.count(target.code)) throw std::runtime_error("Troppi inviti pendenti");
         invited_[target.code]={caller,now};
     } else if (action=="notify" || action=="receive_invite") {
@@ -146,11 +146,11 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
         if(action=="receive_invite") {
             if(!self) throw std::runtime_error("Operazione riservata al launcher locale");
             FriendCodeInfo from;
-            if(parse_friend_code(request.at("from").text,from)!=CodeParseError::Ok) throw std::runtime_error("Mittente non valido");
+            if(parse_friend_code(request.at("from").text,from)!=CodeParseError::Ok) throw std::runtime_error("Invalid sender");
             sender=from.code;
         }
         FriendCodeInfo host;
-        if (parse_friend_code(request.at("owner").text,host)!=CodeParseError::Ok) throw std::runtime_error("Host invito non valido");
+        if (parse_friend_code(request.at("owner").text,host)!=CodeParseError::Ok) throw std::runtime_error("Invalid invitation host");
         if (inbox_.size()>=64 && !inbox_.count(sender)) throw std::runtime_error("Troppi inviti ricevuti");
         inbox_[sender]=host.code; inbox_seen_[sender]=now;
     } else if (action=="destination" || action=="new") {
@@ -158,10 +158,10 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
         if (members_.size()>1) throw std::runtime_error("La tua lobby contiene altri giocatori");
         const std::string destination=action=="new" ? owner_ : request.at("owner").text;
         FriendCodeInfo target;
-        if (parse_friend_code(destination,target)!=CodeParseError::Ok) throw std::runtime_error("Destinazione non valida");
+        if (parse_friend_code(destination,target)!=CodeParseError::Ok) throw std::runtime_error("Invalid destination");
         const auto* supplied_room=request.find("room");
         const auto new_room=action=="destination" && supplied_room ? supplied_room->text : hex(random_bytes(32));
-        if(!valid_room_selector(new_room))throw std::runtime_error("Codice stanza non valido");
+        if(!valid_room_selector(new_room))throw std::runtime_error("Invalid room code");
         destination_=target.code;room_=new_room;members_.clear();invited_.clear();
         generation_=0;
         share_token_.clear();share_created_=0;

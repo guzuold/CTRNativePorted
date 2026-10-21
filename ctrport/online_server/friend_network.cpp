@@ -40,16 +40,16 @@ Json verify_peer_message(const Json& packet, const std::string& expected_code, s
     FriendCodeInfo identity;
     if (!packet.is_object() || parse_friend_code(expected_code, identity) != CodeParseError::Ok ||
         text_or_empty(packet, "code") != identity.code)
-        throw std::runtime_error("Identita del servizio amico non valida");
+        throw std::runtime_error("Invalid friend service identity");
     const auto timestamp = packet.at("time").as_u64();
     if ((timestamp > now ? timestamp - now : now - timestamp) > 60)
-        throw std::runtime_error("Messaggio del servizio amico scaduto");
+        throw std::runtime_error("Friend service message expired");
     const auto& body = packet.at("payload").text;
     if (!verify_friend_response(identity.public_key, digest_text(body), {}, timestamp,
                                 from_hex(packet.at("signature").text)))
-        throw std::runtime_error("Firma del servizio amico non valida");
+        throw std::runtime_error("Invalid friend service signature");
     Json payload = parse_json(body);
-    if (!payload.is_object()) throw std::runtime_error("Messaggio del servizio amico non valido");
+    if (!payload.is_object()) throw std::runtime_error("Invalid friend service message");
     return payload;
 }
 
@@ -61,13 +61,13 @@ Json peer_request(const HostIdentity& self, const std::string& ip, std::uint16_t
     std::string body;
     const int status = http_request(ip, port, "/ctr/v1/peer", dump_json(sign_peer_message(self, payload)), body, timeout_ms);
     if (status != 200) {
-        std::string reason = status == 0 ? "Servizio amico non raggiungibile" : "Servizio amico: HTTP " + std::to_string(status);
+        std::string reason = status == 0 ? "Friend service unreachable" : "Friend service: HTTP " + std::to_string(status);
         try { const auto error = parse_json(body); if (error.find("error")) reason = error.at("error").text; } catch (...) {}
         throw std::runtime_error(reason);
     }
     Json response = verify_peer_message(parse_json(body), target_code, party_now());
     if (text_or_empty(response, "nonce") != nonce || text_or_empty(response, "to") != self.friend_code())
-        throw std::runtime_error("Risposta del servizio amico non corrispondente");
+        throw std::runtime_error("Friend service reply does not match");
     return response;
 }
 
@@ -186,7 +186,7 @@ void FriendWatcher::poll_now() {
                 if (entry.last_endpoint != address)
                     FriendStore(friends_path_).update_endpoint(state.code, address, "Server verificato");
             } else if (on_failure) {
-                on_failure(state.code, "Indirizzo amico non ancora risolto");
+                on_failure(state.code, "Friend address not resolved yet");
             }
         } catch (const std::exception& error) {
             {
@@ -255,9 +255,9 @@ bool FriendWatcher::is_friend(const std::string& code) const {
 }
 
 Json FriendWatcher::request(const std::string& code, Json payload, int timeout_ms) {
-    if (!is_friend(code)) throw std::runtime_error("Non e nella lista amici");
+    if (!is_friend(code)) throw std::runtime_error("Not in the friends list");
     const auto endpoint = endpoint_of(code);
-    if (!endpoint) throw std::runtime_error("Servizio amico non raggiungibile");
+    if (!endpoint) throw std::runtime_error("Friend service unreachable");
     return peer_request(self_, endpoint->first, endpoint->second, code, std::move(payload), timeout_ms);
 }
 

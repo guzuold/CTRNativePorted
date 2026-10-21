@@ -526,12 +526,12 @@ struct Server::Impl {
     }
     // A friend's player as its own service names it; never a player of this PC.
     void check_friend_player(const std::string& caller, const std::string& name) {
-        if (name.empty() || name.size() > 32) throw std::runtime_error("Giocatore amico non indicato");
+        if (name.empty() || name.size() > 32) throw std::runtime_error("Friend player not specified");
         if (const auto known = friend_watcher->by_code(caller); known && !known->name.empty() && known->name != name)
-            throw std::runtime_error("Giocatore amico non corrispondente");
-        if (name == local_player_name()) throw std::runtime_error("Giocatore di questo PC");
+            throw std::runtime_error("Friend player does not match");
+        if (name == local_player_name()) throw std::runtime_error("Player on this PC");
         std::lock_guard<std::mutex> lock(state);
-        if (is_local(user_id(name))) throw std::runtime_error("Giocatore di questo PC");
+        if (is_local(user_id(name))) throw std::runtime_error("Player on this PC");
     }
     // Actions a friend's service may ask for (POST /ctr/v1/peer, already authenticated).
     // presence: this PC's player, whether its game is connected, its game status, the PSN
@@ -593,13 +593,13 @@ struct Server::Impl {
                               sender = text_field(request, "sender");
             const Json* recipient = request.find("recipient");
             if (!lower_hex(invitation, 32) || !lower_hex(session, 32) || !recipient || !recipient->is_unsigned())
-                throw std::runtime_error("Invito non valido");
+                throw std::runtime_error("Invalid invitation");
             check_friend_player(caller, sender);
             const std::string local = local_player_name();
             const auto now = static_cast<std::uint64_t>(std::time(nullptr));
             std::lock_guard<std::mutex> lock(state);
             if (!is_local(recipient->as_u64()) && (local.empty() || user_id(local) != recipient->as_u64()))
-                throw std::runtime_error("Destinatario non presente su questo PC");
+                throw std::runtime_error("Recipient not on this PC");
             for (auto it = remote_invitations.begin(); it != remote_invitations.end();)
                 it = it->second.expires <= now ? remote_invitations.erase(it) : std::next(it);
             if (remote_invitations.size() >= 64 && !remote_invitations.count(invitation))
@@ -610,7 +610,7 @@ struct Server::Impl {
                 const auto& previous = existing->second;
                 if (previous.session != session || previous.sender != sender || previous.origin != caller ||
                     previous.recipient != recipient->as_u64())
-                    throw std::runtime_error("Identificativo invito gia utilizzato");
+                    throw std::runtime_error("Invitation ID already used");
             } else {
                 remote_invitations.emplace(invitation,
                     RemoteInvitation{session, sender, caller, recipient->as_u64(), now + 300, false});
@@ -628,7 +628,7 @@ struct Server::Impl {
                                         starts_with(target, "/webapi/sdk:sessionInvitation/v1/users/me/invitations/") ||
                                         starts_with(target, "/ctr/v1/session-invitations/");
             if (!allowed_target || (method != "GET" && method != "PUT" && method != "POST" && method != "DELETE"))
-                throw std::runtime_error("Richiesta non inoltrabile");
+                throw std::runtime_error("Request cannot be forwarded");
             check_friend_player(caller, name);
             std::map<std::string, std::string> headers{{"host", "ctr-online"}, {"x-ctr-online-id", name}};
             if (const auto type = text_field(request, "content_type"); !type.empty()) headers.emplace("content-type", type);
@@ -640,7 +640,7 @@ struct Server::Impl {
             response.set("body", Json::of(base64_encode(Bytes(answer.body.begin(), answer.body.end()))));
             return response;
         }
-        throw std::runtime_error("Azione non supportata: " + action);
+        throw std::runtime_error("Unsupported action: " + action);
     }
     // --- public matchmaking hub ---------------------------------------------------------
     // Hub side: players of other PCs, identified by their service's signed code, run their
@@ -648,7 +648,7 @@ struct Server::Impl {
     Json hub_action(const std::string& caller, const std::string& action, const Json& request,
                     const std::string& source_ip) {
         const std::string name = text_field(request, "name");
-        if (name.empty() || name.size() > 32) throw std::runtime_error("Giocatore non indicato");
+        if (name.empty() || name.size() > 32) throw std::runtime_error("Player not specified");
         const auto account = user_id(name);
         const auto now = static_cast<std::uint64_t>(std::time(nullptr));
         Json response = Json::object();
@@ -656,10 +656,10 @@ struct Server::Impl {
         expire_hub_clients(now);
         auto found = live_clients.find(account);
         if (found != live_clients.end() && found->second->hub_origin != caller)
-            throw std::runtime_error("Giocatore gia presente su questo servizio");
+            throw std::runtime_error("Player already on this service");
         if (found != live_clients.end()) found->second->ip = source_ip;
         if (action == "mm_peers") {
-            if (found == live_clients.end()) throw std::runtime_error("Giocatore non presente");
+            if (found == live_clients.end()) throw std::runtime_error("Player not present");
             Json peers = Json::array();
             for (const auto& ip : connection_addresses(account, public_room_token())) peers.items.push_back(Json::of(ip));
             response.set("peers", std::move(peers));
@@ -671,7 +671,7 @@ struct Server::Impl {
             return response;
         }
         if (action == "mm_poll") {
-            if (found == live_clients.end()) throw std::runtime_error("Giocatore non presente");
+            if (found == live_clients.end()) throw std::runtime_error("Player not present");
             found->second->last_seen = now;
             Json events = Json::array();
             for (const Bytes& event : found->second->outbox) events.items.push_back(Json::of(base64_encode(event)));
@@ -681,7 +681,7 @@ struct Server::Impl {
         }
         const TaskRequest task = parse_task_request(base64_decode(text_field(request, "task")));
         if (task.service != 145 || (task.task != 2 && task.task != 3 && task.task != 15 && task.task != 18))
-            throw std::runtime_error("Task di matchmaking non ammesso");
+            throw std::runtime_error("Matchmaking task not allowed");
         if (found == live_clients.end()) {
             std::size_t from_caller = 0, remote = 0;
             for (const auto& [id, client] : live_clients) {
@@ -1126,15 +1126,15 @@ struct Server::Impl {
                 const auto now = party_now();
                 const Json request = verify_peer_message(packet, caller, now);
                 const Json* to = request.find("to");
-                if (!to || to->text != host_identity->friend_code()) throw std::runtime_error("Messaggio per un altro servizio");
+                if (!to || to->text != host_identity->friend_code()) throw std::runtime_error("Message for another service");
                 const Json* nonce = request.find("nonce");
                 if (!nonce || !peer_nonces.fresh(caller, nonce->text, now)) throw std::runtime_error("Messaggio duplicato");
                 const Json* action = request.find("action");
                 const std::string name = action ? action->text : std::string();
                 // Public matchmaking (mm_*) is open to every signed service; the rest to friends.
                 if (name.rfind("mm_", 0) != 0) {
-                    if (!friend_watcher) throw std::runtime_error("Rete amici non attiva");
-                    if (!friend_watcher->is_friend(caller)) throw std::runtime_error("Non e nella lista amici");
+                    if (!friend_watcher) throw std::runtime_error("Friend network not active");
+                    if (!friend_watcher->is_friend(caller)) throw std::runtime_error("Not in the friends list");
                     if (name == "presence") {
                         const auto* port = request.find("contact_port");
                         const auto contact = port && port->is_unsigned() ? port->as_u64() : 8780;
@@ -1157,7 +1157,7 @@ struct Server::Impl {
             }
         }
         if (method == "POST" && target == "/ctr/v1/party") {
-            if (!party) return json_answer(404, R"({"error":"Lobby launcher non disponibile"})", "party_unavailable");
+            if (!party) return json_answer(404, R"({"error":"Launcher lobby unavailable"})", "party_unavailable");
             try {
                 if (body.size()>16384) throw std::runtime_error("Messaggio troppo grande");
                 const Json packet=parse_json(std::string(body.begin(),body.end()));
@@ -1166,7 +1166,7 @@ struct Server::Impl {
                 Json request=verify_party_message(packet,caller,now);
                 const std::string nonce=request.at("nonce").text;
                 if (nonce.size()!=32 || nonce.find_first_not_of("0123456789abcdef")!=std::string::npos)
-                    throw std::runtime_error("Nonce non valido");
+                    throw std::runtime_error("Invalid nonce");
                 {
                     std::lock_guard<std::mutex> guard(party_requests_mutex);
                     for (auto it=party_nonces.begin();it!=party_nonces.end();) {

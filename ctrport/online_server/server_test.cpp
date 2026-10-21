@@ -382,7 +382,7 @@ void test_peer_channel() {
     auto presence=[]{Json j=Json::object();j.set("action",Json::of("presence"));return j;};
     std::string reason;
     try{peer_request(cid,"127.0.0.2",28780,a,presence());}catch(const std::exception& e){reason=e.what();}
-    check(reason=="Non e nella lista amici","peer channel: stranger gets the rubrica refusal");
+    check(reason=="Not in the friends list","peer channel: stranger gets the rubrica refusal");
     Json payload=presence();payload.set("nonce",Json::of(hex(random_bytes(16))));payload.set("to",Json::of(a));
     const std::string packet=dump_json(sign_peer_message(bid,payload));
     std::string first,second;
@@ -392,7 +392,7 @@ void test_peer_channel() {
     Json elsewhere=presence();elsewhere.set("nonce",Json::of(hex(random_bytes(16))));elsewhere.set("to",Json::of(c));
     std::string misdirected;
     check(http_request("127.0.0.2",28780,"/ctr/v1/peer",dump_json(sign_peer_message(bid,elsewhere)),misdirected,3000)==403 &&
-          misdirected.find("altro servizio")!=std::string::npos,"peer channel: packet addressed to another service refused");
+          misdirected.find("another service")!=std::string::npos,"peer channel: packet addressed to another service refused");
     Json forged=sign_peer_message(bid,payload);forged.set("code",Json::of(c));
     std::string third;
     check(http_request("127.0.0.3",28780,"/ctr/v1/peer",dump_json(forged),third,3000)==403,
@@ -531,11 +531,11 @@ void test_friend_invitation() {
     check(!reason.empty(),"cross invite: a friend's service cannot act as the host's own player");
     reason.clear();
     try{peer_request(bid,"127.0.0.2",28780,a,webapi("GuestBruno","GET","/ctr/v1/config"));}catch(const std::exception& e){reason=e.what();}
-    check(reason=="Richiesta non inoltrabile","cross invite: only session and invitation routes are forwarded");
+    check(reason=="Request cannot be forwarded","cross invite: only session and invitation routes are forwarded");
     reason.clear();
     try{peer_request(cid,"127.0.0.2",28780,a,webapi("OtherCarla","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session));}
     catch(const std::exception& e){reason=e.what();}
-    check(reason=="Non e nella lista amici","cross invite: a stranger's service cannot read the session");
+    check(reason=="Not in the friends list","cross invite: a stranger's service cannot read the session");
     check(game_http("127.0.0.3","DELETE","/webapi/sdk:sessionInvitation/v1/sessions/"+session+"/members/me","GuestBruno","",answer)==204 &&
           game_http("127.0.0.2","GET","/webapi/sdk:sessionInvitation/v1/sessions/"+session,"HostAnna","",answer)==200 &&
           answer.find("GuestBruno")==std::string::npos,"cross invite: guest leaves the host's session through its own service");
