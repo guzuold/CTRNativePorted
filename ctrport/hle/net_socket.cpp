@@ -422,6 +422,10 @@ CTR_SYSV int sceNetAccept(int id, void* address, std::uint32_t* length) {
         }
         return result;
     }
+    if (!ctr_hle::online::source_allowed(host.sin_addr.s_addr)) {
+        closesocket(accepted);
+        return fail(E_WOULDBLOCK);
+    }
     to_guest(host, address, length);
     auto child = std::make_shared<Socket>();
     child->handle = accepted;
@@ -558,14 +562,15 @@ int send_common(const char* function, int id, const void* data, std::uint64_t le
     return sent;
 }
 
-// Receive on the game socket with the relay or its test switch active: each datagram is read
-// whole, relay control messages and dropped direct datagrams are skipped, relayed game
-// datagrams are unwrapped and reported with the sender address the relay gave.
+// Receive every UDP datagram whole into private scratch space. Check its real source
+// before copying bytes to the guest, decoding the relay or remapping discovery.
+// Relay controls and rejected packets are consumed even for a guest MSG_PEEK.
 int receive_game(const char* function, int id, const Socket& entry, char* buffer, int size, int flags,
                  int host_flags, void* address, std::uint32_t* address_length) {
     namespace relay = ctr_hle::online::relay;
     thread_local std::vector<char> scratch(65536);
-    for (;;) {
+    for (unsigned discarded = 0; discarded < 64; ++discarded) {
+        if ((flags & MSG_DONTWAIT_) && !ready(entry.handle, true)) return fail(E_WOULDBLOCK);
         sockaddr_in host{};
         int host_length = sizeof(host);
         const int received = recvfrom(entry.handle, scratch.data(), static_cast<int>(scratch.size()), host_flags,
@@ -579,8 +584,11 @@ int receive_game(const char* function, int id, const Socket& entry, char* buffer
         }
         int offset = 0, payload = received;
         sockaddr_in source = host;
-        const relay::Incoming kind =
-            relay::receive(entry.handle, scratch.data(), received, host, &offset, &payload, &source);
+        const relay::Incoming kind = !ctr_hle::online::source_allowed(host.sin_addr.s_addr)
+            ? relay::Incoming::Dropped
+            : entry.game && (relay::enabled() || relay::block_direct())
+                ? relay::receive(entry.handle, scratch.data(), received, host, &offset, &payload, &source)
+                : relay::Incoming::Pass;
         if (kind == relay::Incoming::Consumed || kind == relay::Incoming::Dropped) {
             if (host_flags & MSG_PEEK) { // take the skipped datagram off the queue
                 recvfrom(entry.handle, scratch.data(), static_cast<int>(scratch.size()), 0, nullptr, nullptr);
@@ -606,6 +614,7 @@ int receive_game(const char* function, int id, const Socket& entry, char* buffer
                     hex_prefix(buffer, copied) + "\"");
         return copied;
     }
+    return fail(E_WOULDBLOCK); // Bound work per call even under a continuous rejected flood.
 }
 
 int receive_common(const char* function, int id, void* buffer, std::uint64_t length, int flags,
@@ -626,7 +635,7 @@ int receive_common(const char* function, int id, void* buffer, std::uint64_t len
     }
     const int size = length > 0x7fffffff ? 0x7fffffff : static_cast<int>(length);
     namespace relay = ctr_hle::online::relay;
-    if (entry->game && datagram(*entry) && (relay::enabled() || relay::block_direct())) {
+    if (datagram(*entry)) {
         return receive_game(function, id, *entry, static_cast<char*>(buffer), size, flags, host_flags, address,
                             address_length);
     }
