@@ -81,28 +81,29 @@ cd CTRNativePorted
 powershell -File tools/bootstrap.ps1
 ```
 
-Then, from the repository root:
+Then, from the repository root, build everything in the release layout:
 
 ```powershell
-powershell -File ctrport/build_audio_backend.ps1
-powershell -File ctrport/build_font_backend.ps1
-python -B tools/lane_lock.py --name build-data --lane data -- powershell -File ctrport/video/build.ps1     # ctr_video.lib
-powershell -File ctrport/build.ps1              # build/CTRPort-infra
-powershell -File ctrport/build_profile.ps1      # build/CTRPort-claude/ctrport.exe
-powershell -File ctrport/build_launcher.ps1     # build/CTRPort-claude/launcher.exe
-python -B tools/lane_lock.py --name build-claude --lane claude -- powershell -File ctrport/gpu/build.ps1  # ctr_gpu.dll, ctr_hle.dll
+powershell -File ctrport/build_release.ps1      # build/release-local
 ```
 
-`ctrport/video/build.ps1` and the scripts it calls refuse to run without the build lock,
-hence `tools/lane_lock.py`.
+The script builds the audio and font backends, `ctr_video.lib`, `ctrport.exe`,
+`ctr_gpu.dll` and `ctr_hle.dll`, `ctr_online_server.exe` and the launcher. It copies the
+Visual C++ runtime DLLs, the assets and the documents next to them. Start
+`build/release-local/launcher.exe` and choose your dump folders as in a release.
 
-> **Known limitation:** `ctrport/video/build.ps1` still reads compile and control results
-> from `reports/reconstruction/data/`, which is local material not published in this
-> repository. Until that step is separated from the local evidence, `ctr_video.lib`
-> cannot be built from a fresh clone.
+The scripts for single parts stay available: `ctrport/build_launcher.ps1` for the
+launcher, `ctrport/gpu/build.ps1` for `ctr_gpu.dll` and `ctr_hle.dll`, and
+`ctrport/online_server/build_online_server.ps1` for the server. The development scripts
+`ctrport/build.ps1` and `ctrport/build_profile.ps1` also expect outputs of earlier local
+builds (`build/CTRPort-data`), so use `build_release.ps1` on a fresh clone.
 
-Start the native launcher (`build/CTRPort-claude/launcher.exe`), or run from the
-command line:
+`ctrport/video/build.ps1` additionally runs a GPU control suite before publishing
+`ctr_video.lib`. It needs the build lock (`tools/lane_lock.py`) and local evidence that is
+not in this repository, so `build_release.ps1` compiles the same `ctr_video.lib` sources
+without that suite.
+
+Development builds can also be started from the command line:
 
 ```powershell
 python -B ctrport/play_gpu.py --base-dir <CUSA14876 folder> [--1.21 --patch-dir <update folder>] [--60fps] [--pro] [--native-4k] [--1080p | --fullscreen]
@@ -176,6 +177,10 @@ The server also exists as a standalone program, `ctr_online_server.exe --auto-pu
   touch pad button. Motion sensors and touch position are not passed to the game.
 - **Quick Controller Exit**: hold **View + Menu** (PlayStation: **Share + Options**) for 1.2 seconds on your controller, then press **A** (Cross) to confirm exit or **B** (Circle) to cancel.
 - **Rendering Modes**: choose between standard 1080p, PS4 Pro 1440p, or **Native 4K** internal resolution buffers, with 60 FPS unlocked on v01.21.
+- **Mods and patches** (MODS tab): loose-file mods in `runtime/mods` with load order in
+  `mods.json`, and shadPS4 / GoldHEN patch XML files in `runtime/patches` with choices in
+  `patches.json`. These are the same formats as SacredFire / GetLostIn CTR-NitroFueled-PC.
+  Game files are never modified. See [`ctrport/MODS.md`](ctrport/MODS.md).
 
 
 ## Credits and licenses

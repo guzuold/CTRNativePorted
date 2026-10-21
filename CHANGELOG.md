@@ -1,3 +1,26 @@
+## v0.5.0 — 2026-10-21
+
+Mods and patch files in the MODS tab, and a build from the public sources alone.
+
+- **File mods:** one folder per mod in `runtime/mods`, holding the game's own folders (`archives/`, `icons/`, ...), optionally inside `app0/`, `CUSA14876/`, `CUSA13795/` or one extra wrapper folder.
+  - Load order and switches are kept in `runtime/user/mods.json` (`{"order": [...], "disabled": [...]}`); a mod lower in the list wins.
+  - The runtime reads `/app0` files from the enabled mods first, then from the update and the base game. Game files are never modified.
+  - Links, and `eboot.bin`, `sce_module` or `sce_sys` inside a mod, are refused with a message.
+- **Patch files:** shadPS4 / GoldHEN XML files in `runtime/patches`, with choices in `runtime/user/patches.json` (`"file.xml/Name"`).
+  - A patch applies only when its TitleID, AppElf and AppVer match the running eboot.
+  - Values and the `mask` pattern search follow shadPS4 v0.18.0. Every write must lie inside the eboot's mapped segments; `mask_jump32` is not supported.
+  - All selected patches are checked before any byte is written. A problem stops the launch with the reason, and skipped patches are logged.
+- **Same formats as SacredFire / GetLostIn CTR-NitroFueled-PC**, so the same mod folders and patch files work in both.
+- **MODS tab:** two views, File mods and Patches. File mods have switches and up/down order; the Patches view marks patches that do not match your game version. A "Use mods and patches" switch turns everything off at once.
+- **Public build:** `ctrport/build_release.ps1` builds the whole program in the release layout from a fresh clone after `tools/bootstrap.ps1`. `ctrport/original_call_session.hpp`, already compiled into `ctrport.exe`, is now in the repository. The audio and font backend scripts create their output folder.
+
+Validation:
+- 49 checks of the mod and patch formats, built both as C++17 (runtime) and as C++20 (launcher), on synthetic files.
+- A retail run with a local test mod and patch file: the log reports 2 game files replaced, the 01.21 patch applied and the 01.00 patch skipped, and the game read the mod's archives up to the start screen. The changed graphics were not checked on screen.
+- A fresh clone was built with `build_release.ps1`.
+
+Update with Check updates. `runtime/mods` and `runtime/user` are kept.
+
 ## v0.4.4 — 2026-10-20
 
 Fix JOIN from the in-game friends list across separate launchers.
