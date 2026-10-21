@@ -833,10 +833,21 @@ void draw_field(Graphics& gr, const RectF& r, HWND edit) {
 fs::path friends_path() { return g.root / "runtime/user/online/friends.json"; }
 void reload_friends() {
     const auto live = g.host.friends();
+    // The last name each friend's service reported, kept by the service (friend_names.json):
+    // shown also while Online is off.
+    ctr_online::Json saved_names = ctr_online::Json::object();
+    try {
+        std::ifstream file(friends_path().parent_path() / "friend_names.json", std::ios::binary);
+        std::stringstream text;
+        text << file.rdbuf();
+        if (file) saved_names = ctr_online::parse_json(text.str());
+    } catch (const std::exception&) {}
     std::vector<ctr_online::FriendState> rows;
     for (const auto& entry : ctr_online::FriendStore(friends_path()).entries()) {
         ctr_online::FriendState row;
         for (const auto& state : live) if (state.code == entry.friend_code) row = state;
+        if (row.name.empty() && saved_names.is_object())
+            if (const auto* name = saved_names.find(entry.friend_code); name && name->is_string()) row.name = name->text;
         row.code = entry.friend_code;
         row.nickname = entry.nickname;
         rows.push_back(std::move(row));

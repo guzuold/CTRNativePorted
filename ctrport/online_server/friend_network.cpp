@@ -175,8 +175,15 @@ void FriendWatcher::poll_now() {
                 const Json report = peer_request(self_, endpoint->first, endpoint->second, state.code, request, 2000);
                 state.online = true;
                 state.in_game = report.find("in_game") && report.at("in_game").boolean;
-                state.name = text_or_empty(report, "name");
+                // An answer without a name (its player not chosen yet) keeps the last known one.
+                if (const auto reported = text_or_empty(report, "name"); !reported.empty()) state.name = reported;
                 state.account = state.name.empty() ? 0 : player_account(state.code, state.name);
+                // A friend added by code alone gets its player's name in the rubrica, so the
+                // launcher shows it also while Online is off.
+                if (!state.name.empty() && (entry.nickname.empty() || entry.nickname == "Friend" || entry.nickname == "Amico")) {
+                    FriendStore(friends_path_).add_or_update(state.code, state.name);
+                    state.nickname = state.name;
+                }
                 state.ip = endpoint->first;
                 state.port = endpoint->second;
                 state.seen = party_now();
@@ -184,7 +191,7 @@ void FriendWatcher::poll_now() {
                 // Persist only after the expected friend signs a fresh presence response.
                 const std::string address = state.ip + ":" + std::to_string(state.port);
                 if (entry.last_endpoint != address)
-                    FriendStore(friends_path_).update_endpoint(state.code, address, "Server verificato");
+                    FriendStore(friends_path_).update_endpoint(state.code, address, "Verified service");
             } else if (on_failure) {
                 on_failure(state.code, "Friend address not resolved yet");
             }

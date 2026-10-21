@@ -306,7 +306,7 @@ void test_friend_restart() {
     const auto a=local_friend_code(aroot),b=local_friend_code(broot);
     const auto book=aroot/"runtime/user/online/friends.json";
     FriendStore(book).add_or_update(b,"Bruno");
-    FriendStore(book).update_endpoint(b,"127.0.0.3:28780","Server verificato");
+    FriendStore(book).update_endpoint(b,"127.0.0.3:28780","Verified service");
     FriendStore(broot/"runtime/user/online/friends.json").add_or_update(a,"Anna");
     ServerConfig cfg;cfg.host="127.0.0.3";cfg.public_host=cfg.host;cfg.relay_port=0;
     cfg.tcp_record_ports={};cfg.udp_record_ports={};cfg.state_dir=broot/"runtime/user/online";
