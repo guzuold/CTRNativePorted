@@ -38,6 +38,7 @@ namespace Gdiplus { using std::min; using std::max; }
 #include "xbox_prepare.hpp"
 #include "launcher_font.hpp"
 #include "launcher_update.hpp"
+#include "guest_patch_xml.hpp"
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "gdiplus.lib")
@@ -114,16 +115,16 @@ enum : int {
     ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
     ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_NATIVE_4K, ID_SCENE_RES, ID_UNLOCK, ID_LAUNCH,
     ID_TAB_BASE = 130, // 130..133 for 4 tabs
-    ID_MOD_TOGGLE_BASE = 140, // 140..143 for sample mods
     ID_OPEN_MODS = 150,
     ID_SAVE_BACKUP = 160, ID_OPEN_SAVES, ID_OPEN_DUMP, ID_OPEN_LOGS, ID_AUDIO_TEST,
     ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT, ID_ONLINE_HOST, ID_ONLINE_FRIENDS, ID_WUMPA_X100
 };
 
-struct ModItem {
-    std::wstring name, detail;
-    bool enabled;
-    ARGB badge_color;
+// MODS tab: a page of kModRows rows, each with a toggle and (file mods) move buttons.
+constexpr int kModRows = 7;
+enum : int {
+    ID_MODS_FILES = 200, ID_MODS_PATCHES, ID_MODS_MASTER, ID_MODS_REFRESH, ID_MODS_PREV, ID_MODS_NEXT,
+    ID_MOD_ROW_TOGGLE = 210, ID_MOD_ROW_UP = 220, ID_MOD_ROW_DOWN = 230
 };
 
 struct Config {
@@ -136,6 +137,7 @@ struct Config {
     bool wumpa_x100 = false;
     bool xbox_prompts = true;
     bool split_screen = false;
+    bool mods_enabled = true;
     std::wstring online_id = L"CTRPlayer";
     std::wstring online_server = L"127.0.0.1";
     std::wstring online_friend_code;
@@ -306,7 +308,7 @@ struct LaneLock {
     }
 };
 
-enum class Kind { Browse, Toggle, Pill, Launch, TabBtn, ActionBtn };
+enum class Kind { Browse, Toggle, Pill, Launch, TabBtn, ActionBtn, Segment };
 struct Control { Kind kind; const wchar_t* label; bool* value; int pill; RectF box; int tab = -1; };
 struct Status { std::wstring text; int kind = 0; };  // 0 neutral, 1 ok, 2 error
 
@@ -339,7 +341,20 @@ struct App {
     HWND language_combo = nullptr;
     std::vector<HWND> tab_buttons;
     std::map<HWND, Control> controls;
-    std::vector<ModItem> mods;
+    // MODS tab (mod_overlay.hpp, guest_patch_xml.hpp)
+    std::vector<ctrport::mods::Mod> mod_list;
+    std::vector<std::wstring> mod_details;
+    std::vector<bool> mod_bad;
+    std::vector<ctrport::guest_patches::Patch> patch_list;
+    std::vector<std::wstring> patch_details;
+    std::vector<bool> patch_warn;
+    ctrport::guest_patches::Selection patch_selection;
+    std::wstring mods_notice, mods_game;
+    bool mods_notice_error = false;
+    int mods_view = 0, mods_page = 0;  // view 0: file mods, 1: patches
+    bool mod_row_on[kModRows]{};
+    HWND mod_row_toggle[kModRows]{}, mod_row_up[kModRows]{}, mod_row_down[kModRows]{};
+    HWND mods_prev = nullptr, mods_next = nullptr;
     float scale = 1.0f;
     fs::path exe_dir, root, runtime_exe;
     Config cfg;
@@ -515,7 +530,7 @@ void load_config() {
             text(L"online_public_ip", g.cfg.online_public_ip); flag(L"online_host", g.cfg.online_host);
             text(L"public_server", g.cfg.public_server);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
-            flag(L"split_screen", g.cfg.split_screen); flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
+            flag(L"split_screen", g.cfg.split_screen); flag(L"mods_enabled", g.cfg.mods_enabled); flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
             g.cfg.scene_height = g.cfg.native_4k ? L"2160" : (g.cfg.ps4_pro ? L"1440" : L"1080");
             text(L"scene_height", g.cfg.scene_height);
             text(L"upscaler", g.cfg.upscaler);
@@ -550,7 +565,7 @@ void save_config() {
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
     const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"scene_height\": " + json_string(g.cfg.scene_height) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
-        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) +
+        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) + ",\n  \"mods_enabled\": " + flag(g.cfg.mods_enabled) +
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
         ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) + ",\n  \"game_language\": " + json_string(g.cfg.game_language) +
         ",\n  \"online\": " + flag(g.cfg.online) +
@@ -659,6 +674,7 @@ void draw_cover(Graphics& gr, Bitmap& image, const RectF& dest) {
 }
 
 void select_tab(int tab);
+void sync_mod_rows();
 
 // Static layer: Left aside background, diagonal cut, outer frame
 void render_base_layer() {
@@ -1100,37 +1116,57 @@ void paint_window(HDC target) {
 
             if (g.current_tab == TAB_MODS) {
                 text(gr, L"MODS", 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
-                draw_slanted_box(gr, rect(724, 84, 112, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
-                text(gr, L"0 ENABLED", 1, 11.0f, FontStyleBold, rect(724, 84, 112, 26), kTextMuted, StringAlignmentCenter);
+                int active = 0;
+                for (const auto& mod : g.mod_list) active += mod.enabled;
+                for (std::size_t i = 0; i < g.patch_list.size(); ++i)
+                    active += !g.patch_warn[i] && ctrport::guest_patches::selected(g.patch_list[i], g.patch_selection);
+                draw_slanted_box(gr, rect(410, 84, 120, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
+                text(gr, g.cfg.mods_enabled ? std::to_wstring(active) + L" ENABLED" : std::wstring(L"ALL OFF"), 1, 11.0f, FontStyleBold,
+                     rect(410, 84, 120, 26), g.cfg.mods_enabled && active ? kArcadeLime : kTextMuted, StringAlignmentCenter);
 
-                if (g.mods.empty()) {
-                    const RectF empty_card = rect(296, 140, 694, 180);
+                const bool files = g.mods_view == 0;
+                const int count = files ? static_cast<int>(g.mod_list.size()) : static_cast<int>(g.patch_list.size());
+                const float alpha = g.cfg.mods_enabled ? 1.f : 0.5f;
+                if (count == 0) {
+                    const RectF empty_card = rect(296, 176, 694, 160);
                     fill_round(gr, empty_card, 16, SolidBrush(Color(kArcadeCard)));
                     stroke_round(gr, empty_card, 16, kArcadeDark, 3.0f);
-                    text(gr, L"Your mod garage", 0, 22.0f, FontStyleBold, rect(320, 164, 640, 30), kTextLight);
-                    text(gr, L"Package management and load order are not available yet.\nYou can open the mods folder; this screen does not activate any mods.", 1, 12.5f, FontStyleRegular, rect(320, 202, 640, 40), kTextMuted);
-                    text(gr, L"Folder: runtime/mods (use OPEN FOLDER above)", 1, 12.0f, FontStyleRegular, rect(320, 256, 640, 20), kArcadeCyan);
-                } else {
-                    for (int i = 0; i < static_cast<int>(g.mods.size()); ++i) {
-                        const float y = 136.f + i * 58.f;
-                        const RectF card_r = rect(296, y, 694, 48);
-                        fill_round(gr, card_r, 14, SolidBrush(Color(kArcadeCard)));
-                        stroke_round(gr, card_r, 14, kArcadeDark, 3.0f);
-                        PointF badge_pts[] = {
-                            PointF(296.f, y),
-                            PointF(348.f, y),
-                            PointF(338.f, y + 48.f),
-                            PointF(296.f, y + 48.f)
-                        };
-                        SolidBrush badge_br(Color(g.mods[i].enabled ? g.mods[i].badge_color : kTextOff));
-                        gr.FillPolygon(&badge_br, badge_pts, 4);
-                        Pen badge_pen(Color(kArcadeDark), 3.0f);
-                        gr.DrawPolygon(&badge_pen, badge_pts, 4);
-                        text(gr, std::to_wstring(i + 1), 0, 20.0f, FontStyleBold, rect(296, y + 10, 46, 28), kArcadeDark, StringAlignmentCenter);
-                        text(gr, g.mods[i].name, 1, 14.0f, FontStyleBold, rect(356, y + 6, 260, 20), kTextLight);
-                        text(gr, g.mods[i].detail, 1, 11.0f, FontStyleRegular, rect(356, y + 26, 260, 18), kTextMuted);
-                    }
+                    text(gr, files ? L"No mods yet" : L"No patch files yet", 0, 22.0f, FontStyleBold, rect(320, 196, 640, 30), kTextLight);
+                    text(gr, files ? L"Put each mod in its own folder in runtime/mods, with the game's folders inside (archives, icons, ...),\n"
+                                     L"optionally under app0/ or CUSA14876/. Mods lower in the list win. Same layout and mods.json as SacredFire."
+                                   : L"Put shadPS4 / GoldHEN patch XML files in runtime/patches. A patch applies only when its TitleID and\n"
+                                     L"AppVer match your game; choices are kept in patches.json, as in SacredFire.",
+                         1, 12.0f, FontStyleRegular, rect(320, 234, 650, 40), kTextMuted);
+                    text(gr, files ? L"Folder: runtime/mods (OPEN FOLDER above, then REFRESH)" : L"Folder: runtime/patches (OPEN FOLDER above, then REFRESH)",
+                         1, 12.0f, FontStyleRegular, rect(320, 292, 640, 20), kArcadeCyan);
                 }
+                for (int row = 0; row < kModRows; ++row) {
+                    const int i = g.mods_page * kModRows + row;
+                    if (i >= count) break;
+                    const float y = 176.f + row * 52.f;
+                    const bool on = g.mod_row_on[row];
+                    const bool warn = files ? g.mod_bad[i] : g.patch_warn[i];
+                    fill_round(gr, rect(296, y, 694, 44), 14, SolidBrush(Color(kArcadeCard)));
+                    stroke_round(gr, rect(296, y, 694, 44), 14, kArcadeDark, 3.0f);
+                    PointF badge_pts[] = {PointF(296.f, y), PointF(344.f, y), PointF(335.f, y + 44.f), PointF(296.f, y + 44.f)};
+                    SolidBrush badge_br(Color(fade(on && g.cfg.mods_enabled ? (warn ? kArcadeOrange : files ? kArcadeLime : kArcadeCyan) : kTextOff, alpha)));
+                    gr.FillPolygon(&badge_br, badge_pts, 4);
+                    Pen badge_pen(Color(kArcadeDark), 3.0f);
+                    gr.DrawPolygon(&badge_pen, badge_pts, 4);
+                    text(gr, std::to_wstring(i + 1), 0, 18.0f, FontStyleBold, rect(296, y + 8, 42, 28), kArcadeDark, StringAlignmentCenter);
+                    const std::wstring name = files ? g.mod_list[i].name : widen(g.patch_list[i].name);
+                    const std::wstring& detail = files ? g.mod_details[i] : g.patch_details[i];
+                    text(gr, name, 1, 13.5f, FontStyleBold, rect(354, y + 4, files ? 470.f : 560.f, 20), fade(kTextLight, alpha));
+                    text(gr, detail, 1, 10.5f, FontStyleRegular, rect(354, y + 24, files ? 470.f : 560.f, 18), fade(warn ? kArcadeOrange : kTextMuted, alpha));
+                }
+                const int pages = std::max(1, (count + kModRows - 1) / kModRows);
+                std::wstring footer = L"Page " + std::to_wstring(g.mods_page + 1) + L" / " + std::to_wstring(pages);
+                if (files && count > 1) footer += L"  ·  lower in the list wins";
+                text(gr, footer, 1, 11.5f, FontStyleBold, rect(396, 544, 494, 30), kTextMuted, StringAlignmentCenter);
+                const std::wstring notice = !g.mods_notice.empty() ? g.mods_notice
+                    : (g.mods_game.empty() ? L"Game version unknown: check the dump folders in ADVANCED." : L"Game: " + g.mods_game) +
+                      L"  ·  changes apply at the next launch";
+                text(gr, notice, 1, 11.0f, FontStyleRegular, rect(296, 582, 694, 22), g.mods_notice_error ? kArcadePink : kTextMuted, StringAlignmentCenter);
             } else if (g.current_tab == TAB_SETTINGS) {
                 text(gr, L"SETTINGS", 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
 
@@ -1229,7 +1265,8 @@ void draw_control(const DRAWITEMSTRUCT& item) {
     HDC source = CreateCompatibleDC(item.hDC);
     const HGDIOBJ previous_source = SelectObject(source, g.base_layer);
     BitBlt(dc, 0, 0, w, h, source, origin.x, origin.y, SRCCOPY);
-    if (control.tab == TAB_SETTINGS) {
+    const int control_id = GetDlgCtrlID(item.hwndItem);
+    if (control.tab == TAB_SETTINGS || (control_id >= ID_MOD_ROW_TOGGLE && control_id < ID_MOD_ROW_DOWN + kModRows)) {
         HBRUSH card = CreateSolidBrush(RGB(42, 33, 112));
         FillRect(dc, &item.rcItem, card);
         DeleteObject(card);
@@ -1277,8 +1314,9 @@ void draw_control(const DRAWITEMSTRUCT& item) {
             text(gr, control.label, 1, 12.0f, FontStyleBold, full, kArcadeDark, StringAlignmentCenter);
             break;
         }
+        case Kind::Segment:
         case Kind::Pill: {
-            const bool selected = g.resolution == control.pill;
+            const bool selected = control.kind == Kind::Segment ? g.mods_view == control.pill : g.resolution == control.pill;
             fill_round(gr, full, 8, SolidBrush(Color(fade(selected ? kArcadeGold : kArcadeCardSub, alpha))));
             stroke_round(gr, full, 8, selected ? kArcadeDark : fade(kArcadeDark, 0.6f), selected ? 2.5f : 1.5f);
             text(gr, control.label, 1, 11.5f, FontStyleBold, full, selected ? kArcadeDark : kTextLight, StringAlignmentCenter);
@@ -1498,6 +1536,7 @@ void select_tab(int tab) {
             ShowWindow(hwnd, ctrl.tab == tab ? SW_SHOW : SW_HIDE);
         }
     }
+    sync_mod_rows();  // hides the unused rows of the MODS page
     ShowWindow(g.base_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
     ShowWindow(g.patch_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
 
@@ -1647,6 +1686,146 @@ std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring
     return block;
 }
 
+// --- MODS tab -------------------------------------------------------------------------------
+// Loose-file mods in runtime/mods with runtime/user/mods.json, and patch XML files in
+// runtime/patches with runtime/user/patches.json: the formats of SacredFire / GetLostIn
+// CTR-NitroFueled-PC. The runtime reads the same files (mod_overlay.hpp, guest_patch_xml.hpp).
+fs::path mods_dir() { return g.root / "runtime/mods"; }
+fs::path mods_config_path() { return g.root / "runtime/user/mods.json"; }
+fs::path patches_dir() { return g.root / "runtime/patches"; }
+fs::path patches_config_path() { return g.root / "runtime/user/patches.json"; }
+
+void reload_mods() {
+    namespace mods = ctrport::mods;
+    namespace patches = ctrport::guest_patches;
+    g.mods_notice.clear();
+    g.mods_notice_error = false;
+    g.mod_list.clear(); g.mod_details.clear(); g.mod_bad.clear();
+    g.patch_list.clear(); g.patch_details.clear(); g.patch_warn.clear();
+    try {
+        g.mod_list = mods::list_mods(mods_dir(), mods::read_config(mods_config_path()));
+    } catch (const std::exception& e) { g.mods_notice = widen(e.what()); g.mods_notice_error = true; }
+    for (const auto& mod : g.mod_list) {
+        try {
+            auto single = mod;
+            single.enabled = true;
+            const auto index = mods::build_index({single}, {});
+            const auto inner = mods::content_root(mod.folder).lexically_relative(mod.folder).generic_wstring();
+            g.mod_details.push_back(std::to_wstring(index.files.size()) + L" game files" + (inner.empty() || inner == L"." ? L"" : L" in " + inner + L"/"));
+            g.mod_bad.push_back(index.files.empty());
+            if (index.files.empty()) g.mod_details.back() = L"No game files found: put the game's folders (archives, icons, ...) in this mod";
+        } catch (const std::exception& e) {
+            g.mod_details.push_back(widen(e.what()));
+            g.mod_bad.push_back(true);
+        }
+    }
+    // The game the patches are checked against: TITLE_ID and APP_VER of the eboot that will run.
+    std::string title, version;
+    g.mods_game.clear();
+    try {
+        const fs::path game = resolve(g.cfg.use_patch && !g.cfg.patch_dir.empty() ? g.cfg.patch_dir : g.cfg.base_dir);
+        const auto sfo = patches::read_sfo(game / "sce_sys/param.sfo");
+        if (sfo.count("TITLE_ID") && sfo.count("APP_VER")) {
+            title = sfo.at("TITLE_ID");
+            version = sfo.at("APP_VER");
+            g.mods_game = widen(title + " " + version);
+        }
+    } catch (const std::exception&) {}
+    try {
+        g.patch_selection = patches::read_selection(patches_config_path());
+        std::wstring unreadable;
+        for (auto& file : patches::load_folder(patches_dir())) {
+            if (!file.error.empty()) { unreadable += (unreadable.empty() ? L"" : L", ") + file.file; continue; }
+            for (auto& patch : file.patches) {
+                const auto why = title.empty() ? std::string("game version unknown") : patches::mismatch(patch, title, version);
+                std::wstring detail = why.empty() ? std::wstring() : L"Not for this game: " + widen(why) + L"  ·  ";
+                if (!patch.author.empty()) detail += widen(patch.author) + L"  ·  ";
+                if (!patch.app_ver.empty()) detail += L"AppVer " + widen(patch.app_ver) + L"  ·  ";
+                detail += patch.file;
+                g.patch_details.push_back(detail);
+                g.patch_warn.push_back(!why.empty());
+                g.patch_list.push_back(std::move(patch));
+            }
+        }
+        if (!unreadable.empty() && g.mods_notice.empty()) {
+            g.mods_notice = L"Unreadable patch files (ignored): " + unreadable;
+            g.mods_notice_error = true;
+        }
+    } catch (const std::exception& e) {
+        if (g.mods_notice.empty()) { g.mods_notice = widen(e.what()); g.mods_notice_error = true; }
+    }
+}
+
+void sync_mod_rows() {
+    if (!g.mods_prev) return;
+    const bool files = g.mods_view == 0;
+    const int count = files ? static_cast<int>(g.mod_list.size()) : static_cast<int>(g.patch_list.size());
+    const int pages = std::max(1, (count + kModRows - 1) / kModRows);
+    g.mods_page = std::clamp(g.mods_page, 0, pages - 1);
+    const bool shown = g.current_tab == TAB_MODS;
+    for (int row = 0; row < kModRows; ++row) {
+        const int i = g.mods_page * kModRows + row;
+        const bool used = i < count;
+        if (used) g.mod_row_on[row] = files ? g.mod_list[i].enabled : ctrport::guest_patches::selected(g.patch_list[i], g.patch_selection);
+        ShowWindow(g.mod_row_toggle[row], shown && used ? SW_SHOW : SW_HIDE);
+        ShowWindow(g.mod_row_up[row], shown && used && files ? SW_SHOW : SW_HIDE);
+        ShowWindow(g.mod_row_down[row], shown && used && files ? SW_SHOW : SW_HIDE);
+        EnableWindow(g.mod_row_up[row], used && i > 0);
+        EnableWindow(g.mod_row_down[row], used && i + 1 < count);
+        for (HWND control : {g.mod_row_toggle[row], g.mod_row_up[row], g.mod_row_down[row]}) InvalidateRect(control, nullptr, FALSE);
+    }
+    ShowWindow(g.mods_prev, shown && pages > 1 ? SW_SHOW : SW_HIDE);
+    ShowWindow(g.mods_next, shown && pages > 1 ? SW_SHOW : SW_HIDE);
+    EnableWindow(g.mods_prev, g.mods_page > 0);
+    EnableWindow(g.mods_next, g.mods_page + 1 < pages);
+    for (const auto& entry : g.controls)
+        if (entry.second.kind == Kind::Segment) InvalidateRect(entry.first, nullptr, FALSE);
+    InvalidateRect(g.window, nullptr, FALSE);
+}
+
+// Saves the order and switches of the file mods, or the patch choices.
+void save_mods_choice(int index, bool toggle, int move) {
+    try {
+        if (g.mods_view == 0) {
+            if (index < 0 || index >= static_cast<int>(g.mod_list.size())) return;
+            if (toggle) g.mod_list[index].enabled = !g.mod_list[index].enabled;
+            const int other = index + move;
+            if (move && other >= 0 && other < static_cast<int>(g.mod_list.size())) {
+                std::swap(g.mod_list[index], g.mod_list[other]);
+                std::swap(g.mod_details[index], g.mod_details[other]);
+                const bool bad = g.mod_bad[index];
+                g.mod_bad[index] = g.mod_bad[other];
+                g.mod_bad[other] = bad;
+                // Keep the moved mod on screen.
+                g.mods_page = other / kModRows;
+            }
+            ctrport::mods::write_config(mods_config_path(), ctrport::mods::config_of(g.mod_list));
+        } else {
+            if (index < 0 || index >= static_cast<int>(g.patch_list.size())) return;
+            const auto& patch = g.patch_list[index];
+            ctrport::guest_patches::choose(g.patch_selection, patch, !ctrport::guest_patches::selected(patch, g.patch_selection));
+            ctrport::guest_patches::write_selection(patches_config_path(), g.patch_selection);
+        }
+    } catch (const std::exception& e) {
+        g.mods_notice = widen(e.what());
+        g.mods_notice_error = true;
+    }
+    sync_mod_rows();
+}
+
+// Checked again at launch: the runtime refuses the same problems, but here they get a dialog.
+bool check_mods_before_launch(const fs::path& base, const fs::path& patch) {
+    if (!g.cfg.mods_enabled) return true;
+    try {
+        ctrport::mods::build_index(ctrport::mods::list_mods(mods_dir(), ctrport::mods::read_config(mods_config_path())), {patch, base});
+        return true;
+    } catch (const std::exception& e) {
+        MessageBoxW(g.window, (L"A mod cannot be loaded:\n" + widen(e.what()) + L"\n\nDisable it in MODS, or turn off \"Use mods and patches\".").c_str(),
+                    kTitle, MB_ICONERROR);
+        return false;
+    }
+}
+
 void launch_game();
 
 // The archives the runtime reads through app0_read_path: patch first, then base.
@@ -1708,6 +1887,7 @@ void launch_game() {
     }
     if (g.cfg.xbox_prompts && !g.xbox_ready) { prepare_xbox_prompts(); return; }
     g.xbox_ready = false;
+    if (!check_mods_before_launch(resolve(g.cfg.base_dir), g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path())) return;
     save_config();
     if (!g.lock.acquire(g.root, g.window)) return;
     std::error_code ec;
@@ -1744,6 +1924,12 @@ void launch_game() {
     set[L"CTR_UPSCALER"] = g.cfg.upscaler;
     set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
+    if (g.cfg.mods_enabled) {
+        set[L"CTR_MODS_DIR"] = mods_dir().wstring();
+        set[L"CTR_MODS_CONFIG"] = mods_config_path().wstring();
+        set[L"CTR_PATCHES_DIR"] = patches_dir().wstring();
+        set[L"CTR_PATCHES_CONFIG"] = patches_config_path().wstring();
+    }
     if (g.cfg.fullscreen) set[L"CTR_GPU_FULLSCREEN"] = L"1";
     else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
     if (g.cfg.online) {
@@ -1777,7 +1963,8 @@ void launch_game() {
         L"CTR_SCENE_HEIGHT", L"CTR_GPU_INTERNAL_WIDTH", L"CTR_GPU_INTERNAL_HEIGHT",
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION",
         L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
-        L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT"});
+        L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT",
+        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     const auto open_log = [&](const wchar_t* suffix) {
@@ -1919,10 +2106,20 @@ void create_controls() {
     g.launch = add_button(ID_LAUNCH, Kind::Launch, rect(kWidth - 364, kHeight - 110, 320, 68), L"PLAY!", nullptr, -1, TAB_HOME);
 
     // --- TAB 1: MODS ---
+    add_button(ID_MODS_REFRESH, Kind::ActionBtn, rect(738, 78, 106, 36), L"REFRESH", nullptr, -1, TAB_MODS);
     add_button(ID_OPEN_MODS, Kind::ActionBtn, rect(854, 78, 136, 36), L"OPEN FOLDER", nullptr, -1, TAB_MODS);
-    for (int i = 0; i < static_cast<int>(g.mods.size()); ++i) {
-        add_button(ID_MOD_TOGGLE_BASE + i, Kind::Toggle, rect(920, 144.f + i * 58.f, 56, 32), L"", &g.mods[i].enabled, -1, TAB_MODS);
+    add_button(ID_MODS_FILES, Kind::Segment, rect(296, 128, 140, 32), L"FILE MODS", nullptr, 0, TAB_MODS);
+    add_button(ID_MODS_PATCHES, Kind::Segment, rect(442, 128, 140, 32), L"PATCHES", nullptr, 1, TAB_MODS);
+    add_button(ID_MODS_MASTER, Kind::Toggle, rect(770, 130, 220, 28), L"Use mods and patches", &g.cfg.mods_enabled, -1, TAB_MODS);
+    for (int row = 0; row < kModRows; ++row) {
+        const float y = 176.f + row * 52.f;
+        g.mod_row_up[row] = add_button(ID_MOD_ROW_UP + row, Kind::ActionBtn, rect(836, y + 8, 36, 28), L"▲", nullptr, -1, TAB_MODS);
+        g.mod_row_down[row] = add_button(ID_MOD_ROW_DOWN + row, Kind::ActionBtn, rect(878, y + 8, 36, 28), L"▼", nullptr, -1, TAB_MODS);
+        g.mod_row_toggle[row] = add_button(ID_MOD_ROW_TOGGLE + row, Kind::Toggle, rect(930, y + 6, 54, 32), L"", &g.mod_row_on[row], -1, TAB_MODS);
     }
+    g.mods_prev = add_button(ID_MODS_PREV, Kind::ActionBtn, rect(296, 544, 90, 30), L"◀ PREV", nullptr, -1, TAB_MODS);
+    g.mods_next = add_button(ID_MODS_NEXT, Kind::ActionBtn, rect(900, 544, 90, 30), L"NEXT ▶", nullptr, -1, TAB_MODS);
+    reload_mods();
 
     // --- TAB 2: SETTINGS ---
     // Graphics: Resolution pills
@@ -2083,24 +2280,49 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         // Tab selection
         if (id >= ID_TAB_BASE && id < ID_TAB_BASE + static_cast<int>(TAB_COUNT)) {
             const int tab = id - ID_TAB_BASE;
+            if (tab == TAB_MODS) reload_mods();  // folders may have changed outside the launcher
             select_tab(tab);
             return 0;
         }
 
-        // Mod toggles
-        if (id >= ID_MOD_TOGGLE_BASE && id < ID_MOD_TOGGLE_BASE + static_cast<int>(g.mods.size())) {
-            const int mod_idx = id - ID_MOD_TOGGLE_BASE;
-            g.mods[mod_idx].enabled = !g.mods[mod_idx].enabled;
+        // MODS tab
+        if (id >= ID_MOD_ROW_TOGGLE && id < ID_MOD_ROW_TOGGLE + kModRows) {
+            save_mods_choice(g.mods_page * kModRows + id - ID_MOD_ROW_TOGGLE, true, 0);
+            return 0;
+        }
+        if (id >= ID_MOD_ROW_UP && id < ID_MOD_ROW_UP + kModRows) {
+            save_mods_choice(g.mods_page * kModRows + id - ID_MOD_ROW_UP, false, -1);
+            return 0;
+        }
+        if (id >= ID_MOD_ROW_DOWN && id < ID_MOD_ROW_DOWN + kModRows) {
+            save_mods_choice(g.mods_page * kModRows + id - ID_MOD_ROW_DOWN, false, 1);
+            return 0;
+        }
+        if (id == ID_MODS_FILES || id == ID_MODS_PATCHES) {
+            g.mods_view = id == ID_MODS_PATCHES;
+            g.mods_page = 0;
+            sync_mod_rows();
+            return 0;
+        }
+        if (id == ID_MODS_PREV || id == ID_MODS_NEXT) {
+            g.mods_page += id == ID_MODS_NEXT ? 1 : -1;
+            sync_mod_rows();
+            return 0;
+        }
+        if (id == ID_MODS_REFRESH) { reload_mods(); sync_mod_rows(); return 0; }
+        if (id == ID_MODS_MASTER) {
+            g.cfg.mods_enabled = !g.cfg.mods_enabled;
+            save_config();
             InvalidateRect(reinterpret_cast<HWND>(lparam), nullptr, FALSE);
-            InvalidateRect(window, nullptr, FALSE);
+            sync_mod_rows();
             return 0;
         }
 
         if (id == ID_OPEN_MODS) {
-            const fs::path mods_dir = g.root / "runtime/mods";
+            const fs::path folder = g.mods_view ? patches_dir() : mods_dir();
             std::error_code ec;
-            fs::create_directories(mods_dir, ec);
-            ShellExecuteW(nullptr, L"open", mods_dir.c_str(), nullptr, nullptr, SW_SHOW);
+            fs::create_directories(folder, ec);
+            ShellExecuteW(nullptr, L"open", folder.c_str(), nullptr, nullptr, SW_SHOW);
             return 0;
         }
         if (id == ID_SAVE_BACKUP) { backup_save_data(); return 0; }

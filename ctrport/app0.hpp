@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include "mod_overlay.hpp"
 #include "xbox_asset_overlay.hpp"
 namespace ctrport {
 inline std::filesystem::path app0_read_path(const std::filesystem::path& base,
@@ -33,6 +34,12 @@ inline std::filesystem::path app0_read_path(const std::filesystem::path& base,
             throw std::runtime_error("app0 target is not a file");
         return actual;
     };
+    // Enabled loose-file mods first (mod_overlay.hpp). A mod's archive is used as it is:
+    // the Xbox icon overlay applies only to the retail archives it was prepared from.
+    if (const auto mod = mods::overlay.lookup(relative); !mod.empty()) {
+        if (regular_only && !fs::is_regular_file(mod)) throw std::runtime_error("mod target is not a file");
+        return mod;
+    }
     if (!patch.empty()) {
         const auto candidate = resolve(patch);
         if (!candidate.empty()) return xbox_asset_overlay(candidate,relative);

@@ -18,6 +18,7 @@
 #include "online_traffic_key.hpp"
 #include "race_host_migration.hpp"
 #include "retail_profiles.hpp"
+#include "guest_patch_xml.hpp"
 #include "retail_reward_catalog.hpp"
 #include "gnm_init_dispatch.hpp"
 #include "gnm_submission_snapshot.hpp"
@@ -2882,6 +2883,10 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
         static const bool unlock_all=[]{char v[2]{};return GetEnvironmentVariableA("CTR_UNLOCK_ALL",v,sizeof(v))==1 && v[0]=='1';}();
         if(unlock_all) start_unlock_all(images.front().get(),pin);
     }
+    // CTR_PATCHES_DIR: third-party patch XML files chosen in the launcher (guest_patch_xml.hpp),
+    // applied after the built-in patches above so that they win where both write.
+    if(continue_after_libc_init)
+        guest_patches::apply_from_environment(images.front().get(),metadata.front().spans,profile->title_id,profile->version);
     for(const auto& span:metadata.front().executable_spans) {
         DWORD previous=0;
         if(!VirtualProtect(images.front().get()+span.first,static_cast<SIZE_T>(span.second-span.first),PAGE_EXECUTE_READ,&previous)) throw std::runtime_error("Entry code protection failed");
