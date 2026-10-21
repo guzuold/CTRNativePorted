@@ -1,4 +1,6 @@
-## Unreleased
+## v0.5.8 — 2026-10-21
+
+The two games of an online match can connect again: answers to the game's own datagrams are no longer dropped.
 
 - **Answers to the game's own datagrams are accepted at once.** Since v0.5.5 the incoming filter dropped the first datagram from an address until the service confirmed it, and an authorization without traffic lasted three seconds. A connection handshake answers once and retries only seconds later, so in the v0.5.7 two-PC test the answers kept arriving to an expired or pending check and the two games never connected: the host's log shows the guest's handshake datagram blocked, then accepted and answered, and the guest never continuing. Now when the game sends to an address the service authorizes, that address is authorized for incoming datagrams too, as a firewall accepts replies to connections it opened. Addresses the game has not written to are still checked first.
 

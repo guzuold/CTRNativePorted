@@ -1,0 +1,8 @@
+﻿{"scope":"online_services_test","check":"relay: game socket bound on the peer port","ok":true}
+{"scope":"online_services_test","check":"relay auto fallback: registered with relay before sending","ok":true}
+{"scope":"online_services_test","check":"relay auto fallback: initial probe sent directly","ok":true}
+{"scope":"online_services_test","check":"relay auto fallback: direct peer drops probe (no reply)","ok":true}
+{"scope":"online_services_test","check":"relay auto fallback: send after probe timeout","ok":true}
+{"scope":"online_services_test","check":"relay auto fallback: packet routed via relay after timeout","ok":true}
+{"scope":"online_services_test","check":"relay auto fallback: reply received through relay","ok":true}
+{"scope":"online_services_test","mode":"relay-auto-fallback","passed":true}

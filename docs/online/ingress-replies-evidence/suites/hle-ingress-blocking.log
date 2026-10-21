@@ -1,0 +1,4 @@
+﻿{"scope":"online_services_test","check":"ingress blocking: bind","ok":true}
+{"scope":"online_services_test","blocking_receive":2}
+{"scope":"online_services_test","check":"ingress blocking: blocking receive skips 100 refused datagrams and returns the accepted one","ok":true}
+ingress-blocking failures=0
