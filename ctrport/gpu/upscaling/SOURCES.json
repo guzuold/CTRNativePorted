@@ -11,5 +11,15 @@
     "gpu/shadps4/video_core/renderer_vulkan/vk_ctr_fsr3.cpp": "4a6241e9523ee91f6fbbad31cf5f4d440a114815e0fc54f5715aec73c765a3ae",
     "gpu/shadps4/video_core/host_shaders/ctr_fsr3_inputs.comp": "445e097e847cf39da20787b9ab89fb8056ab65071b24dff11d84d062beae4927"
   },
-  "adaptation": "FSR 1 from pinned shadPS4. CTR temporal input conversion and DLSS wrapper adapted to v0.18.0; FSR 3 dependency removed. Object motion remains experimental."
+  "adaptation": "FSR 1 from pinned shadPS4. CTR temporal input conversion and DLSS wrapper adapted to v0.18.0; FSR 3 dependency removed. Object motion remains experimental.",
+  "framegen": {
+    "repository": "https://github.com/GetLostIn/CTR-NitroFueled-PC",
+    "revision": "0cf8def7f676192de4f37a26e08a92ea0cd4674a",
+    "sha256": {
+      "gpu/shadps4/video_core/renderer_vulkan/vk_ctr_framegen.h": "2e59fc838efcba0dc482d1299354756c9a4a73c78a67d1fd05cfc2a8fc47dc64",
+      "gpu/shadps4/video_core/renderer_vulkan/vk_ctr_framegen.cpp": "5bd8cfd3141a05d4d9a722b81693d12797102194f00218b5def44785e907a14e",
+      "gpu/shadps4/video_core/host_shaders/fg_convert.comp": "81c259bf1db4bb75704cec7acf6833a7c1e4806cc4b0fab904d6cdda1b28886c"
+    },
+    "adaptation": "ctr_framegen.{h,cpp}: optical flow only (no game vectors, no HUD-less frame), convert shader inlined, CTR_FRAMEGEN switch; presenter hooks in make_patched.py."
+  }
 }

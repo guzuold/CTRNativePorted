@@ -104,6 +104,7 @@ foreach(FILE vk_instance.cpp vk_platform.cpp)
     list(APPEND VIDEO_CORE ${PATCHED}/video_core/renderer_vulkan/${FILE})
 endforeach()
 list(APPEND VIDEO_CORE ${CMAKE_CURRENT_SOURCE_DIR}/upscaling/ctr_dlss.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/upscaling/ctr_framegen.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/upscaling/vk_dlss_ngx.cpp)
 file(GLOB_RECURSE RECOMPILER CONFIGURE_DEPENDS ${SHAD}/src/shader_recompiler/*.cpp)
 set(COMMON
@@ -130,13 +131,14 @@ target_compile_options(ctr_gpu PRIVATE -Wno-invalid-offsetof -Wno-unused-command
 target_link_libraries(ctr_gpu PRIVATE Boost::headers fmt::fmt SDL3::SDL3-static Vulkan::Headers
                       GPUOpen::VulkanMemoryAllocator glslang::glslang glslang::SPIRV tsl::robin_map
                       magic_enum::magic_enum xxhash sirit half miniz Zydis xbyak::xbyak mincore ntdll)
-# AMD FSR 3.1 through FireBurn/FSR-Vulkan (MIT): static libraries built by build.ps1.
+# AMD FSR 3.1 and its 3.1.6 frame generation through FireBurn/FSR-Vulkan (MIT): static libraries built by build.ps1.
 set(CTR_FSR_VULKAN_LIBS "" CACHE PATH "FSR-Vulkan static libraries (build.ps1)")
 if (NOT EXISTS "${CTR_FSR_VULKAN_LIBS}/ffx_vulkan_portable.lib")
     message(FATAL_ERROR "FSR-Vulkan libraries missing in '${CTR_FSR_VULKAN_LIBS}': build with ctrport/gpu/build.ps1")
 endif()
 target_include_directories(ctr_gpu PRIVATE ${SHAD}/../fsr-vulkan/include)
 target_link_libraries(ctr_gpu PRIVATE ${CTR_FSR_VULKAN_LIBS}/ffx_vulkan_portable.lib
+                      ${CTR_FSR_VULKAN_LIBS}/ffx_vulkan_fsr3_vk_framegeneration_3_1_6.lib
                       ${CTR_FSR_VULKAN_LIBS}/ffx_vulkan_fsr3_vk_backend_1_1_4.lib
                       ${CTR_FSR_VULKAN_LIBS}/ffx_vulkan_fsr3_host_1_1_4.lib ${CTR_FSR_VULKAN_LIBS}/vulkan-1.lib)
 # 128-bit helpers (__udivti3 and similar) emitted by clang-cl.
