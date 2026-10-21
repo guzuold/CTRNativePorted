@@ -160,9 +160,12 @@ public:
     // presence a friend's service caches and answers 138/14 from.
     std::vector<std::pair<std::string, FriendSession>> owned_sessions(std::uint64_t account) const;
     std::uint64_t start_search(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
-    // Selects connected pending players with equal room and retail filters.
+    // Selects connected pending players with equal room and retail filters. The host is the
+    // first searcher among `reachable` (players whose PC accepts connections from the
+    // Internet), else the first searcher.
     std::vector<LobbyPlan> match_ready(const std::map<std::uint64_t, std::string>& available,
-                                       const std::map<std::string, std::size_t>& expected = {});
+                                       const std::map<std::string, std::size_t>& expected = {},
+                                       const std::set<std::uint64_t>& reachable = {});
     void save_documents(std::uint64_t lobby, const Json& host, const Json& backend, std::uint64_t update_id);
     bool sync_document(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
     // Preserve the existing race documents/keys while electing a connected member.

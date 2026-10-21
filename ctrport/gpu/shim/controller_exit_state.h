@@ -25,4 +25,16 @@ struct ExitGesture {
     }
     void cancel(){visible=false;ready=false;holding=false;draining=true;captured=true;}
 };
+// Escape held for two seconds with the game window in front closes the game, as the window's
+// close button does. Escape is not bound to a game button by default.
+struct KeyHoldExit {
+    static constexpr std::uint64_t hold_ms=2000;
+    bool holding=false;
+    std::uint64_t since=0;
+    bool update(bool down,bool focused,std::uint64_t now){
+        if(!down || !focused){holding=false;return false;}
+        if(!holding){holding=true;since=now;}
+        return now-since>=hold_ms;
+    }
+};
 }

@@ -16,7 +16,7 @@ int main(int argc,char** argv){
     const bool is_hub=std::string(argv[1])=="--hub";
     c.host=is_hub?"127.0.0.2":"127.0.0.3";c.public_host=c.host;
     c.http_port=29780;c.lobby_port=29774;c.discovery_port=29781;
-    c.friend_network=true;c.hub_reachable=false;
+    c.friend_network=true;c.hub_reachable=is_hub; // the hub can be reached, the member cannot
     c.match_hub=[&]{return gate.current();};
     Server* recording=nullptr;
     const bool assigned=std::string(argv[4])=="assigned";

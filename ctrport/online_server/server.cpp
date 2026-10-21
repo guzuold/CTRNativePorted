@@ -246,6 +246,7 @@ struct Server::Impl {
         // A player of another PC matching on this hub: no socket; its service (friend code
         // hub_origin) collects the pushed events from the outbox (peer action mm_poll).
         std::string hub_origin;
+        bool hub_origin_reachable = false; // that service accepts connections from the Internet
         std::vector<Bytes> outbox;
         std::uint64_t last_seen = 0;
     };
@@ -716,6 +717,9 @@ struct Server::Impl {
         if (found != live_clients.end() && found->second->hub_origin != caller)
             throw std::runtime_error("Player already on this service");
         if (found != live_clients.end()) found->second->ip = source_ip;
+        const Json* reachable = request.find("reachable");
+        const bool origin_reachable = reachable && reachable->kind == Json::Kind::Bool && reachable->boolean;
+        if (found != live_clients.end() && reachable) found->second->hub_origin_reachable = origin_reachable; // mm_task only
         if (action == "mm_peers") {
             if (found == live_clients.end()) throw std::runtime_error("Player not present");
             Json peers = Json::array();
@@ -753,6 +757,7 @@ struct Server::Impl {
             client->user.user_id = account;
             client->user.room_token = public_room_token();
             client->hub_origin = caller;
+            client->hub_origin_reachable = origin_reachable;
             client->ip = source_ip;
             found = live_clients.emplace(account, std::move(client)).first;
             Json f = Json::object();
@@ -833,6 +838,7 @@ struct Server::Impl {
         message.set("action", Json::of("mm_task"));
         message.set("name", Json::of(user.online_id));
         message.set("task", Json::of(base64_encode(payload)));
+        message.set("reachable", Json::of(config.hub_reachable));
         Json f = Json::object();
         f.set("online_id", Json::of(user.online_id));
         f.set("hub", Json::of(hub->code));
@@ -1780,7 +1786,11 @@ struct Server::Impl {
         for (const auto& [account, client] : live_clients)
             if (!party || client->user.room_token == public_room_token() || party->admits(client->user.room_token,client->user.online_id))
                 available[account] = client->user.room_token;
-        for (LobbyPlan& plan : matchmaking.match_ready(available, party ? party->expected_players() : std::map<std::string, std::size_t>{})) {
+        // This service's own players share its reachability; players of other PCs, their service's.
+        std::set<std::uint64_t> reachable;
+        for (const auto& [account, client] : live_clients)
+            if (client->hub_origin.empty() ? config.hub_reachable : client->hub_origin_reachable) reachable.insert(account);
+        for (LobbyPlan& plan : matchmaking.match_ready(available, party ? party->expected_players() : std::map<std::string, std::size_t>{}, reachable)) {
             const Json advertisement = parse_json(*matchmaking.player_info(plan.host));
             const auto [host_doc, backend_doc] = lobby_documents(plan, advertisement, static_cast<std::uint64_t>(std::time(nullptr)));
             matchmaking.save_documents(plan.lobby_id, host_doc, backend_doc, 1);

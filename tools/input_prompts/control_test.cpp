@@ -21,6 +21,15 @@ int main(int argc,char** argv){
     assert(g.update(0x30,true,false,2000)==A::None && !g.captured);
     g.update(0x30,true,true,2001);g.update(0x30,true,true,3201);
     assert(g.update(0,false,true,3202)==A::Cancel && !g.captured);
+    Frontend::KeyHoldExit esc;
+    assert(!esc.update(true,true,0) && !esc.update(true,true,1999));
+    assert(esc.update(true,true,2000));                                  // held two seconds
+    esc={};esc.update(true,true,0);
+    assert(!esc.update(false,true,1000) && !esc.update(true,true,1500)); // a release restarts the count
+    assert(!esc.update(true,true,3499) && esc.update(true,true,3500));
+    esc={};esc.update(true,true,0);
+    assert(!esc.update(true,false,2500));                                // another window in front
+    assert(!esc.update(true,true,2600) && esc.update(true,true,4600));
     if(argc>=2)for(const char* archive : {"archives/permanent.pak","archives/languagestartup.pak"}){
         _putenv_s("CTR_XBOX_PROMPTS","0");
         auto original=ctrport::app0_read_path(argv[1],{},archive);

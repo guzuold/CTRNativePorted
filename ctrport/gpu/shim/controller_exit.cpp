@@ -163,6 +163,10 @@ bool PollControllerExit(SDL_Window* window){
     static auto poll=[] {auto module=LoadLibraryExW(L"xinput1_4.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);return module?reinterpret_cast<GetState>(GetProcAddress(module,"XInputGetState")):nullptr;}();
     HWND owner=static_cast<HWND>(SDL_GetPointerProperty(SDL_GetWindowProperties(window),SDL_PROP_WINDOW_WIN32_HWND_POINTER,nullptr));
     HWND foreground=GetForegroundWindow();bool focused=foreground==owner || (dialog && foreground==dialog);
+    static Frontend::KeyHoldExit escape;
+    if(escape.update((GetAsyncKeyState(VK_ESCAPE)&0x8000)!=0,foreground==owner,GetTickCount64())){
+        std::fputs("ctrport: Escape held, closing the game\n",stderr);dismiss();return true;
+    }
     // View + Menu on any XInput slot, or Share/touch pad + Options on a PlayStation controller.
     WORD buttons=0;bool connected=false;
     for(DWORD slot=0;poll && slot<4;++slot){XINPUT_STATE state{};if(poll(slot,&state)==ERROR_SUCCESS){connected=true;buttons|=state.Gamepad.wButtons;}}
