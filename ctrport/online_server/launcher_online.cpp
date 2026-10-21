@@ -308,15 +308,15 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
     if (candidates.empty()) {
         result.status = VerifyStatus::NoResponse;
         if (!dht_started) {
-            result.detail = "DHT locale non avviata: impossibile cercare l'amico. Riprova o usa l'indirizzo IP.";
+            result.detail = "Local DHT not started: cannot look up the friend. Try again or use the IP address.";
         } else if (lookup_stats.good_nodes + lookup_stats.dubious_nodes == 0) {
             result.detail = "Nessun nodo DHT raggiunto entro " + std::to_string(dht_timeout_ms / 1000) +
-                " s: bootstrap incompleto o rete UDP non disponibile. Lo stato dell'amico e sconosciuto.";
+                " s: bootstrap incomplete or UDP network unavailable. The friend's status is unknown.";
         } else {
-            result.detail = "Amico non trovato nella DHT entro " + std::to_string(dht_timeout_ms / 1000) +
+            result.detail = "Friend not found in the DHT within " + std::to_string(dht_timeout_ms / 1000) +
                 " s (nodi attivi: " + std::to_string(lookup_stats.good_nodes) +
                 ", altri nodi noti: " + std::to_string(lookup_stats.dubious_nodes) +
-                "). Verifica che il launcher remoto sia online e riprova: l'annuncio potrebbe non essere ancora disponibile.";
+                "). Check that the friend's launcher is online and try again: its announcement may not be available yet.";
         }
         store.update_status(info.code, result.detail);
         return result;
@@ -330,7 +330,7 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
             return v;
         } else if (v.status == VerifyStatus::InvalidIdentity) {
             result = v;
-            store.update_endpoint(info.code, "", "Identità non valida");
+            store.update_endpoint(info.code, "", "Invalid identity");
             continue; // Reject this candidate, but verify the remaining DHT results.
         }
     }
@@ -416,7 +416,7 @@ bool poll_party_invitations(const std::filesystem::path& root, const std::string
     const auto response=party_request(root,host.ip,host_code,request);
     for(const auto& invite:response.at("invitations").items) {
         const auto sender=invite.at("from").text;
-        if(invite.at("owner").text!=host_code) throw std::runtime_error("Host invito non corrispondente");
+        if(invite.at("owner").text!=host_code) throw std::runtime_error("Invitation host does not match");
         bool trusted=false;
         for(const auto& entry:friends.entries()) if(entry.friend_code==sender) trusted=true;
         if(!trusted) continue;
@@ -433,19 +433,19 @@ Json party_request(const std::filesystem::path& root, const std::string& ip, con
     std::string body;
     const int status=http_request(ip,8780,"/ctr/v1/party",dump_json(sign_party_message(identity,request)),body,3000);
     if(status!=200) {
-        std::string reason="Host della lobby non raggiungibile";
+        std::string reason="Lobby host unreachable";
         try { reason=parse_json(body).at("error").text; } catch (...) {}
         throw std::runtime_error(reason);
     }
     Json response=verify_party_message(parse_json(body),code,party_now());
-    if(response.at("nonce").text!=nonce) throw std::runtime_error("Risposta lobby non corrispondente");
+    if(response.at("nonce").text!=nonce) throw std::runtime_error("Lobby reply does not match");
     const auto action = request.at("action").text;
     if (action == "heartbeat" || action == "configure" || action == "join") {
         // Store the authenticated response, partitioned by host and account. No
         // automatic merging: balances from two hosts are not additive progress.
         try {
             const auto* wallet = response.find("wallet_backup");
-            if (!wallet) throw std::runtime_error("Host da aggiornare: backup Pit Stop remoto non disponibile");
+            if (!wallet) throw std::runtime_error("Host needs an update: remote Pit Stop backup unavailable");
             if (wallet->at("format").text != "ctr-marketplace-account-v1" ||
                 !wallet->at("state").is_string() || wallet->at("state").text.size() > 8 * 1024 * 1024 ||
                 wallet->at("account").as_u64() != user_id(response.at("backup_name").text))
@@ -461,11 +461,11 @@ Json party_request(const std::filesystem::path& root, const std::string& ip, con
 }
 PartySelection recover_party(const std::filesystem::path& root, const PartySelection& previous, const std::string& local_ip) {
     const auto* ticket=previous.snapshot.find("migration_ticket");
-    if(!ticket)throw std::runtime_error("L'host non ha fornito un checkpoint di migrazione");
+    if(!ticket)throw std::runtime_error("The host provided no migration checkpoint");
     const auto plan=verify_party_recovery(*ticket,previous.owner,previous.room,party_now());
     const auto self=local_friend_code(root);
     if(std::none_of(plan.members.begin(),plan.members.end(),[&](const auto& m){return m.code==self;}))
-        throw std::runtime_error("Questo client non appartiene al checkpoint della stanza");
+        throw std::runtime_error("This client is not in the room checkpoint");
     const auto candidate=std::find_if(plan.members.begin(),plan.members.end(),[&](const auto& m){return m.code==plan.successor;});
     const auto ip=self==plan.successor ? local_ip : candidate->endpoint;
     auto request=Json::object();
@@ -479,7 +479,7 @@ PartySelection recover_party(const std::filesystem::path& root, const PartySelec
     } else request.set("action",Json::of("heartbeat"));
     auto snapshot=party_request(root,ip,plan.successor,request);
     if(snapshot.at("room").text!=previous.room || snapshot.at("owner").text!=plan.successor)
-        throw std::runtime_error("Il successore non ha ripristinato questa stanza");
+        throw std::runtime_error("The successor did not restore this room");
     if(self!=plan.successor) {
         auto destination=Json::object();destination.set("action",Json::of("destination"));
         destination.set("owner",Json::of(plan.successor));destination.set("room",Json::of(previous.room));

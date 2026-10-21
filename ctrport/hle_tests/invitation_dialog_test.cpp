@@ -35,12 +35,12 @@ template<typename T> T bind(const char* nid) {
 BOOL CALLBACK answer(HWND window, LPARAM button) {
     DWORD pid = 0; GetWindowThreadProcessId(window, &pid);
     wchar_t title[64]{}; GetWindowTextW(window, title, 64);
-    if (pid == GetCurrentProcessId() && !std::wcscmp(title, L"CTR - Invito")) {
+    if (pid == GetCurrentProcessId() && !std::wcscmp(title, L"CTR - Invitation")) {
         if (button == IDYES) ++notice_prompts;
         if (button == IDOK && GetDlgItem(window, 100)) SendDlgItemMessageW(window, 100, LB_SETSEL, TRUE, 0);
         PostMessageW(window, WM_COMMAND, static_cast<WPARAM>(button), 0);
     }
-    if (pid == GetCurrentProcessId() && !std::wcscmp(title, L"CTR - Errore invito"))
+    if (pid == GetCurrentProcessId() && !std::wcscmp(title, L"CTR - Invitation error"))
         PostMessageW(window, WM_COMMAND, IDCANCEL, 0);
     return TRUE;
 }

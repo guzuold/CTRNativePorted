@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
         FriendStore store(config.state_dir / "friends.json");
         FriendCodeInfo info;
         if (parse_friend_code(add_friend[0], info) != CodeParseError::Ok || !store.add_or_update(info.code, "", &error) ||
-            !store.update_endpoint(info.code, add_friend[1], "Aggiunto da riga di comando")) {
+            !store.update_endpoint(info.code, add_friend[1], "Added from the command line")) {
             std::fprintf(stderr, "add-friend: %s\n", error.empty() ? "invalid friend code" : error.c_str());
             return 2;
         }
@@ -186,8 +186,8 @@ int main(int argc, char** argv) {
         if (mapper.open(ports, "CTR Native Port", location) && auto_public && config.public_host.empty()) {
             const std::string scope = ipv4_scope(mapper.external_ip());
             if (scope != "public")
-                say("upnp: il router riporta l'indirizzo " + mapper.external_ip() + " (" + scope +
-                    "): la connessione e' dietro un altro NAT (per esempio CGNAT), gli altri giocatori non potranno raggiungere questo PC");
+                say("upnp: the router reports the address " + mapper.external_ip() + " (" + scope +
+                    "): the connection is behind another NAT (for example CGNAT); other players will not be able to reach this PC");
             config.public_host = mapper.external_ip();
         }
         if (auto_public && config.public_host.empty()) {

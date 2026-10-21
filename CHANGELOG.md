@@ -1,3 +1,18 @@
+## v0.5.1 — 2026-10-21
+
+The launcher in English that follows the game language, and online races between two PCs confirmed.
+
+- **Online:** races between two separate PCs over the Internet complete, both in a private match with a friend and through public matchmaking (tested by the project owner on v0.5.0). Races with more than two players are not tested yet.
+- **Launcher language:** every text is in English and follows the game language chosen in Settings (French, Italian, German or Spanish) at once, without a restart. Arabic shows English. The language list shows each language in its own name.
+- **Fewer notes:** explanations and instructions were removed from Settings, the friends drawer and the MODS tab; the remaining messages are shorter.
+- **In-game invitation windows** (picker, prompts and errors) use the game language.
+- **English messages** from the online service and the updater, which reach the launcher's notices and the logs.
+- **README:** a complete list of the features and of the serverless peer-to-peer online design.
+
+Validation: online service suite with 0 failures; invitation window test with 0 failures; mods test unchanged. Launcher, online service and `ctr_hle.dll` are built from a fresh clone of this version. Translated layouts were not checked on screen: a long translation may not fit a button. `ctrport.exe` and `ctr_gpu.dll` are unchanged from v0.5.0.
+
+Update with Check updates. `runtime/user` and `runtime/mods` are kept.
+
 ## v0.5.0 — 2026-10-21
 
 Mods and patch files in the MODS tab, and a build from the public sources alone.

@@ -3,6 +3,7 @@
 // Event ABI follows pinned invitation_dialog.h and systemservice.h. Transport is project-owned.
 #include "invitation_flow.h"
 #include "invitation_ui.h"
+#include "ui_text.h"
 #include "online_config.h"
 #include "online_http.h"
 #include "ctr_hle.h"
@@ -20,7 +21,10 @@ std::atomic<unsigned long> dialog_thread{0};
 namespace {
 using ctr_online::Json;
 constexpr int failure = static_cast<int>(0x80B8000Eu);
-constexpr const wchar_t* title = L"CTR - Invito";
+constexpr const wchar_t* title = ctr_ui::kInvitationTitle;
+using ctr_ui::Text;
+using ctr_ui::ui_text;
+using ctr_ui::ui_format;
 struct Pending { std::string id, session, sender; };
 struct Event { std::int32_t type; unsigned char data[8192]; };
 static_assert(sizeof(Event) == 8196);
@@ -103,8 +107,8 @@ Outcome send(std::string session, std::vector<std::uint64_t> recipients, unsigne
                 accounts.push_back(account); names.push_back(name); rows.push_back(wide(name));
             }
             ui_thread = GetCurrentThreadId();
-            if (rows.empty()) { MessageBoxW(nullptr, L"Nessun amico disponibile.", title, MB_OK); ui_thread = 0; return result; }
-            const auto selected = choose(rows, maximum, title, L"Invia");
+            if (rows.empty()) { MessageBoxW(nullptr, ui_text(Text::NoFriends), title, MB_OK); ui_thread = 0; return result; }
+            const auto selected = choose(rows, maximum, title, ui_text(Text::Send));
             ui_thread = 0;
             if (selected.empty()) return result;
             for (int i : selected) { recipients.push_back(accounts.at(i)); result.names.push_back(names.at(i)); }
@@ -130,10 +134,10 @@ Outcome receive(std::atomic<unsigned long>& ui_thread) {
     try {
         const auto pending = fetch();
         std::vector<std::wstring> rows;
-        for (const auto& entry : pending) rows.push_back(L"Invito da " + wide(entry.sender));
+        for (const auto& entry : pending) rows.push_back(ui_format(Text::InvitationFrom, wide(entry.sender)));
         ui_thread = GetCurrentThreadId();
-        if (rows.empty()) { MessageBoxW(nullptr, L"Nessun invito in attesa.", title, MB_OK); ui_thread = 0; return {}; }
-        const auto selected = choose(rows, 1, title, L"Accetta");
+        if (rows.empty()) { MessageBoxW(nullptr, ui_text(Text::NoInvitations), title, MB_OK); ui_thread = 0; return {}; }
+        const auto selected = choose(rows, 1, title, ui_text(Text::Accept));
         ui_thread = 0;
         return selected.empty() ? Outcome{} : accept(pending.at(selected[0]));
     } catch (const std::exception& error) {
@@ -190,7 +194,7 @@ void tick() {
                     notice = std::async(std::launch::async, [entry] {
                         try {
                             notice_thread = GetCurrentThreadId();
-                            const auto message = L"Invito da " + wide(entry.sender) + L". Entrare nella sessione?";
+                            const auto message = ui_format(Text::JoinQuestion, wide(entry.sender));
                             const int choice = MessageBoxW(nullptr, message.c_str(), title, MB_YESNO | MB_ICONQUESTION);
                             notice_thread = 0;
                             if (!choice) throw std::runtime_error("invitation prompt unavailable");
@@ -201,12 +205,10 @@ void tick() {
                                     return Outcome{};
                                 } catch (const std::exception& error) {
                                     log_failure(error);
-                                    const auto message = std::wstring(choice == IDYES
-                                        ? L"Impossibile accettare l'invito. Non sei entrato nella sessione.\n\n"
-                                        : L"Impossibile rifiutare l'invito.\n\n") + wide(error.what()) +
-                                        L"\n\nRiprova per ripetere l'operazione. Annulla interrompe gli avvisi automatici per questo invito.";
+                                    const auto message = std::wstring(ui_text(choice == IDYES ? Text::AcceptFailed : Text::DeclineFailed)) +
+                                        L"\n\n" + wide(error.what()) + L"\n\n" + ui_text(Text::RetryHint);
                                     notice_thread = GetCurrentThreadId();
-                                    const int retry = MessageBoxW(nullptr, message.c_str(), L"CTR - Errore invito",
+                                    const int retry = MessageBoxW(nullptr, message.c_str(), ui_text(Text::ErrorTitle),
                                                                   MB_RETRYCANCEL | MB_ICONERROR);
                                     notice_thread = 0;
                                     if (retry != IDRETRY) { Outcome result; result.error = failure; return result; }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "invitation_ui.h"
+#include "ui_text.h"
 #include <windows.h>
 #include <mutex>
 #include <stdexcept>
@@ -16,7 +17,7 @@ LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM wparam, LPARAM lpar
     if (message == WM_COMMAND && LOWORD(wparam) == IDOK) {
         const auto count = SendMessageW(state->list, LB_GETSELCOUNT, 0, 0);
         if (count <= 0 || static_cast<unsigned>(count) > state->maximum) {
-            const auto message = L"Seleziona da 1 a " + std::to_wstring(state->maximum) + L" destinatari.";
+            const auto message = ctr_ui::ui_format(ctr_ui::Text::SelectRecipients, std::to_wstring(state->maximum));
             MessageBoxW(window, message.c_str(), L"CTR", MB_OK);
             return 0;
         }
@@ -51,7 +52,7 @@ std::vector<int> choose(const std::vector<std::wstring>& rows, unsigned maximum,
         14, 14, 475, 310, window, reinterpret_cast<HMENU>(100), GetModuleHandleW(nullptr), nullptr);
     auto ok = CreateWindowW(L"BUTTON", action, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
         265, 342, 110, 30, window, reinterpret_cast<HMENU>(IDOK), GetModuleHandleW(nullptr), nullptr);
-    auto cancel = CreateWindowW(L"BUTTON", L"Annulla", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+    auto cancel = CreateWindowW(L"BUTTON", ctr_ui::ui_text(ctr_ui::Text::Cancel), WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         385, 342, 105, 30, window, reinterpret_cast<HMENU>(IDCANCEL), GetModuleHandleW(nullptr), nullptr);
     if (!state.list || !ok || !cancel) { DestroyWindow(window); throw std::runtime_error("cannot create picker controls"); }
     for (HWND control : {state.list, ok, cancel})

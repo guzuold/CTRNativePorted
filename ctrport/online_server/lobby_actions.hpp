@@ -19,7 +19,7 @@ inline LobbyActionResult lobby_action(const std::filesystem::path& root,const st
                 result.detail=format_room_invite({self,response.at("token").text,ip});
             } else if(action==111) {
                 const auto ticket=parse_room_invite(invite);
-                if(ticket.host==self || ticket.host==selection.owner)throw std::runtime_error("Sei gia in questa stanza");
+                if(ticket.host==self || ticket.host==selection.owner)throw std::runtime_error("You are already in this room");
                 const auto verified=verify_candidate_endpoint(ticket.ip+":8780",ticket.host);
                 if(verified.status!=VerifyStatus::Verified)throw std::runtime_error(verified.detail);
                 auto join=command("join");join.set("name",Json::of(name));join.set("invite_token",Json::of(ticket.token));

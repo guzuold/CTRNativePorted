@@ -140,7 +140,7 @@ int CTR_SYSV sceInvitationDialogClose() {
         if (thread) EnumThreadWindows(thread, [](HWND window, LPARAM argument)->BOOL {
             wchar_t title[64]{};
             GetWindowTextW(window, title, 64);
-            if (!std::wcscmp(title, L"CTR - Invito"))
+            if (!std::wcscmp(title, L"CTR - Invitation"))
                 *reinterpret_cast<bool*>(argument) = PostMessageW(window, WM_COMMAND, IDCANCEL, 0) != 0;
             return TRUE;
         }, reinterpret_cast<LPARAM>(&posted));

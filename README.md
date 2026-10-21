@@ -13,9 +13,10 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.5.0](https://github.com/guzuold/CTRNativePorted/releases)**
-(experimental pre-release). The game is playable from start to finish. Online play
-works between instances, with limits listed [below](#online-status-and-limits).
+**Latest release: [v0.5.1](https://github.com/guzuold/CTRNativePorted/releases)**
+(experimental pre-release). The game is playable from start to finish. Online races
+between two PCs over the Internet work and complete, in private matches and in public
+matchmaking; see the [limits](#online-status-and-limits).
 
 ## Contents
 
@@ -168,15 +169,13 @@ service; the services find each other and cooperate directly.
 
 ### Online status and limits
 - **Verified:**
-  - two retail instances on one PC, each connected only to its own service:
-    - JOIN from the friends list led to a race together (Crash Cove);
-    - public matchmaking through the elected hub led to a race together (Polar Pass);
-  - between two separate PCs, matchmaking has connected the two games;
+  - **two separate PCs over the Internet:** complete races, both in a private match with
+    a friend and through public matchmaking;
+  - two retail instances on one PC, each connected only to its own service: JOIN from the
+    friends list (Crash Cove) and public matchmaking through the elected hub (Polar Pass);
   - local protocol suites with separate services, covering friends, invitations,
     matchmaking and peer authorization.
-- **Not yet verified:**
-  - a full race between two PCs over the Internet;
-  - JOIN between two PCs after its v0.4.4 fix.
+- **Not yet verified:** races with more than two players.
 - **No relay between services yet:** players behind strict NAT or carrier-grade NAT may not
   reach each other directly.
 - **Public matchmaking needs at least one service reachable from the Internet,** through
@@ -300,10 +299,11 @@ Runtime milestones, each recorded with logs and screenshots:
 | R5 | Menus with controller and audio | done |
 | R6 | Track loaded | done |
 | R7 | Race playable from start to finish | done; the game can be completed |
-| R8 | Online between PCs without Activision or Sony servers | in progress |
+| R8 | Online between PCs without Activision or Sony servers | two-PC races complete; in progress |
 
-R8 is not declared complete yet. It still needs a recorded race between two PCs over the
-Internet, and real implementations for the online compatibility stubs still active.
+R8 is not declared complete yet. Races between two PCs over the Internet complete, in a
+private match and through public matchmaking. Still missing: races with more than two
+players, and real implementations for the online compatibility stubs still active.
 
 ## Credits and licenses
 
