@@ -1,4 +1,6 @@
-## Unreleased
+## v0.5.5 — 2026-10-21
+
+Security of the online service and more reliable public matchmaking.
 
 - Filter incoming game UDP and TCP accepts using bounded asynchronous peer authorization; preserve relay delivery and discovery mapping.
 - Authorized peers are renewed every second ahead of unknown sources and, while they keep sending, stay accepted during the renewal: no race datagram is lost to renewals (an earlier build of this filter lost 1–10% per peer, more with several opponents). A refusal takes effect at the service's answer; with the service unreachable an authorization ends three seconds after the last confirmation. A blocking receive skips refused datagrams instead of failing with EWOULDBLOCK.
