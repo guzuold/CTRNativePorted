@@ -2,10 +2,18 @@
 // libSceNpTrophy without trophy data. Behaviour follows pinned shadPS4 v0.18.0
 // src/core/libraries/np/np_trophy.cpp when no trophy files are installed: contexts and
 // handles are real (1-based ids, argument checks and error codes as there), registration
-// succeeds, the unlock state reports zero trophies, info queries return ORBIS_OK without
-// output and icons ICON_FILE_NOT_FOUND. Unlocks are recorded in
-// runtime/user/trophies/unlocks.jsonl. ShowTrophyList, AbortHandle and CaptureScreenshot
-// are declared compatibility stubs (ctrport/compat_stubs.json, tag R8).
+// succeeds, info queries return ORBIS_OK without output and icons ICON_FILE_NOT_FOUND.
+// With the trophy file of the user's dump (trophy_data.hpp) the unlock state is kept in
+// runtime/user/trophies/<NP communication ID>.txt and reported to the game, an unlocked
+// trophy returns TROPHY_ALREADY_UNLOCKED, the platinum unlocks with the last base trophy (as
+// shadPS4 np_trophy.cpp), and each unlock shows a notice over the game (trophy_popup.cpp).
+// Without the file, unlocks are only recorded in runtime/user/trophies/unlocks.jsonl.
+// ShowTrophyList, AbortHandle and CaptureScreenshot are declared compatibility stubs
+// (ctrport/compat_stubs.json, tag R8).
+#include "../trophy_data.hpp"
+#include "trophy_popup.h"
+#include "ui_text.h"
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -13,6 +21,9 @@
 #include <set>
 #include <vector>
 #include "ctr_hle.h"
+// windows.h (through trophy_data.hpp) defines Win32 codes with two of the names below.
+#undef ERROR_INVALID_HANDLE
+#undef ERROR_ALREADY_REGISTERED
 
 namespace {
 constexpr int OK = 0;
@@ -25,6 +36,8 @@ constexpr int ERROR_NOT_REGISTERED = static_cast<int>(0x8055160F);
 constexpr int ERROR_ALREADY_REGISTERED = static_cast<int>(0x80551610);
 constexpr int ERROR_CONTEXT_ALREADY_EXISTS = static_cast<int>(0x80551613);
 constexpr int ERROR_ICON_FILE_NOT_FOUND = static_cast<int>(0x80551614);
+constexpr int ERROR_TROPHY_ALREADY_UNLOCKED = static_cast<int>(0x8055160C);
+constexpr int ERROR_PLATINUM_CANNOT_UNLOCK = static_cast<int>(0x8055160D);
 constexpr int NUM_MAX = 128;
 constexpr std::size_t MAX_CONTEXTS = 8, MAX_HANDLES = 4;
 constexpr const char* LIB = "libSceNpTrophy";
@@ -37,6 +50,56 @@ struct Context {
 std::mutex mutex;
 std::vector<Context> contexts;
 std::vector<bool> handles;
+
+// The trophy set of the dump and its unlocks, loaded at the first registration.
+struct Trophies {
+    bool tried = false, ok = false;
+    ctr_trophy::Set set;
+    std::filesystem::path file;
+    std::map<int, std::int64_t> unlocked;
+};
+Trophies trophies;
+std::string env(const char* name) {
+    const char* value = std::getenv(name);
+    return value ? value : "";
+}
+void load_trophies() {
+    if (trophies.tried) return;
+    trophies.tried = true;
+    try {
+        const int language = std::atoi(env("CTR_SYSTEM_LANGUAGE").c_str());
+        trophies.set = ctr_trophy::load({env("CTR_PATCH_DIR"), env("CTR_BASE_DIR")}, env("CTR_TROPHY_KEY"), language ? language : 1);
+        const std::filesystem::path user = "runtime/user";
+        trophies.file = ctr_trophy::unlock_file(user, trophies.set.np_comm_id);
+        ctr_trophy::import_jsonl(user, trophies.file);
+        trophies.unlocked = ctr_trophy::read_unlocks(trophies.file);
+        trophies.ok = !trophies.set.trophies.empty();
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "Trophies: %s; unlocks are only recorded\n", error.what());
+    }
+    char extra[160];
+    std::snprintf(extra, sizeof(extra), ",\"trophies\":%zu,\"unlocked\":%zu,\"texts\":%s", trophies.set.trophies.size(),
+                  trophies.unlocked.size(), trophies.set.texts ? "true" : "false");
+    ctr_hle::log_call(LIB, "trophy_data", trophies.ok ? 0 : -1, extra);
+    if (!trophies.set.error.empty()) std::fprintf(stderr, "Trophies: texts unavailable: %s\n", trophies.set.error.c_str());
+}
+const ctr_trophy::Trophy* find_trophy(int id) {
+    for (const auto& t : trophies.set.trophies) if (t.id == id) return &t;
+    return nullptr;
+}
+void notify(const ctr_trophy::Trophy& t) {
+    std::wstring name;
+    if (!t.name.empty()) {
+        const int n = MultiByteToWideChar(CP_UTF8, 0, t.name.data(), static_cast<int>(t.name.size()), nullptr, 0);
+        name.resize(static_cast<std::size_t>(n));
+        MultiByteToWideChar(CP_UTF8, 0, t.name.data(), static_cast<int>(t.name.size()), name.data(), n);
+    } else {
+        name = ctr_ui::ui_format(ctr_ui::Text::Trophy, std::to_wstring(t.id));
+    }
+    std::vector<unsigned char> png;
+    try { png = ctr_trophy::icon(trophies.set, t.id); } catch (const std::exception&) {}
+    ctr_hle::trophy::show_popup(std::move(png), ctr_ui::ui_text(ctr_ui::Text::TrophyUnlocked), std::move(name));
+}
 
 int log(const char* function, int result, const char* extra = "") {
     ctr_hle::log_call(LIB, function, result, extra);
@@ -173,7 +236,8 @@ CTR_SYSV int sceNpTrophyRegisterContext(std::int32_t context, std::int32_t handl
         return log("sceNpTrophyRegisterContext", ERROR_ALREADY_REGISTERED);
     }
     ctx->registered = true;
-    return log("sceNpTrophyRegisterContext", OK, ",\"trophy_data\":false");
+    load_trophies();
+    return log("sceNpTrophyRegisterContext", OK, trophies.ok ? ",\"trophy_data\":true" : ",\"trophy_data\":false");
 }
 CTR_HLE_REGISTER("TJCAxto9SEU", "libSceNpTrophy", sceNpTrophyRegisterContext);
 
@@ -189,7 +253,12 @@ CTR_SYSV int sceNpTrophyGetTrophyUnlockState(std::int32_t context, std::int32_t 
     }
     std::memset(flags, 0, NUM_MAX / 8);
     *count = 0;
-    return log("sceNpTrophyGetTrophyUnlockState", OK, ",\"count\":0,\"trophy_data\":false");
+    if (!trophies.ok) return log("sceNpTrophyGetTrophyUnlockState", OK, ",\"count\":0,\"trophy_data\":false");
+    for (const auto& [id, when] : trophies.unlocked) flags[id / 32] |= 1u << (id % 32);
+    *count = static_cast<std::uint32_t>(trophies.set.trophies.size());
+    char extra[96];
+    std::snprintf(extra, sizeof(extra), ",\"count\":%u,\"unlocked\":%zu", *count, trophies.unlocked.size());
+    return log("sceNpTrophyGetTrophyUnlockState", OK, extra);
 }
 CTR_HLE_REGISTER("LHuSmO3SLd8", "libSceNpTrophy", sceNpTrophyGetTrophyUnlockState);
 
@@ -213,6 +282,30 @@ CTR_SYSV int sceNpTrophyUnlockTrophy(std::int32_t context, std::int32_t handle, 
         return log("sceNpTrophyUnlockTrophy", status);
     }
     *platinum = -1;
+    if (trophies.ok) {
+        const auto* trophy_entry = find_trophy(trophy);
+        if (!trophy_entry || trophy < 0) return log("sceNpTrophyUnlockTrophy", ERROR_INVALID_TROPHY_ID);
+        if (trophies.unlocked.count(trophy)) return log("sceNpTrophyUnlockTrophy", ERROR_TROPHY_ALREADY_UNLOCKED);
+        const int platinum_id = trophies.set.platinum();
+        if (trophy == platinum_id) return log("sceNpTrophyUnlockTrophy", ERROR_PLATINUM_CANNOT_UNLOCK);
+        const std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
+        trophies.unlocked[trophy] = now;
+        // The platinum comes with the last trophy of the base game.
+        bool platinum_now = false;
+        if (platinum_id >= 0 && !trophies.unlocked.count(platinum_id)) {
+            platinum_now = true;
+            for (const auto& t : trophies.set.trophies)
+                if (t.id != platinum_id && t.group == -1 && !trophies.unlocked.count(t.id)) { platinum_now = false; break; }
+            if (platinum_now) { trophies.unlocked[platinum_id] = now; *platinum = platinum_id; }
+        }
+        try { ctr_trophy::write_unlocks(trophies.file, trophies.unlocked); }
+        catch (const std::exception& error) { std::fprintf(stderr, "Trophies: %s\n", error.what()); }
+        notify(*trophy_entry);
+        if (platinum_now) if (const auto* p = find_trophy(platinum_id)) notify(*p);
+        char extra[64];
+        std::snprintf(extra, sizeof(extra), ",\"trophy\":%d,\"platinum\":%d", trophy, *platinum);
+        return log("sceNpTrophyUnlockTrophy", OK, extra);
+    }
     std::filesystem::create_directories("runtime/user/trophies");
     if (FILE* file = std::fopen("runtime/user/trophies/unlocks.jsonl", "ab")) {
         std::fprintf(file, "{\"trophy\":%d,\"time\":%lld}\n", trophy,

@@ -67,6 +67,10 @@ CTR_GPU_API int ctr_gpu_gamepad_list(CtrGpuGamepadEntry* out, int capacity);
 /* Rumble and light bar of one PlayStation controller by id; unknown ids are ignored. */
 CTR_GPU_API void ctr_gpu_gamepad_rumble_one(uint32_t id, uint16_t low_frequency, uint16_t high_frequency);
 CTR_GPU_API void ctr_gpu_gamepad_light(uint32_t id, uint8_t red, uint8_t green, uint8_t blue);
+/* The device path of one PlayStation controller by id (the HID interface path on Windows), so
+ * that the launcher's controller assignment can find it. Returns the length written, 0 if the
+ * id is unknown; the text is truncated to capacity - 1 bytes and always terminated. */
+CTR_GPU_API int ctr_gpu_gamepad_path(uint32_t id, char* out, int capacity);
 
 #ifdef __cplusplus
 }

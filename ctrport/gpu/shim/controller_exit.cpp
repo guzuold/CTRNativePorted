@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <cstring>
 #include <mutex>
 #include <vector>
 #include <SDL3/SDL.h>
@@ -106,6 +107,19 @@ extern "C" CTR_GPU_API int ctr_gpu_gamepad_list(CtrGpuGamepadEntry* out,int capa
 extern "C" CTR_GPU_API void ctr_gpu_gamepad_rumble_one(uint32_t id,uint16_t low_frequency,uint16_t high_frequency){
     std::lock_guard<std::mutex> guard(pad_lock);
     for(auto* pad:pads)if(SDL_GetGamepadID(pad)==id)SDL_RumbleGamepad(pad,low_frequency,high_frequency,(low_frequency||high_frequency)?10000:0);
+}
+extern "C" CTR_GPU_API int ctr_gpu_gamepad_path(uint32_t id,char* out,int capacity){
+    std::lock_guard<std::mutex> guard(pad_lock);
+    if(!out || capacity<=0)return 0;
+    out[0]=0;
+    for(auto* pad:pads)if(SDL_GetGamepadID(pad)==id){
+        const char* path=SDL_GetGamepadPath(pad);
+        if(!path)return 0;
+        const int length=static_cast<int>(std::min<std::size_t>(std::strlen(path),static_cast<std::size_t>(capacity-1)));
+        std::memcpy(out,path,static_cast<std::size_t>(length));out[length]=0;
+        return length;
+    }
+    return 0;
 }
 extern "C" CTR_GPU_API void ctr_gpu_gamepad_light(uint32_t id,uint8_t red,uint8_t green,uint8_t blue){
     std::lock_guard<std::mutex> guard(pad_lock);

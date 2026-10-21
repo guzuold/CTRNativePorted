@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstring>
 #include <fstream>
+#include <map>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -137,6 +138,9 @@ inline std::uint32_t sdl_joystick_id(std::uint32_t id){return id&~playstation_fl
 // player presses the PS button to log in. A device that only mirrors an assigned one (one pad
 // seen through two XInput slots, see merge_xinput) never joins: its buttons always match.
 // A device that disconnects leaves its port and that port's user logs out.
+// The launcher can also fix a device to a port (CTR_PAD_PLAYERS): that port takes only that
+// device, logs in while it is connected, and other devices never join it; a port set to
+// "none" stays empty. Ports left on "auto" keep the rules above.
 class PortAssigner {
  static constexpr std::uint64_t join_hold_ms=300;
  std::optional<std::uint32_t> candidate;std::uint64_t candidate_since=0;
@@ -150,14 +154,25 @@ class PortAssigner {
  }
 public:
  struct Change {int port;std::uint32_t device;bool login;};
- std::array<std::optional<std::uint32_t>,4> owner;
- bool assigned(std::uint32_t id) const {for(const auto& o:owner)if(o==id)return true;return false;}
+ std::array<std::optional<std::uint32_t>,4> owner,fixed;
+ std::array<bool,4> blocked{};
+ bool assigned(std::uint32_t id) const {
+  for(const auto& o:owner)if(o==id)return true;
+  for(const auto& f:fixed)if(f==id)return true;
+  return false;
+ }
  std::vector<Change> update(const std::vector<PadDevice>& devices,std::uint64_t now_ms){
   std::vector<Change> changes;
-  for(int port=0;port<4;++port)if(owner[port] && !find(devices,*owner[port])){
-   changes.push_back({port,*owner[port],false});owner[port].reset();
+  for(int port=0;port<4;++port){
+   if(fixed[port]){
+    const bool present=find(devices,*fixed[port])!=nullptr;
+    if(present && owner[port]!=fixed[port]){if(!owner[port])changes.push_back({port,*fixed[port],true});owner[port]=fixed[port];}
+    else if(!present && owner[port]){changes.push_back({port,*owner[port],false});owner[port].reset();}
+   }else if(owner[port] && (!find(devices,*owner[port]) || blocked[port])){
+    changes.push_back({port,*owner[port],false});owner[port].reset();
+   }
   }
-  if(!owner[0]){
+  if(!owner[0] && !fixed[0]){
    for(const auto& d:devices)if(!assigned(d.id) && active(d.pad)){owner[0]=d.id;changes.push_back({0,d.id,true});break;}
    candidate.reset();return changes;
   }
@@ -171,7 +186,7 @@ public:
    const auto* d=find(devices,*candidate);
    if(!d || !eligible(*d))candidate.reset();
    else if(now_ms-candidate_since>=join_hold_ms){
-    for(int port=1;port<4;++port)if(!owner[port]){owner[port]=d->id;changes.push_back({port,d->id,true});break;}
+    for(int port=1;port<4;++port)if(!owner[port] && !fixed[port] && !blocked[port]){owner[port]=d->id;changes.push_back({port,d->id,true});break;}
     candidate.reset();return changes;
    }
   }
@@ -182,7 +197,7 @@ public:
  bool state(int port,const std::vector<PadDevice>& devices,XINPUT_GAMEPAD& out) const {
   out={};
   if(owner[port]){if(const auto* d=find(devices,*owner[port])){out=d->pad;return true;}return false;}
-  if(port)return false;
+  if(port || fixed[0])return false;
   bool any=false;for(const auto& d:devices)if(!assigned(d.id)){merge_gamepad(out,d.pad);any=true;}
   return any;
  }
@@ -190,7 +205,7 @@ public:
  std::vector<std::uint32_t> devices_of(int port,const std::vector<PadDevice>& devices) const {
   std::vector<std::uint32_t> ids;
   if(owner[port]){ids.push_back(*owner[port]);return ids;}
-  if(!port)for(const auto& d:devices)if(!assigned(d.id))ids.push_back(d.id);
+  if(!port && !fixed[0])for(const auto& d:devices)if(!assigned(d.id))ids.push_back(d.id);
   return ids;
  }
 };
@@ -214,12 +229,17 @@ class PadBackend {
  std::array<DWORD,4> status{};std::vector<PadDevice> devices;
  PortAssigner assigner;
  bool split=false,keyboard=true;KeyboardMap keys;
+ // CTR_PAD_PLAYERS: four choices separated by '|', for players 1..4: "auto", "none",
+ // "keyboard", "xinput:N" (slot 0..3) or "hid:<device path>" (a controller read by ctr_gpu).
+ std::array<std::string,4> choices{"auto","auto","auto","auto"};
+ std::map<std::uint32_t,std::string> device_paths;
  struct PlayStationApi {
   int(*merged)(XINPUT_GAMEPAD*)=nullptr;
   int(*list)(void*,int)=nullptr;
   void(*rumble_all)(std::uint16_t,std::uint16_t)=nullptr;
   void(*rumble_one)(std::uint32_t,std::uint16_t,std::uint16_t)=nullptr;
   void(*light)(std::uint32_t,std::uint8_t,std::uint8_t,std::uint8_t)=nullptr;
+  int(*path)(std::uint32_t,char*,int)=nullptr;
  };
  // ctr_gpu.dll reads PlayStation controllers through SDL's HID drivers in the XINPUT_GAMEPAD
  // layout (ctrport/gpu/ctr_gpu.h). Looked up until the DLL is loaded.
@@ -230,6 +250,7 @@ class PadBackend {
    api.rumble_all=reinterpret_cast<void(*)(std::uint16_t,std::uint16_t)>(GetProcAddress(library,"ctr_gpu_gamepad_rumble"));
    api.rumble_one=reinterpret_cast<void(*)(std::uint32_t,std::uint16_t,std::uint16_t)>(GetProcAddress(library,"ctr_gpu_gamepad_rumble_one"));
    api.light=reinterpret_cast<void(*)(std::uint32_t,std::uint8_t,std::uint8_t,std::uint8_t)>(GetProcAddress(library,"ctr_gpu_gamepad_light"));
+   api.path=reinterpret_cast<int(*)(std::uint32_t,char*,int)>(GetProcAddress(library,"ctr_gpu_gamepad_path"));
    api.merged=reinterpret_cast<int(*)(XINPUT_GAMEPAD*)>(GetProcAddress(library,"ctr_gpu_gamepad_state"));
   }
   return api;
@@ -258,6 +279,7 @@ class PadBackend {
    const bool front=focused();
    devices.push_back({keyboard_device,front?keys.state([](int code){return (GetAsyncKeyState(code)&0x8000)!=0;}):XINPUT_GAMEPAD{}});
   }
+  resolve_choices();
   if(!split)return;
   for(const auto& change:assigner.update(devices,GetTickCount64())){
    std::printf("{\"scope\":\"split_screen_port\",\"port\":%d,\"device\":\"%s\",\"assigned\":%s}\n",change.port,pad_device_name(change.device).c_str(),change.login?"true":"false");std::fflush(stdout);
@@ -266,13 +288,39 @@ class PadBackend {
    }
   }
  }
+ // The device each launcher choice names right now (a PlayStation controller's SDL id changes
+ // when it reconnects, so paths are matched again at every poll).
+ void resolve_choices(){
+  const auto& ps=playstation();
+  for(int port=0;port<4;++port){
+   const std::string& choice=choices[port];
+   std::optional<std::uint32_t> device;
+   if(choice=="keyboard")device=keyboard_device;
+   else if(choice.rfind("xinput:",0)==0)device=static_cast<std::uint32_t>(std::atoi(choice.c_str()+7)&3);
+   else if(choice.rfind("hid:",0)==0){
+    device=0x7fffffffu;  // not connected
+    for(const auto& d:devices)if(is_playstation_device(d.id) && d.id!=playstation_merged_device){
+     auto known=device_paths.find(d.id);
+     if(known==device_paths.end()){
+      char path[1024]{};if(ps.path)ps.path(sdl_joystick_id(d.id),path,sizeof(path));
+      known=device_paths.emplace(d.id,path).first;
+     }
+     if(!known->second.empty() && _stricmp(known->second.c_str(),choice.c_str()+4)==0){device=d.id;break;}
+    }
+   }
+   assigner.fixed[port]=device;
+   assigner.blocked[port]=port && choice=="none";
+  }
+ }
  // The pad of a controller port after polling.
  bool port_state(int index,XINPUT_GAMEPAD& out) const {
   if(split)return assigner.state(index,devices,out);
+  if(assigner.fixed[0]){out={};for(const auto& d:devices)if(d.id==*assigner.fixed[0]){out=d.pad;return true;}return false;}
   out={};bool any=false;for(const auto& d:devices){merge_gamepad(out,d.pad);any=true;}return any;
  }
  std::vector<std::uint32_t> port_devices(int index) const {
   if(split)return assigner.devices_of(index,devices);
+  if(assigner.fixed[0])return {*assigner.fixed[0]};
   std::vector<std::uint32_t> ids;for(const auto& d:devices)ids.push_back(d.id);return ids;
  }
  std::vector<Port>::iterator find_port(int handle){return std::find_if(ports.begin(),ports.end(),[handle](const Port& p){return p.handle==handle;});}
@@ -308,6 +356,14 @@ public:
   module=candidate;get_state=call;status=prepared_status;
   split=environment_flag("CTR_SPLIT_SCREEN",false);keyboard=environment_flag("CTR_KEYBOARD",true);
   if(keyboard)load_keyboard_map();
+  char players[4096]{};
+  if(const DWORD length=GetEnvironmentVariableA("CTR_PAD_PLAYERS",players,sizeof(players));length && length<sizeof(players)){
+   std::stringstream list(players);std::string choice;
+   for(int port=0;port<4 && std::getline(list,choice,'|');++port)if(!choice.empty())choices[port]=choice;
+   std::printf("{\"scope\":\"pad_players\",\"player1\":\"%s\",\"player2\":\"%s\",\"player3\":\"%s\",\"player4\":\"%s\"}\n",
+               choices[0].substr(0,64).c_str(),choices[1].substr(0,64).c_str(),choices[2].substr(0,64).c_str(),choices[3].substr(0,64).c_str());
+   std::fflush(stdout);
+  }
   return 0;
  }
  // Test configuration of an isolated backend (controls only).
@@ -548,6 +604,21 @@ inline int pad_split_screen_control(){
  devices.erase(devices.begin());
  changes=a.update(devices,2100);
  if(changes.size()!=1 || changes[0].port!=0 || changes[0].login || a.owner[0] || a.state(0,devices,out))return 12;
+ // Launcher assignment: player 1 = slot 1, player 2 = keyboard, player 3 = none, player 4 auto.
+ PortAssigner f;f.fixed[0]=1u;f.fixed[1]=keyboard_device;f.blocked[2]=true;
+ std::vector<PadDevice> fixed_devices{{0,pad(0)},{keyboard_device,pad(0)}};
+ changes=f.update(fixed_devices,0);
+ // Slot 1 is not connected: player 1 has no input and slot 0 does not take its place.
+ if(changes.size()!=1 || changes[0].port!=1 || changes[0].device!=keyboard_device || !changes[0].login || f.state(0,fixed_devices,out))return 17;
+ fixed_devices[0].pad=pad(XINPUT_GAMEPAD_A,30000);
+ if(!f.update(fixed_devices,10).empty() || f.owner[0])return 18;
+ // Slot 0 held long enough joins the first free automatic port: 4, not the "none" port 3.
+ f.update(fixed_devices,400);
+ if(f.owner[3]!=0u || f.owner[2])return 19;
+ // Slot 1 connects: player 1 logs in on it.
+ fixed_devices.push_back({1,pad(XINPUT_GAMEPAD_B)});
+ changes=f.update(fixed_devices,500);
+ if(changes.size()!=1 || changes[0].port!=0 || changes[0].device!=1u || !f.state(0,fixed_devices,out) || out.wButtons!=XINPUT_GAMEPAD_B)return 20;
  // Keyboard map: defaults, remapping, rejected lines, stick extremes.
  KeyboardMap keys;
  std::istringstream file("# comment\ncross=P,Space\nr1=shift\nl2=nokey\nwrong=A\nmove_left=numpad4\n");
