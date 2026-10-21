@@ -1,3 +1,14 @@
+## Unreleased
+
+- Filter incoming game UDP and TCP accepts using bounded asynchronous peer authorization; preserve relay delivery and discovery mapping.
+- Bound JSON nesting to 64 containers and decode BLOB/STRUCT lengths without recursion.
+- Restrict local game HTTP routes to loopback while preserving signed peer/party and identity flows.
+- Apply absolute five-second HTTP header/body deadlines, 128 global and 8 per-IP TCP connection limits, and a separate five-minute lobby idle timeout.
+- Stop requesting TCP 3074 through UPnP; bind the lobby and diagnostic TCP 3075 / UDP 3075, 3478, 3479 to loopback.
+- Compatibility: signed service and game wire formats are unchanged, so mixed v0.5.4/current per-PC launcher peers remain protocol-compatible (two-PC play still needs manual verification). Manually pointing a game at a LAN/remote CTR_ONLINE_SERVER is intentionally no longer supported. Unusually deep payloads, slow HTTP clients and connections over the limits are now rejected.
+- Fix invitation ownership validation to use the registered session member name with the service-scoped account, preserving rejection of spoofed senders.
+- Document hub election alternatives; no election changes are implemented.
+
 ## v0.5.4 — 2026-10-21
 
 AMD FSR 3.1 upscaling, and friends keep their names while offline.
