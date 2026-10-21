@@ -14,7 +14,8 @@ vk::ImageView Rasterizer::UpscaleScene(VideoCore::ImageId id, vk::ImageView view
     const auto& display = texture_cache.GetImage(cb_descs[0].first);
     const vk::Extent2D in{source.info.size.width, source.info.size.height};
     const vk::Extent2D out{display.info.size.width, display.info.size.height};
-    if (CtrUpscaling::Mode() == 2) {
+    // DLSS and FSR 3 are temporal: CtrDlss feeds both from the same inputs.
+    if (CtrUpscaling::Mode() == 2 || CtrUpscaling::Mode() == 3) {
         upscale_view = ctr_dlss->Upscale(id, format, mapping, out, upscale_layout);
         return upscale_view;
     }
