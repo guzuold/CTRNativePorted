@@ -312,6 +312,11 @@ for name in ['vk_instance.cpp', 'vk_platform.cpp']:
 ''' + marker, 'DLSS device extensions')
         marker = '    VULKAN_HPP_DEFAULT_DISPATCHER.init(*device);'
         s = replace_once(s, marker, marker+'\n    if (auto* dlss = DlssNgx::Get()) dlss->Initialize(*instance, physical_device, *device);', 'initialize NGX')
+        # FSR 3 (FSR-Vulkan) stores to images through views declared without a format.
+        s = replace_once(s, '                .shaderStorageImageMultisample = features.shaderStorageImageMultisample,',
+                         '                .shaderStorageImageMultisample = features.shaderStorageImageMultisample,\n'
+                         '                .shaderStorageImageWriteWithoutFormat = features.shaderStorageImageWriteWithoutFormat,',
+                         'FSR 3 storage without format')
         s = replace_once(s, 'Instance::~Instance() {', 'Instance::~Instance() {\n    if (auto* dlss = DlssNgx::Get()) dlss->Shutdown();', 'NGX shutdown')
     else:
         marker = '    const auto extensions = GetLayerExtensions(GetInstanceExtensions(window_type, true), layers);'
