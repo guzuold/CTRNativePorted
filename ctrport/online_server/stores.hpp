@@ -172,12 +172,22 @@ public:
     std::vector<LobbyPlan> promote_disconnected(std::uint64_t lost,
         const std::map<std::uint64_t, std::string>& connected);
     void cancel_pending(std::uint64_t account, const std::string& selector);
+    // 145/10: `account` leaves `lobby`. When it was the host, the next connected member of the
+    // lobby is promoted and returned (the remaining players must be told).
+    std::optional<std::uint64_t> leave_lobby(std::uint64_t account, std::uint64_t lobby,
+        const std::map<std::uint64_t, std::string>& connected);
+    // 145/8: `account` cancels its search `search_id` (the mm_id answered by 145/18).
+    void cancel_search(std::uint64_t account, std::uint64_t search_id);
+    bool departed(std::uint64_t lobby, std::uint64_t account) const;
     const std::string* player_info(std::uint64_t account) const;
     const LobbyDocuments* documents(std::uint64_t lobby) const;
     std::set<std::uint64_t> connection_peers(std::uint64_t account, const std::string& selector) const;
 
 private:
     std::string migration_routes(std::uint64_t lobby) const;
+    struct Lobby;
+    std::optional<std::uint64_t> promote(std::uint64_t id, Lobby& lobby, std::uint64_t lost,
+        const std::map<std::uint64_t, std::string>& connected);
     struct MatchPlayer { Bytes address; std::uint32_t a, b; Bytes custom; };
     struct MatchSession {
         std::string selector, context;

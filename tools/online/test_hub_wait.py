@@ -52,6 +52,17 @@ with tempfile.TemporaryDirectory(prefix='ctr_hub_wait_') as tmp:
                 host,created=h.first_push([remote,local],timeout=10)
                 print(json.dumps({'mode':'host-choice','host':host['name'] if host else None}),flush=True)
                 h.check(host is local,'host choice: the reachable player hosts although the unreachable one searched first')
+                if created:
+                    # The player of the other PC leaves the matchmaking screen: its 145/10 must
+                    # reach the hub, which removes it from the lobby.
+                    remote['lobby'].send_task(145,10,h.e2e.typed((h.UINT64,created[2][1])))
+                    while True:
+                        kind,payload=remote['lobby'].receive()
+                        if kind==1:break
+                    left=h.Reader(payload).values()
+                    hub_log=[json.loads(l) for l in (root/'hub/runtime/user/logs/member.jsonl').read_text().splitlines()]
+                    h.check(len(left)>1 and left[1][1]==0 and any(e['event']=='room_left' and e.get('account')==remote['user'] for e in hub_log),
+                            'leave from the other PC reaches the hub (145/10 forwarded)')
                 remote['lobby'].s.close();local['lobby'].s.close();proc.terminate();proc.wait();processes.remove(proc)
                 continue
             player=h.login(h.MEMBER,'SyntheticPlayer')

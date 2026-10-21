@@ -1,0 +1,36 @@
+﻿{"scope": "online_server_test", "check": "peer presence: friend's service reports its player", "ok": true}
+{"scope": "online_server_test", "check": "peer presence: both directions", "ok": true}
+{"scope": "online_server_test", "check": "peer presence: service refuses a caller outside its rubrica", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: stranger gets the rubrica refusal", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: replayed packet refused", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: packet addressed to another service refused", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: claimed sender must match the signature", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: unknown action refused", "ok": true}
+{"scope": "online_server_test", "check": "public matchmaking: a service's code is learned and verified from its identity answer", "ok": true}
+{"scope": "online_server_test", "check": "public matchmaking: an endpoint without a service is not a candidate", "ok": true}
+{"scope": "online_server_test", "check": "public matchmaking: hub is the lowest code among reachable services, never an unreachable self", "ok": true}
+{"scope": "online_server_test", "check": "peer presence: game status stored on the friend's own service", "ok": true}
+{"scope": "online_server_test", "check": "peer presence: friend's game status reaches this service", "ok": true}
+{"scope": "online_server_test", "check": "in-game friendList is the rubrica; friend without a running game is offline", "ok": true}
+{"scope": "online_server_test", "check": "peer presence: removal takes effect at once, offline friend keeps its last name", "ok": true}
+{"scope": "online_server_test", "check": "in-game friendList keeps an offline friend after a restart", "ok": true}
+{"scope": "online_server_test", "check": "friend removed from the rubrica leaves the in-game list", "ok": true}
+{"scope":"peer_channel","failures":0}
+{"scope": "online_server_test", "check": "cross invite: host creates a private session on its own service", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: host sends the invitation", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: guest's own service delivers it to the guest's game", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: another PC's player does not receive it", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: PSN invitation list carries the session details from the host's service", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: invited guest reads the host's private session", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: acceptance reaches the host's service", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: an accepted invitation is no longer pending", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: repeated delivery does not reopen an accepted invitation", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: guest joins the host's session from its own service", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: the host's service lists the guest as a member", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: friend sessions on the guest's service include the host's session", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: the host's sessions by account come from the host's report", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: a friend's service cannot act as the host's own player", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: only session and invitation routes are forwarded", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: a stranger's service cannot read the session", "ok": true}
+{"scope": "online_server_test", "check": "cross invite: guest leaves the host's session through its own service", "ok": true}
+{"scope":"friend_invitation","failures":0}

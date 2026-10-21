@@ -1,0 +1,3 @@
+﻿{"mode": "host-choice", "host": "HubPlayer"}
+{"scope": "public_hub", "check": "host choice: the reachable player hosts although the unreachable one searched first", "ok": true}
+{"scope": "public_hub", "check": "leave from the other PC reaches the hub (145/10 forwarded)", "ok": true}

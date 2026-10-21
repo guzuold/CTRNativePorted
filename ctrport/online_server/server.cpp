@@ -742,7 +742,7 @@ struct Server::Impl {
             return response;
         }
         const TaskRequest task = parse_task_request(base64_decode(text_field(request, "task")));
-        if (task.service != 145 || (task.task != 2 && task.task != 3 && task.task != 15 && task.task != 18))
+        if (task.service != 145 || (task.task != 2 && task.task != 3 && task.task != 8 && task.task != 10 && task.task != 15 && task.task != 18))
             throw std::runtime_error("Matchmaking task not allowed");
         if (found == live_clients.end()) {
             std::size_t from_caller = 0, remote = 0;
@@ -793,7 +793,7 @@ struct Server::Impl {
     // in use. nullopt: handle it here (no hub, this service is the hub, or the hub failed).
     std::optional<Bytes> hub_task(const TaskRequest& request, const Bytes& payload, const AuthSession& user) {
         if (!config.match_hub || request.service != 145 || user.room_token != public_room_token() ||
-            (request.task != 2 && request.task != 3 && request.task != 15 && request.task != 18))
+            (request.task != 2 && request.task != 3 && request.task != 8 && request.task != 10 && request.task != 15 && request.task != 18))
             return std::nullopt;
         // A sequence stays on the side that answered its advertise (task 2): the hub refuses a
         // search from a player it never registered. Task 2 starts a new sequence.
@@ -1818,6 +1818,7 @@ struct Server::Impl {
         for (const PlanPlayer& player : plan.players) {
             const auto it = live_clients.find(player.account);
             if (it == live_clients.end() || it->second->user.room_token != plan.selector) continue;
+            if (matchmaking.departed(lobby, player.account)) continue; // left with 145/10
             if (player.account == plan.host || plan.guests_notified.count(player.account)) {
                 push(it->second, room_update_event(lobby, docs->host, docs->backend));
             } else {
@@ -1946,6 +1947,28 @@ struct Server::Impl {
                 w.u32(1).u32(1).string("{\"mm_id\":" + std::to_string(id) + "}");
                 return task_reply(task, &w);
             });
+        // Leaving the matchmaking screen: 145/10 leaves the lobby (its ID), 145/8 cancels the
+        // search (the mm_id of 145/18). A host that leaves is replaced by the next member, who
+        // is sent the updated lobby; the leaver can search again at once.
+        if (service == 145 && task == 10 && params.size() == 1 && params[0].kind == typed::UINT64)
+            return guarded([&] {
+                const std::uint64_t lobby = params[0].value.as_u64();
+                std::map<std::uint64_t, std::string> connected;
+                for (const auto& [other, live] : live_clients) connected[other] = live->user.room_token;
+                const auto promoted = matchmaking.leave_lobby(user.user_id, lobby, connected);
+                Json f = Json::object();
+                f.set("lobby", Json::of(lobby));
+                f.set("account", Json::of(user.user_id));
+                f.set("new_host", promoted ? Json::of(*promoted) : Json::null());
+                record("room_left", std::move(f));
+                if (promoted) {
+                    if (const auto pending = pending_lobbies.find(lobby); pending != pending_lobbies.end()) pending->second.host = *promoted;
+                    publish_host_document(lobby);
+                }
+                return task_reply(task);
+            });
+        if (service == 145 && task == 8 && params.size() == 1 && params[0].kind == typed::UINT64)
+            return guarded([&] { matchmaking.cancel_search(user.user_id, params[0].value.as_u64()); return task_reply(task); });
         if (service == 145 && task == 15)
             return guarded([&] {
                 const bool success = matchmaking.sync_document(params, user.user_id, user.room_token);

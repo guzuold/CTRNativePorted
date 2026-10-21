@@ -1,0 +1,8 @@
+﻿{"scope": "public_hub", "check": "first searcher hosts", "ok": true}
+{"scope": "public_hub", "check": "guest joins the lobby", "ok": true}
+{"scope": "public_hub", "check": "leave lobby (145/10) answered without error", "ok": false}
+{"scope": "public_hub", "check": "cancel search (145/8) answered without error", "ok": false}
+{"scope": "public_hub", "check": "remaining player is told it is now the host", "ok": false}
+{"scope": "public_hub", "check": "last player leaves the lobby", "ok": false}
+{"scope": "public_hub", "check": "both search again and meet in a new lobby", "ok": true}
+{"scope": "lobby_leave", "failures": 4}

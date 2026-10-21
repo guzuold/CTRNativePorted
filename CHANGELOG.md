@@ -1,3 +1,7 @@
+## Unreleased
+
+- **Leaving the matchmaking screen:** the game's leave-lobby (145/10) and cancel-search (145/8) tasks were answered "not served", and from a PC using a hub they were not even forwarded. A player who left stayed in the lobby for the hub; when it was the host, the other player promoted itself in game and waited forever on "Preparazione lobby in corso" for the hub to confirm. Now the hub removes the player from the lobby and cancels its search. When the host leaves, the next connected member becomes host and is sent the updated lobby. Players who left get no more updates of that lobby and can search again at once.
+
 ## v0.5.8 — 2026-10-21
 
 The two games of an online match can connect again: answers to the game's own datagrams are no longer dropped.
