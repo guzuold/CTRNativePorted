@@ -1,4 +1,6 @@
-## Unreleased
+## v0.5.6 — 2026-10-21
+
+Public matchmaking from PCs that cannot be reached: no dead local queue, and the hub election in the log.
 
 - A PC that cannot be reached from the Internet (behind the operator's NAT, a phone hotspot) and has not found a matchmaking hub refuses the public search instead of queueing it on its own service, where no other player could ever join. The game receives an error for the search; the next attempt starts over and uses the hub if one has been found. The refusal is logged as `hub_none` with reason `search_refused`. How the game shows the refusal still has to be checked in a real session: on 19 October 2026 the game survived errors on these tasks, gave up the search after 60 seconds and went on.
 - Every hub election round writes a `hub_round` line to the service log: addresses returned by the DHT, identities that answered, live candidates, whether this PC can be reached, and the elected hub. A PC that never finds a hub now shows it directly.
