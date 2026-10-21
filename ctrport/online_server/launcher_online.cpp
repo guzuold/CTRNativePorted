@@ -95,7 +95,7 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
         }
         const auto found = find_friend_server(root, code, 1500, 1500, {}, shared);
         if (found.status != VerifyStatus::Verified) return std::nullopt;
-        FriendStore(friends_path).update_endpoint(code, found.ip + ":" + std::to_string(found.port), "Server verificato");
+        FriendStore(friends_path).update_endpoint(code, found.ip + ":" + std::to_string(found.port), "Verified service");
         return std::make_pair(found.ip, found.port);
     };
     status.log = config.log_path;
@@ -326,7 +326,7 @@ VerifyResult find_friend_server(const std::filesystem::path& root,
     for (const std::string& candidate : candidates) {
         VerifyResult v = verify_candidate_endpoint(candidate, info, verify_timeout_ms);
         if (v.status == VerifyStatus::Verified) {
-            store.update_endpoint(info.code, v.ip + ":" + std::to_string(v.port), "Server verificato");
+            store.update_endpoint(info.code, v.ip + ":" + std::to_string(v.port), "Verified service");
             return v;
         } else if (v.status == VerifyStatus::InvalidIdentity) {
             result = v;
