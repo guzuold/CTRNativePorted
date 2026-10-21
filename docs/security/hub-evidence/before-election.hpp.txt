@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#pragma once
+#include "launcher_online.hpp"
+#include <functional>
+namespace ctr_online {
+// Network-free seam extracted from the original Host round; callbacks verify signatures.
+class HubElection {
+public:
+    using Search = std::function<std::vector<std::string>()>;
+    using Identify = std::function<std::optional<MatchHub>(const std::string&)>;
+    using Publish = std::function<void(std::optional<MatchHub>, const std::string&, std::size_t)>;
+    MatchHub self;
+    bool reachable;
+    HubElection(MatchHub s, bool r):self(std::move(s)),reachable(r){}
+    void load(const std::filesystem::path&, std::uint64_t) {}
+    bool save(const std::filesystem::path&) const {return true;}
+    void round(std::uint64_t, const Search& search, const Identify& identify, const Publish& publish) {
+        std::vector<MatchHub> verified;
+        const auto endpoints=search();
+        for(std::size_t i=0;i<endpoints.size() && i<16;++i)
+            if(auto h=identify(endpoints[i])) verified.push_back(*h);
+        publish(choose_hub(self,reachable,verified),"dht",verified.size());
+    }
+};
+}
