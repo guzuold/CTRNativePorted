@@ -45,7 +45,7 @@
 #include "guest_copy_images.hpp"
 #include "owner_dispatch_host.hpp"
 #include "original_call.hpp"
-#include "../tools/harness/original_call_session.hpp"
+#include "original_call_session.hpp"
 #include "original_register_call.hpp"
 #include "process_guard.hpp"
 #include "kernel_time.hpp"
@@ -107,7 +107,7 @@ extern "C" int ctr_json2_stub(unsigned index,std::uint64_t caller) {return ctr_j
 #include "thread_atexit.hpp"
 #include "application_heap.hpp"
 #include "heap_trace.hpp"
-#include "../tools/harness/original_call_session.hpp"
+#include "original_call_session.hpp"
 // Public reference: pinned shadPS4 kernel.cpp87-90, GPL-2.0-or-later.
 // Independent per-host-thread guest errno cell; error conversion is separate.
 extern "C" int* ctr_guest_errno() {static thread_local int value=0;return &value;}
@@ -1648,6 +1648,9 @@ int main(int argc, char** argv) {
                 }
                 ctrport::kernel_files.configure(base_path, patch_path);
                 ctrport::kernel_files.configure_user("runtime/user/data");
+                // CTR_MODS_DIR: enabled loose-file mods override /app0 files (mod_overlay.hpp).
+                try { ctrport::mods::overlay.configure_from_environment({patch_path, base_path}); }
+                catch (const std::exception& error) { throw std::runtime_error(std::string("Mods: ") + error.what()); }
             }
             std::vector<ctrport::MappedImage> images;
             std::vector<ctrport::ImageMetadata> metadata;
