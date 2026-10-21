@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "settings.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
@@ -91,14 +92,6 @@ constexpr auto Compute = vk::PipelineStageFlagBits2::eComputeShader;
 constexpr auto MemoryRw = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
 constexpr auto ShaderRw = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite;
 
-bool Requested() {
-    static const bool value = [] {
-        const char* v = std::getenv("CTR_FRAMEGEN");
-        return v && *v && std::strcmp(v, "0") != 0 && std::strcmp(v, "off") != 0;
-    }();
-    return value;
-}
-
 } // namespace
 
 CtrFrameGen::CtrFrameGen(const Instance& instance_, Scheduler& scheduler_)
@@ -113,7 +106,7 @@ CtrFrameGen::~CtrFrameGen() {
 }
 
 bool CtrFrameGen::Enabled() const {
-    return Requested() && !failed.load(std::memory_order_relaxed);
+    return CtrUpscaling::FrameGen() && !failed.load(std::memory_order_relaxed);
 }
 
 void CtrFrameGen::Fail(const char* reason) {
@@ -135,8 +128,10 @@ void CtrFrameGen::Reset() {
     }
     rgba_view.reset();
     generated_view.reset();
+    hudless_rgba_view.reset();
     rgba_image.Destroy();
     generated_image.Destroy();
+    hudless_rgba_image.Destroy();
     flat_depth_image.Destroy();
     flat_motion_image.Destroy();
     for (auto& output : outputs) {
@@ -291,6 +286,7 @@ bool CtrFrameGen::Ensure(u32 w, u32 h) {
     const auto rw = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled;
     make(rgba_image, &rgba_view, vk::Format::eR8G8B8A8Unorm, rw);
     make(generated_image, &generated_view, vk::Format::eR8G8B8A8Unorm, rw);
+    make(hudless_rgba_image, &hudless_rgba_view, vk::Format::eR8G8B8A8Unorm, rw);
     make(flat_depth_image, nullptr, vk::Format::eR32Sfloat,
          rw | vk::ImageUsageFlagBits::eTransferDst);
     make(flat_motion_image, nullptr, vk::Format::eR16G16Sfloat,
@@ -300,8 +296,9 @@ bool CtrFrameGen::Ensure(u32 w, u32 h) {
     // Out of Undefined: the working images to General, the stand-ins cleared (far depth, no
     // motion) and left in SHADER_READ_ONLY, the layout every import declares for them.
     const auto cmdbuf = scheduler.CommandBuffer();
-    std::array<vk::ImageMemoryBarrier2, 4> first{};
-    const std::array<vk::Image, 4> images{vk::Image(rgba_image), vk::Image(generated_image),
+    std::array<vk::ImageMemoryBarrier2, 5> first{};
+    const std::array<vk::Image, 5> images{vk::Image(rgba_image), vk::Image(generated_image),
+                                         vk::Image(hudless_rgba_image),
                                          vk::Image(flat_depth_image),
                                          vk::Image(flat_motion_image)};
     for (u32 i = 0; i < first.size(); ++i) {
@@ -310,7 +307,7 @@ bool CtrFrameGen::Ensure(u32 w, u32 h) {
             .dstStageMask = AllCommands,
             .dstAccessMask = MemoryRw,
             .oldLayout = vk::ImageLayout::eUndefined,
-            .newLayout = i < 2 ? vk::ImageLayout::eGeneral : vk::ImageLayout::eTransferDstOptimal,
+            .newLayout = i < 3 ? vk::ImageLayout::eGeneral : vk::ImageLayout::eTransferDstOptimal,
             .image = images[i],
             .subresourceRange = ColorRange,
         };
@@ -402,7 +399,18 @@ bool CtrFrameGen::Record(const Inputs& in) {
     }
     RetireCompleted(false);
 
-    const bool reset = in.reset || needs_reset;
+    // The game's vectors when the upscaler wrote them this frame at no more than the frame's size
+    // (FSR scales render-size motion up to the frame); a switch either way restarts the history.
+    const auto& vec = in.vectors;
+    const bool vectors = vec.fresh && vec.depth && vec.motion && vec.width != 0 &&
+                         vec.height != 0 && vec.width <= in.width && vec.height <= in.height;
+    const bool hudless = bool(in.hudless);
+    const u32 render_w = vectors ? vec.width : in.width;
+    const u32 render_h = vectors ? vec.height : in.height;
+    const bool reset =
+        in.reset || needs_reset || vectors != last_vectors || hudless != last_hudless;
+    last_vectors = vectors;
+    last_hudless = hudless;
     needs_reset = false;
 
     const vk::CommandBuffer cmdbuf = scheduler.CommandBuffer();
@@ -425,12 +433,37 @@ bool CtrFrameGen::Record(const Inputs& in) {
     }
     Convert(cmdbuf, SourceView(in.color, in.color_format), *rgba_view, in.width, in.height,
             false);
-    Barrier(cmdbuf, vk::Image(rgba_image), vk::ImageLayout::eGeneral,
-            vk::ImageLayout::eShaderReadOnlyOptimal, Compute, vk::AccessFlagBits2::eShaderWrite,
-            Compute, vk::AccessFlagBits2::eShaderRead);
+    if (hudless) {
+        Convert(cmdbuf, SourceView(in.hudless, in.color_format), *hudless_rgba_view, in.width,
+                in.height, false);
+    }
+    for (const vk::Image image : {vk::Image(rgba_image), vk::Image(hudless_rgba_image)}) {
+        Barrier(cmdbuf, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eShaderReadOnlyOptimal,
+                Compute, vk::AccessFlagBits2::eShaderWrite, Compute,
+                vk::AccessFlagBits2::eShaderRead);
+    }
+    // FSR imports sampled inputs in SHADER_READ_ONLY: the game's vectors are moved there and
+    // back, so every exit path restores what the upscaler expects (General).
+    const vk::Image depth = vectors ? vec.depth : vk::Image(flat_depth_image);
+    const vk::Image motion = vectors ? vec.motion : vk::Image(flat_motion_image);
+    if (vectors) {
+        for (const vk::Image image : {depth, motion}) {
+            Barrier(cmdbuf, image, vk::ImageLayout::eGeneral,
+                    vk::ImageLayout::eShaderReadOnlyOptimal, AllCommands, MemoryRw, Compute,
+                    vk::AccessFlagBits2::eShaderRead);
+        }
+    }
     const auto restore = [&] {
-        Barrier(cmdbuf, vk::Image(rgba_image), vk::ImageLayout::eShaderReadOnlyOptimal,
-                vk::ImageLayout::eGeneral, Compute, ShaderRw, AllCommands, MemoryRw);
+        for (const vk::Image image : {vk::Image(rgba_image), vk::Image(hudless_rgba_image)}) {
+            Barrier(cmdbuf, image, vk::ImageLayout::eShaderReadOnlyOptimal,
+                    vk::ImageLayout::eGeneral, Compute, ShaderRw, AllCommands, MemoryRw);
+        }
+        if (vectors) {
+            for (const vk::Image image : {depth, motion}) {
+                Barrier(cmdbuf, image, vk::ImageLayout::eShaderReadOnlyOptimal,
+                        vk::ImageLayout::eGeneral, Compute, ShaderRw, AllCommands, MemoryRw);
+            }
+        }
         scheduler.GetDynamicState().Invalidate(); // FSR records its own Vulkan state
     };
 
@@ -440,29 +473,36 @@ bool CtrFrameGen::Record(const Inputs& in) {
     prepare.commandBuffer = cmdbuf;
     prepare.color = {vk::Image(rgba_image), VK_FORMAT_R8G8B8A8_UNORM, in.width, in.height,
                      read_only, usage};
-    prepare.depth = {vk::Image(flat_depth_image), VK_FORMAT_R32_SFLOAT, in.width, in.height,
-                     read_only, usage};
-    prepare.motionVectors = {vk::Image(flat_motion_image), VK_FORMAT_R16G16_SFLOAT, in.width,
-                             in.height, read_only, usage};
-    prepare.renderWidth = in.width;
-    prepare.renderHeight = in.height;
+    prepare.depth = {depth, VK_FORMAT_R32_SFLOAT, render_w, render_h, read_only, usage};
+    prepare.motionVectors = {motion, VK_FORMAT_R16G16_SFLOAT, render_w, render_h, read_only,
+                             usage};
+    prepare.renderWidth = render_w;
+    prepare.renderHeight = render_h;
+    // Same conventions as the upscaler that produced them: pixel motion, scale 1.
+    prepare.jitterOffsetX = vectors ? vec.jitter[0] : 0.0f;
+    prepare.jitterOffsetY = vectors ? vec.jitter[1] : 0.0f;
     prepare.motionVectorScaleX = 1.0f;
     prepare.motionVectorScaleY = 1.0f;
     prepare.frameTimeMilliseconds = std::clamp(in.frame_ms, 1.0f, 100.0f);
     prepare.minLuminance = 0.0f;
     prepare.maxLuminance = 1.0f; // the finished, tonemapped 8-bit frame
     prepare.transferFunction = FFX_VK_FSR3_3_1_6_FRAMEGEN_TRANSFER_SRGB;
-    // CTR's scene camera (CtrDlss validates the same range): near 16, far 20000, about 45
-    // degrees. Only the optical flow carries motion, so these only scale its depth handling.
-    prepare.cameraNear = 16.0f;
-    prepare.cameraFar = 20000.0f;
-    prepare.cameraVerticalFovRadians = 0.785f;
+    // The retail projection's planes (CtrDlss validates them), CTR's own values otherwise.
+    const bool camera_ok = vec.near_plane > 0.0f && vec.far_plane > vec.near_plane &&
+                           vec.fov > 0.01f && vec.fov < 3.1f;
+    prepare.cameraNear = camera_ok ? vec.near_plane : 16.0f;
+    prepare.cameraFar = camera_ok ? vec.far_plane : 150000.0f;
+    prepare.cameraVerticalFovRadians = camera_ok ? vec.fov : 1.2870f;
     prepare.viewSpaceToMeters = 0.01f;
     prepare.cameraUp[1] = 1.0f;
     prepare.cameraRight[0] = 1.0f;
     prepare.cameraForward[2] = -1.0f;
     prepare.frameId = frame_id;
     prepare.reset = reset ? VK_TRUE : VK_FALSE;
+    if (hudless) {
+        prepare.colorHudless = {vk::Image(hudless_rgba_image), VK_FORMAT_R8G8B8A8_UNORM,
+                                in.width, in.height, read_only, usage};
+    }
     const auto prepared = ffxVkFsr3_3_1_6FrameGenerationContextRecordPrepare(context, &prepare);
     if (prepared != FFX_VK_FSR3_3_1_6_FRAMEGEN_OK) {
         restore();
@@ -523,10 +563,15 @@ bool CtrFrameGen::Record(const Inputs& in) {
 
     ++stats.frames;
     stats.resets += reset ? 1 : 0;
-    if (!announced) {
+    stats.game_vectors += vectors ? 1 : 0;
+    stats.hudless += hudless ? 1 : 0;
+    if (!announced || vectors != announced_vectors || hudless != announced_hudless) {
         announced = true;
-        std::fprintf(stderr, "CTR_FRAMEGEN generating at %ux%u (optical flow)\n", in.width,
-                     in.height);
+        announced_vectors = vectors;
+        announced_hudless = hudless;
+        std::fprintf(stderr, "CTR_FRAMEGEN generating at %ux%u (%s, %s)\n", in.width, in.height,
+                     vectors ? "game motion + optical flow" : "optical flow",
+                     hudless ? "HUD kept out" : "HUD interpolated");
         std::fflush(stderr);
     }
     // A reset dispatch only starts the history: there is no previous frame to interpolate from,

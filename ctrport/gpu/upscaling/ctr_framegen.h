@@ -6,9 +6,12 @@
 // MIT), which returns the frame halfway between it and the previous one. The presenter shows
 // that generated frame first and the real one half a frame later.
 //
-// Motion comes from the optical flow alone (flat far depth and zero motion stand in for the
-// game's vectors, like driver-level frame generation), so it works with every upscaler and in
-// menus.
+// The game's motion (scene depth R32F + pixel motion RG16F from CtrDlss's inputs pass, when the
+// FSR 3 or DLSS upscaler ran this frame) is used when it is fresh and no larger than the frame;
+// otherwise flat far depth and zero motion stand in and the optical flow carries the motion
+// alone (like driver-level frame generation), so it works with every upscaler and in menus.
+// With a HUD-less copy of the frame, optical flow and interpolation run on the scene alone and
+// the HUD is taken from the real frame instead of being smeared.
 //
 // Threading: Record runs on the GPU thread that calls Presenter::PrepareFrame; OutputImage is
 // read by the presenting thread for a frame whose generation was recorded and submitted before.
@@ -45,11 +48,22 @@ public:
     /// CTR_FRAMEGEN asks for frame generation and it has not failed in this session.
     [[nodiscard]] bool Enabled() const;
 
+    struct Vectors {
+        bool fresh = false; ///< the upscaler wrote them this frame
+        vk::Image depth{}, motion{};
+        u32 width = 0, height = 0;
+        float jitter[2]{};
+        float near_plane = 16.0f, far_plane = 150000.0f, fov = 1.2870f;
+    };
+
     struct Inputs {
         u32 slot = 0;              ///< the presenter frame's id (< MaxSlots)
         vk::Image color{};         ///< the finished frame, General layout, MUTABLE_FORMAT
         vk::Format color_format{}; ///< its format (the swapchain's)
         u32 width = 0, height = 0;
+        Vectors vectors{};
+        /// The same frame without the HUD (General, same format and size), or null.
+        vk::Image hudless{};
         float frame_ms = 16.6f;    ///< since the previous real frame
         bool reset = false;        ///< a discontinuity the caller knows of (load, pause)
     };
@@ -70,7 +84,7 @@ public:
     void Reset();
 
     struct Stats {
-        u64 frames = 0, generated = 0, resets = 0;
+        u64 frames = 0, generated = 0, resets = 0, game_vectors = 0, hudless = 0;
     };
     [[nodiscard]] const Stats& GetStats() const {
         return stats;
@@ -94,15 +108,16 @@ private:
     FfxVkFsr3_3_1_6FrameGenerationContext* context = nullptr;
     u32 width = 0, height = 0;
     std::atomic<bool> failed{false};
-    bool announced = false;
+    bool announced = false, announced_vectors = false, announced_hudless = false;
     bool needs_reset = true;
+    bool last_vectors = false, last_hudless = false;
     u64 next_frame_id = 1;
     /// Recorded frame ids and the tick that carries them: retired once the GPU is past it.
     std::deque<std::pair<u64, u64>> in_flight;
 
     // FSR 3.1.6 takes R8G8B8A8_UNORM: the converted frame and the interpolated output.
-    VideoCore::UniqueImage rgba_image, generated_image;
-    vk::UniqueImageView rgba_view, generated_view;
+    VideoCore::UniqueImage rgba_image, generated_image, hudless_rgba_image;
+    vk::UniqueImageView rgba_view, generated_view, hudless_rgba_view;
     // Optical-flow-only stand-ins at the frame size: far depth, zero motion.
     VideoCore::UniqueImage flat_depth_image, flat_motion_image;
 

@@ -27,6 +27,14 @@ $fsrShort = Join-Path $env:TEMP "ctrfsr-$tag"
 $fsrBuild = Join-Path $env:TEMP "ctrfsrb-$tag"
 if (-not (Test-Path $fsrShort)) { New-Item -ItemType Junction -Path $fsrShort -Target $fsrSource | Out-Null }
 if ((Get-Item $fsrShort).Target -ne $fsrSource -and (Get-Item $fsrShort).Target -notcontains $fsrSource) { throw "$fsrShort does not point to $fsrSource" }
+# Local fixes and the HUD-less frame-generation source (patches/fsr-vulkan/README.md).
+foreach ($patch in Get-ChildItem (Join-Path $PSScriptRoot 'patches/fsr-vulkan') -Filter '*.patch' | Sort-Object Name) {
+    cmd /c "git -C `"$fsrShort`" -c core.longpaths=true apply --reverse --check `"$($patch.FullName)`" 2>nul"
+    if ($LASTEXITCODE -eq 0) { continue } # already applied
+    cmd /c "git -C `"$fsrShort`" -c core.longpaths=true apply `"$($patch.FullName)`""
+    if ($LASTEXITCODE -ne 0) { throw "FSR-Vulkan patch $($patch.Name) does not apply" }
+    Write-Host "      engine/fsr-vulkan: applied $($patch.Name)"
+}
 # FindVulkan needs vulkan-1.lib: an import library of the system loader's exports.
 $vulkanLib = Join-Path $fsrLibs 'vulkan-1.lib'
 if (-not (Test-Path $vulkanLib)) {

@@ -152,8 +152,9 @@ t = '#include "upscaling/frame_evidence.h"\n' + t
 t = replace_once(t, '        DebugState.IncFlipFrameNum();', '        RecordGuestPresentation();\n        DebugState.IncFlipFrameNum();', 'guest presentation timestamps')
 
 # Frame generation (CTR_FRAMEGEN, upscaling/ctr_framegen.h) fills only the gap between the
-# game's real frame rate and its target (60 with CTR_60FPS_PATCH, else 30): at the target it
-# stays idle. Below it, PrepareFrame records the interpolation after post-processing, and Present
+# game's real frame rate and its target (CTR_FRAMEGEN_TARGET frames per second, else the game's
+# own: 60 with CTR_60FPS_PATCH, 30 without): at the target it stays idle. One generated frame per
+# real frame at most, so it shows up to twice the real rate. Below it, PrepareFrame records the interpolation after post-processing, and Present
 # shows a generated frame before as many real frames as the deficit needs (one per frame at half
 # the target), the real one half a frame later (FIFO paces the two presents by itself).
 t = '#include <thread>\n#include "upscaling/ctr_framegen.h"\n' + t
@@ -166,8 +167,17 @@ float fg_interval_ms = 33.3f;
 float fg_credit = 0.0f;   // generated frames owed to reach the target rate
 bool fg_recording = false;
 u64 fg_flips = 0, fg_presented = 0;
+VideoCore::UniqueImage fg_hudless_image;
+vk::ImageView fg_hudless_view{};
+u32 fg_hudless_width = 0, fg_hudless_height = 0;
+vk::Format fg_hudless_format{};
+u64 fg_hudless_serial = 0, fg_vector_sequence = 0;
 float FrameGenTargetMs() {
     static const float value = [] {
+        if (const char* t = std::getenv("CTR_FRAMEGEN_TARGET")) {
+            const int fps = std::atoi(t);
+            if (fps >= 30 && fps <= 360) return 1000.0f / float(fps);
+        }
         const char* v = std::getenv("CTR_60FPS_PATCH");
         return v && std::strcmp(v, "1") == 0 ? 1000.0f / 60.0f : 1000.0f / 30.0f;
     }();
@@ -180,7 +190,7 @@ t = replace_once(t, '    pp_pass.Create(device, swapchain.GetSurfaceFormat().for
                  '    pp_pass.Create(device, swapchain.GetSurfaceFormat().format);\n'
                  '    ctr_framegen = std::make_unique<CtrFrameGen>(instance, draw_scheduler);\n',
                  'create frame generation')
-t = replace_once(t, 'Presenter::~Presenter() {\n', 'Presenter::~Presenter() {\n    ctr_framegen.reset();\n',
+t = replace_once(t, 'Presenter::~Presenter() {\n', 'Presenter::~Presenter() {\n    ctr_framegen.reset();\n    if (fg_hudless_view) instance.GetDevice().destroyImageView(fg_hudless_view);\n    fg_hudless_view = nullptr;\n    fg_hudless_image.Destroy();\n',
                  'destroy frame generation')
 t = replace_once(t, '    pp_pass.Render(cmdbuf, image_view, image_size, *frame, pp_settings);\n', '''    pp_pass.Render(cmdbuf, image_view, image_size, *frame, pp_settings);
 
@@ -211,6 +221,93 @@ t = replace_once(t, '    pp_pass.Render(cmdbuf, image_view, image_size, *frame, 
             // A load, a pause or a hitch: interpolating across it would only smear two
             // unrelated frames, so the history starts over.
             in.reset = frame_ms >= 100.0f || !fg_recording;
+            // The game's depth and motion when the FSR 3 or DLSS upscaler made this frame.
+            if (const auto* upscaler = rasterizer->GetCtrDlss()) {
+                const auto& v = upscaler->LastVectors();
+                auto& out = in.vectors;
+                out.fresh = v.sequence != 0 && v.sequence != fg_vector_sequence;
+                fg_vector_sequence = v.sequence;
+                out.depth = v.depth;
+                out.motion = v.motion;
+                out.width = v.width;
+                out.height = v.height;
+                out.jitter[0] = v.jitter[0];
+                out.jitter[1] = v.jitter[1];
+                out.near_plane = v.near_plane;
+                out.far_plane = v.far_plane;
+                out.fov = v.fov;
+            }
+            // The HUD-less copy of this display buffer, through the same passes as the frame.
+            const auto& hud = rasterizer->GetCtrHudless();
+            if (hud.image && hud.serial != fg_hudless_serial && hud.address == cpu_address &&
+                hud.width == image_size.width && hud.height == image_size.height &&
+                !(fsr_settings.enable && (image_size.width < frame->width ||
+                                          image_size.height < frame->height))) {
+                fg_hudless_serial = hud.serial;
+                const auto device = instance.GetDevice();
+                const vk::Format format = swapchain.GetSurfaceFormat().format;
+                if (!fg_hudless_image || fg_hudless_width != frame->width ||
+                    fg_hudless_height != frame->height || fg_hudless_format != format) {
+                    draw_scheduler.Finish();
+                    if (fg_hudless_view) device.destroyImageView(fg_hudless_view);
+                    fg_hudless_image = VideoCore::UniqueImage(device, instance.GetAllocator());
+                    fg_hudless_image.Create(vk::ImageCreateInfo{
+                        .flags = vk::ImageCreateFlagBits::eMutableFormat,
+                        .imageType = vk::ImageType::e2D,
+                        .format = format,
+                        .extent = {frame->width, frame->height, 1},
+                        .mipLevels = 1,
+                        .arrayLayers = 1,
+                        .samples = vk::SampleCountFlagBits::e1,
+                        .usage = vk::ImageUsageFlagBits::eColorAttachment |
+                                 vk::ImageUsageFlagBits::eSampled |
+                                 vk::ImageUsageFlagBits::eTransferSrc,
+                        .initialLayout = vk::ImageLayout::eUndefined,
+                    });
+                    fg_hudless_view = Check(device.createImageView({
+                        .image = vk::Image(fg_hudless_image),
+                        .viewType = vk::ImageViewType::e2D,
+                        .format = format,
+                        .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+                    }));
+                    fg_hudless_width = frame->width;
+                    fg_hudless_height = frame->height;
+                    fg_hudless_format = format;
+                }
+                // Sampled exactly like the display buffer (same view format, alpha excluded).
+                const vk::ImageView input = Check(device.createImageView({
+                    .image = hud.image,
+                    .viewType = vk::ImageViewType::e2D,
+                    .format = view_info.format,
+                    .components = {vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity,
+                                   vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eOne},
+                    .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+                }));
+                draw_scheduler.DeferOperation([device, input] { device.destroyImageView(input); });
+                const auto to_attachment = vk::ImageMemoryBarrier2{
+                    .srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+                    .srcAccessMask = vk::AccessFlagBits2::eMemoryRead,
+                    .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                    .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+                    .oldLayout = vk::ImageLayout::eUndefined,
+                    .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                    .image = vk::Image(fg_hudless_image),
+                    .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+                };
+                cmdbuf.pipelineBarrier2({.imageMemoryBarrierCount = 1,
+                                         .pImageMemoryBarriers = &to_attachment});
+                Frame target{};
+                target.width = frame->width;
+                target.height = frame->height;
+                target.image = vk::Image(fg_hudless_image);
+                target.image_view = fg_hudless_view;
+                target.is_hdr = frame->is_hdr;
+                const vk::ImageView source = fsr_pass.Render(cmdbuf, input, image_size,
+                                                             {target.width, target.height},
+                                                             fsr_settings, target.is_hdr);
+                pp_pass.Render(cmdbuf, source, image_size, target, pp_settings);
+                in.hudless = vk::Image(fg_hudless_image);
+            }
             fg_ready[frame->id] = ctr_framegen->Record(in);
             }
             fg_recording = needed;
@@ -320,11 +417,13 @@ t = replace_once(t, '''    if (!swapchain.AcquireNextImage()) {
         } else if (now - fg_stats_since >= std::chrono::seconds(10)) {
             const auto& stats = ctr_framegen->GetStats();
             const float seconds = std::chrono::duration<float>(now - fg_stats_since).count();
-            std::fprintf(stderr, "CTR_FRAMEGEN %.1f game FPS -> %.1f shown (target %.0f); %llu generated, %llu history resets (%s)\\n",
+            std::fprintf(stderr, "CTR_FRAMEGEN %.1f game FPS -> %.1f shown (target %.0f); %llu generated, %llu history resets, %llu with game motion, %llu HUD-less (%s)\\n",
                          float(fg_flips) / seconds, float(fg_flips + fg_presented) / seconds,
                          1000.0f / FrameGenTargetMs(),
                          static_cast<unsigned long long>(stats.generated),
                          static_cast<unsigned long long>(stats.resets),
+                         static_cast<unsigned long long>(stats.game_vectors),
+                         static_cast<unsigned long long>(stats.hudless),
                          EmulatorSettings.GetPresentMode().c_str());
             std::fflush(stderr);
             fg_stats_since = now;
@@ -400,6 +499,18 @@ t = replace_once(t, marker, '''    const auto& regs_before = liverpool->regs;
         upscale_done = false;
         ctr_dlss->OnFrameEnd();
     } else if (!display) { upscale_pending = false; }
+    // Frame generation's HUD-less frame: the display buffer after the scene stretch (the first
+    // draw of the display pass), copied before the first HUD draw.
+    if (display && last_display && ctr_hudless_due) {
+        ctr_hudless_due = false;
+        CaptureHudless(cb_descs[0].first);
+    }
+    if (display && !last_display) {
+        ctr_hudless_due = CtrUpscaling::FrameGen();
+        ctr_hudless_address = regs_before.color_buffers[0].Address();
+    } else if (!display) {
+        ctr_hudless_due = false;
+    }
     last_display = display;
 ''' + marker, 'detect registered display pass')
 marker = '''        db_desc.first = {};

@@ -63,6 +63,20 @@ public:
     vk::ImageView Upscale(VideoCore::ImageId source, vk::Format view_format,
                           vk::ComponentMapping mapping, vk::Extent2D out, vk::ImageLayout& layout);
 
+    /// What the last upscaled frame was made from, for frame generation: the scene depth (R32F)
+    /// and pixel motion (RG16F) at render size, both left in General; `sequence` grows by one
+    /// per upscaled frame.
+    struct FrameVectors {
+        u64 sequence = 0;
+        vk::Image depth{}, motion{};
+        u32 width = 0, height = 0;
+        float jitter[2]{};
+        float near_plane = 16.0f, far_plane = 150000.0f, fov = 1.2870f;
+    };
+    [[nodiscard]] const FrameVectors& LastVectors() const {
+        return last_vectors;
+    }
+
 private:
     bool EnsureResources(u32 w, u32 h, u32 ow, u32 oh, vk::Format format);
     void CreatePipelines();
@@ -124,6 +138,10 @@ private:
     std::array<u32, 4> fsr3_size{};
     bool fsr3_failed = false;
     bool EnsureFsr3(u32 w, u32 h, u32 ow, u32 oh);
+    /// Near and far planes and vertical field of view of the retail projection, or CTR's own.
+    void CameraPlanes(float& near_plane, float& far_plane, float& fov) const;
+    void NoteVectors(u32 w, u32 h);
+    FrameVectors last_vectors{};
 
     vk::UniqueDescriptorSetLayout desc_layout;
     vk::UniquePipelineLayout pipeline_layout;
