@@ -203,6 +203,10 @@ std::atomic<int> fetched_discovery_port{0};
 std::atomic<std::uint32_t> fetched_public_address{0};
 } // namespace
 
+namespace {
+void grant_incoming(std::uint32_t address);
+}
+
 bool destination_allowed(std::uint32_t address) {
     if (address == server_address()) {
         return true;
@@ -214,7 +218,13 @@ bool destination_allowed(std::uint32_t address) {
     if (!strict_peers() && private_or_local(address)) {
         return true;
     }
-    return peer_allowed(address);
+    if (!peer_allowed(address)) {
+        return false;
+    }
+    // The answer to what the game just sent must not wait for a check of its own: a
+    // handshake answers once and then waits seconds, longer than an authorization lasts.
+    grant_incoming(address);
+    return true;
 }
 
 
@@ -306,7 +316,22 @@ struct IncomingPolicy {
         }
         return false;
     }
+    // An address the game was just allowed to send to: accepted at once, as a peer that sent.
+    void grant(std::uint32_t address) {
+        std::lock_guard lock(mutex);
+        auto it=entries.find(address);
+        if(it==entries.end()) {
+            if(entries.size()>=256) return; // the check path evicts; a full cache falls back to it
+            it=entries.emplace(address,Entry{}).first;
+        }
+        const auto now=Clock::now();
+        auto& entry=it->second;
+        entry.allowed=true; entry.seen=now; entry.until=now+kValidFor;
+        if(!entry.pending) entry.renew=now+kRenewAfter;
+    }
 };
+IncomingPolicy& incoming_policy() { static IncomingPolicy policy; return policy; }
+void grant_incoming(std::uint32_t address) { incoming_policy().grant(address); }
 }
 bool source_allowed(std::uint32_t address) {
     const auto a=ntohl(address);
@@ -314,8 +339,7 @@ bool source_allowed(std::uint32_t address) {
     // Source addresses cannot be wildcard, multicast or broadcast.
     if(a==0 || a==0xffffffffu || (a>>28)==0xe) return false;
     if(!strict_peers() && private_or_local(address)) return true;
-    static IncomingPolicy policy;
-    return policy.check(address);
+    return incoming_policy().check(address);
 }
 
 std::uint32_t server_public_address() {

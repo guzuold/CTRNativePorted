@@ -497,7 +497,58 @@ int ingress_steady_test(int delay_ms) {
     std::printf("ingress-steady failures=%d\n",failures); return failures?1:0;
 }
 
+// The game writes to a peer the service authorizes; the peer answers at once, with a single
+// datagram and nothing more for several seconds, as a connection handshake does. The answer
+// must reach the game: the first datagram of a reply may not be lost to a pending check.
+int ingress_reply_test() {
+    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
+    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
+    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
+    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
+    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
+    lan.sin_port=0;
+    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
+    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,16);
+    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
+    std::thread service([&]{for(;;){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
+        char request[4096]; recv(c,request,sizeof(request),0); Sleep(100); // a remote hub is asked
+        const char* response="HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        send(c,response,static_cast<int>(std::strlen(response)),0); closesocket(c); }});
+    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
+    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
+    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
+    if(!resolve) std::exit(2);
+    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
+    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
+    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
+    auto send_to=bind<int(SYSV*)(int,const void*,std::uint64_t,int,const void*,unsigned)>("gvD1greCu0A","libSceNet");
+    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
+    int g=ns("ingress-reply",2,2,0); auto addr=loopback(0); addr.addr=0;
+    check(nb(g,&addr,sizeof(addr))==0,"ingress reply: bind");
+    unsigned size=sizeof(addr); name(g,&addr,&size);
+    SOCKET peer=socket(AF_INET,SOCK_DGRAM,0); ::bind(peer,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    sockaddr_in peer_address{}; int peer_length=sizeof(peer_address); getsockname(peer,reinterpret_cast<sockaddr*>(&peer_address),&peer_length);
+    OrbisSockaddrIn to{}; to.len=sizeof(to); to.family=2; to.port=peer_address.sin_port; to.addr=peer_address.sin_addr.s_addr;
+    check(send_to(g,"hi",2,0,&to,sizeof(to))==2,"ingress reply: game writes to the peer");
+    char buffer[8]{}; sockaddr_in from{}; int from_length=sizeof(from);
+    const int got=recvfrom(peer,buffer,sizeof(buffer),0,reinterpret_cast<sockaddr*>(&from),&from_length);
+    check(got==2,"ingress reply: peer receives the game's datagram");
+    sendto(peer,"ok",2,0,reinterpret_cast<sockaddr*>(&from),from_length); // one answer, at once
+    Sleep(50);
+    const int answer=receive(g,buffer,sizeof(buffer),0x80,nullptr,nullptr);
+    std::printf("{\"scope\":\"online_services_test\",\"reply_receive\":%d}\n",answer);
+    check(answer==2 && !std::memcmp(buffer,"ok",2),"ingress reply: the peer's immediate answer reaches the game");
+    closesocket(peer); closesocket(http); service.join();
+    std::printf("ingress-reply failures=%d\n",failures); return failures?1:0;
+}
+
 int main(int argc, char** argv) {
+    if(argc>1 && !std::strcmp(argv[1],"--ingress-reply")) return ingress_reply_test();
     if(argc>2 && !std::strcmp(argv[1],"--ingress-steady")) return ingress_steady_test(std::atoi(argv[2]));
     if(argc>1 && !std::strcmp(argv[1],"--ingress")) return ingress_test();
     if(argc>1 && !std::strcmp(argv[1],"--ingress-blocking")) return ingress_blocking_test();
