@@ -1,0 +1,12 @@
+{"scope":"online_services_test","check":"ingress: bind","ok":true}
+{"scope":"online_services_test","check":"ingress: unauthorized oversized PEEK datagram dropped","ok":true}
+{"scope":"online_services_test","check":"ingress: rejected PEEK removed from queue","ok":true}
+{"scope":"online_services_test","check":"ingress: newly assigned peer accepted without outbound game traffic","ok":true}
+{"scope":"online_services_test","check":"ingress: bind","ok":true}
+{"scope":"online_services_test","check":"ingress: unauthorized oversized PEEK datagram dropped","ok":true}
+{"scope":"online_services_test","check":"ingress: rejected PEEK removed from queue","ok":true}
+{"scope":"online_services_test","check":"ingress: newly assigned peer accepted without outbound game traffic","ok":true}
+{"scope":"online_services_test","check":"ingress: unauthorized TCP closed","ok":true}
+{"scope":"online_services_test","check":"ingress: authorized TCP accepted","ok":true}
+{"scope":"online_services_test","check":"ingress: authorization requests rate limited","ok":true}
+ingress failures=0 requests=3

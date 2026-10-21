@@ -9,6 +9,10 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <condition_variable>
+#include <deque>
+#include <set>
+#include <thread>
 #include "ctr_hle.h"
 #include "online_config.h"
 #include "online_http.h"
@@ -185,6 +189,7 @@ bool peer_allowed(std::uint32_t address) {
     const bool allowed = reached && response.status == 200;
     {
         std::scoped_lock lock{mutex};
+        if (cache.size() >= 256 && !cache.count(address)) cache.erase(cache.begin());
         cache[address] = {allowed, clock::now() + std::chrono::milliseconds(allowed ? 1000 : 250)};
     }
     ctr_hle::log_call("ctr_online", "peer_allowed", allowed ? 1 : 0,
@@ -210,6 +215,79 @@ bool destination_allowed(std::uint32_t address) {
         return true;
     }
     return peer_allowed(address);
+}
+
+
+namespace {
+// One worker, bounded cache/queue and at most four query starts per second.
+// No HTTP or thread creation per datagram. Pending/negative entries fail closed.
+struct IncomingPolicy {
+    using Clock = std::chrono::steady_clock;
+    struct Entry { bool allowed=false, pending=false; Clock::time_point until{}; };
+    std::mutex mutex;
+    std::condition_variable wake;
+    std::map<std::uint32_t,Entry> entries;
+    std::deque<std::uint32_t> queue;
+    std::set<std::uint32_t> logged;
+    std::uint64_t dropped=0;
+    bool stop=false;
+    std::thread worker;
+    IncomingPolicy():worker([this]{run();}) {}
+    ~IncomingPolicy() { {std::lock_guard lock(mutex); stop=true;} wake.notify_all(); worker.join(); }
+    void run() {
+        std::unique_lock lock(mutex);
+        while (!stop) {
+            wake.wait(lock,[&]{return stop || !queue.empty();});
+            if(stop) break;
+            auto address=queue.front(); queue.pop_front();
+            lock.unlock();
+            bool allowed=false;
+            try { HttpResponse response; allowed=http_exchange("GET","/ctr/v1/peer-allowed?ip="+format_address(address),{},"",&response) && response.status==200; }
+            catch(...) { /* Failure remains a denial. */ }
+            lock.lock();
+            entries[address]={allowed,false,Clock::now()+std::chrono::milliseconds(allowed?1000:250)};
+            wake.wait_for(lock,std::chrono::milliseconds(250),[&]{return stop;});
+        }
+    }
+    bool check(std::uint32_t address) {
+        std::unique_lock lock(mutex);
+        auto it=entries.find(address);
+        if(it==entries.end() && entries.size()==256) {
+            // Do not evict in-flight entries or valid positive authorizations under a flood.
+            auto victim=entries.end();
+            for(auto p=entries.begin();p!=entries.end();++p)
+                if(!p->second.pending && p->second.until<=Clock::now() &&
+                   (victim==entries.end() || p->second.until<victim->second.until)) victim=p;
+            if(victim!=entries.end()) entries.erase(victim);
+        }
+        if(it==entries.end() && entries.size()<256) it=entries.emplace(address,Entry{}).first;
+        if(it!=entries.end()) {
+            auto& entry=it->second;
+            if(entry.until>Clock::now() && entry.allowed) return true;
+            if(!entry.pending && entry.until<=Clock::now()) {
+                entry.pending=true; entry.allowed=false; queue.push_back(address); wake.notify_one();
+            }
+        }
+        ++dropped;
+        // Bounded exact log-once set; after saturation suppress new address logs, keep counting.
+        if(logged.size()<4096 && logged.insert(address).second) {
+            auto count=dropped;
+            lock.unlock();
+            ctr_hle::log_call("ctr_online","incoming_blocked",static_cast<long long>(count),
+                (",\"address\":\""+format_address(address)+"\",\"log_address_limit\":4096").c_str());
+        }
+        return false;
+    }
+};
+}
+bool source_allowed(std::uint32_t address) {
+    const auto a=ntohl(address);
+    if(address==server_address() || (a>>24)==127) return true;
+    // Source addresses cannot be wildcard, multicast or broadcast.
+    if(a==0 || a==0xffffffffu || (a>>28)==0xe) return false;
+    if(!strict_peers() && private_or_local(address)) return true;
+    static IncomingPolicy policy;
+    return policy.check(address);
 }
 
 std::uint32_t server_public_address() {

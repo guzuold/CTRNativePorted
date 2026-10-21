@@ -35,6 +35,9 @@ bool resolve(const char* hostname, std::uint32_t* address, const char** reason);
 // project server confirms as assigned lobby/session peers (GET /ctr/v1/peer-allowed,
 // cached for at most one second; pending session joins have a short authority lease).
 bool destination_allowed(std::uint32_t address);
+// Receive/accept policy: never performs HTTP on the caller; unknown peers are
+// denied while one bounded, rate-limited worker asks the local service.
+bool source_allowed(std::uint32_t address);
 // UDP port of the project server's discovery service. The game sends discovery to the
 // server on the fixed port 3074; when the server runs next to a game on the same PC that port
 // belongs to the game, so the server announces another one (GET /ctr/v1/config, fetched once).

@@ -331,7 +331,67 @@ int relay_test(const char* test_mode) {
 }
 } // namespace
 
+
+// Real local sockets: strict mode makes the LAN interface require service approval.
+int ingress_test() {
+    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
+    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
+    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
+    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
+    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
+    lan.sin_port=0;
+    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
+    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,8);
+    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
+    std::atomic<bool> allow{false}, stop{false}; std::atomic<int> requests{0};
+    std::thread service([&]{while(!stop){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
+        char request[4096]; recv(c,request,sizeof(request),0); ++requests;
+        std::string response=std::string("HTTP/1.1 ")+(allow?"200 OK":"403 Forbidden")+"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        send(c,response.data(),static_cast<int>(response.size()),0); closesocket(c); }});
+    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
+    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
+    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
+    if(!resolve) std::exit(2);
+    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
+    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
+    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
+    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
+    auto close=bind<int(SYSV*)(int)>("45ggEzakPJQ","libSceNet");
+    auto listen_guest=bind<int(SYSV*)(int,int)>("kOj1HiAGE54","libSceNet");
+    auto accept_guest=bind<int(SYSV*)(int,void*,unsigned*)>("PIWqhn9oSxc","libSceNet");
+    SOCKET sender=socket(AF_INET,SOCK_DGRAM,0); ::bind(sender,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    for(unsigned port: {0u,3074u}) {
+        int g=ns("ingress",2,2,0); auto addr=loopback(static_cast<unsigned short>(port)); addr.addr=0;
+        check(nb(g,&addr,sizeof(addr))==0,"ingress: bind"); unsigned size=sizeof(addr); name(g,&addr,&size);
+        sockaddr_in dst=lan; dst.sin_port=addr.port;
+        char buffer[8]{}; sendto(sender,"bad",3,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst)); Sleep(20);
+        check(receive(g,buffer,1,0x82,nullptr,nullptr)==(kErrorBase|35),"ingress: unauthorized oversized PEEK datagram dropped");
+        check(receive(g,buffer,8,0x80,nullptr,nullptr)==(kErrorBase|35),"ingress: rejected PEEK removed from queue");
+        allow=true; int got=-1;
+        for(int i=0;i<80 && got!=2;++i){sendto(sender,"ok",2,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst)); Sleep(50); got=receive(g,buffer,8,0x80,nullptr,nullptr);}
+        check(got==2 && !memcmp(buffer,"ok",2),"ingress: newly assigned peer accepted without outbound game traffic");
+        close(g); allow=false; Sleep(1200);
+    }
+    int listener=ns("ingress-tcp",2,1,0); auto addr=loopback(0); addr.addr=0; nb(listener,&addr,sizeof(addr));
+    unsigned size=sizeof(addr); name(listener,&addr,&size); listen_guest(listener,8);
+    auto attempt=[&](){SOCKET c=socket(AF_INET,SOCK_STREAM,0); ::bind(c,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+        sockaddr_in dst=lan; dst.sin_port=addr.port; connect(c,reinterpret_cast<sockaddr*>(&dst),sizeof(dst));
+        int child=accept_guest(listener,nullptr,nullptr); if(child>0) close(child); closesocket(c); return child;};
+    check(attempt()<0,"ingress: unauthorized TCP closed"); allow=true; int child=-1;
+    for(int i=0;i<80 && child<0;++i){Sleep(50); child=attempt();}
+    check(child>0,"ingress: authorized TCP accepted"); close(listener); closesocket(sender);
+    check(requests<35,"ingress: authorization requests rate limited");
+    stop=true; closesocket(http); service.join();
+    std::printf("ingress failures=%d requests=%d\n",failures,requests.load()); return failures?1:0;
+}
+
 int main(int argc, char** argv) {
+    if(argc>1 && !std::strcmp(argv[1],"--ingress")) return ingress_test();
     if (argc > 1 && (!std::strcmp(argv[1], "--relay") ||
                      !std::strcmp(argv[1], "--relay-block") ||
                      !std::strcmp(argv[1], "--relay-auto-direct") ||
