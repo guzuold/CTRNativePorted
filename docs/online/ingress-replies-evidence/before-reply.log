@@ -1,0 +1,6 @@
+﻿{"scope":"online_services_test","check":"ingress reply: bind","ok":true}
+{"scope":"online_services_test","check":"ingress reply: game writes to the peer","ok":true}
+{"scope":"online_services_test","check":"ingress reply: peer receives the game's datagram","ok":true}
+{"scope":"online_services_test","reply_receive":-2143223517}
+{"scope":"online_services_test","check":"ingress reply: the peer's immediate answer reaches the game","ok":false}
+ingress-reply failures=1

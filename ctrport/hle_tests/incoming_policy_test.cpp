@@ -111,6 +111,19 @@ int main(int argc,char** argv) {
          check(ms>=0 && ms<=3500,"unreachable: authorization ends within the declared 3 s validity");
          answer_status=200;}
     }
+    if(mode=="all" || mode=="grant"){
+        answer_status=403; answer_delay_ms=100;
+        ctr_hle::online::IncomingPolicy policy;
+        const unsigned before=queries.load();
+        policy.grant(peer(9));
+        check(policy.check(peer(9)) && queries.load()==before,"grant: the answer to the game's own datagram is accepted at once, without a query");
+        // Granted, then quiet: after the renewal the service is asked and its refusal holds.
+        std::this_thread::sleep_for(std::chrono::milliseconds(2200));
+        check(!policy.check(peer(9)),"grant: a quiet granted peer waits for its renewal");
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        check(!policy.check(peer(9)),"grant: the service's refusal then holds");
+        answer_status=200;
+    }
     std::printf("failures=%d\n",failures);
     return failures?1:0;
 }
