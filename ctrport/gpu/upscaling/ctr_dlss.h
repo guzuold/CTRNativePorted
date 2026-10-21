@@ -21,6 +21,7 @@
 namespace VideoCore {
 class TextureCache;
 }
+struct FfxVkPortableUpscaleContext;
 
 namespace Vulkan {
 
@@ -118,6 +119,11 @@ private:
     std::array<SourceViewEntry, 3> source_views{}; ///< depth, velocity, the frame (DLSS)
     vk::UniqueImageView output_storage_view;       ///< DLSS writes the output through it
     bool dlss_failed = false, dlss_warned = false, last_dlss = false;
+    // AMD FSR 3.1 (CTR_UPSCALER=fsr3) through FireBurn/FSR-Vulkan (MIT), on the same inputs.
+    FfxVkPortableUpscaleContext* fsr3_context = nullptr;
+    std::array<u32, 4> fsr3_size{};
+    bool fsr3_failed = false;
+    bool EnsureFsr3(u32 w, u32 h, u32 ow, u32 oh);
 
     vk::UniqueDescriptorSetLayout desc_layout;
     vk::UniquePipelineLayout pipeline_layout;

@@ -13,7 +13,8 @@ inline int Mode() {
         if (!v || !std::strcmp(v, "off")) return 0;
         if (!std::strcmp(v, "fsr1")) return 1;
         if (!std::strcmp(v, "dlss")) return 2;
-        throw std::runtime_error("CTR_UPSCALER must be off, fsr1 or dlss");
+        if (!std::strcmp(v, "fsr3")) return 3;
+        throw std::runtime_error("CTR_UPSCALER must be off, fsr1, dlss or fsr3");
     }();
     return value;
 }

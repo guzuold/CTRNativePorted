@@ -14,6 +14,7 @@
 
 #include "settings.h"
 #include "vk_dlss_ngx.h"
+#include "ffx_vk_portable.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
@@ -167,8 +168,63 @@ CtrDlss::CtrDlss(const Instance& instance_, Scheduler& scheduler_,
                  VideoCore::TextureCache& texture_cache_)
     : instance{instance_}, scheduler{scheduler_}, texture_cache{texture_cache_} {}
 
-CtrDlss::~CtrDlss() = default;
-bool CtrDlss::Enabled() const { return !failed && !dlss_failed && CtrUpscaling::Mode() == 2; }
+CtrDlss::~CtrDlss() {
+    if (fsr3_context) ffxVkPortableUpscaleContextDestroy(fsr3_context);
+}
+
+// The FSR 3 context for these sizes; made again when they change. A failure turns FSR 3 off
+// for the session, logged, without substituting another upscaler.
+bool CtrDlss::EnsureFsr3(u32 w, u32 h, u32 ow, u32 oh) {
+    const std::array<u32, 4> size{w, h, ow, oh};
+    if (fsr3_context && fsr3_size == size) return true;
+    scheduler.Finish();
+    if (fsr3_context) {
+        ffxVkPortableUpscaleContextDestroy(fsr3_context);
+        fsr3_context = nullptr;
+    }
+    const auto physical = instance.GetPhysicalDevice();
+    const auto chain = physical.getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan12Features,
+                                             vk::PhysicalDeviceVulkan13Features>();
+    const auto& core = chain.get<vk::PhysicalDeviceFeatures2>().features;
+    const auto& vk12 = chain.get<vk::PhysicalDeviceVulkan12Features>();
+    const auto& vk13 = chain.get<vk::PhysicalDeviceVulkan13Features>();
+    FfxVkPortableDeviceInfo device_info{};
+    device_info.structSize = sizeof(device_info);
+    device_info.instance = instance.GetInstance();
+    device_info.physicalDevice = physical;
+    device_info.device = instance.GetDevice();
+    device_info.getDeviceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr;
+    device_info.queue = instance.GetGraphicsQueue();
+    device_info.queueFamilyIndex = instance.GetGraphicsQueueFamilyIndex();
+    device_info.shaderFloat16Enabled = vk12.shaderFloat16;
+    device_info.subgroupSizeControlEnabled = vk13.subgroupSizeControl;
+    device_info.synchronization2Enabled = vk13.synchronization2;
+    device_info.shaderStorageImageWriteWithoutFormatEnabled = core.shaderStorageImageWriteWithoutFormat;
+    FfxVkPortableUpscaleCreateInfo create_info{};
+    create_info.structSize = sizeof(create_info);
+    create_info.maxRenderSize = {w, h};
+    create_info.maxOutputSize = {ow, oh};
+    if (const u64 issues = ffxVkPortableValidateUpscaleCreateInfo(&create_info)) {
+        std::printf("FSR 3: sizes %ux%u -> %ux%u not supported (issues 0x%llx); off for this session\n", w, h, ow, oh,
+                    static_cast<unsigned long long>(issues));
+        fsr3_failed = true;
+        return false;
+    }
+    if (ffxVkPortableUpscaleContextCreate(&device_info, &create_info, &fsr3_context) != FFX_VK_PORTABLE_OK) {
+        std::printf("FSR 3: context creation failed for %ux%u -> %ux%u; off for this session\n", w, h, ow, oh);
+        fsr3_context = nullptr;
+        fsr3_failed = true;
+        return false;
+    }
+    fsr3_size = size;
+    reset = true;
+    std::printf("FSR 3: %ux%u -> %ux%u\n", w, h, ow, oh);
+    std::fflush(stdout);
+    return true;
+}
+bool CtrDlss::Enabled() const {
+    return !failed && ((CtrUpscaling::Mode() == 2 && !dlss_failed) || (CtrUpscaling::Mode() == 3 && !fsr3_failed));
+}
 
 void CtrDlss::OnGBufferPass(VideoCore::ImageId depth, VideoCore::ImageId velocity_,
                             const Viewport& viewport_) {
@@ -548,11 +604,15 @@ vk::ImageView CtrDlss::Upscale(VideoCore::ImageId source_id, vk::Format view_for
             std::fflush(stdout);
         }
     }
-    if (!use_dlss) { dlss_failed = true; return {}; }
+    const bool use_fsr3 = CtrUpscaling::Mode() == 3 && !fsr3_failed;
+    if (!use_dlss && !use_fsr3) {
+        if (CtrUpscaling::Mode() == 2) dlss_failed = true;
+        return {};
+    }
     if (use_dlss != last_dlss) {
         last_dlss = use_dlss;
         reset = true;
-        std::printf("Temporal upscaling: %s\n", use_dlss ? "DLSS" : "unavailable");
+        std::printf("Temporal upscaling: %s\n", use_dlss ? "DLSS" : "FSR 3");
     }
 
     source.Transit(vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderRead, {});
@@ -728,6 +788,111 @@ vk::ImageView CtrDlss::Upscale(VideoCore::ImageId source_id, vk::Format view_for
         if (last_skip) {
             last_skip = nullptr;
             std::printf("DLSS: upscaling again\n");
+        }
+        layout = vk::ImageLayout::eGeneral;
+        return OutputView(view_format, mapping);
+    }
+
+    // 3. FSR 3.1: the same inputs (General layout), the frame in shader-read layout.
+    if (use_fsr3) {
+        if (!EnsureFsr3(w, h, out.width, out.height)) return {};
+        // Planes from the retail projection (floats 48-63, column-major): [5] = 1/tan(fov/2),
+        // [10] = A, [14] = B, near = B/(A-1), far = B/(A+1); CTR's own values otherwise.
+        float near_plane = 16.0f, far_plane = 150000.0f, fov = 1.2870f;
+        if (camera_valid) {
+            const float* p = &camera[48];
+            const float a = p[10], b = p[14];
+            if (p[5] > 0.0f && std::isfinite(a) && std::isfinite(b) && a != 1.0f && a != -1.0f) {
+                fov = 2.0f * std::atan(1.0f / p[5]);
+                near_plane = std::abs(b / (a - 1.0f));
+                far_plane = std::abs(b / (a + 1.0f));
+            }
+        }
+        if (!(near_plane > 0.0f) || !(far_plane > near_plane) || !(fov > 0.01f && fov < 3.1f)) {
+            near_plane = 16.0f;
+            far_plane = 150000.0f;
+            fov = 1.2870f;
+        }
+        const auto describe = [](vk::Image image, vk::Format format, u32 iw, u32 ih, vk::ImageUsageFlags usage,
+                                 FfxVkPortableResourceState state) {
+            FfxVkPortableImage d{};
+            d.structSize = sizeof(d);
+            d.image = image;
+            d.format = static_cast<VkFormat>(format);
+            d.extent = {iw, ih};
+            d.mipCount = 1;
+            d.arrayLayers = 1;
+            d.usage = static_cast<VkImageUsageFlags>(usage);
+            d.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+            d.state = state;
+            return d;
+        };
+        const auto internal = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+                              vk::ImageUsageFlagBits::eTransferSrc;
+        FfxVkPortableUpscaleDispatchInfo info{};
+        info.structSize = sizeof(info);
+        info.commandBuffer = cmdbuf;
+        info.color = describe(source.GetImage(), source.info.pixel_format, w, h, source.usage_flags,
+                              FFX_VK_PORTABLE_RESOURCE_STATE_COMPUTE_READ);
+        info.depth = describe(vk::Image(depth_image), vk::Format::eR32Sfloat, w, h, internal,
+                              FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+        info.motionVectors = describe(vk::Image(motion_image), vk::Format::eR16G16Sfloat, w, h, internal,
+                                      FFX_VK_PORTABLE_RESOURCE_STATE_GENERIC_READ);
+        info.output = describe(vk::Image(output_image), output_format, out.width, out.height, internal,
+                               FFX_VK_PORTABLE_RESOURCE_STATE_UNORDERED_ACCESS);
+        info.exposure.structSize = sizeof(info.exposure);
+        info.reactiveMask.structSize = sizeof(info.reactiveMask);
+        info.transparencyAndCompositionMask.structSize = sizeof(info.transparencyAndCompositionMask);
+        info.jitterOffset = {frame_jitter[0], frame_jitter[1]};
+        info.motionVectorScale = {1.0f, 1.0f};
+        info.renderSize = {w, h};
+        info.outputSize = {out.width, out.height};
+        info.frameTimeMilliseconds = frame_ms;
+        info.preExposure = 1.0f;
+        info.cameraNear = near_plane;
+        info.cameraFar = far_plane;
+        info.cameraVerticalFovRadians = fov;
+        info.viewSpaceToMeters = 0.01f;
+        static const float sharpness = [] {
+            const char* v = std::getenv("CTR_FSR3_SHARPNESS");
+            return v ? std::clamp(float(std::atof(v)), 0.0f, 1.0f) : 0.3f;
+        }();
+        info.sharpness = sharpness;
+        info.enableSharpening = sharpness > 0.0f ? VK_TRUE : VK_FALSE;
+        info.reset = reset ? VK_TRUE : VK_FALSE;
+        info.frameId = frame_id;
+        FfxVkPortableUpscaleCreateInfo limits{};
+        limits.structSize = sizeof(limits);
+        limits.maxRenderSize = {fsr3_size[0], fsr3_size[1]};
+        limits.maxOutputSize = {fsr3_size[2], fsr3_size[3]};
+        if (const u64 issues = ffxVkPortableValidateUpscaleDispatchInfo(&limits, &info)) {
+            std::printf("FSR 3: dispatch rejected (issues 0x%llx); off for this session\n", static_cast<unsigned long long>(issues));
+            fsr3_failed = true;
+            return {};
+        }
+        if (ffxVkPortableUpscaleContextRecordDispatch(fsr3_context, &info) != FFX_VK_PORTABLE_OK) {
+            std::printf("FSR 3: dispatch failed; off for this session\n");
+            fsr3_failed = true;
+            return {};
+        }
+        scheduler.GetDynamicState().Invalidate(); // FSR records its own Vulkan state
+        const vk::MemoryBarrier2 done{
+            .srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+            .srcAccessMask = vk::AccessFlagBits2::eMemoryWrite,
+            .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+            .dstAccessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+        };
+        cmdbuf.pipelineBarrier2({.memoryBarrierCount = 1, .pMemoryBarriers = &done});
+        if (++frame_id <= 3 || frame_id % 120 == 0) {
+            std::printf("CTR_UPSCALE_DISPATCH mode=fsr3 frame=%llu input=%ux%u output=%ux%u near=%.2f far=%.0f fov=%.1f jitter=%g,%g\n",
+                        (unsigned long long)frame_id, w, h, out.width, out.height, near_plane, far_plane, fov * 57.29578f,
+                        frame_jitter[0], frame_jitter[1]);
+            std::fflush(stdout);
+        }
+        reset = false;
+        if (last_skip) {
+            last_skip = nullptr;
+            std::printf("FSR 3: upscaling again\n");
         }
         layout = vk::ImageLayout::eGeneral;
         return OutputView(view_format, mapping);

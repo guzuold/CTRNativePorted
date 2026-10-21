@@ -29,6 +29,18 @@ $head = (& git -C $shad rev-parse HEAD).Trim()
 if ($head -ne $shadCommit) { throw "engine/shadPS4 is at $head, expected $shadCommit (v.0.18.0)" }
 Write-Host "      engine/shadPS4 at $head"
 
+# FireBurn/FSR-Vulkan (MIT): AMD FSR 3.1 for Vulkan, built by ctrport/gpu/build.ps1.
+$fsrCommit = 'c64f093404125e960813f95f1996c14780f0dd69'
+$fsr = Join-Path $root 'engine/fsr-vulkan'
+if (-not (Test-Path -LiteralPath (Join-Path $fsr '.git'))) {
+    & git -c core.longpaths=true clone --no-checkout https://github.com/FireBurn/FSR-Vulkan.git $fsr
+    if ($LASTEXITCODE -ne 0) { throw 'git clone of FSR-Vulkan failed' }
+}
+& git -C $fsr -c core.longpaths=true checkout --detach $fsrCommit
+if ($LASTEXITCODE -ne 0) { throw "checkout of FSR-Vulkan $fsrCommit failed" }
+if ((& git -C $fsr rev-parse HEAD).Trim() -ne $fsrCommit) { throw "engine/fsr-vulkan is not at $fsrCommit" }
+Write-Host "      engine/fsr-vulkan at $fsrCommit"
+
 Write-Host '[2/3] LLVM 19.1.1'
 if ($SkipLlvm) {
     if ($env:CTR_CLANG_CL -and (Test-Path -LiteralPath $env:CTR_CLANG_CL)) { Write-Host "      using CTR_CLANG_CL=$env:CTR_CLANG_CL" }
