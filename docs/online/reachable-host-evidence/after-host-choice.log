@@ -1,0 +1,2 @@
+﻿{"mode": "host-choice", "host": "HubPlayer"}
+{"scope": "public_hub", "check": "host choice: the reachable player hosts although the unreachable one searched first", "ok": true}

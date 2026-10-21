@@ -1,3 +1,9 @@
+## Unreleased
+
+- **Public matchmaking host:** when the hub forms a lobby it picks as host the first searcher whose PC accepts connections from the Internet. The hub's own players count as such; each other service now says so with the tasks it forwards. Only when nobody can be reached does the first searcher host, as before. In the v0.5.6 two-PC test the PC on a phone hotspot searched first and hosted, advertising an address of its operator's network (10.x) that the other game could not reach.
+- **Esc to quit:** holding Esc for two seconds with the game window in front closes the game, as the window's close button does.
+- Services of earlier versions do not report whether they can be reached, so their players never host a lobby formed by a newer hub.
+
 ## v0.5.6 — 2026-10-21
 
 Public matchmaking from PCs that cannot be reached: no dead local queue, and the hub election in the log.

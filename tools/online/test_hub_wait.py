@@ -3,7 +3,7 @@
 import argparse,json,subprocess,tempfile,time
 from pathlib import Path
 import test_public_hub as h
-p=argparse.ArgumentParser();p.add_argument('--member',default='build/hub-test/hub_election_test.exe');p.add_argument('--hub');p.add_argument('--assigned',action='store_true');p.add_argument('--late',action='store_true');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--member',default='build/hub-test/hub_election_test.exe');p.add_argument('--hub');p.add_argument('--assigned',action='store_true');p.add_argument('--late',action='store_true');p.add_argument('--host-choice',action='store_true');args=p.parse_args()
 # Only synthetic services on dedicated ports; never probe the user's default ports.
 def at(host):
     h.e2e.HOST,h.e2e.HTTP=host,29780
@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix='ctr_hub_wait_') as tmp:
         ready(root/'hub',processes[-1]);
         at(h.HUB)
         code=json.loads(h.e2e.http('GET','/ctr/v1/identity?nonce=00112233445566778899aabbccddeeff')[3])['friend_code']
-        for mode in (['assigned'] if args.assigned else ['late'] if args.late else ['appears','absent']):
+        for mode in (['assigned'] if args.assigned or args.host_choice else ['late'] if args.late else ['appears','absent']):
             member=root/mode
             proc=subprocess.Popen([str(Path(args.member).resolve()),'--member',str(member),code,mode],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             processes.append(proc)
@@ -42,6 +42,18 @@ with tempfile.TemporaryDirectory(prefix='ctr_hub_wait_') as tmp:
                 if logpath.exists() and '"listening"' in logpath.read_text():break
                 time.sleep(.02)
             ready(member,proc)
+            if args.host_choice:
+                # The player of the PC that cannot be reached searches first; a player of the hub,
+                # which can be reached, searches second. The hub's player must host the lobby.
+                remote=h.login(h.MEMBER,'RemotePlayer')
+                h.advertise(remote,'192.0.2.1');h.search(remote)
+                local=h.login(h.HUB,'HubPlayer')
+                h.advertise(local,'198.51.100.20');h.search(local)
+                host,created=h.first_push([remote,local],timeout=10)
+                print(json.dumps({'mode':'host-choice','host':host['name'] if host else None}),flush=True)
+                h.check(host is local,'host choice: the reachable player hosts although the unreachable one searched first')
+                remote['lobby'].s.close();local['lobby'].s.close();proc.terminate();proc.wait();processes.remove(proc)
+                continue
             player=h.login(h.MEMBER,'SyntheticPlayer')
             start=time.monotonic();h.advertise(player,'192.0.2.1');elapsed=time.monotonic()-start
             if mode in ['appears','assigned']:h.search(player)

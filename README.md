@@ -69,6 +69,8 @@ matchmaking; see the [limits](#online-status-and-limits).
   first launch. See [`ctrport/XBOX_PROMPTS.md`](ctrport/XBOX_PROMPTS.md).
 - **Quick exit from the controller:** hold View + Menu (Share + Options) for 1.2 seconds,
   then confirm with A (Cross).
+- **Quick exit from the keyboard:** hold Esc for two seconds with the game window in front;
+  the game closes as with the window's close button.
 
 ### Mods and patches
 - **Loose-file mods** in `runtime/mods`, with load order in `mods.json`.

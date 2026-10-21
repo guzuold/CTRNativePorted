@@ -1,0 +1,110 @@
+﻿[
+    {
+        "suite":  "server-default",
+        "exit":  0,
+        "checks":  237,
+        "failed":  0
+    },
+    {
+        "suite":  "server-security-json",
+        "exit":  0,
+        "checks":  1,
+        "failed":  0
+    },
+    {
+        "suite":  "server-security-blob",
+        "exit":  0,
+        "checks":  1,
+        "failed":  0
+    },
+    {
+        "suite":  "server-security-http",
+        "exit":  0,
+        "checks":  30,
+        "failed":  0
+    },
+    {
+        "suite":  "server-security-ports",
+        "exit":  0,
+        "checks":  13,
+        "failed":  0
+    },
+    {
+        "suite":  "server-connection-policy-only",
+        "exit":  0,
+        "checks":  15,
+        "failed":  0
+    },
+    {
+        "suite":  "server-friend-restart-only",
+        "exit":  0,
+        "checks":  8,
+        "failed":  0
+    },
+    {
+        "suite":  "server-peer-only",
+        "exit":  0,
+        "checks":  34,
+        "failed":  0
+    },
+    {
+        "suite":  "server-party-migration-only",
+        "exit":  0,
+        "checks":  8,
+        "failed":  0
+    },
+    {
+        "suite":  "server-room-invite-only",
+        "exit":  0,
+        "checks":  20,
+        "failed":  0
+    },
+    {
+        "suite":  "server-invite-pull-only",
+        "exit":  0,
+        "checks":  11,
+        "failed":  0
+    },
+    {
+        "suite":  "hle-default",
+        "exit":  0,
+        "checks":  87,
+        "failed":  0
+    },
+    {
+        "suite":  "hle-ingress",
+        "exit":  0,
+        "checks":  11,
+        "failed":  0
+    },
+    {
+        "suite":  "hle-offline",
+        "exit":  0,
+        "checks":  2,
+        "failed":  0
+    },
+    {
+        "suite":  "hle-relay",
+        "exit":  0,
+        "checks":  18,
+        "failed":  0
+    },
+    {
+        "suite":  "hle-relay-block",
+        "exit":  0,
+        "checks":  4,
+        "failed":  0
+    },
+    {
+        "suite":  "hle-relay-auto-direct",
+        "exit":  0,
+        "checks":  8,
+        "failed":  0
+    },
+    {
+        "suite":  "hle-relay-auto-fallback",
+        "exit":  0,
+        "checks":  7,
+        "failed":  0
+    }
+]

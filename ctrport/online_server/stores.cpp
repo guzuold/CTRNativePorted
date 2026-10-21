@@ -974,7 +974,8 @@ std::uint64_t MatchmakingStore::start_search(const std::vector<Param>& params, s
     }
 }
 std::vector<LobbyPlan> MatchmakingStore::match_ready(const std::map<std::uint64_t, std::string>& available,
-                                                       const std::map<std::string, std::size_t>& expected) {
+                                                       const std::map<std::string, std::size_t>& expected,
+                                                       const std::set<std::uint64_t>& reachable) {
     std::vector<std::pair<std::pair<std::string, std::string>, std::vector<Search*>>> groups;
     for (Search& s : searches_) {
         if (s.status != "pending") continue;
@@ -1003,7 +1004,10 @@ std::vector<LobbyPlan> MatchmakingStore::match_ready(const std::map<std::uint64_
         LobbyPlan plan;
         plan.lobby_id = lobby;
         plan.selector = key.first;
-        Lobby record{key.first, players[0]->account, {}};
+        // Guests connect to the host; a host behind a NAT that refuses incoming connections
+        // (operator NAT, phone hotspot) can be reached by nobody.
+        const auto host = std::find_if(players.begin(), players.end(), [&](const Search* s) { return reachable.count(s->account) != 0; });
+        Lobby record{key.first, (host != players.end() ? *host : players[0])->account, {}};
         for (Search* player : players) {
             record.members.push_back(player->account);
             player->status = "paired";
