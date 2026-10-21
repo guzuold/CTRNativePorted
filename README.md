@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.5.6](https://github.com/guzuold/CTRNativePorted/releases)**
+**Latest release: [v0.5.7](https://github.com/guzuold/CTRNativePorted/releases)**
 (experimental pre-release). The game is playable from start to finish. Online races
 between two PCs over the Internet work and complete, in private matches and in public
 matchmaking; see the [limits](#online-status-and-limits).
