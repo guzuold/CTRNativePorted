@@ -164,8 +164,30 @@ service; the services find each other and cooperate directly.
   - a session the player has joined;
   - a verified friend's JOIN.
 
-  Unknown addresses stay blocked. Sharing the matchmaking queue alone does not authorize a
-  connection.
+  The policy applies to outbound connect/send and inbound UDP/TCP accept. The configured
+  project server and loopback are allowed; private/LAN, link-local and CGNAT ranges are
+  also allowed unless `CTR_ONLINE_STRICT_PEERS=1`. Other unapproved addresses are blocked.
+  Outbound multicast/broadcast discovery remains allowed; invalid source addresses are denied.
+  Sharing the matchmaking queue alone does not authorize a connection.
+
+  Incoming unknown peers are dropped while a single background worker queries the local
+  service (at most four query starts/second, 256 cached/pending addresses). Positive
+  authorization lasts one second; negative answers are retried after 250 ms. The first
+  packet may be dropped, including after assignment, until authorization completes; game
+  retransmission is required. Under cache saturation additional unknown addresses fail closed.
+  Relay deliveries are checked using the relay's real source before exposing its peer address;
+  discovery source remapping happens after filtering. Rejections are counted, with one log
+  per address for up to 4096 distinct addresses; further new-address logs are suppressed to
+  bound memory. The receive call also limits rejected packets processed per call to 64.
+
+  Only signed peer/party requests and identity verification are exposed remotely over HTTP.
+  Game routes (including config, traffic-key, auth3 and WebAPI) require a loopback source.
+  Use each PC's own launcher service; a remote/LAN `CTR_ONLINE_SERVER` deployment is no
+  longer supported. The verified internal peer forwarding path remains available.
+  HTTP headers and bodies each have an absolute five-second read deadline. TCP connections
+  are limited to 128 total and 8 per source IP; lobby idle reads allow five minutes.
+  Lobby TCP 3074 and diagnostic TCP/UDP listeners bind only to loopback. TCP 3074 is no
+  longer requested through UPnP; existing manual/router mappings are not modified.
 - The launcher asks the router for port forwarding with UPnP when the router supports it.
 
 **What replaces the official servers**
