@@ -59,6 +59,13 @@ const Identity& identity() {
             hash = (hash ^ c) * 0x100000001b3ull;
         }
         result.account_id = hash ? hash : 1;
+        // CTR_ONLINE_ACCOUNT: the account the launcher's service gives this player (the name
+        // with the service's friend code), so that players with the same name stay different.
+        if (const char* account = std::getenv("CTR_ONLINE_ACCOUNT"); account && *account) {
+            char* end = nullptr;
+            const unsigned long long value = std::strtoull(account, &end, 10);
+            if (end && !*end && value) result.account_id = value;
+        }
         return result;
     }();
     return value;

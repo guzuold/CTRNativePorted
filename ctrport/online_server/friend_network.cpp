@@ -96,7 +96,7 @@ FriendWatcher::FriendWatcher(const HostIdentity& self, std::filesystem::path fri
         state.nickname = entry.nickname;
         if (const Json* name = names.is_object() ? names.find(entry.friend_code) : nullptr; name && name->is_string()) {
             state.name = name->text;
-            state.account = state.name.empty() ? 0 : user_id(state.name);
+            state.account = state.name.empty() ? 0 : player_account(state.code, state.name);
         }
         order_.push_back(state.code);
         states_.emplace(state.code, std::move(state));
@@ -176,7 +176,7 @@ void FriendWatcher::poll_now() {
                 state.online = true;
                 state.in_game = report.find("in_game") && report.at("in_game").boolean;
                 state.name = text_or_empty(report, "name");
-                state.account = state.name.empty() ? 0 : user_id(state.name);
+                state.account = state.name.empty() ? 0 : player_account(state.code, state.name);
                 state.ip = endpoint->first;
                 state.port = endpoint->second;
                 state.seen = party_now();

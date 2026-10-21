@@ -192,6 +192,34 @@ void MarketplaceStore::set_balance(std::uint64_t account, std::uint64_t currency
     else balances_.erase({std::to_string(account), currency});
     try { save(); } catch (...) { balances_ = before; throw; }
 }
+bool MarketplaceStore::adopt(std::uint64_t from, std::uint64_t to) {
+    if (from == to) return false;
+    load();
+    const auto old_owner = std::to_string(from), owner = std::to_string(to);
+    bool found = false;
+    for (const auto& [key, amount] : balances_) { if (key.first == owner) return false; found |= key.first == old_owner; }
+    for (const auto& [key, quantity] : inventory_) { if (key.first == owner) return false; found |= key.first == old_owner; }
+    for (const auto& key : rewarded_) { if (key.first == owner) return false; found |= key.first == old_owner; }
+    if (!found) return false;
+    const auto balances_before = balances_, inventory_before = inventory_;
+    const auto rewarded_before = rewarded_;
+    const auto move = [&](auto& table) {
+        for (auto it = table.begin(); it != table.end();) {
+            if (it->first.first != old_owner) { ++it; continue; }
+            table[{owner, it->first.second}] = it->second;
+            it = table.erase(it);
+        }
+    };
+    move(balances_);
+    move(inventory_);
+    for (auto it = rewarded_.begin(); it != rewarded_.end();) {
+        if (it->first != old_owner) { ++it; continue; }
+        rewarded_.insert({owner, it->second});
+        it = rewarded_.erase(it);
+    }
+    try { save(); } catch (...) { balances_ = balances_before; inventory_ = inventory_before; rewarded_ = rewarded_before; throw; }
+    return true;
+}
 void MarketplaceStore::set_inventory(std::uint64_t account, std::uint64_t item, std::int64_t quantity) {
     load();
     const auto before = inventory_;

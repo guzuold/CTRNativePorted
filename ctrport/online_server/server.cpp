@@ -397,6 +397,7 @@ struct Server::Impl {
     bool friends_listed() const { return friend_watcher || experiment_friends(); }
     struct ListedFriend {
         std::string name;
+        std::uint64_t account = 0;
         bool online = false;
         Json context = Json::object(); // stored gameStatus/gameData
     };
@@ -409,6 +410,7 @@ struct Server::Impl {
                 if (known.name.empty() || known.name == requester) continue;
                 ListedFriend row;
                 row.name = known.name;
+                row.account = known.account;
                 row.online = known.online && known.in_game;
                 if (const Json* saved = known.report.find("game_presence"); saved && saved->is_object()) row.context = *saved;
                 result.push_back(std::move(row));
@@ -437,8 +439,9 @@ struct Server::Impl {
         for (const auto& name : names) {
             ListedFriend row;
             row.name = name;
+            row.account = local_account(name);
             row.online = online.count(name) > 0;
-            if (const auto saved = presence_snapshot.find(user_id(name)); saved != presence_snapshot.end()) row.context = saved->second;
+            if (const auto saved = presence_snapshot.find(row.account); saved != presence_snapshot.end()) row.context = saved->second;
             result.push_back(std::move(row));
         }
         return result;
@@ -452,7 +455,7 @@ struct Server::Impl {
         for (std::size_t i = static_cast<std::size_t>(offset); i < rows.size() && list.items.size() < static_cast<std::size_t>(limit); ++i) {
             const auto& row = rows[i];
             Json user = Json::object();
-            user.set("accountId", Json::of(std::to_string(user_id(row.name))));
+            user.set("accountId", Json::of(std::to_string(row.account)));
             user.set("onlineId", Json::of(row.name));
             Json detail = Json::object();
             detail.set("displayName", Json::of(row.name));
@@ -524,6 +527,20 @@ struct Server::Impl {
     static bool lower_hex(const std::string& text, std::size_t size) {
         return text.size() == size && text.find_first_not_of("0123456789abcdef") == std::string::npos;
     }
+    // This PC's friend code, empty without a friend identity (then accounts are the name alone).
+    std::string own_code() const { return host_identity ? host_identity->friend_code() : std::string(); }
+    std::uint64_t local_account(const std::string& name) const { return player_account(own_code(), name); }
+    // The account the game should see for a player it knows only by name: this PC's player,
+    // a friend, or a public matchmaking player; otherwise the name-only account. `state` held.
+    std::uint64_t account_by_name(const std::string& name, const AuthSession& asking) {
+        if (name == asking.online_id) return asking.user_id;
+        if (friend_watcher)
+            for (const auto& known : friend_watcher->friends())
+                if (known.name == name && known.account) return known.account;
+        if (!config.local_name.empty() && name == config.local_name) return local_account(name);
+        for (const auto& [account, client] : live_clients) if (client->user.online_id == name) return account;
+        return user_id(name);
+    }
     // A friend's player as its own service names it; never a player of this PC.
     void check_friend_player(const std::string& caller, const std::string& name) {
         if (name.empty() || name.size() > 32) throw std::runtime_error("Friend player not specified");
@@ -531,7 +548,7 @@ struct Server::Impl {
             throw std::runtime_error("Friend player does not match");
         if (name == local_player_name()) throw std::runtime_error("Player on this PC");
         std::lock_guard<std::mutex> lock(state);
-        if (is_local(user_id(name))) throw std::runtime_error("Player on this PC");
+        if (is_local(local_account(name))) throw std::runtime_error("Player on this PC");
     }
     // Actions a friend's service may ask for (POST /ctr/v1/peer, already authenticated).
     // presence: this PC's player, whether its game is connected, its game status, the PSN
@@ -546,14 +563,14 @@ struct Server::Impl {
             check_friend_player(caller, name);
             std::lock_guard<std::mutex> lock(state);
             // This action is a session authority query only; never forwards to another service.
-            std::set<std::string> addresses = connection_addresses(user_id(name), "");
+            std::set<std::string> addresses = connection_addresses(player_account(caller, name), "");
             // A friend's player joining through this PC's Delta record: admitted for a minute,
             // reaching this PC's players (it is a verified friend, see check_friend_player).
             if (const Json* joining = request.find("joining"); joining && joining->is_bool() && joining->boolean) {
                 const auto now = party_now();
                 for (auto it = delta_joiners.begin(); it != delta_joiners.end();)
                     it = it->second <= now ? delta_joiners.erase(it) : std::next(it);
-                delta_joiners[user_id(name)] = now + 60;
+                delta_joiners[player_account(caller, name)] = now + 60;
                 for (const auto& [account, client] : live_clients)
                     if (client->hub_origin.empty() && !client->ip.empty()) addresses.insert(reachable_address(client->ip));
             }
@@ -567,7 +584,7 @@ struct Server::Impl {
             std::lock_guard<std::mutex> lock(state);
             response.set("name", Json::of(name));
             response.set("in_game", Json::of(any_local()));
-            const auto account = name.empty() ? 0 : user_id(name);
+            const auto account = name.empty() ? 0 : local_account(name);
             const auto saved = account ? game_presence.find(account) : game_presence.end();
             response.set("game_presence", saved == game_presence.end() ? Json::object() : saved->second);
             Json delta = Json::array();
@@ -584,7 +601,7 @@ struct Server::Impl {
                     delta.items.push_back(std::move(row));
                 }
             }
-            response.set("sessions", account && !viewer.empty() ? session_store.user_sessions(user_id(viewer), account) : Json::array());
+            response.set("sessions", account && !viewer.empty() ? session_store.user_sessions(player_account(caller, viewer), account) : Json::array());
             response.set("delta", std::move(delta));
             return response;
         }
@@ -598,7 +615,7 @@ struct Server::Impl {
             const std::string local = local_player_name();
             const auto now = static_cast<std::uint64_t>(std::time(nullptr));
             std::lock_guard<std::mutex> lock(state);
-            if (!is_local(recipient->as_u64()) && (local.empty() || user_id(local) != recipient->as_u64()))
+            if (!is_local(recipient->as_u64()) && (local.empty() || local_account(local) != recipient->as_u64()))
                 throw std::runtime_error("Recipient not on this PC");
             for (auto it = remote_invitations.begin(); it != remote_invitations.end();)
                 it = it->second.expires <= now ? remote_invitations.erase(it) : std::next(it);
@@ -649,7 +666,7 @@ struct Server::Impl {
                     const std::string& source_ip) {
         const std::string name = text_field(request, "name");
         if (name.empty() || name.size() > 32) throw std::runtime_error("Player not specified");
-        const auto account = user_id(name);
+        const auto account = player_account(caller, name);
         const auto now = static_cast<std::uint64_t>(std::time(nullptr));
         Json response = Json::object();
         std::lock_guard<std::mutex> lock(state);
@@ -689,7 +706,7 @@ struct Server::Impl {
                 ++remote;
                 if (client->hub_origin == caller) ++from_caller;
             }
-            if (from_caller >= 4 || remote >= 64) throw std::runtime_error("Hub pieno");
+            if (from_caller >= 4 || remote >= 64) throw std::runtime_error("Hub full");
             auto client = std::make_shared<Client>();
             client->user.online_id = name;
             client->user.user_id = account;
@@ -873,7 +890,7 @@ struct Server::Impl {
         std::string origin, invitation;
         {
             std::lock_guard<std::mutex> lock(state);
-            const auto account = user_id(online_id);
+            const auto account = local_account(online_id);
             std::string id = id_after("/ctr/v1/session-invitations/");
             if (id.empty()) id = id_after("/webapi/sdk:sessionInvitation/v1/users/me/invitations/");
             if (!id.empty()) {
@@ -933,7 +950,7 @@ struct Server::Impl {
             row.set("invitationId", Json::of(id));
             row.set("sessionId", Json::of(invite.session));
             row.set("onlineId", Json::of(invite.sender));
-            row.set("accountId", Json::of(std::to_string(user_id(invite.sender))));
+            row.set("accountId", Json::of(std::to_string(player_account(invite.origin, invite.sender))));
             rows.items.push_back(std::move(row));
         }
     }
@@ -962,6 +979,8 @@ struct Server::Impl {
         };
         const std::string host = lower(header("host").substr(0, header("host").find(':')));
         const std::string online_id = header("x-ctr-online-id");
+        const std::string requester_code = starts_with(peer_address, "peer:") ? peer_address.substr(5) : own_code();
+        const std::uint64_t requester_account = player_account(requester_code, online_id);
         // Without a room token the player uses public matchmaking.
         const std::string request_room = header("x-ctr-room-token").empty() ? public_room_token() : header("x-ctr-room-token");
         // A request a friend's service forwarded here is answered here, never forwarded again.
@@ -971,7 +990,7 @@ struct Server::Impl {
             starts_with(target, "/ctr/v1/session-invitations/")) {
             if (online_id.empty()) return json_answer(403, R"({"error":"project identity required"})", "game_invitation", false);
             try {
-                const auto account = user_id(online_id);
+                const auto account = requester_account;
                 const auto now = static_cast<std::uint64_t>(std::time(nullptr));
                 std::unique_lock<std::mutex> lock(state);
                 if (target == "/ctr/v1/session-invitations" && method == "GET") {
@@ -1048,7 +1067,7 @@ struct Server::Impl {
             std::set<std::string> origins, joining;
             {
                 std::lock_guard<std::mutex> lock(state);
-                const auto requester = online_id.empty() ? live_clients.end() : live_clients.find(user_id(online_id));
+                const auto requester = online_id.empty() ? live_clients.end() : live_clients.find(requester_account);
                 local = requester != live_clients.end() && is_local(requester->first) && valid_room_token(room) &&
                         requester->second->user.room_token == room;
                 if (local) {
@@ -1096,7 +1115,7 @@ struct Server::Impl {
             std::string refusal;
             {
                 std::lock_guard<std::mutex> lock(state);
-                const auto requester = online_id.empty() ? live_clients.end() : live_clients.find(user_id(online_id));
+                const auto requester = online_id.empty() ? live_clients.end() : live_clients.find(requester_account);
                 if (requester == live_clients.end()) refusal = "not online in the lobby";
                 else if (!valid_room_token(room) || requester->second->user.room_token != room) refusal = "room mismatch";
                 else if (requester->second->ip != reachable_address(peer_address)) refusal = "address differs from the lobby connection";
@@ -1183,7 +1202,7 @@ struct Server::Impl {
                 Json response=party->apply(caller,request,allowed,now);
                 if (const auto* name = response.find("backup_name")) {
                     std::lock_guard<std::mutex> guard(state);
-                    response.set("wallet_backup", marketplace->snapshot(user_id(name->text)));
+                    response.set("wallet_backup", marketplace->snapshot(local_account(name->text)));
                 }
                 char migration[2]{};
                 if(response.find("backup_name") && GetEnvironmentVariableA("CTR_EXPERIMENTAL_HOST_MIGRATION",migration,2)==1 && migration[0]=='1')
@@ -1237,7 +1256,10 @@ struct Server::Impl {
             if (!multiplier_header.empty() && multiplier_header != "1" && multiplier_header != "100")
                 return json_answer(400, R"({"error":"unsupported Wumpa multiplier"})", "auth3", false);
             Auth3Reply reply;
-            try { reply = auth3_reply(request, online_id, *key); } catch (const std::exception&) {
+            // A wallet of this player from before v0.5.2, when the account was the name alone.
+            if (!starts_with(peer_address, "peer:") && marketplace && !online_id.empty())
+                try { marketplace->adopt(user_id(online_id), requester_account); } catch (const std::exception&) {}
+            try { reply = auth3_reply(request, online_id, *key, requester_account); } catch (const std::exception&) {
                 return json_answer(400, R"({"error":"bad auth3 request"})", "auth3", false);
             }
             HttpAnswer a{reply.status, {{"Content-Type", "application/json"}}, reply.body, "auth3"};
@@ -1299,7 +1321,7 @@ struct Server::Impl {
             }
             if (method == "POST" && path == "sdk:sessionInvitation/v1/sessions") {
                 if (online_id.empty()) return json_answer(403, R"({"error":{"message":"project identity required"}})", "webapi_session_create", false);
-                const std::uint64_t account = user_id(online_id);
+                const std::uint64_t account = requester_account;
                 Json payload;
                 try {
                     std::lock_guard<std::mutex> lock(state);
@@ -1328,7 +1350,7 @@ struct Server::Impl {
                 const std::string id = path.substr(std::string("sdk:sessionInvitation/v1/sessions/").size());
                 try {
                     std::lock_guard<std::mutex> lock(state);
-                    session_store.update(user_id(online_id), id, body);
+                    session_store.update(requester_account, id, body);
                 } catch (const std::exception& error) {
                     HttpAnswer a = json_answer(400, R"({"error":{"message":"invalid session update"}})", "webapi_session_update", false);
                     a.fields.set("reason", Json::of(error.what()));
@@ -1345,7 +1367,7 @@ struct Server::Impl {
             if (method == "GET" && session_route == "sdk:sessionInvitation/v1/users/me/invitations") {
                 if (online_id.empty()) return json_answer(403, R"({"error":"identity required"})", "webapi_invitations", false);
                 try {
-                    const auto account = user_id(online_id), now = static_cast<std::uint64_t>(std::time(nullptr));
+                    const auto account = requester_account, now = static_cast<std::uint64_t>(std::time(nullptr));
                     Json rows = Json::array(), result = Json::object(), remote = Json::array();
                     {
                         std::lock_guard<std::mutex> lock(state);
@@ -1381,7 +1403,7 @@ struct Server::Impl {
                     for (const auto& entry : friends.at("friendList").items) {
                         const auto& user = entry.at("user");
                         const auto friend_account = std::stoull(user.at("accountId").text);
-                        Json listed = session_store.user_sessions(user_id(online_id), friend_account);
+                        Json listed = session_store.user_sessions(requester_account, friend_account);
                         for (auto& row : remote_user_sessions(friend_account).items) listed.items.push_back(std::move(row));
                         for (auto row : listed.items) {
                             const auto id = row.at("sessionId").text;
@@ -1413,7 +1435,7 @@ struct Server::Impl {
                         const auto account = std::stoull(text);
                         Json row = Json::object();
                         row.set("accountId", Json::of(std::to_string(account)));
-                        Json listed = session_store.user_sessions(user_id(online_id), account);
+                        Json listed = session_store.user_sessions(requester_account, account);
                         for (auto& remote : remote_user_sessions(account).items) listed.items.push_back(std::move(remote));
                         row.set("sessions", std::move(listed));
                         users.items.push_back(row);
@@ -1428,7 +1450,7 @@ struct Server::Impl {
                 if (online_id.empty()) return json_answer(403, R"({"error":"identity required"})", "webapi_session", false);
                 try {
                     std::lock_guard<std::mutex> lock(state);
-                    const auto account = user_id(online_id);
+                    const auto account = requester_account;
                     if (starts_with(session_route, invite_prefix)) {
                         const auto id = session_route.substr(invite_prefix.size());
                         if (method == "GET" && id.ends_with("/invitationData")) {
@@ -1515,7 +1537,7 @@ struct Server::Impl {
                         throw std::invalid_argument("unsupported presence route");
                     std::lock_guard<std::mutex> lock(state);
                     if (method == "PUT" && !suffix_path.empty()) {
-                        if (account != user_id(online_id)) throw std::invalid_argument("presence owner mismatch");
+                        if (account != requester_account) throw std::invalid_argument("presence owner mismatch");
                         const auto value = parse_json(std::string(body.begin(), body.end()));
                         if (!value.is_object() || value.members.empty()) throw std::invalid_argument("invalid presence body");
                         for (const auto& [field_name, data] : value.members) {
@@ -1573,7 +1595,7 @@ struct Server::Impl {
                 const std::string digits = route.substr(prefix.size(), route.size() - prefix.size() - suffix.size());
                 if (digits.find_first_not_of("0123456789") == std::string::npos) {
                     const std::string stripped = digits.find_first_not_of('0') == std::string::npos ? "0" : digits.substr(digits.find_first_not_of('0'));
-                    if (online_id.empty() || stripped != std::to_string(user_id(online_id)))
+                    if (online_id.empty() || stripped != std::to_string(requester_account))
                         return json_answer(403, R"({"error":{"message":"project identity mismatch"}})", "webapi_friends", false);
                     const std::string query = path.find('?') == std::string::npos ? "" : path.substr(path.find('?') + 1);
                     const auto offset = python_int(query_value(query, "offset", "0"));
@@ -1586,7 +1608,7 @@ struct Server::Impl {
                         return json_answer(400, R"({"error":{"message":"invalid friend request"}})", "webapi_friends", false);
                     }
                     HttpAnswer a = json_answer(200, dump_json_spaced(payload), "webapi_friends");
-                    a.fields.set("account", Json::of(user_id(online_id)));
+                    a.fields.set("account", Json::of(requester_account));
                     a.fields.set("reply", payload);
                     return a;
                 }
@@ -1746,14 +1768,15 @@ struct Server::Impl {
             // getUserIDs: online IDs to account IDs, asked by the retail client for the friends of
             // its friend list (observed 2026-10-20: [u32 1][string "FriendA"]). One result per
             // name: u64 account, string online ID (layout as documented for the other port's
-            // server, 12/9 and 12/10). Accounts are user_id(online_id), also for offline friends.
+            // server, 12/9 and 12/10). The account of a friend comes from the friend's code
+            // (player_account); a name that is not a friend keeps the name-only account.
             return guarded([&] {
                 Writer w;
                 const auto count = static_cast<std::uint32_t>(params.size() - 1);
                 w.u32(count).u32(count);
                 for (std::size_t i = 1; i < params.size(); ++i) {
                     if (params[i].kind != typed::STRING || params[i].value.text.empty()) throw std::invalid_argument("online ID expected");
-                    w.u64(user_id(params[i].value.text)).string(params[i].value.text);
+                    w.u64(account_by_name(params[i].value.text, user)).string(params[i].value.text);
                 }
                 return task_reply(task, &w);
             });

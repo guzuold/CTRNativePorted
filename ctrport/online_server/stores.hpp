@@ -52,6 +52,9 @@ public:
     // 11 "Nitro Boost", 12 "Free Nitro Boost". Amount 0 removes the balance.
     void set_balance(std::uint64_t account, std::uint64_t currency, std::int64_t amount);
     void set_inventory(std::uint64_t account, std::uint64_t item, std::int64_t quantity);
+    // Moves every row of `from` to `to` when `to` has none (accounts before v0.5.2 were the
+    // name alone). Returns whether anything moved.
+    bool adopt(std::uint64_t from, std::uint64_t to);
     // Project rule: all end_race activities, track base x1/x100, common base32 if
     // unavailable. Unranked uses first-place base. Receipts prevent replay credit.
     void award_races(const std::vector<Param>& params, std::uint64_t account, unsigned multiplier = 1);

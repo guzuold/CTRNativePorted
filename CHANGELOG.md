@@ -1,3 +1,18 @@
+## v0.5.2 — 2026-10-21
+
+Players with the same name no longer collide online.
+
+- Until v0.5.1 the account the game uses for a player was computed from the name alone, so two players with the same name (for example the default "CTRPlayer") had the same account on every PC. In public matchmaking the second one was refused by the hub; an invitation or JOIN between two players with the same name was refused as "Player on this PC"; in a private match one member replaced the other.
+- The account now comes from the player's name together with the friend code of the launcher that hosts the player. Each launcher passes it to its game (`CTR_ONLINE_ACCOUNT`); friends, invitations, sessions, the matchmaking hub and the in-game friend list use the same account.
+- The Pit Stop wallet of the old name-only account moves to the new account the first time the game connects, unless the new account already has a wallet.
+- The last Italian message of the matchmaking hub ("Hub full") is in English.
+
+All players should update together: a v0.5.1 player and a v0.5.2 player see different accounts for each other, so friends' status, invitations and matchmaking between the two versions can fail.
+
+Validation: online service suite with 0 failures, including the signed wallet backup with the new accounts. Not tested in game: the same-name case and the wallet move are to be checked on the PCs.
+
+Update with Check updates. `runtime/user` and `runtime/mods` are kept.
+
 ## v0.5.1 — 2026-10-21
 
 The launcher in English that follows the game language, and online races between two PCs confirmed.

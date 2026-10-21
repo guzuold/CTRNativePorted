@@ -105,10 +105,15 @@ bool valid_room_token(const std::string& value);
 const std::string& public_room_token();
 
 // auth3.
-std::uint64_t user_id(const std::string& online_id); // FNV-1a 64, as the runtime reports it
+std::uint64_t user_id(const std::string& online_id); // FNV-1a 64 of the name (accounts before v0.5.2)
+// The account the game uses for a player: the player's name together with the friend code of
+// the service that hosts it, so that players with the same name on different PCs stay
+// different. Without a service code (no friend identity) it is user_id(online_id).
+std::uint64_t player_account(const std::string& service_code, const std::string& online_id);
+// account 0: user_id(online_id).
 Bytes client_ticket(std::uint32_t title_id, const std::string& online_id, const Bytes& session_key,
-                    std::uint32_t now, std::uint32_t lifetime = 86400);
-Bytes server_ticket(const std::string& online_id, const Bytes& session_key);
+                    std::uint32_t now, std::uint32_t lifetime = 86400, std::uint64_t account = 0);
+Bytes server_ticket(const std::string& online_id, const Bytes& session_key, std::uint64_t account = 0);
 struct AuthSession {
     std::string online_id;
     std::uint64_t user_id = 0;
@@ -123,7 +128,7 @@ struct Auth3Reply {
     std::string body;
     std::optional<AuthSession> session;
 };
-Auth3Reply auth3_reply(const Json& request, const std::string& online_id, const RsaKey& key);
+Auth3Reply auth3_reply(const Json& request, const std::string& online_id, const RsaKey& key, std::uint64_t account = 0);
 
 // Lobby protocol 210.
 constexpr std::size_t LOBBY_CLIENT_HEADER_SIZE = 28;
