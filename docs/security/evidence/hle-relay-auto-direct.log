@@ -1,0 +1,9 @@
+{"scope":"online_services_test","check":"relay: game socket bound on the peer port","ok":true}
+{"scope":"online_services_test","check":"relay auto: registered with relay before sending","ok":true}
+{"scope":"online_services_test","check":"relay auto: probe sent directly","ok":true}
+{"scope":"online_services_test","check":"relay auto: direct probe reached peer directly","ok":true}
+{"scope":"online_services_test","check":"relay auto: direct reply received, direct confirmed","ok":true}
+{"scope":"online_services_test","check":"relay auto: subsequent send after direct confirmed","ok":true}
+{"scope":"online_services_test","check":"relay auto: subsequent send delivered directly","ok":true}
+{"scope":"online_services_test","check":"relay auto: zero data packets sent to relay on confirmed direct path","ok":true}
+{"scope":"online_services_test","mode":"relay-auto-direct","passed":true}

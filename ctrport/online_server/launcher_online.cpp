@@ -25,7 +25,6 @@ struct Wsa {
 
 std::vector<PortRequest> host_ports(std::uint16_t http_port, std::uint16_t discovery_port, std::uint16_t game_udp_port) {
     return {{"TCP", http_port, "server HTTP"},
-            {"TCP", 3074, "lobby"},
             {"UDP", game_udp_port, "game"},
             {"UDP", discovery_port, "discovery"},
             {"UDP", static_cast<std::uint16_t>(discovery_port + 1), "discovery"},

@@ -1,0 +1,5 @@
+{"scope":"online_services_test","check":"relay: game socket bound on the peer port","ok":true}
+{"scope":"online_services_test","check":"relay test switch: direct send reported as sent","ok":true}
+{"scope":"online_services_test","check":"relay test switch: nothing reaches the peer directly","ok":true}
+{"scope":"online_services_test","check":"relay test switch: direct peer datagram dropped, server datagram delivered","ok":true}
+{"scope":"online_services_test","mode":"relay-block","passed":true}

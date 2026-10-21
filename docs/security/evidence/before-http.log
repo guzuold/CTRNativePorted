@@ -1,0 +1,16 @@
+{"scope": "online_server_test", "check": "security: local invitations allowed", "ok": true}
+{"scope": "online_server_test", "check": "security: LAN invitations forbidden", "ok": false}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": false}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": false}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": false}
+{"scope": "online_server_test", "check": "security: local route forbidden from LAN", "ok": false}
+{"scope": "online_server_test", "check": "security: peer route verifies unsigned request", "ok": true}
+{"scope": "online_server_test", "check": "security: silent HTTP closed before six seconds", "ok": false}
+{"scope": "online_server_test", "check": "security: per-IP excess refused immediately", "ok": false}
+{"scope": "online_server_test", "check": "security: admitted connection remains served", "ok": true}
+{"scope": "online_server_test", "check": "security: global connection limit refuses immediately", "ok": false}
+{"scope": "online_server_test", "check": "security: global saturation preserves admitted client", "ok": true}
+{"scope": "online_server_test", "check": "security: incomplete HTTP body times out", "ok": false}
+{"scope": "online_server_test", "check": "security: header drip cannot reset absolute deadline", "ok": false}
+{"scope": "online_server_test", "check": "security: local lobby still reachable", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby not given HTTP idle timeout", "ok": true}

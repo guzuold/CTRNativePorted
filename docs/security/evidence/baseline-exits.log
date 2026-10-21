@@ -1,0 +1,6 @@
+Original b95b24e implementation, regression test executable:
+--ingress: exit 1, failures=5
+--security-json: exit -1073741571 (0xC00000FD), no normal output
+--security-blob: exit -1073741571 (0xC00000FD), no normal output
+--security-http: exit -1073741571 (0xC00000FD), after failed source/timeout assertions
+--security-ports: exit 1, 6 failing checks

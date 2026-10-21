@@ -588,7 +588,8 @@ Json SessionStore::invite(std::uint64_t account, const std::string& sender, cons
                         const std::vector<std::uint64_t>& recipients, std::uint64_t now) {
     expire_invitations(now);
     const auto owner = sessions_.find(session);
-    if (owner == sessions_.end() || owner->second.owner != account || user_id(sender) != account)
+    if (owner == sessions_.end() || owner->second.owner != account ||
+        !owner->second.members.count(account) || owner->second.members.at(account) != sender)
         throw Rejected("invitation sender must own session");
     if (recipients.empty() || recipients.size() > 16) throw Rejected("invalid invitation recipient count");
     const std::set<std::uint64_t> unique(recipients.begin(), recipients.end());

@@ -164,10 +164,19 @@ SOCKET open_socket(int type, const std::string& ip, std::uint16_t port) {
     }
     return s;
 }
-bool recv_exact(SOCKET s, Bytes& out, std::size_t size) {
+// Refresh the socket timeout against an absolute deadline, including slow-drip clients.
+bool read_deadline(SOCKET s, std::chrono::steady_clock::time_point deadline) {
+    const auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(deadline-std::chrono::steady_clock::now()).count();
+    if(remaining<=0) return false;
+    const DWORD timeout=static_cast<DWORD>(remaining);
+    return setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<const char*>(&timeout),sizeof(timeout))==0;
+}
+bool recv_exact(SOCKET s, Bytes& out, std::size_t size,
+                std::chrono::steady_clock::time_point deadline=std::chrono::steady_clock::time_point::max()) {
     out.resize(size);
     std::size_t done = 0;
     while (done < size) {
+        if(deadline!=std::chrono::steady_clock::time_point::max() && !read_deadline(s,deadline)) return false;
         const int n = recv(s, reinterpret_cast<char*>(out.data() + done), static_cast<int>(std::min<std::size_t>(size - done, 1 << 20)), 0);
         if (n <= 0) return false;
         done += static_cast<std::size_t>(n);
@@ -261,6 +270,8 @@ struct Server::Impl {
     struct Worker { std::thread thread; std::shared_ptr<std::atomic<bool>> done; };
     std::vector<Worker> workers;
     std::set<SOCKET> connections;
+    std::map<SOCKET,std::uint32_t> connection_ips;
+    std::map<std::uint32_t,unsigned> connections_per_ip;
     bool wsa = false;
 
     // --- log ------------------------------------------------------------------------
@@ -296,9 +307,21 @@ struct Server::Impl {
         auto done = std::make_shared<std::atomic<bool>>(false);
         workers.push_back({std::thread([body = std::move(body), done] { body(); done->store(true); }), done});
     }
-    void track(SOCKET s) { std::lock_guard<std::mutex> lock(workers_mutex); connections.insert(s); }
+    bool track(SOCKET s, std::uint32_t ip) {
+        std::lock_guard<std::mutex> lock(workers_mutex);
+        if(stopping || connections.size()>=128) return false;
+        auto it=connections_per_ip.find(ip);
+        if(it!=connections_per_ip.end() && it->second>=8) return false;
+        ++connections_per_ip[ip]; connection_ips[s]=ip; connections.insert(s); return true;
+    }
     void release(SOCKET s) {
-        { std::lock_guard<std::mutex> lock(workers_mutex); connections.erase(s); }
+        { std::lock_guard<std::mutex> lock(workers_mutex);
+          if(auto it=connection_ips.find(s);it!=connection_ips.end()) {
+              auto count=connections_per_ip.find(it->second);
+              if(count!=connections_per_ip.end() && --count->second==0) connections_per_ip.erase(count);
+              connection_ips.erase(it);
+          }
+          connections.erase(s); }
         closesocket(s);
     }
     void accept_loop(SOCKET listener, std::function<void(SOCKET, std::string)> handler) {
@@ -308,8 +331,12 @@ struct Server::Impl {
             const SOCKET s = accept(listener, reinterpret_cast<sockaddr*>(&peer), &size);
             if (s == INVALID_SOCKET) { if (stopping) return; continue; }
             const std::string name = endpoint_of(peer).text();
-            track(s);
-            spawn([this, s, name, handler] {
+            if(!track(s,peer.sin_addr.s_addr)) { closesocket(s); continue; }
+            const DWORD timeout=300000; // Lobby idle budget: five minutes, not the HTTP deadline.
+            setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<const char*>(&timeout),sizeof(timeout));
+            const DWORD send_timeout=5000;
+            setsockopt(s,SOL_SOCKET,SO_SNDTIMEO,reinterpret_cast<const char*>(&send_timeout),sizeof(send_timeout));
+            try { spawn([this, s, name, handler] {
                 try { handler(s, name); } catch (const std::exception& error) {
                     Json f = Json::object();
                     f.set("peer", Json::of(name));
@@ -317,7 +344,7 @@ struct Server::Impl {
                     record("connection_error", std::move(f));
                 }
                 release(s);
-            });
+            }); } catch(...) { release(s); }
         }
     }
 
@@ -973,6 +1000,13 @@ struct Server::Impl {
     HttpAnswer http_answer(const std::string& method, const std::string& target,
                            const std::map<std::string, std::string>& headers, const Bytes& body,
                            const std::string& peer_address) {
+        const bool verified_peer=starts_with(peer_address,"peer:");
+        in_addr source{};
+        const bool loopback=InetPtonA(AF_INET,peer_address.c_str(),&source)==1 && (ntohl(source.s_addr)>>24)==127;
+        const bool public_route=(method=="POST" && (target=="/ctr/v1/peer" || target=="/ctr/v1/party")) ||
+            (method=="GET" && (target=="/ctr/v1/identity" || starts_with(target,"/ctr/v1/identity?")));
+        if(!verified_peer && !loopback && !public_route)
+            return json_answer(403,R"({"error":"local service route"})","http_source_rejected",false);
         auto header = [&](const char* name) {
             const auto it = headers.find(name);
             return it == headers.end() ? std::string() : it->second;
@@ -1618,10 +1652,11 @@ struct Server::Impl {
         return json_answer(404, R"({"error":"not served"})", "http");
     }
     void handle_http(SOCKET s, const std::string& peer) {
+        const auto header_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
         std::string head;
         char c;
         while (head.size() < 4 || head.compare(head.size() - 4, 4, "\r\n\r\n") != 0) {
-            if (head.size() >= kMaxHttpHead || recv(s, &c, 1, 0) != 1) return;
+            if (head.size() >= kMaxHttpHead || !read_deadline(s,header_deadline) || recv(s, &c, 1, 0) != 1) return;
             head += c;
         }
         std::vector<std::string> lines;
@@ -1649,7 +1684,7 @@ struct Server::Impl {
             length = *parsed;
         }
         Bytes body;
-        if (!recv_exact(s, body, static_cast<std::size_t>(length))) return;
+        if (!recv_exact(s, body, static_cast<std::size_t>(length),std::chrono::steady_clock::now()+std::chrono::seconds(5))) return;
         HttpAnswer answer = http_answer(method, target, headers, body, peer.substr(0, peer.rfind(':')));
         Json fields = Json::object();
         auto optional_header = [&](const char* name) {
@@ -2136,15 +2171,16 @@ struct Server::Impl {
         marketplace = std::make_unique<MarketplaceStore>(config.state_dir / "marketplace.txt");
         achievements = std::make_unique<AchievementStore>(config.state_dir / "achievement_events.jsonl");
 
+        const std::string local_host=starts_with(config.host,"127.") ? config.host : "127.0.0.1";
         SOCKET s;
         if (open("http/" + std::to_string(config.http_port), SOCK_STREAM, config.host, config.http_port, s))
             listener_threads.emplace_back([this, s] { accept_loop(s, [this](SOCKET c, std::string peer) { handle_http(c, peer); }); });
-        if (open("lobby/tcp/3074", SOCK_STREAM, config.host, 3074, s))
+        if (open("lobby/tcp/3074", SOCK_STREAM, local_host, 3074, s))
             listener_threads.emplace_back([this, s] {
                 accept_loop(s, [this](SOCKET c, std::string peer) { handle_lobby(c, peer, peer.substr(0, peer.rfind(':'))); });
             });
         for (const std::uint16_t port : config.tcp_record_ports)
-            if (open("tcp/" + std::to_string(port), SOCK_STREAM, config.host, port, s))
+            if (open("tcp/" + std::to_string(port), SOCK_STREAM, local_host, port, s))
                 listener_threads.emplace_back([this, s, port] {
                     accept_loop(s, [this, port](SOCKET c, std::string peer) { handle_tcp_record(c, peer, port); });
                 });
@@ -2172,7 +2208,7 @@ struct Server::Impl {
             listener_threads.emplace_back([this, s] { relay_loop(s); });
         }
         for (const std::uint16_t port : config.udp_record_ports)
-            if (open("udp/" + std::to_string(port), SOCK_DGRAM, config.host, port, s))
+            if (open("udp/" + std::to_string(port), SOCK_DGRAM, local_host, port, s))
                 listener_threads.emplace_back([this, s, port] { udp_loop(s, port, false); });
 
         Json ports = Json::array();

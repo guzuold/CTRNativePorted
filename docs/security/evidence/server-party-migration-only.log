@@ -1,0 +1,9 @@
+{"scope": "online_server_test", "check": "HTTP recovery checkpoint contains registered successor endpoint", "ok": true}
+{"scope": "online_server_test", "check": "survivor waits for successor without changing destination prematurely", "ok": true}
+{"scope": "online_server_test", "check": "HTTP restore reunites both survivors in unchanged room after old server stops", "ok": true}
+{"scope": "online_server_test", "check": "survivor local backend follows new room owner", "ok": true}
+{"scope": "online_server_test", "check": "restore retry recovers a lost response without replacing room again", "ok": true}
+{"scope": "online_server_test", "check": "successor refreshes signed checkpoint for next failure", "ok": true}
+{"scope": "online_server_test", "check": "successor can issue fresh invitations after recovery", "ok": true}
+{"scope": "online_server_test", "check": "old host is not silently readmitted by recovered membership", "ok": true}
+{"scope":"party_migration_http","failures":0}

@@ -1,0 +1,13 @@
+{"scope": "online_server_test", "check": "peer presence: friend's service reports its player", "ok": false}
+{"scope": "online_server_test", "check": "peer presence: both directions", "ok": true}
+{"scope": "online_server_test", "check": "peer presence: service refuses a caller outside its rubrica", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: stranger gets the rubrica refusal", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: replayed packet refused", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: packet addressed to another service refused", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: claimed sender must match the signature", "ok": true}
+{"scope": "online_server_test", "check": "peer channel: unknown action refused", "ok": false}
+{"scope": "online_server_test", "check": "public matchmaking: a service's code is learned and verified from its identity answer", "ok": true}
+{"scope": "online_server_test", "check": "public matchmaking: an endpoint without a service is not a candidate", "ok": true}
+{"scope": "online_server_test", "check": "public matchmaking: hub is the lowest code among reachable services, never an unreachable self", "ok": true}
+{"scope": "online_server_test", "check": "peer presence: game status stored on the friend's own service", "ok": false}
+online_server_test exception: missing JSON key gameStatus
