@@ -1,0 +1,11 @@
+﻿{"mode": "appears", "elapsed": 0.157}
+{"scope": "public_hub", "check": "waiting public task forwarded when election publishes hub", "ok": true}
+{"scope": "public_hub", "check": "public search task 145/18 forwarded to hub", "ok": true}
+{"scope": "public_hub", "check": "hub logs remote player arrival", "ok": true}
+{"scope": "public_hub", "check": "task actually waited for delayed election", "ok": true}
+{"scope": "public_hub", "check": "hub_elected fields written to service log", "ok": true}
+{"scope": "public_hub", "check": "absent: unreachable PC refuses a public search it could only queue locally", "ok": false}
+{"mode": "absent", "elapsed": 1.016}
+{"scope": "public_hub", "check": "local fallback logs hub_none with unreachable/deadline fields", "ok": true}
+{"scope": "public_hub", "check": "refused search logged as hub_none search_refused", "ok": false}
+{"scope": "public_hub", "check": "only the advertise waits the one-second budget", "ok": true}

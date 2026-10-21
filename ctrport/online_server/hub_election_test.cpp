@@ -108,5 +108,20 @@ int main(int argc,char** argv){
  check(recorded.size()==2 && recorded[0].first=="hub_elected" && recorded[0].second.at("source").text=="dht" &&
        recorded[0].second.at("address").text=="192.0.2.1:8780" && recorded[0].second.at("candidates").as_u64()==1 &&
        recorded[1].first=="hub_lost" && recorded[1].second.at("reason").text=="direct_failures","transition logs contain election fields and loss reason");
+ {
+    // Every round reports what the DHT returned and what answered, so a PC that never
+    // finds a hub shows it in its log.
+    HubElection counted(self,false);
+    std::map<std::string,MatchHub> answering{{"192.0.2.1:8780",a}};
+    ads={"192.0.2.1:8780","192.0.2.2:8780","192.0.2.1:9999"};
+    counted.round(5000,search,[&](const std::string& ep)->std::optional<MatchHub>{auto i=answering.find(ep);return i==answering.end()?std::nullopt:std::optional<MatchHub>(i->second);},publish);
+    Json fields=counted.round_fields(chosen);
+    check(fields.at("dht_results").as_u64()==3 && fields.at("verified").as_u64()==1 && fields.at("candidates").as_u64()==1 &&
+          fields.at("hub").text==a.code,"round fields: DHT results, verified answers, candidates and hub");
+    ads.clear();
+    counted.round(5060,search,[&](const std::string&)->std::optional<MatchHub>{return std::nullopt;},publish);
+    fields=counted.round_fields(std::nullopt);
+    check(fields.at("dht_results").as_u64()==0 && fields.at("verified").as_u64()==0 && fields.at("hub").is_null(),"round fields: an empty DHT round shows zero results and no hub");
+ }
  std::filesystem::remove(file);std::printf("failures=%d\n",failures);return failures?1:0;
 }

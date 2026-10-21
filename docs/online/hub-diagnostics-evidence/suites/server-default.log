@@ -1,0 +1,239 @@
+﻿{"scope": "online_server_test", "check": "JSON round trip keeps order, u64 and ensure_ascii escapes", "ok": true}
+{"scope": "online_server_test", "check": "JSON escapes parsed and written back", "ok": true}
+{"scope": "online_server_test", "check": "JSON default separators", "ok": true}
+{"scope": "online_server_test", "check": "JSON sorted keys", "ok": true}
+{"scope": "online_server_test", "check": "JSON float repr", "ok": true}
+{"scope": "online_server_test", "check": "JSON object equality ignores order", "ok": true}
+{"scope": "online_server_test", "check": "SHA-1 abc", "ok": true}
+{"scope": "online_server_test", "check": "SHA-256 abc", "ok": true}
+{"scope": "online_server_test", "check": "HMAC-SHA1 RFC 2202", "ok": true}
+{"scope": "online_server_test", "check": "AES-128-CBC SP 800-38A", "ok": true}
+{"scope": "online_server_test", "check": "AES-128-CBC decrypt", "ok": true}
+{"scope": "online_server_test", "check": "base64", "ok": true}
+{"scope": "online_server_test", "check": "strict base64 rejects non-alphabet characters", "ok": true}
+{"scope": "online_server_test", "check": "SPKI DER is 0x126 bytes", "ok": true}
+{"scope": "online_server_test", "check": "server key persists across starts", "ok": true}
+{"scope": "online_server_test", "check": "PSS-SHA256 salt 0 signature verifies from the SPKI, altered message fails", "ok": true}
+{"scope": "online_server_test", "check": "room selector as room.py", "ok": true}
+{"scope": "online_server_test", "check": "user ID as demonware_auth3.user_id", "ok": true}
+{"scope": "online_server_test", "check": "client ticket layout", "ok": true}
+{"scope": "online_server_test", "check": "server ticket carries the session key", "ok": true}
+{"scope": "online_server_test", "check": "typed writer and reader", "ok": true}
+{"scope": "online_server_test", "check": "REST A/B response bytes as demonware_rest.response", "ok": true}
+{"scope": "online_server_test", "check": "REST 404 response bytes", "ok": true}
+{"scope": "online_server_test", "check": "IP request answered from primary, loopback reported with the public address (discovery.py bytes)", "ok": true}
+{"scope": "online_server_test", "check": "change address+port from the fourth endpoint (discovery.py bytes)", "ok": true}
+{"scope": "online_server_test", "check": "NAT request without change answered from primary", "ok": true}
+{"scope": "online_server_test", "check": "unknown NAT request ignored", "ok": true}
+{"scope": "online_server_test", "check": "protected address form", "ok": true}
+{"scope": "online_server_test", "check": "lobby handshake finds the session key and proves the server", "ok": true}
+{"scope": "online_server_test", "check": "client record opened", "ok": true}
+{"scope": "online_server_test", "check": "replayed record counter rejected", "ok": true}
+{"scope": "online_server_test", "check": "server record MAC", "ok": true}
+{"scope": "online_server_test", "check": "one player per room: no lobby", "ok": true}
+{"scope": "online_server_test", "check": "search in another room than the advertisement rejected", "ok": true}
+{"scope": "online_server_test", "check": "repeated search keeps its ID", "ok": true}
+{"scope": "online_server_test", "check": "player connected in another room not paired", "ok": true}
+{"scope": "online_server_test", "check": "launcher lobby waits for all three members rather than pairing first two", "ok": true}
+{"scope": "online_server_test", "check": "same password pairs 42 and 43, 42 hosts", "ok": true}
+{"scope": "online_server_test", "check": "paired searches not paired again", "ok": true}
+{"scope": "online_server_test", "check": "host document order and values", "ok": true}
+{"scope": "online_server_test", "check": "guest cannot update the lobby document", "ok": true}
+{"scope": "online_server_test", "check": "host update accepted, version 2", "ok": true}
+{"scope": "online_server_test", "check": "stale version refused", "ok": true}
+{"scope": "online_server_test", "check": "null attachment after race start", "ok": true}
+{"scope": "online_server_test", "check": "guest disconnect does not elect a host", "ok": true}
+{"scope": "online_server_test", "check": "successor in another room rejected", "ok": true}
+{"scope": "online_server_test", "check": "no connected successor leaves documents unchanged", "ok": true}
+{"scope": "online_server_test", "check": "connected member inherits the same lobby", "ok": true}
+{"scope": "online_server_test", "check": "migration increments version and changes owner", "ok": true}
+{"scope": "online_server_test", "check": "cached migration routes contain survivor address only", "ok": true}
+{"scope": "online_server_test", "check": "migration preserves race attachment and security documents", "ok": true}
+{"scope": "online_server_test", "check": "duplicate disconnect does not repeat election", "ok": true}
+{"scope": "online_server_test", "check": "former owner cannot overwrite successor document", "ok": true}
+{"scope": "online_server_test", "check": "successor can remove the disconnected former host", "ok": true}
+{"scope": "online_server_test", "check": "departed host removed from backend membership", "ok": true}
+{"scope": "online_server_test", "check": "former host reconnect cannot reclaim an old race", "ok": true}
+{"scope": "online_server_test", "check": "CTR_ONLINE_MIN_PLAYERS=3: 2 players do not match", "ok": true}
+{"scope": "online_server_test", "check": "CTR_ONLINE_MIN_PLAYERS=3: 3 players match together", "ok": true}
+{"scope": "online_server_test", "check": "public selector as room.py, distinct from passwords", "ok": true}
+{"scope": "online_server_test", "check": "public: same playlist paired, other playlist and private room left waiting", "ok": true}
+{"scope": "online_server_test", "check": "relay: HELLO with an unknown token refused", "ok": true}
+{"scope": "online_server_test", "check": "relay: foreign datagrams get no answer", "ok": true}
+{"scope": "online_server_test", "check": "relay: HELLO binds the endpoint and reports what the server saw", "ok": true}
+{"scope": "online_server_test", "check": "relay: player without binding is offline", "ok": true}
+{"scope": "online_server_test", "check": "relay: SEND to the advertised public endpoint delivered, sender shown by its public endpoint", "ok": true}
+{"scope": "online_server_test", "check": "relay: reply delivered with the address the first sender used", "ok": true}
+{"scope": "online_server_test", "check": "relay: advertised local endpoint resolves when unambiguous", "ok": true}
+{"scope": "online_server_test", "check": "relay: source shown is the address the receiving game used last", "ok": true}
+{"scope": "online_server_test", "check": "relay: player of another room unreachable", "ok": true}
+{"scope": "online_server_test", "check": "relay: unregistered sender refused", "ok": true}
+{"scope": "online_server_test", "check": "relay: oversized payload refused", "ok": true}
+{"scope": "online_server_test", "check": "relay: datagram within the byte budget forwarded", "ok": true}
+{"scope": "online_server_test", "check": "relay: byte rate limited", "ok": true}
+{"scope": "online_server_test", "check": "relay: budget refilled over time", "ok": true}
+{"scope": "online_server_test", "check": "relay: new NAT mapping rebinds the player", "ok": true}
+{"scope": "online_server_test", "check": "relay: previous endpoint no longer accepted", "ok": true}
+{"scope": "online_server_test", "check": "relay: player who left the room unreachable", "ok": true}
+{"scope": "online_server_test", "check": "relay: binding expires without traffic", "ok": true}
+{"scope": "online_server_test", "check": "relay: token withdrawn when the player leaves the lobby", "ok": true}
+{"scope": "online_server_test", "check": "relay: endpoints read from the retail advertisement block", "ok": true}
+{"scope": "online_server_test", "check": "statistics persisted, other account refused", "ok": true}
+{"scope": "online_server_test", "check": "retail session multipart without final delimiter", "ok": true}
+{"scope": "online_server_test", "check": "data after the final part refused", "ok": true}
+{"scope": "online_server_test", "check": "invitation: batch delivery isolated to recipients", "ok": true}
+{"scope": "online_server_test", "check": "invitation: send retry reuses outstanding ID", "ok": true}
+{"scope": "online_server_test", "check": "invitation: nonowner and duplicate batch rejected without delivery", "ok": true}
+{"scope": "online_server_test", "check": "invitation: another recipient cannot consume invite", "ok": true}
+{"scope": "online_server_test", "check": "invitation: polling does not consume", "ok": true}
+{"scope": "online_server_test", "check": "invitation: dismissal affects only selected recipient", "ok": true}
+{"scope": "online_server_test", "check": "invitation: stale session invitations expire", "ok": true}
+{"scope": "online_server_test", "check": "Delta: invalid reservation selector refused", "ok": true}
+{"scope": "online_server_test", "check": "Delta: reservation hidden before initialization", "ok": true}
+{"scope": "online_server_test", "check": "Delta: other account cannot initialize", "ok": true}
+{"scope": "online_server_test", "check": "Delta: two players use one info block", "ok": true}
+{"scope": "online_server_test", "check": "Delta: malformed update preserves published state", "ok": true}
+{"scope": "online_server_test", "check": "Delta: self and other context excluded", "ok": true}
+{"scope": "online_server_test", "check": "Delta: other account cannot delete", "ok": true}
+{"scope": "online_server_test", "check": "Delta: deletion removes friend session", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: struct buffer parameter logged as the reference", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: retail inventory page answered empty", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: retail balances answered with an empty struct", "ok": true}
+{"scope": "online_server_test", "check": "wumpa: retail login event acknowledged", "ok": true}
+{"scope": "online_server_test", "check": "wumpa: retail states of the eight kinds answered empty", "ok": true}
+{"scope": "online_server_test", "check": "wumpa: event summary and complete retail attribute bytes persisted", "ok": true}
+{"scope": "online_server_test", "check": "wumpa: persistence failure returns task error instead of acknowledging lost events", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: other tasks left to the server", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: balances per account, zigzag", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: balances reloaded from the state file", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: currency IDs above one byte refused", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: balance set from outside reaches the running store", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: zero balance removed", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: nonempty inventory refused (layout not validated)", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: other account's inventory unaffected", "ok": true}
+{"scope": "online_server_test", "check": "pit stop: other balances context refused", "ok": true}
+{"scope": "online_server_test", "check": "wumpa: state kind 8 refused", "ok": true}
+{"scope": "online_server_test", "check": "wumpa: paged states refused", "ok": true}
+{"scope": "online_server_test", "check": "wumpa: report without events refused", "ok": true}
+{"scope": "online_server_test", "check": "entitlements: empty service list, other requests refused", "ok": true}
+{"scope": "online_server_test", "check": "reward: modifier defaults to normal base payout", "ok": true}
+{"scope": "online_server_test", "check": "reward: changing multiplier does not repay old event", "ok": true}
+{"scope": "online_server_test", "check": "reward: base amount read from local catalogue", "ok": true}
+{"scope": "online_server_test", "check": "reward: replay does not credit twice across restart", "ok": true}
+{"scope": "online_server_test", "check": "reward: receipts scoped to account", "ok": true}
+{"scope": "online_server_test", "check": "reward: zero-duration activity refused without wallet change", "ok": true}
+{"scope": "online_server_test", "check": "reward: alternate mode, zero laps, online and golden flag accept common x100 policy", "ok": true}
+{"scope": "online_server_test", "check": "reward: unranked activity uses first-place base x100", "ok": true}
+{"scope": "online_server_test", "check": "reward: unknown arena uses common 3200 payout", "ok": true}
+{"scope": "online_server_test", "check": "reward: missing retail catalogue does not block activity credit", "ok": true}
+{"scope": "online_server_test", "check": "reward: failed write rolls back balance and leaves disk intact", "ok": true}
+{"scope": "online_server_test", "check": "reward: failed transaction can retry successfully", "ok": true}
+{"scope": "online_server_test", "check": "reward: balance overflow refused without mutation", "ok": true}
+{"scope": "online_server_test", "check": "shop: purchase debits catalogue price", "ok": true}
+{"scope": "online_server_test", "check": "shop: persisted inventory serializes account, item, quantity and expiry fields", "ok": true}
+{"scope": "online_server_test", "check": "shop: retry after restart does not charge twice", "ok": true}
+{"scope": "online_server_test", "check": "shop: insufficient balance grants no item", "ok": true}
+{"scope": "online_server_test", "check": "shop: unknown SKU rejected", "ok": true}
+{"scope": "online_server_test", "check": "shop: failed persistence rolls back money and item", "ok": true}
+{"scope": "online_server_test", "check": "shop: failed purchase can retry successfully", "ok": true}
+{"scope": "online_server_test", "check": "backup: committed wallet versions archived before replacement", "ok": true}
+{"scope": "online_server_test", "check": "backup: disk failure prevents wallet overwrite and rolls back memory", "ok": true}
+{"scope": "online_server_test", "check": "shop: incomplete bundle cannot partially grant", "ok": true}
+{"scope": "online_server_test", "check": "shop: duplicate bundle SKU rejected", "ok": true}
+{"scope": "online_server_test", "check": "shop: bundle debits sum and grants both items", "ok": true}
+{"scope": "online_server_test", "check": "shop: bundle retry after restart is free", "ok": true}
+{"scope": "online_server_test", "check": "shop: owned component excluded from bundle price", "ok": true}
+{"scope": "online_server_test", "check": "shop: insufficient bundle balance grants nothing", "ok": true}
+{"scope": "online_server_test", "check": "shop: bundle write failure rolls back every item and debit", "ok": true}
+{"scope": "online_server_test", "check": "hosted server answers with the public address", "ok": true}
+{"scope": "online_server_test", "check": "traffic key served equals the key file the host's game uses", "ok": true}
+{"scope": "online_server_test", "check": "host assigns a valid friend code", "ok": true}
+{"scope": "online_server_test", "check": "identity endpoint responds with 200 for valid nonce", "ok": true}
+{"scope": "online_server_test", "check": "identity response protocol is ctr-friend-auth-v1", "ok": true}
+{"scope": "online_server_test", "check": "candidate endpoint successfully verified against friend code", "ok": true}
+{"scope": "online_server_test", "check": "verified candidate returns matching traffic key", "ok": true}
+{"scope": "online_server_test", "check": "missing identity fields return MalformedResponse without throwing", "ok": true}
+{"scope": "online_server_test", "check": "extreme unsigned timestamp rejected without signed overflow", "ok": true}
+{"scope": "online_server_test", "check": "friend search while hosting reuses DHT and verifies cached endpoint", "ok": true}
+{"scope": "online_server_test", "check": "friend search does not stop host DHT", "ok": true}
+{"scope": "online_server_test", "check": "signed HTTP join assigns same retail network selector to two launchers", "ok": true}
+{"scope": "online_server_test", "check": "signed HTTP heartbeat preserves party membership", "ok": true}
+{"scope": "online_server_test", "check": "backup: signed host response contains only authenticated member wallet", "ok": true}
+{"scope": "online_server_test", "check": "backup: remote wallet actually persisted on guest disk", "ok": true}
+{"scope": "online_server_test", "check": "backup: unchanged heartbeat deduplicates snapshot", "ok": true}
+{"scope": "online_server_test", "check": "backup: reset inventory cannot overwrite earlier ownership snapshot", "ok": true}
+{"scope": "online_server_test", "check": "backup: caller cannot select another account", "ok": true}
+{"scope": "online_server_test", "check": "backup: before and after game saves remain independent immutable copies", "ok": true}
+{"scope": "online_server_test", "check": "verification against different friend code rejected", "ok": true}
+{"scope": "online_server_test", "check": "identity endpoint rejects missing nonce", "ok": true}
+{"scope": "online_server_test", "check": "identity endpoint rejects short nonce", "ok": true}
+{"scope": "online_server_test", "check": "identity endpoint rejects non-hex nonce", "ok": true}
+{"scope": "online_server_test", "check": "second host on the same ports refused with a reason", "ok": true}
+{"scope": "online_server_test", "check": "ports released when hosting stops", "ok": true}
+{"scope": "online_server_test", "check": "offline endpoint returns NoResponse", "ok": true}
+{"scope": "online_server_test", "check": "hosting starts again after a stop", "ok": true}
+{"scope": "online_server_test", "check": "two HTTP servers: signed invitation delivered to friend inbox", "ok": true}
+{"scope": "online_server_test", "check": "accept invite: same retail room, presence redirects to owner, invitation consumed", "ok": true}
+{"scope": "online_server_test", "check": "two HTTP servers: leaving frees membership immediately", "ok": true}
+{"scope": "online_server_test", "check": "ECDSA P-256 public key is 64 bytes uncompressed (X, Y)", "ok": true}
+{"scope": "online_server_test", "check": "DHT infohash is 20 bytes SHA-1", "ok": true}
+{"scope": "online_server_test", "check": "friend code starts with CTR1- prefix", "ok": true}
+{"scope": "online_server_test", "check": "host identity persists across loads", "ok": true}
+{"scope": "online_server_test", "check": "valid friend code parses correctly", "ok": true}
+{"scope": "online_server_test", "check": "friend code parsing is case-insensitive", "ok": true}
+{"scope": "online_server_test", "check": "friend code parsing ignores formatting whitespace/hyphens", "ok": true}
+{"scope": "online_server_test", "check": "corrupted friend code caught by checksum", "ok": true}
+{"scope": "online_server_test", "check": "bad prefix rejected", "ok": true}
+{"scope": "online_server_test", "check": "truncated code rejected", "ok": true}
+{"scope": "online_server_test", "check": "invalid Crockford base32 character rejected", "ok": true}
+{"scope": "online_server_test", "check": "friend code Crockford Base32 maps 'O' to '0'", "ok": true}
+{"scope": "online_server_test", "check": "ECDSA P-256 challenge signature verifies against public key", "ok": true}
+{"scope": "online_server_test", "check": "altered nonce fails signature verification", "ok": true}
+{"scope": "online_server_test", "check": "altered timestamp fails signature verification", "ok": true}
+{"scope": "online_server_test", "check": "altered traffic key fails signature verification", "ok": true}
+{"scope": "online_server_test", "check": "altered signature byte fails verification", "ok": true}
+{"scope": "online_server_test", "check": "signature fails against different public key", "ok": true}
+{"scope": "online_server_test", "check": "corrupt identity refused without replacing existing friend code", "ok": true}
+{"scope": "online_server_test", "check": "party room admits only its registered names", "ok": true}
+{"scope": "online_server_test", "check": "unlisted uninvited identity cannot join party", "ok": true}
+{"scope": "online_server_test", "check": "party holds exactly eight including owner", "ok": true}
+{"scope": "online_server_test", "check": "ninth party member rejected without modifying roster", "ok": true}
+{"scope": "online_server_test", "check": "leaving withdraws game admission", "ok": true}
+{"scope": "online_server_test", "check": "invited identity can join without sharing a password", "ok": true}
+{"scope": "online_server_test", "check": "duplicate display name rejected to preserve retail account identity", "ok": true}
+{"scope": "online_server_test", "check": "authenticated invite reaches recipient inbox", "ok": true}
+{"scope": "online_server_test", "check": "offline guests expire and release capacity", "ok": true}
+{"scope": "online_server_test", "check": "party signed request round trip", "ok": true}
+{"scope": "online_server_test", "check": "party tampering rejected before mutation", "ok": true}
+{"scope": "online_server_test", "check": "signed checkpoint deterministically elects one surviving member", "ok": true}
+{"scope": "online_server_test", "check": "tampered checkpoint cannot mutate destination lobby", "ok": true}
+{"scope": "online_server_test", "check": "checkpoint from another signer rejected", "ok": true}
+{"scope": "online_server_test", "check": "checkpoint cannot replace a different selected room", "ok": true}
+{"scope": "online_server_test", "check": "expired checkpoint cannot restore membership", "ok": true}
+{"scope": "online_server_test", "check": "noncandidate cannot claim host role from same checkpoint", "ok": true}
+{"scope": "online_server_test", "check": "successor restores same room and all surviving members without departed host", "ok": true}
+{"scope": "online_server_test", "check": "restored room advances generation", "ok": true}
+{"scope": "online_server_test", "check": "checkpoint replay cannot reset an already restored room", "ok": true}
+{"scope": "online_server_test", "check": "checkpoint is not exposed to outsiders", "ok": true}
+{"scope": "online_server_test", "check": "duplicate account names in signed checkpoint rejected", "ok": true}
+{"scope": "online_server_test", "check": "valid friend added to store", "ok": true}
+{"scope": "online_server_test", "check": "invalid friend code rejected by store", "ok": true}
+{"scope": "online_server_test", "check": "friend store has Bob", "ok": true}
+{"scope": "online_server_test", "check": "friend store persists updates across reloads", "ok": true}
+{"scope": "online_server_test", "check": "friend last_seen survives integer JSON reload", "ok": true}
+{"scope": "online_server_test", "check": "friend rename saves without manual mutex unlock", "ok": true}
+{"scope": "online_server_test", "check": "renamed friend persisted", "ok": true}
+{"scope": "online_server_test", "check": "friend removed from store", "ok": true}
+{"scope": "online_server_test", "check": "friend removal persists", "ok": true}
+{"scope": "online_server_test", "check": "DhtService starts on UDP port", "ok": true}
+{"scope": "online_server_test", "check": "DhtService reports running", "ok": true}
+{"scope": "online_server_test", "check": "second process-global DHT instance rejected without corrupting first", "ok": true}
+{"scope": "online_server_test", "check": "first DHT survives rejected second instance", "ok": true}
+{"scope": "online_server_test", "check": "DhtService reports stopped", "ok": true}
+{"scope": "online_server_test", "check": "spawned DHT host child process", "ok": true}
+DHT_HOST_RUNNING
+{"scope": "online_server_test", "check": "guest DHT node started and bootstrapped to host child process", "ok": true}
+{"scope": "online_server_test", "check": "2-process isolated DHT test: guest discovered host candidate 127.0.0.1:8780 via BitTorrent DHT", "ok": true}
+{"scope": "online_server_test", "check": "server names resolved to IPv4", "ok": true}
+{"scope": "online_server_test", "check": "address scope classification", "ok": true}
+{"scope": "online_server_test", "passed": true, "failures": 0}

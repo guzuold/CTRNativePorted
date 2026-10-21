@@ -1,0 +1,5 @@
+﻿{"scope": "public_hub", "check": "late: unreachable PC refuses a public search it could only queue locally", "ok": false}
+{"mode": "late", "elapsed": 1.0}
+{"scope": "public_hub", "check": "late hub: first public task fell back locally", "ok": true}
+{"scope": "public_hub", "check": "late hub: no task of the local sequence forwarded to the hub", "ok": true}
+{"scope": "public_hub", "check": "late hub: refused search logged", "ok": false}

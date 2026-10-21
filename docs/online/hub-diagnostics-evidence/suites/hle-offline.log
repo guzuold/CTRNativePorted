@@ -1,0 +1,3 @@
+﻿{"scope":"online_services_test","check":"offline: online services not resolved","ok":true}
+{"scope":"online_services_test","check":"offline: sceNetInetPton still resolved","ok":true}
+{"scope":"online_services_test","mode":"offline","passed":true}

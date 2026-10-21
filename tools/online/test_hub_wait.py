@@ -45,13 +45,16 @@ with tempfile.TemporaryDirectory(prefix='ctr_hub_wait_') as tmp:
             player=h.login(h.MEMBER,'SyntheticPlayer')
             start=time.monotonic();h.advertise(player,'192.0.2.1');elapsed=time.monotonic()-start
             if mode in ['appears','assigned']:h.search(player)
-            if mode=='late':
-                # The hub is published after the advertise fell back locally; the rest of the
-                # sequence must stay on the side that holds the advertise.
-                time.sleep(.3)
+            refused=None
+            if mode in ['late','absent']:
+                # This PC cannot be reached: a local public queue could never pair it with anyone.
+                # The search is refused (error 1) instead, also when the hub appears halfway
+                # through, since the advertise is on this side; the next attempt starts over.
+                if mode=='late':time.sleep(.3)
                 kind,payload=h.search(player)
                 values=h.Reader(payload).values()
-                h.check(kind==1 and any(t==h.STRING and 'mm_id' in v for t,v in values),'late hub: search answered on the side that holds the advertise')
+                refused=len(values)>1 and values[1][1]==1 and not any(t==h.STRING and 'mm_id' in str(v) for t,v in values)
+                h.check(refused,'%s: unreachable PC refuses a public search it could only queue locally'%mode)
             log=[json.loads(line) for line in (member/'runtime/user/logs/member.jsonl').read_text().splitlines()]
             print(json.dumps({'mode':mode,'elapsed':round(elapsed,3)}),flush=True)
             if mode=='late':
@@ -66,10 +69,13 @@ with tempfile.TemporaryDirectory(prefix='ctr_hub_wait_') as tmp:
                     h.check(elapsed>=.13,'task actually waited for delayed election')
                     h.check(any(e['event']=='hub_elected' and e.get('source')=='dht' and e.get('address')=='127.0.0.2:29780' and e.get('candidates')==1 for e in log),'hub_elected fields written to service log')
             else:
-                none=[e for e in log if e['event']=='hub_none']
-                h.check(len(none)==1 and all(e.get('reason')=='wait_expired' and e.get('reachable') is False and e.get('wait_ms')==1000 for e in none),'local fallback logs hub_none with unreachable/deadline fields')
+                none=[e for e in log if e['event']=='hub_none' and e.get('reason')=='wait_expired']
+                h.check(len(none)==1 and all(e.get('reachable') is False and e.get('wait_ms')==1000 for e in none),'local fallback logs hub_none with unreachable/deadline fields')
+                h.check(any(e['event']=='hub_none' and e.get('task')==18 and e.get('reason')=='search_refused' for e in log),'refused search logged as hub_none search_refused')
                 # Task 2 waits the budget; task 3 continues the local sequence without waiting again.
                 h.check(.9<=elapsed<1.9,'only the advertise waits the one-second budget')
+            if mode=='late':
+                h.check(any(e['event']=='hub_none' and e.get('task')==18 and e.get('reason')=='search_refused' for e in log),'late hub: refused search logged')
             player['lobby'].s.close();proc.terminate();proc.wait();processes.remove(proc)
     finally:
         for proc in processes:
