@@ -48,8 +48,6 @@ inline const std::map<std::wstring, Entry>& table() {
         {L"Game language:", {L"Langue du jeu :", L"Lingua del gioco:", L"Spielsprache:", L"Idioma del juego:"}},
         {L"Custom", {L"Autre", L"Altro", L"Eigene", L"Otra"}},
         {L"Fullscreen Mode", {L"Plein écran", L"Schermo intero", L"Vollbild", L"Pantalla completa"}},
-        {L"Frame gen: off", {L"Gén. d'images : non", L"Gen. frame: off", L"Frame-Gen: aus", L"Gen. fotogramas: no"}},
-        {L"Frame gen: fill gaps", {L"Gén. d'images : auto", L"Gen. frame: auto", L"Frame-Gen: Lücken", L"Gen. fotogramas: auto"}},
         {L"Multiplayer Online", {L"Multijoueur en ligne", L"Multiplayer online", L"Online-Mehrspieler", L"Multijugador online"}},
         {L"Colored Xbox icons", {L"Icônes Xbox", L"Icone Xbox colorate", L"Xbox-Symbole", L"Iconos Xbox"}},
         {L"Split screen (2-4)", {L"Écran partagé (2-4)", L"Schermo diviso (2-4)", L"Splitscreen (2-4)", L"Pantalla dividida (2-4)"}},
