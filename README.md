@@ -171,21 +171,26 @@ service; the services find each other and cooperate directly.
   Sharing the matchmaking queue alone does not authorize a connection.
 
   Incoming unknown peers are dropped while a single background worker queries the local
-  service (at most four query starts/second, 256 cached/pending addresses). Positive
-  authorization lasts one second; negative answers are retried after 250 ms. The first
-  packet may be dropped, including after assignment, until authorization completes; game
-  retransmission is required. Under cache saturation additional unknown addresses fail closed.
+  service (at most four query starts/second, 256 cached/pending addresses). An authorized
+  peer is renewed every second, ahead of unknown addresses; while it keeps sending it stays
+  accepted during the renewal, so race traffic is not interrupted. A refusal takes effect at
+  the service's answer; without an answer the authorization ends three seconds after the last
+  confirmation. Negative answers are retried after 250 ms. The first packet from a newly
+  assigned peer may be dropped until authorization completes; game retransmission is
+  required. Under cache saturation additional unknown addresses fail closed.
   Relay deliveries are checked using the relay's real source before exposing its peer address;
   discovery source remapping happens after filtering. Rejections are counted, with one log
   per address for up to 4096 distinct addresses; further new-address logs are suppressed to
-  bound memory. The receive call also limits rejected packets processed per call to 64.
+  bound memory. A non-blocking receive processes at most 64 rejected packets per call; a
+  blocking receive waits for the next accepted packet.
 
   Only signed peer/party requests and identity verification are exposed remotely over HTTP.
   Game routes (including config, traffic-key, auth3 and WebAPI) require a loopback source.
   Use each PC's own launcher service; a remote/LAN `CTR_ONLINE_SERVER` deployment is no
   longer supported. The verified internal peer forwarding path remains available.
-  HTTP headers and bodies each have an absolute five-second read deadline. TCP connections
-  are limited to 128 total and 8 per source IP; lobby idle reads allow five minutes.
+  HTTP headers and bodies each have an absolute five-second read deadline. Remote TCP
+  connections are limited to 128 total and 8 per source IP; the local game (127.0.0.1) has a
+  separate quota of 64, so remote connections cannot cut it off. The lobby has no idle timeout.
   Lobby TCP 3074 and diagnostic TCP/UDP listeners bind only to loopback. TCP 3074 is no
   longer requested through UPnP; existing manual/router mappings are not modified.
 - The launcher asks the router for port forwarding with UPnP when the router supports it.

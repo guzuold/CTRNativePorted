@@ -73,3 +73,7 @@ Runtime milestones: build evidence only in this security task; no new title/menu
 ## Hub-election follow-up (2026-10-21)
 
 The `hub-election` branch starts at `f4d7cc6`, after this security work. See [hub-election.md](hub-election.md) for the retained candidate set, persistence, bounded task wait, deadline evidence, logging, before/after tests, mixed-version protocol checks and outstanding manual CGNAT acceptance. All 18 modes above were rerun successfully; `hub-evidence/suite-exits.json` and its per-mode logs preserve results. The ingress files are unchanged. The external-reachability witness remains a proposal.
+
+## Follow-up (2026-10-21)
+
+The `security-followup` branch starts at `d0de95a`. See [followup.md](followup.md): authorized peers no longer lose datagrams at renewals, blocking receives no longer fail under a refused flood, the local game has its own connection quota, the lobby idle timeout is removed, and a matchmaking sequence stays on one side. All 18 modes were rerun with zero failures; evidence is in `followup-evidence/`.

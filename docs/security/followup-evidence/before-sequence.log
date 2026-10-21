@@ -1,0 +1,4 @@
+﻿{"scope": "public_hub", "check": "late hub: search answered on the side that holds the advertise", "ok": false}
+{"mode": "late", "elapsed": 1.109}
+{"scope": "public_hub", "check": "late hub: first public task fell back locally", "ok": true}
+{"scope": "public_hub", "check": "late hub: no task of the local sequence forwarded to the hub", "ok": false}

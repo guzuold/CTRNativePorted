@@ -213,6 +213,8 @@ struct Server::Impl {
     // `state`; hub_leaving: players whose game disconnected, to be signed off at the hub.
     struct HubLeave { std::string name; MatchHub hub; };
     std::map<std::uint64_t, MatchHub> hub_seats;
+    // Players of this PC whose current public sequence is handled here (under `state`).
+    std::set<std::uint64_t> local_seats;
     std::vector<HubLeave> hub_leaving;
     std::thread hub_poller;
     // Invitations a friend's service delivered to this PC's player. Their session stays on that
@@ -307,18 +309,30 @@ struct Server::Impl {
         auto done = std::make_shared<std::atomic<bool>>(false);
         workers.push_back({std::thread([body = std::move(body), done] { body(); done->store(true); }), done});
     }
+    // The local game connects from 127.0.0.1: its own quota, so remote sources holding every
+    // remote slot cannot cut it off from its service.
+    unsigned local_connections = 0;
+    static bool local_game(std::uint32_t ip) { return ip == htonl(INADDR_LOOPBACK); }
     bool track(SOCKET s, std::uint32_t ip) {
         std::lock_guard<std::mutex> lock(workers_mutex);
-        if(stopping || connections.size()>=128) return false;
-        auto it=connections_per_ip.find(ip);
-        if(it!=connections_per_ip.end() && it->second>=8) return false;
-        ++connections_per_ip[ip]; connection_ips[s]=ip; connections.insert(s); return true;
+        if(stopping) return false;
+        if(local_game(ip)) {
+            if(local_connections>=64) return false;
+            ++local_connections;
+        } else {
+            if(connections.size()-local_connections>=128) return false;
+            auto it=connections_per_ip.find(ip);
+            if(it!=connections_per_ip.end() && it->second>=8) return false;
+            ++connections_per_ip[ip];
+        }
+        connection_ips[s]=ip; connections.insert(s); return true;
     }
     void release(SOCKET s) {
         { std::lock_guard<std::mutex> lock(workers_mutex);
           if(auto it=connection_ips.find(s);it!=connection_ips.end()) {
-              auto count=connections_per_ip.find(it->second);
-              if(count!=connections_per_ip.end() && --count->second==0) connections_per_ip.erase(count);
+              if(local_game(it->second)) --local_connections;
+              else if(auto count=connections_per_ip.find(it->second);count!=connections_per_ip.end() && --count->second==0)
+                  connections_per_ip.erase(count);
               connection_ips.erase(it);
           }
           connections.erase(s); }
@@ -332,8 +346,8 @@ struct Server::Impl {
             if (s == INVALID_SOCKET) { if (stopping) return; continue; }
             const std::string name = endpoint_of(peer).text();
             if(!track(s,peer.sin_addr.s_addr)) { closesocket(s); continue; }
-            const DWORD timeout=300000; // Lobby idle budget: five minutes, not the HTTP deadline.
-            setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<const char*>(&timeout),sizeof(timeout));
+            // No idle read timeout here: HTTP sets its own deadlines, and the lobby and recorders
+            // listen on loopback only, where a game left in a menu must not be disconnected.
             const DWORD send_timeout=5000;
             setsockopt(s,SOL_SOCKET,SO_SNDTIMEO,reinterpret_cast<const char*>(&send_timeout),sizeof(send_timeout));
             try { spawn([this, s, name, handler] {
@@ -776,10 +790,19 @@ struct Server::Impl {
         if (!config.match_hub || request.service != 145 || user.room_token != public_room_token() ||
             (request.task != 2 && request.task != 3 && request.task != 15 && request.task != 18))
             return std::nullopt;
+        // A sequence stays on the side that answered its advertise (task 2): the hub refuses a
+        // search from a player it never registered. Task 2 starts a new sequence.
+        auto stay_local = [&] {
+            std::lock_guard<std::mutex> lock(state);
+            local_seats.insert(user.user_id);
+            return std::nullopt;
+        };
         std::optional<MatchHub> hub;
         {
             std::lock_guard<std::mutex> lock(state);
             if (const auto seat = hub_seats.find(user.user_id); seat != hub_seats.end()) hub = seat->second;
+            else if (request.task == 2) local_seats.erase(user.user_id);
+            else if (local_seats.count(user.user_id)) return std::nullopt;
         }
         if (!hub) hub = config.match_hub();
         if (!hub && !config.hub_reachable && config.await_match_hub)
@@ -790,9 +813,9 @@ struct Server::Impl {
             none.set("reachable",Json::of(config.hub_reachable));
             none.set("candidates",Json::of(0));
             none.set("wait_ms",Json::of(!config.hub_reachable && config.await_match_hub ? static_cast<unsigned>(config.hub_wait_budget.count()) : 0u));
-            record("hub_none",std::move(none));return std::nullopt;
+            record("hub_none",std::move(none));return stay_local();
         }
-        if (hub->code == host_identity->friend_code()) return std::nullopt;
+        if (hub->code == host_identity->friend_code()) return stay_local();
         Json message = Json::object();
         message.set("action", Json::of("mm_task"));
         message.set("name", Json::of(user.online_id));
@@ -817,7 +840,7 @@ struct Server::Impl {
             }
             f.set("reason", Json::of(error.what()));
             record("hub_unreachable", std::move(f));
-            return std::nullopt;
+            return stay_local();
         }
     }
     // Member side: delivers the events the hub pushed for this PC's players, and signs off
@@ -905,6 +928,7 @@ struct Server::Impl {
             hub_leaving.push_back(HubLeave{client->user.online_id, seat->second});
             hub_seats.erase(seat);
         }
+        local_seats.erase(account);
         if (!client->hub_origin.empty()) {
             Json f = Json::object();
             f.set("online_id", Json::of(client->user.online_id));

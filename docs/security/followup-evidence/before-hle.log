@@ -1,0 +1,20 @@
+﻿{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":1,"name":"ingress-steady","family":2,"type":2,"protocol":0}
+{"scope":"online_services_test","check":"ingress steady: bind","ok":true}
+{"scope":"online_services_test","steady_delay_ms":0,"sent":360,"received":355}
+{"scope":"online_services_test","check":"ingress steady: an authorized peer loses no datagram across renewals","ok":false}
+ingress-steady failures=1
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":1,"name":"ingress-steady","family":2,"type":2,"protocol":0}
+{"scope":"online_services_test","check":"ingress steady: bind","ok":true}
+{"scope":"online_services_test","steady_delay_ms":30,"sent":360,"received":350}
+{"scope":"online_services_test","check":"ingress steady: an authorized peer loses no datagram across renewals","ok":false}
+ingress-steady failures=1
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":1,"name":"ingress-steady","family":2,"type":2,"protocol":0}
+{"scope":"online_services_test","check":"ingress steady: bind","ok":true}
+{"scope":"online_services_test","steady_delay_ms":100,"sent":360,"received":326}
+{"scope":"online_services_test","check":"ingress steady: an authorized peer loses no datagram across renewals","ok":false}
+ingress-steady failures=1
+{"scope":"hle_call","library":"libSceNet","function":"sceNetSocket","result":1,"name":"ingress-blocking","family":2,"type":2,"protocol":0}
+{"scope":"online_services_test","check":"ingress blocking: bind","ok":true}
+{"scope":"online_services_test","blocking_receive":-2143223517}
+{"scope":"online_services_test","check":"ingress blocking: blocking receive skips 100 refused datagrams and returns the accepted one","ok":false}
+ingress-blocking failures=1

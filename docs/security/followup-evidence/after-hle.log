@@ -1,0 +1,13 @@
+{"scope":"online_services_test","steady_delay_ms":0,"sent":360,"received":360}
+{"scope":"online_services_test","check":"ingress steady: an authorized peer loses no datagram across renewals","ok":true}
+ingress-steady failures=0
+{"scope":"online_services_test","steady_delay_ms":30,"sent":360,"received":360}
+{"scope":"online_services_test","check":"ingress steady: an authorized peer loses no datagram across renewals","ok":true}
+ingress-steady failures=0
+{"scope":"online_services_test","steady_delay_ms":100,"sent":360,"received":360}
+{"scope":"online_services_test","check":"ingress steady: an authorized peer loses no datagram across renewals","ok":true}
+ingress-steady failures=0
+{"scope":"online_services_test","check":"ingress blocking: bind","ok":true}
+{"scope":"online_services_test","blocking_receive":2}
+{"scope":"online_services_test","check":"ingress blocking: blocking receive skips 100 refused datagrams and returns the accepted one","ok":true}
+ingress-blocking failures=0
