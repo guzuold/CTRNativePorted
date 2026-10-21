@@ -150,6 +150,168 @@ if a < 0 or b < 0 or b < a or t.count(present_start) != 1 or t.count(present_end
 t = t[:a] + blit + t[b:]
 t = '#include "upscaling/frame_evidence.h"\n' + t
 t = replace_once(t, '        DebugState.IncFlipFrameNum();', '        RecordGuestPresentation();\n        DebugState.IncFlipFrameNum();', 'guest presentation timestamps')
+
+# Frame generation (CTR_FRAMEGEN, upscaling/ctr_framegen.h): PrepareFrame records the
+# interpolation after post-processing; Present shows the generated frame first and the real one
+# half a game frame later (FIFO paces the two presents by itself).
+t = '#include <thread>\n#include "upscaling/ctr_framegen.h"\n' + t
+t = replace_once(t, 'Presenter::Presenter(', '''namespace {
+std::unique_ptr<CtrFrameGen> ctr_framegen;
+std::array<bool, CtrFrameGen::MaxSlots> fg_ready{};
+std::array<float, CtrFrameGen::MaxSlots> fg_interval{};
+std::chrono::steady_clock::time_point fg_last_prepare{}, fg_stats_since{};
+float fg_interval_ms = 33.3f;
+u64 fg_flips = 0, fg_presented = 0;
+} // namespace
+
+Presenter::Presenter(''', 'frame generation state')
+t = replace_once(t, '    pp_pass.Create(device, swapchain.GetSurfaceFormat().format);\n',
+                 '    pp_pass.Create(device, swapchain.GetSurfaceFormat().format);\n'
+                 '    ctr_framegen = std::make_unique<CtrFrameGen>(instance, draw_scheduler);\n',
+                 'create frame generation')
+t = replace_once(t, 'Presenter::~Presenter() {\n', 'Presenter::~Presenter() {\n    ctr_framegen.reset();\n',
+                 'destroy frame generation')
+t = replace_once(t, '    pp_pass.Render(cmdbuf, image_view, image_size, *frame, pp_settings);\n', '''    pp_pass.Render(cmdbuf, image_view, image_size, *frame, pp_settings);
+
+    if (frame->id < CtrFrameGen::MaxSlots) {
+        fg_ready[frame->id] = false;
+        if (ctr_framegen && ctr_framegen->Enabled()) {
+            const auto now = std::chrono::steady_clock::now();
+            float frame_ms = 100.0f;
+            if (fg_last_prepare.time_since_epoch().count() != 0) {
+                frame_ms = std::chrono::duration<float, std::milli>(now - fg_last_prepare).count();
+            }
+            fg_last_prepare = now;
+            if (frame_ms < 100.0f) {
+                fg_interval_ms += (std::clamp(frame_ms, 2.0f, 50.0f) - fg_interval_ms) * 0.2f;
+            }
+            fg_interval[frame->id] = fg_interval_ms;
+            CtrFrameGen::Inputs in{};
+            in.slot = frame->id;
+            in.color = frame->image;
+            in.color_format = swapchain.GetSurfaceFormat().format;
+            in.width = frame->width;
+            in.height = frame->height;
+            in.frame_ms = frame_ms;
+            // A load, a pause or a hitch: interpolating across it would only smear two
+            // unrelated frames, so the history starts over.
+            in.reset = frame_ms >= 100.0f;
+            fg_ready[frame->id] = ctr_framegen->Record(in);
+        }
+    }
+''', 'record frame generation')
+t = replace_once(t, '''    if (!swapchain.AcquireNextImage()) {
+        swapchain.Recreate(window.GetWidth(), window.GetHeight());
+''', '''    const bool generated_ready = !is_reusing_frame && frame->id < CtrFrameGen::MaxSlots &&
+                                 std::exchange(fg_ready[frame->id], false);
+    if (!is_reusing_frame && ctr_framegen && ctr_framegen->Enabled()) {
+        ++fg_flips;
+        const vk::Image generated = generated_ready ? ctr_framegen->OutputImage(frame->id) : vk::Image{};
+        if (generated && window.GetWidth() != 0 && window.GetHeight() != 0 &&
+            swapchain.AcquireNextImage()) {
+            const vk::Image target = swapchain.Image();
+            const vk::Extent2D target_extent = swapchain.GetExtent();
+            const auto fg_cmdbuf = present_scheduler.CommandBuffer();
+            const vk::ImageSubresourceRange range{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+            const std::array fg_pre{
+                vk::ImageMemoryBarrier{
+                    .dstAccessMask = vk::AccessFlagBits::eTransferWrite,
+                    .oldLayout = vk::ImageLayout::eUndefined,
+                    .newLayout = vk::ImageLayout::eTransferDstOptimal,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = target,
+                    .subresourceRange = range,
+                },
+                vk::ImageMemoryBarrier{
+                    .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+                    .dstAccessMask = vk::AccessFlagBits::eTransferRead,
+                    .oldLayout = vk::ImageLayout::eGeneral,
+                    .newLayout = vk::ImageLayout::eTransferSrcOptimal,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = generated,
+                    .subresourceRange = range,
+                },
+            };
+            fg_cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                                      vk::PipelineStageFlagBits::eTransfer,
+                                      vk::DependencyFlagBits::eByRegion, {}, {}, fg_pre);
+            const vk::ClearColorValue fg_black{std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}};
+            fg_cmdbuf.clearColorImage(target, vk::ImageLayout::eTransferDstOptimal, fg_black, range);
+            const vk::MemoryBarrier fg_clear{
+                .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+                .dstAccessMask = vk::AccessFlagBits::eTransferWrite,
+            };
+            fg_cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                      vk::PipelineStageFlagBits::eTransfer,
+                                      vk::DependencyFlagBits::eByRegion, fg_clear, {}, {});
+            fg_cmdbuf.blitImage(generated, vk::ImageLayout::eTransferSrcOptimal, target,
+                                vk::ImageLayout::eTransferDstOptimal,
+                                MakeImageBlitFit(frame->width, frame->height, target_extent.width,
+                                                 target_extent.height),
+                                vk::Filter::eLinear);
+            const std::array fg_post{
+                vk::ImageMemoryBarrier{
+                    .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+                    .oldLayout = vk::ImageLayout::eTransferDstOptimal,
+                    .newLayout = vk::ImageLayout::ePresentSrcKHR,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = target,
+                    .subresourceRange = range,
+                },
+                vk::ImageMemoryBarrier{
+                    .srcAccessMask = vk::AccessFlagBits::eTransferRead,
+                    .dstAccessMask = vk::AccessFlagBits::eShaderWrite,
+                    .oldLayout = vk::ImageLayout::eTransferSrcOptimal,
+                    .newLayout = vk::ImageLayout::eGeneral,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = generated,
+                    .subresourceRange = range,
+                },
+            };
+            fg_cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                      vk::PipelineStageFlagBits::eAllCommands,
+                                      vk::DependencyFlagBits::eByRegion, {}, {}, fg_post);
+            SubmitInfo fg_info{};
+            fg_info.AddWait(swapchain.GetImageAcquiredSemaphore());
+            fg_info.AddWait(frame->ready_semaphore, frame->ready_tick);
+            fg_info.AddSignal(swapchain.GetPresentReadySemaphore());
+            present_scheduler.Flush(fg_info);
+            {
+                std::scoped_lock submit_lock{Scheduler::submit_mutex};
+                if (!swapchain.Present()) {
+                    swapchain.Recreate(window.GetWidth(), window.GetHeight());
+                }
+            }
+            ++fg_presented;
+            if (EmulatorSettings.GetPresentMode() != "Fifo") {
+                std::this_thread::sleep_for(std::chrono::duration<float, std::milli>(
+                    std::clamp(fg_interval[frame->id] * 0.5f, 0.0f, 25.0f)));
+            }
+        }
+        const auto now = std::chrono::steady_clock::now();
+        if (fg_stats_since.time_since_epoch().count() == 0) {
+            fg_stats_since = now;
+        } else if (now - fg_stats_since >= std::chrono::seconds(10)) {
+            const auto& stats = ctr_framegen->GetStats();
+            const float seconds = std::chrono::duration<float>(now - fg_stats_since).count();
+            std::fprintf(stderr, "CTR_FRAMEGEN %.1f game FPS -> %.1f shown; %llu generated, %llu history resets (%s)\\n",
+                         float(fg_flips) / seconds, float(fg_flips + fg_presented) / seconds,
+                         static_cast<unsigned long long>(stats.generated),
+                         static_cast<unsigned long long>(stats.resets),
+                         EmulatorSettings.GetPresentMode().c_str());
+            std::fflush(stderr);
+            fg_stats_since = now;
+            fg_flips = fg_presented = 0;
+        }
+    }
+
+    if (!swapchain.AcquireNextImage()) {
+        swapchain.Recreate(window.GetWidth(), window.GetHeight());
+''', 'present generated frame first')
 for marker in ("ImGui::", "Screenshot", "png_"):
     if marker in t:  # report position
         print(t[max(0, t.find(marker) - 300):t.find(marker) + 100])

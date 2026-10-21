@@ -15,7 +15,7 @@ if (-not (Test-Path (Join-Path $llvm 'clang-cl.exe'))) { throw "clang-cl missing
 $env:PATH = "$llvm;$vs/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin;$vs/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja;$env:PATH"
 $build = Join-Path $root 'build/CTRPort-gpu'
 
-# FireBurn/FSR-Vulkan (MIT, engine/fsr-vulkan from tools/bootstrap.ps1): AMD FSR 3.1. Its generated
+# FireBurn/FSR-Vulkan (MIT, engine/fsr-vulkan from tools/bootstrap.ps1): AMD FSR 3.1 and frame generation. Its generated
 # shader headers pass Windows' 260-character path limit under a deep checkout, so it is
 # configured and built through a short junction in %TEMP%; its static libraries are copied here.
 $fsrSource = Join-Path $root 'engine/fsr-vulkan'
@@ -44,9 +44,9 @@ if (-not (Test-Path (Join-Path $fsrBuild 'build.ninja')) -or $Reconfigure) {
         "-DVulkan_LIBRARY=$vulkanLib"
     if ($LASTEXITCODE -ne 0) { throw 'FSR-Vulkan configure failed' }
 }
-cmake --build $fsrBuild --target ffx_vulkan_portable -j $Jobs
+cmake --build $fsrBuild --target ffx_vulkan_portable ffx_vulkan_fsr3_vk_framegeneration_3_1_6 -j $Jobs
 if ($LASTEXITCODE -ne 0) { throw 'FSR-Vulkan build failed' }
-foreach ($lib in 'ffx_vulkan_portable', 'ffx_vulkan_fsr3_host_1_1_4', 'ffx_vulkan_fsr3_vk_backend_1_1_4') {
+foreach ($lib in 'ffx_vulkan_portable', 'ffx_vulkan_fsr3_host_1_1_4', 'ffx_vulkan_fsr3_vk_backend_1_1_4', 'ffx_vulkan_fsr3_vk_framegeneration_3_1_6') {
     Copy-Item (Join-Path $fsrBuild "$lib.lib") $fsrLibs -Force
 }
 if (-not (Test-Path (Join-Path $build 'build.ninja')) -or $Reconfigure) {
