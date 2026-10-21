@@ -40,9 +40,19 @@ int main(int argc,char** argv){
         });
         auto result=gate.acquire(budget);arrival.get();return result;
     };
+    // late: no hub for the first public task; the hub is published 100 ms after that wait expires,
+    // in the middle of the player's matchmaking sequence.
+    std::thread late_publisher;
+    if(std::string(argv[4])=="late") c.await_match_hub=[&](auto budget){
+        auto result=gate.acquire(budget);
+        if(!result && !late_publisher.joinable())
+            late_publisher=std::thread([&]{std::this_thread::sleep_for(std::chrono::milliseconds(100));gate.publish(MatchHub{argv[3],"127.0.0.2",29780});});
+        return result;
+    };
     if(is_hub){c.match_hub={};c.await_match_hub={};}
     Server service(c);recording=&service;service.start();
-    if(!service.failures().empty())return 2;std::this_thread::sleep_for(std::chrono::seconds(45));gate.stop();service.stop();return 0;
+    if(!service.failures().empty())return 2;std::this_thread::sleep_for(std::chrono::seconds(45));gate.stop();service.stop();
+    if(late_publisher.joinable())late_publisher.join();return 0;
  }
 
  const MatchHub self{"M","192.0.2.9"}, a{"A","192.0.2.1"}, b{"B","192.0.2.2"};

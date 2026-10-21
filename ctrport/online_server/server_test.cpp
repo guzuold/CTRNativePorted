@@ -685,8 +685,9 @@ void test_http_security() {
     SOCKET silent=connect_http(); char byte; auto begin=std::chrono::steady_clock::now();
     int n=recv(silent,&byte,1,0); int error=WSAGetLastError();
     check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(6),"security: silent HTTP closed before six seconds"); closesocket(silent);
-    std::vector<SOCKET> held; for(int i=0;i<8;++i)held.push_back(connect_http()); Sleep(100);
-    SOCKET excess=connect_http(); begin=std::chrono::steady_clock::now(); n=recv(excess,&byte,1,0); error=WSAGetLastError();
+    // Loopback aliases other than 127.0.0.1 stand in for remote addresses.
+    std::vector<SOCKET> held; for(int i=0;i<8;++i)held.push_back(connect_http("127.0.2.1")); Sleep(100);
+    SOCKET excess=connect_http("127.0.2.1"); begin=std::chrono::steady_clock::now(); n=recv(excess,&byte,1,0); error=WSAGetLastError();
     check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(1),"security: per-IP excess refused immediately"); closesocket(excess);
     const std::string head="GET /ctr/v1/config HTTP/1.1\r\nHost: local\r\n\r\n";
     send(held[0],head.data(),static_cast<int>(head.size()),0); char buf[512]; n=recv(held[0],buf,sizeof(buf),0);
@@ -703,6 +704,16 @@ void test_http_security() {
     check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(1),"security: global connection limit refuses immediately"); closesocket(excess);
     send(held[0],head.data(),static_cast<int>(head.size()),0); n=recv(held[0],buf,sizeof(buf),0);
     check(n>0 && std::string(buf,buf+n).find("200")!=std::string::npos,"security: global saturation preserves admitted client");
+    // The local game (127.0.0.1) keeps reaching its own service while remote sources hold
+    // every global slot, and is not limited to eight connections.
+    std::vector<SOCKET> local_held;
+    for(int i=0;i<8;++i) local_held.push_back(connect_http());
+    Sleep(100);
+    SOCKET local_request=connect_http();
+    send(local_request,head.data(),static_cast<int>(head.size()),0); n=recv(local_request,buf,sizeof(buf),0);
+    check(n>0 && std::string(buf,buf+n).find("200")!=std::string::npos,"security: local game served during global saturation and past eight local connections");
+    closesocket(local_request);
+    for(auto s:local_held) closesocket(s);
     for(auto s:held) closesocket(s); Sleep(100);
     SOCKET body_client=connect_http();
     const std::string body_head="POST /ctr/v1/peer HTTP/1.1\r\nHost: local\r\nContent-Length: 10\r\n\r\n";

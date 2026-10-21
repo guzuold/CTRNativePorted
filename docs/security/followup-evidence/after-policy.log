@@ -1,0 +1,20 @@
+﻿PASS flood: 20000 unknown sources denied without blocking
+PASS flood: cache, queue and log set bounded
+PASS flood: unknown-source queries rate limited
+steady: 1 peer, service 0 ms, refused=0
+PASS steady: one authorized peer never refused across renewals
+steady: 1 peer, service 30 ms, refused=0
+PASS steady: one authorized peer never refused across renewals
+steady: 1 peer, service 100 ms, refused=0
+PASS steady: one authorized peer never refused across renewals
+steady: 7 peers, service 100 ms, refused=0
+PASS steady: seven authorized peers never refused across renewals
+steady: 7 peers during an unknown-source flood, refused=0
+PASS steady: renewals of authorized peers not delayed by a flood
+revoke: refused after 32 ms
+PASS revoke: a peer the service stops authorizing is refused within 1.5 s
+PASS revoke: a peer quiet for over a second is not accepted before its renewal answers
+PASS revoke: the refusal then holds
+unreachable: refused after 1989 ms
+PASS unreachable: authorization ends within the declared 3 s validity
+failures=0

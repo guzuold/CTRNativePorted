@@ -1,14 +1,16 @@
 ## Unreleased
 
 - Filter incoming game UDP and TCP accepts using bounded asynchronous peer authorization; preserve relay delivery and discovery mapping.
+- Authorized peers are renewed every second ahead of unknown sources and, while they keep sending, stay accepted during the renewal: no race datagram is lost to renewals (an earlier build of this filter lost 1–10% per peer, more with several opponents). A refusal takes effect at the service's answer; with the service unreachable an authorization ends three seconds after the last confirmation. A blocking receive skips refused datagrams instead of failing with EWOULDBLOCK.
 - Bound JSON nesting to 64 containers and decode BLOB/STRUCT lengths without recursion.
 - Restrict local game HTTP routes to loopback while preserving signed peer/party and identity flows.
-- Apply absolute five-second HTTP header/body deadlines, 128 global and 8 per-IP TCP connection limits, and a separate five-minute lobby idle timeout.
+- Apply absolute five-second HTTP header/body deadlines and 128 global and 8 per-IP TCP connection limits for remote sources. The local game (127.0.0.1) has its own quota of 64, so remote connections cannot cut it off from its service. The loopback-only lobby has no idle timeout.
 - Stop requesting TCP 3074 through UPnP; bind the lobby and diagnostic TCP 3075 / UDP 3075, 3478, 3479 to loopback.
 - Compatibility: signed service and game wire formats are unchanged, so mixed v0.5.4/current per-PC launcher peers remain protocol-compatible (two-PC play still needs manual verification). Manually pointing a game at a LAN/remote CTR_ONLINE_SERVER is intentionally no longer supported. Unusually deep payloads, slow HTTP clients and connections over the limits are now rejected.
 - Fix invitation ownership validation to use the registered session member name with the service-scoped account, preserving rejection of spoofed senders.
 - Keep directly verified public matchmaking hubs across intermittent DHT searches and launcher restarts; reverify saved identities before use, expire after three failed rounds or five minutes, and elect the lowest verified code.
 - Start election immediately, deduplicate DHT candidates by IP, and wake election for an unreachable player's public task with a one-second bounded wait. Log `hub_elected`, `hub_lost` and `hub_none` in the service log.
+- A public matchmaking sequence stays on the side that answered its advertise: a hub elected halfway through no longer receives a search for a player it never registered (which it refused). A new advertise chooses again.
 - Document external reachability confirmation as a proposal; mixed v0.5.4/current signed matchmaking tasks are covered by local protocol tests. Real two-PC/CGNAT play still needs the manual check in docs/security/hub-election.md.
 
 ## v0.5.4 — 2026-10-21
