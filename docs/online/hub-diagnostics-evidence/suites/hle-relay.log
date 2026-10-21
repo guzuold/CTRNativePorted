@@ -1,0 +1,19 @@
+﻿{"scope":"online_services_test","check":"relay: game socket bound on the peer port","ok":true}
+{"scope":"online_services_test","check":"relay: HELLO with the token from the game socket before any game send","ok":true}
+{"scope":"online_services_test","check":"relay: game send reported as sent","ok":true}
+{"scope":"online_services_test","check":"relay: SEND carries the game's destination and payload","ok":true}
+{"scope":"online_services_test","check":"relay: nothing sent directly to the peer","ok":true}
+{"scope":"online_services_test","check":"relay: session asked with identity and room token","ok":true}
+{"scope":"online_services_test","check":"relay: WELCOME skipped, DELIVER unwrapped with the sender address from the relay","ok":true}
+{"scope":"online_services_test","check":"relay: REFUSED consumed before the next delivered datagram","ok":true}
+{"scope":"online_services_test","check":"relay: send after refusal","ok":true}
+{"scope":"online_services_test","check":"relay: refused destination reached directly","ok":true}
+{"scope":"online_services_test","check":"relay: socket non-blocking","ok":true}
+{"scope":"online_services_test","check":"relay: control message alone gives EWOULDBLOCK","ok":true}
+{"scope":"online_services_test","check":"relay: send to a server port","ok":true}
+{"scope":"online_services_test","check":"relay: datagram to the server's own port sent as is","ok":true}
+{"scope":"online_services_test","check":"relay: discovery send","ok":true}
+{"scope":"online_services_test","check":"relay: discovery sent as is to the configured discovery port","ok":true}
+{"scope":"online_services_test","check":"relay: send to the public address","ok":true}
+{"scope":"online_services_test","check":"relay: server's public address with a service port not relayed","ok":true}
+{"scope":"online_services_test","mode":"relay","passed":true}

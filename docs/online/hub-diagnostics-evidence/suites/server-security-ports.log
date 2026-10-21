@@ -1,0 +1,13 @@
+﻿{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: lobby excluded from UPnP", "ok": true}
+{"scope": "online_server_test", "check": "security: local-only service leaves LAN port unbound", "ok": true}
+{"scope": "online_server_test", "check": "security: local-only service leaves LAN port unbound", "ok": true}
+{"scope": "online_server_test", "check": "security: local-only service leaves LAN port unbound", "ok": true}
+{"scope": "online_server_test", "check": "security: local-only service leaves LAN port unbound", "ok": true}
+{"scope": "online_server_test", "check": "security: local-only service leaves LAN port unbound", "ok": true}

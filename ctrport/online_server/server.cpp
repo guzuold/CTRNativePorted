@@ -792,18 +792,31 @@ struct Server::Impl {
             return std::nullopt;
         // A sequence stays on the side that answered its advertise (task 2): the hub refuses a
         // search from a player it never registered. Task 2 starts a new sequence.
-        auto stay_local = [&] {
-            std::lock_guard<std::mutex> lock(state);
-            local_seats.insert(user.user_id);
-            return std::nullopt;
+        // A PC that cannot be reached would queue the search where no other player can join, so
+        // it refuses the search instead: the game gives up and the next attempt starts over.
+        auto stay_local = [&]() -> std::optional<Bytes> {
+            {
+                std::lock_guard<std::mutex> lock(state);
+                local_seats.insert(user.user_id);
+            }
+            if (config.hub_reachable || request.task != 18) return std::nullopt;
+            Json refused = Json::object();
+            refused.set("service", Json::of(request.service));
+            refused.set("task", Json::of(request.task));
+            refused.set("reason", Json::of("search_refused"));
+            refused.set("reachable", Json::of(false));
+            record("hub_none", std::move(refused));
+            return task_reply(request.task, nullptr, UNSERVED_ERROR);
         };
         std::optional<MatchHub> hub;
+        bool local_sequence = false;
         {
             std::lock_guard<std::mutex> lock(state);
             if (const auto seat = hub_seats.find(user.user_id); seat != hub_seats.end()) hub = seat->second;
             else if (request.task == 2) local_seats.erase(user.user_id);
-            else if (local_seats.count(user.user_id)) return std::nullopt;
+            else local_sequence = local_seats.count(user.user_id) != 0;
         }
+        if (local_sequence) return stay_local();
         if (!hub) hub = config.match_hub();
         if (!hub && !config.hub_reachable && config.await_match_hub)
             hub = config.await_match_hub(config.hub_wait_budget);

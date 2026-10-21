@@ -1,0 +1,25 @@
+﻿PASS intermittent DHT: known live hub survives four empty searches
+PASS one direct failure retains hub
+PASS two direct failures retain hub
+PASS third direct failure selects remaining live hub
+PASS partial views converge on lowest verified code
+PASS persist verified candidates
+PASS verified saved hub published before probing other cached endpoints
+PASS saved hub published before DHT wait
+PASS restart directly verifies saved hub without DHT
+PASS saved unresponsive candidate is never elected
+PASS unverified saved hints survive a transient restart failure
+PASS expired saved candidate ignored
+PASS deduplicate IP before sixteen-address limit
+PASS reachable self immediately eligible
+PASS five-minute absolute expiry removes overdue candidate
+PASS different signed identity cannot activate saved code
+PASS expired publication is not returned between rounds
+PASS task demand wakes election and waits for hub publication
+PASS no-hub wait obeys declared deadline
+PASS stop releases matchmaking waiters
+PASS late election cannot republish after shutdown
+PASS transition logs contain election fields and loss reason
+PASS round fields: DHT results, verified answers, candidates and hub
+PASS round fields: an empty DHT round shows zero results and no hub
+failures=0

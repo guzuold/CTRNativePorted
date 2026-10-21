@@ -1,0 +1,88 @@
+﻿{"scope":"online_services_test","check":"sceNetInit","ok":true}
+{"scope":"online_services_test","check":"sceNetHtons","ok":true}
+{"scope":"online_services_test","check":"sceNetInetNtop","ok":true}
+{"scope":"online_services_test","check":"sceNetSocket dgram","ok":true}
+{"scope":"online_services_test","check":"sceNetBind","ok":true}
+{"scope":"online_services_test","check":"sceNetGetsockname","ok":true}
+{"scope":"online_services_test","check":"sceNetSetsockopt SO_NBIO","ok":true}
+{"scope":"online_services_test","check":"sceNetRecv EWOULDBLOCK on empty non-blocking socket","ok":true}
+{"scope":"online_services_test","check":"sceNetGetsockopt SO_NBIO","ok":true}
+{"scope":"online_services_test","check":"sceNetSendto loopback","ok":true}
+{"scope":"online_services_test","check":"sceNetEpollControl add","ok":true}
+{"scope":"online_services_test","check":"sceNetEpollWait readable","ok":true}
+{"scope":"online_services_test","check":"sceNetRecvfrom data and source","ok":true}
+{"scope":"online_services_test","check":"sceNetEpollWait empty after read","ok":true}
+{"scope":"online_services_test","check":"sceNetEpollControl del","ok":true}
+{"scope":"online_services_test","check":"sceNetSendto external address blocked","ok":true}
+{"scope":"online_services_test","check":"sceNetListen","ok":true}
+{"scope":"online_services_test","check":"sceNetConnect external address blocked","ok":true}
+{"scope":"online_services_test","check":"sceNetConnect loopback","ok":true}
+{"scope":"online_services_test","check":"sceNetAccept","ok":true}
+{"scope":"online_services_test","check":"sceNetSend","ok":true}
+{"scope":"online_services_test","check":"sceNetRecv WAITALL","ok":true}
+{"scope":"online_services_test","check":"sceNetGetsockopt SO_TYPE","ok":true}
+{"scope":"online_services_test","check":"sceNetSetsockopt unknown option fails","ok":true}
+{"scope":"online_services_test","check":"sceNetSocketClose twice EBADF","ok":true}
+{"scope":"online_services_test","check":"resolver demonware -> project server","ok":true}
+{"scope":"online_services_test","check":"resolver case-insensitive demonware","ok":true}
+{"scope":"online_services_test","check":"resolver Sony host blocked","ok":true}
+{"scope":"online_services_test","check":"resolver Activision host blocked","ok":true}
+{"scope":"online_services_test","check":"resolver suffix must be a domain boundary","ok":true}
+{"scope":"online_services_test","check":"resolver async start","ok":true}
+{"scope":"online_services_test","check":"resolver async completion via epoll","ok":true}
+{"scope":"online_services_test","check":"resolver and epoll destroy","ok":true}
+{"scope":"online_services_test","check":"sceNetCtlGetState IPOBTAINED","ok":true}
+{"scope":"online_services_test","check":"sceNetCtlGetInfo IP_ADDRESS (LAN address with a loopback server)","ok":true}
+{"scope":"online_services_test","check":"sceNetCtlGetInfo SSID not avail","ok":true}
+{"scope":"online_services_test","check":"sceNpGetState SignedIn","ok":true}
+{"scope":"online_services_test","check":"sceNpGetOnlineId local identity","ok":true}
+{"scope":"online_services_test","check":"sceNpGetAccountIdA round trip","ok":true}
+{"scope":"online_services_test","check":"sceNpPollAsync before completion INVALID_ID","ok":true}
+{"scope":"online_services_test","check":"sceNpCheckNpAvailabilityA async OK","ok":true}
+{"scope":"online_services_test","check":"sceNpDeleteRequest","ok":true}
+{"scope":"online_services_test","check":"toolkit SignedIn event delivered once","ok":true}
+{"scope":"online_services_test","check":"sceNpAuthGetAuthorizationCodeA local token","ok":true}
+{"scope":"online_services_test","check":"sceNpAuthGetIdTokenA JWT-shaped local token","ok":true}
+{"scope":"online_services_test","check":"sceNpWebApiCreateContextA id","ok":true}
+{"scope":"online_services_test","check":"sceNpWebApiCreateRequest id","ok":true}
+{"scope":"online_services_test","check":"sceNpWebApiSendRequest2 200 from project server","ok":true}
+{"scope":"online_services_test","check":"sceNpWebApiReadData body","ok":true}
+{"scope":"online_services_test","check":"sceNpWebApiGetHttpResponseHeaderValue","ok":true}
+{"scope":"online_services_test","check":"sceNpWebApiDeleteRequest","ok":true}
+{"scope":"online_services_test","check":"sceNpWebApiSendRequest2 error object code","ok":true}
+{"scope":"online_services_test","check":"web API requests reach the project server","ok":true}
+{"scope":"online_services_test","check":"sceHttp objects, status before send","ok":true}
+{"scope":"online_services_test","check":"sceHttpSendRequest to project server","ok":true}
+{"scope":"online_services_test","check":"sceHttp content length and read","ok":true}
+{"scope":"online_services_test","check":"sceHttpGetAllResponseHeaders and ParseResponseHeader","ok":true}
+{"scope":"online_services_test","check":"sceHttp request reaches project server with inherited headers","ok":true}
+{"scope":"online_services_test","check":"sceHttpSendRequest Sony host blocked","ok":true}
+{"scope":"online_services_test","check":"sceHttpUriEscape","ok":true}
+{"scope":"online_services_test","check":"libc memcpy unaligned retail-size copy and boundaries","ok":true}
+{"scope":"online_services_test","check":"libc memcpy zero length preserves destination","ok":true}
+{"scope":"online_services_test","check":"libc strncat bounded append returns destination and terminates","ok":true}
+{"scope":"online_services_test","check":"libc strncat source terminator and zero count","ok":true}
+{"scope":"online_services_test","check":"instance UDP bind remaps 3074","ok":true}
+{"scope":"online_services_test","check":"instance getsockname exposes reachable remapped port","ok":true}
+{"scope":"online_services_test","check":"instance recvfrom reaches remapped bind","ok":true}
+{"scope":"online_services_test","check":"instance sendto preserves peer destination port","ok":true}
+{"scope":"online_services_test","check":"instance reply has actual mapped source port","ok":true}
+{"scope":"online_services_test","check":"profile lifecycle module loads","ok":true}
+{"scope":"online_services_test","check":"profile rejects absent CommonDialog initialization","ok":true}
+{"scope":"online_services_test","check":"profile respects another dialog owner","ok":true}
+{"scope":"online_services_test","check":"profile claims CommonDialog and keeps initialized status","ok":true}
+{"scope":"online_services_test","check":"profile rejects double initialization","ok":true}
+{"scope":"online_services_test","check":"profile termination releases CommonDialog","ok":true}
+{"scope":"online_services_test","check":"profile rejects termination before initialization","ok":true}
+{"scope":"online_services_test","check":"unimplemented profile UI remains missing","ok":true}
+{"scope":"online_services_test","check":"invitation lifecycle module loads","ok":true}
+{"scope":"online_services_test","check":"profile owner excludes invitation initialization","ok":true}
+{"scope":"online_services_test","check":"invitation owner excludes profile initialization","ok":true}
+{"scope":"online_services_test","check":"invitation termination releases shared owner","ok":true}
+{"scope":"online_services_test","check":"sendto public peer confirmed by the project server","ok":true}
+{"scope":"online_services_test","check":"sendto public address refused by the project server","ok":true}
+{"scope":"online_services_test","check":"confirmed peer cached (one server query)","ok":true}
+{"scope":"online_services_test","check":"sendto project server port 3074","ok":true}
+{"scope":"online_services_test","check":"datagram to server:3074 delivered to the announced discovery port","ok":true}
+{"scope":"online_services_test","check":"discovery reply reported from server port 3074","ok":true}
+{"scope":"online_services_test","passed":true,"failures":0}

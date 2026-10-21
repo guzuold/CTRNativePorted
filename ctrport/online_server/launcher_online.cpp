@@ -198,6 +198,7 @@ void Host::elect_hubs(std::filesystem::path root, MatchHub self, bool self_reach
             if(result.status!=VerifyStatus::Verified)return std::nullopt;
             return MatchHub{code,result.ip,result.port};
         },publish,[]{return party_now();});
+        if(!hub_gate_.stopping()) record("hub_round",election.round_fields(match_hub()));
         if(!hub_gate_.stopping() && !election.save(path)){
             Json f=Json::object();f.set("reason",Json::of("candidate_cache_write_failed"));record("hub_cache_error",std::move(f));
         }

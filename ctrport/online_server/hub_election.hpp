@@ -23,6 +23,8 @@ public:
     bool reachable;
     std::map<std::string,std::string> losses;
     std::map<std::string,Candidate> candidates;
+    // Last round: endpoints the DHT returned and identities that answered (saved, known or new).
+    std::size_t dht_results=0, answered=0;
     HubElection(MatchHub s,bool r):self(std::move(s)),reachable(r){}
     static std::string endpoint(const MatchHub& h){return h.ip+":"+std::to_string(h.port);}
     static bool recent(std::uint64_t then,std::uint64_t now){return then<=now && now-then<max_age;}
@@ -58,30 +60,43 @@ public:
         out(best,i!=candidates.end()?i->second.source:(best?"self":"none"),verified.size()+(reachable?1:0));
     }
     void round(std::uint64_t now,const Search& search,const Identify& identify,const Publish& out,const Clock& clock={}) {
-        losses.clear();std::set<std::string> attempted;
+        losses.clear();std::set<std::string> attempted;dht_results=0;answered=0;
         // Known endpoints go first, independently of DHT availability. Each gets
         // at most one direct failure per round, even if also advertised by DHT.
         for(auto i=candidates.begin();i!=candidates.end();){
             auto& c=i->second;
             if(!recent(c.verified,clock?clock():now)){losses[i->first]="verification_expired";i=candidates.erase(i);continue;}
             const auto ep=endpoint(c.hub);attempted.insert(ep);auto h=identify(ep);
-            if(h && h->code==i->first){c.hub=*h;c.verified=clock?clock():now;c.failures=0;c.source=c.active?"direct":"saved";c.active=true;publish(out);}
+            if(h && h->code==i->first){++answered;c.hub=*h;c.verified=clock?clock():now;c.failures=0;c.source=c.active?"direct":"saved";c.active=true;publish(out);}
             else if(++c.failures>=failure_limit){losses[i->first]="direct_failures";i=candidates.erase(i);continue;}
             ++i;
         }
         publish(out); // Saved candidates become usable before waiting for DHT.
         std::set<std::string> ips;std::size_t count=0;
-        for(const auto& ep:search()){
+        const auto found=search();dht_results=found.size();
+        for(const auto& ep:found){
             const auto ip=ep.substr(0,ep.find(':'));
             if(!ips.insert(ip).second)continue;
             if(count++>=16)break;
             if(attempted.count(ep))continue;
             auto h=identify(ep);if(!h || h->code==self.code)continue;
+            ++answered;
             auto i=candidates.find(h->code);
             if(i==candidates.end() && candidates.size()>=capacity)continue;
             candidates[h->code]=Candidate{*h,clock?clock():now,0,true,"dht"};publish(out);
         }
         publish(out);
+    }
+    // Fields of the per-round `hub_round` log event.
+    Json round_fields(const std::optional<MatchHub>& chosen) const {
+        std::size_t active=0;for(const auto& [code,c]:candidates)active+=c.active;
+        Json f=Json::object();
+        f.set("dht_results",Json::of(static_cast<unsigned>(dht_results)));
+        f.set("verified",Json::of(static_cast<unsigned>(answered)));
+        f.set("candidates",Json::of(static_cast<unsigned>(active)));
+        f.set("reachable",Json::of(reachable));
+        f.set("hub",chosen?Json::of(chosen->code.substr(0,16)):Json::null());
+        return f;
     }
 };
 // The same transition recorder is used by Host and deterministic tests.
