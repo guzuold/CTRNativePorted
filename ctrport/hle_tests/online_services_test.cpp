@@ -390,8 +390,117 @@ int ingress_test() {
     std::printf("ingress failures=%d requests=%d\n",failures,requests.load()); return failures?1:0;
 }
 
+// A blocking guest receive under a flood of refused datagrams waits for the first accepted
+// one instead of failing with EWOULDBLOCK. Refused: this PC's LAN address (strict mode,
+// service answers 403). Accepted: loopback.
+int ingress_blocking_test() {
+    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
+    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
+    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
+    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
+    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
+    lan.sin_port=0;
+    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
+    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,8);
+    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
+    std::thread service([&]{for(;;){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
+        char request[4096]; recv(c,request,sizeof(request),0);
+        const char* response="HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        send(c,response,static_cast<int>(std::strlen(response)),0); closesocket(c); }});
+    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
+    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
+    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
+    if(!resolve) std::exit(2);
+    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
+    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
+    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
+    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
+    int g=ns("ingress-blocking",2,2,0); auto addr=loopback(0); addr.addr=0;
+    check(nb(g,&addr,sizeof(addr))==0,"ingress blocking: bind");
+    unsigned size=sizeof(addr); name(g,&addr,&size);
+    SOCKET refused=socket(AF_INET,SOCK_DGRAM,0); ::bind(refused,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    sockaddr_in to_lan=lan; to_lan.sin_port=addr.port;
+    for(int i=0;i<100;++i) sendto(refused,"bad",3,0,reinterpret_cast<sockaddr*>(&to_lan),sizeof(to_lan));
+    SOCKET accepted=socket(AF_INET,SOCK_DGRAM,0);
+    sockaddr_in to_loop{}; to_loop.sin_family=AF_INET; to_loop.sin_addr.s_addr=htonl(INADDR_LOOPBACK); to_loop.sin_port=addr.port;
+    sendto(accepted,"ok",2,0,reinterpret_cast<sockaddr*>(&to_loop),sizeof(to_loop));
+    Sleep(100);
+    std::atomic<int> got{0}; char buffer[8]{};
+    std::thread reader([&]{ got=receive(g,buffer,sizeof(buffer),0,nullptr,nullptr); });
+    for(int i=0;i<50 && !got.load();++i) Sleep(100);
+    if(!got.load()) { check(false,"ingress blocking: receive returned within 5 s"); std::printf("ingress-blocking failures=%d\n",failures); std::_Exit(1); }
+    reader.join();
+    std::printf("{\"scope\":\"online_services_test\",\"blocking_receive\":%d}\n",got.load());
+    check(got.load()==2 && !std::memcmp(buffer,"ok",2),"ingress blocking: blocking receive skips 100 refused datagrams and returns the accepted one");
+    closesocket(refused); closesocket(accepted);
+    closesocket(http); service.join();
+    std::printf("ingress-blocking failures=%d\n",failures); return failures?1:0;
+}
+
+// An authorized peer (this PC's LAN address in strict mode, service answering 200 after
+// `delay_ms`) streams 60 datagrams/s for 6 s to a game socket: none may be lost to renewals.
+int ingress_steady_test(int delay_ms) {
+    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
+    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
+    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
+    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
+    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
+    lan.sin_port=0;
+    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
+    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,16);
+    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
+    std::thread service([&]{for(;;){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
+        char request[4096]; recv(c,request,sizeof(request),0); if(delay_ms) Sleep(delay_ms);
+        const char* response="HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        send(c,response,static_cast<int>(std::strlen(response)),0); closesocket(c); }});
+    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
+    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
+    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
+    if(!resolve) std::exit(2);
+    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
+    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
+    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
+    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
+    int g=ns("ingress-steady",2,2,0); auto addr=loopback(0); addr.addr=0;
+    check(nb(g,&addr,sizeof(addr))==0,"ingress steady: bind");
+    unsigned size=sizeof(addr); name(g,&addr,&size);
+    SOCKET sender=socket(AF_INET,SOCK_DGRAM,0); ::bind(sender,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    sockaddr_in dst=lan; dst.sin_port=addr.port;
+    std::uint32_t warm=0xffffffffu; char buffer[64];
+    for(int i=0;i<100;++i){
+        sendto(sender,reinterpret_cast<char*>(&warm),4,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst)); Sleep(20);
+        if(receive(g,buffer,sizeof(buffer),0x80,nullptr,nullptr)>0) break;
+    }
+    std::atomic<bool> done{false}; std::vector<bool> got(360,false);
+    std::thread reader([&]{ while(!done){ const int n=receive(g,buffer,sizeof(buffer),0x80,nullptr,nullptr);
+        std::uint32_t v; if(n==4 && (std::memcpy(&v,buffer,4),v<360)) got[v]=true; else if(n<=0) Sleep(1); } });
+    const auto start=std::chrono::steady_clock::now();
+    for(std::uint32_t i=0;i<360;++i){
+        std::this_thread::sleep_until(start+std::chrono::microseconds(16667)*i);
+        sendto(sender,reinterpret_cast<char*>(&i),4,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst));
+    }
+    Sleep(300); done=true; reader.join();
+    unsigned received=0; for(bool b:got) received+=b;
+    std::printf("{\"scope\":\"online_services_test\",\"steady_delay_ms\":%d,\"sent\":360,\"received\":%u}\n",delay_ms,received);
+    check(received==360,"ingress steady: an authorized peer loses no datagram across renewals");
+    closesocket(sender); closesocket(http); service.join();
+    std::printf("ingress-steady failures=%d\n",failures); return failures?1:0;
+}
+
 int main(int argc, char** argv) {
+    if(argc>2 && !std::strcmp(argv[1],"--ingress-steady")) return ingress_steady_test(std::atoi(argv[2]));
     if(argc>1 && !std::strcmp(argv[1],"--ingress")) return ingress_test();
+    if(argc>1 && !std::strcmp(argv[1],"--ingress-blocking")) return ingress_blocking_test();
     if (argc > 1 && (!std::strcmp(argv[1], "--relay") ||
                      !std::strcmp(argv[1], "--relay-block") ||
                      !std::strcmp(argv[1], "--relay-auto-direct") ||

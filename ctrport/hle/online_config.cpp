@@ -219,17 +219,29 @@ bool destination_allowed(std::uint32_t address) {
 
 
 namespace {
-// One worker, bounded cache/queue and at most four query starts per second.
-// No HTTP or thread creation per datagram. Pending/negative entries fail closed.
+// One worker, bounded cache/queues. No HTTP or thread creation per datagram.
+// Unknown sources fail closed and are asked at most four times per second.
+// An authorized peer is renewed one second after each answer, ahead of unknown
+// sources and without that rate limit. A peer that kept sending (a datagram within
+// the last second) stays accepted while its renewal is in flight: a refusal ends it
+// at the answer, an unreachable service at `until` (three seconds after the last
+// positive answer). A peer that went quiet waits for the renewal's answer.
 struct IncomingPolicy {
     using Clock = std::chrono::steady_clock;
-    struct Entry { bool allowed=false, pending=false; Clock::time_point until{}; };
+    static constexpr auto kRenewAfter = std::chrono::milliseconds(1000);
+    static constexpr auto kValidFor = std::chrono::milliseconds(3000);
+    static constexpr auto kActiveWithin = std::chrono::milliseconds(1000);
+    static constexpr auto kDeniedFor = std::chrono::milliseconds(250);
+    static constexpr auto kUnknownInterval = std::chrono::milliseconds(250);
+    struct Entry { bool allowed=false, pending=false; Clock::time_point until{}, renew{}, seen{}; };
     std::mutex mutex;
     std::condition_variable wake;
     std::map<std::uint32_t,Entry> entries;
-    std::deque<std::uint32_t> queue;
+    std::deque<std::uint32_t> renewals; // authorized peers
+    std::deque<std::uint32_t> queue;    // unknown sources
     std::set<std::uint32_t> logged;
     std::uint64_t dropped=0;
+    Clock::time_point next_unknown{};
     bool stop=false;
     std::thread worker;
     IncomingPolicy():worker([this]{run();}) {}
@@ -237,34 +249,50 @@ struct IncomingPolicy {
     void run() {
         std::unique_lock lock(mutex);
         while (!stop) {
-            wake.wait(lock,[&]{return stop || !queue.empty();});
-            if(stop) break;
-            auto address=queue.front(); queue.pop_front();
+            if(renewals.empty() && (queue.empty() || Clock::now()<next_unknown)) {
+                if(queue.empty()) wake.wait(lock);
+                else wake.wait_until(lock,next_unknown);
+                continue;
+            }
+            std::uint32_t address;
+            if(!renewals.empty()) { address=renewals.front(); renewals.pop_front(); }
+            else { address=queue.front(); queue.pop_front(); next_unknown=Clock::now()+kUnknownInterval; }
             lock.unlock();
-            bool allowed=false;
-            try { HttpResponse response; allowed=http_exchange("GET","/ctr/v1/peer-allowed?ip="+format_address(address),{},"",&response) && response.status==200; }
-            catch(...) { /* Failure remains a denial. */ }
+            int status=0; // 0: no answer
+            try { HttpResponse response; if(http_exchange("GET","/ctr/v1/peer-allowed?ip="+format_address(address),{},"",&response)) status=response.status; }
+            catch(...) {}
             lock.lock();
-            entries[address]={allowed,false,Clock::now()+std::chrono::milliseconds(allowed?1000:250)};
-            wake.wait_for(lock,std::chrono::milliseconds(250),[&]{return stop;});
+            auto& entry=entries[address];
+            const auto now=Clock::now();
+            entry.pending=false;
+            if(status==200) { entry.allowed=true; entry.renew=now+kRenewAfter; entry.until=now+kValidFor; }
+            else if(status || !entry.allowed || entry.until<=now) { entry.allowed=false; entry.until=entry.renew=now+kDeniedFor; }
+            else entry.renew=now+kDeniedFor; // no answer: keep the authorization until `until`, ask again soon
         }
     }
     bool check(std::uint32_t address) {
         std::unique_lock lock(mutex);
+        const auto now=Clock::now();
         auto it=entries.find(address);
         if(it==entries.end() && entries.size()==256) {
             // Do not evict in-flight entries or valid positive authorizations under a flood.
             auto victim=entries.end();
             for(auto p=entries.begin();p!=entries.end();++p)
-                if(!p->second.pending && p->second.until<=Clock::now() &&
+                if(!p->second.pending && p->second.until<=now &&
                    (victim==entries.end() || p->second.until<victim->second.until)) victim=p;
             if(victim!=entries.end()) entries.erase(victim);
         }
         if(it==entries.end() && entries.size()<256) it=entries.emplace(address,Entry{}).first;
         if(it!=entries.end()) {
             auto& entry=it->second;
-            if(entry.until>Clock::now() && entry.allowed) return true;
-            if(!entry.pending && entry.until<=Clock::now()) {
+            const auto seen=entry.seen;
+            entry.seen=now;
+            if(entry.allowed && entry.until>now) {
+                if(entry.renew>now) return true;
+                if(!entry.pending) { entry.pending=true; renewals.push_back(address); wake.notify_one(); }
+                if(now-seen<=kActiveWithin) return true;
+            }
+            if(!entry.pending && entry.until<=now) {
                 entry.pending=true; entry.allowed=false; queue.push_back(address); wake.notify_one();
             }
         }

@@ -569,7 +569,10 @@ int receive_game(const char* function, int id, const Socket& entry, char* buffer
                  int host_flags, void* address, std::uint32_t* address_length) {
     namespace relay = ctr_hle::online::relay;
     thread_local std::vector<char> scratch(65536);
-    for (unsigned discarded = 0; discarded < 64; ++discarded) {
+    // A blocking call waits in recvfrom for the next datagram, so skipping refused ones costs
+    // no idle CPU; only non-blocking calls stop after 64 and report EWOULDBLOCK.
+    const bool blocking = !entry.nbio && !(flags & MSG_DONTWAIT_);
+    for (unsigned discarded = 0; blocking || discarded < 64; ++discarded) {
         if ((flags & MSG_DONTWAIT_) && !ready(entry.handle, true)) return fail(E_WOULDBLOCK);
         sockaddr_in host{};
         int host_length = sizeof(host);
@@ -614,7 +617,7 @@ int receive_game(const char* function, int id, const Socket& entry, char* buffer
                     hex_prefix(buffer, copied) + "\"");
         return copied;
     }
-    return fail(E_WOULDBLOCK); // Bound work per call even under a continuous rejected flood.
+    return fail(E_WOULDBLOCK); // Non-blocking: bound work per call under a continuous rejected flood.
 }
 
 int receive_common(const char* function, int id, void* buffer, std::uint64_t length, int flags,
