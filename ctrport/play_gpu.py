@@ -54,9 +54,9 @@ upscaler = os.environ.get('CTR_UPSCALER', 'off')
 if '--upscaler' in sys.argv:
     index = sys.argv.index('--upscaler')
     if index + 1 >= len(sys.argv):
-        sys.exit('--upscaler requires off, fsr1 or dlss')
+        sys.exit('--upscaler requires off, fsr1, fsr3 or dlss')
     upscaler = sys.argv[index + 1]
-if upscaler not in ('off', 'fsr1', 'dlss'):
+if upscaler not in ('off', 'fsr1', 'fsr3', 'dlss'):
     sys.exit('Invalid upscaler: ' + upscaler)
 env['CTR_UPSCALER'] = upscaler
 env['CTR_GPU_FSR'] = '0'
