@@ -1,0 +1,11 @@
+{"scope": "online_server_test", "check": "invite pulled from existing host without any recipient listener", "ok": true}
+{"scope": "online_server_test", "check": "invitation pull discloses no room secret or roster", "ok": true}
+{"scope": "online_server_test", "check": "different signed identity cannot retrieve another recipient invitation", "ok": true}
+{"scope": "online_server_test", "check": "launcher pulls via cached host without DHT or incoming remote connection", "ok": true}
+{"scope": "online_server_test", "check": "verified outbound pull updates local launcher inbox", "ok": true}
+{"scope": "online_server_test", "check": "repeated polls do not duplicate invitation", "ok": true}
+{"scope": "online_server_test", "check": "accepting pulled invite preserves original game room selector", "ok": true}
+{"scope": "online_server_test", "check": "accepting consumes server invitation", "ok": true}
+{"scope": "online_server_test", "check": "accepting clears local inbox", "ok": true}
+{"scope": "online_server_test", "check": "unclaimed invitations expire after fifteen minutes", "ok": true}
+{"scope": "online_server_test", "check": "expired invitation no longer authorizes joining", "ok": true}

@@ -1,0 +1,4 @@
+build_online_server.ps1: exit 0; online server build ok
+gpu/build.ps1: exit 0; ctr_gpu build ok (ctr_hle and ctr_hle_online_test included)
+build_launcher.ps1: exit 0; launcher build ok
+build_incoming_policy_test.ps1: exit 0

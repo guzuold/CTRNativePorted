@@ -374,7 +374,7 @@ void test_peer_channel() {
     sa.poll_friends();sb.poll_friends();sc.poll_friends();
     const auto af=sa.friends(),bf=sb.friends(),cf=sc.friends();
     check(af.size()==1 && af[0].code==b && af[0].online && af[0].name=="PeerBruno" && af[0].nickname=="Bruno" &&
-          af[0].account==user_id("PeerBruno") && !af[0].in_game,"peer presence: friend's service reports its player");
+          af[0].account==player_account(b,"PeerBruno") && !af[0].in_game,"peer presence: friend's service reports its player");
     check(bf.size()==1 && bf[0].online && bf[0].name=="PeerAnna","peer presence: both directions");
     check(cf.size()==1 && !cf[0].online && cf[0].name.empty(),"peer presence: service refuses a caller outside its rubrica");
     const auto cid=HostIdentity::load_or_create(croot/"runtime/user/identity/host_identity.json");
@@ -400,7 +400,7 @@ void test_peer_channel() {
     Json unknown=Json::object();unknown.set("action",Json::of("format_disk"));
     reason.clear();
     try{peer_request(bid,"127.0.0.2",28780,a,unknown);}catch(const std::exception& e){reason=e.what();}
-    check(reason.find("Azione non supportata")==0,"peer channel: unknown action refused");
+    check(reason.find("Unsupported action:")==0,"peer channel: unknown action refused");
     std::string learned;
     const auto identified=identify_endpoint("127.0.0.3:28780",learned,2000);
     check(identified.status==VerifyStatus::Verified && learned==b && identified.ip=="127.0.0.3",
@@ -412,7 +412,7 @@ void test_peer_channel() {
     check(choose_hub(self,true,{high,low})->code=="CTR1-A" && choose_hub(self,true,{high})->code=="CTR1-M" &&
           choose_hub(self,false,{high})->code=="CTR1-Z" && !choose_hub(self,false,{}) && choose_hub(self,true,{})->code=="CTR1-M",
           "public matchmaking: hub is the lowest code among reachable services, never an unreachable self");
-    const auto anna=std::to_string(user_id("PeerAnna")),bruno=std::to_string(user_id("PeerBruno"));
+    const auto anna=std::to_string(player_account(a,"PeerAnna")),bruno=std::to_string(player_account(b,"PeerBruno"));
     std::string answer;
     check(game_http("127.0.0.3","PUT","/webapi/sdk:userProfile/v1/users/"+bruno+"/presence/gameStatus","PeerBruno",
                     R"({"gameStatus":"In gara"})",answer)==204,"peer presence: game status stored on the friend's own service");
@@ -482,7 +482,7 @@ void test_friend_invitation() {
     check(game_http("127.0.0.2","POST","/webapi/sdk:sessionInvitation/v1/sessions","HostAnna",body,answer,"multipart/mixed; boundary=B")==201,
           "cross invite: host creates a private session on its own service");
     const auto session=parse_json(answer).at("sessionId").text;
-    const auto guest=user_id("GuestBruno");
+    const auto guest=player_account(b,"GuestBruno");
     check(game_http("127.0.0.2","POST","/ctr/v1/session-invitations","HostAnna",
                     R"({"sessionId":")"+session+R"(","recipients":[)"+std::to_string(guest)+"]}",answer)==201,
           "cross invite: host sends the invitation");
@@ -516,7 +516,7 @@ void test_friend_invitation() {
     sb.poll_friends();
     check(game_http("127.0.0.3","GET","/webapi/sdk:sessionInvitation/v1/users/me/friends/sessions?offset=0&limit=100","GuestBruno","",answer)==200 &&
           answer.find(session)!=std::string::npos,"cross invite: friend sessions on the guest's service include the host's session");
-    check(game_http("127.0.0.3","GET","/webapi/sdk:sessionInvitation/v1/users/@users/sessions?accountIds="+std::to_string(user_id("HostAnna")),
+    check(game_http("127.0.0.3","GET","/webapi/sdk:sessionInvitation/v1/users/@users/sessions?accountIds="+std::to_string(player_account(a,"HostAnna")),
                     "GuestBruno","",answer)==200 && answer.find(session)!=std::string::npos,
           "cross invite: the host's sessions by account come from the host's report");
     const auto bid=HostIdentity::load_or_create(broot/"runtime/user/identity/host_identity.json");
@@ -555,6 +555,7 @@ void test_connection_policy() {
     bool refused=false;
     try {sessions.begin_connection(2,id,now);} catch(...) {refused=true;}
     check(refused && sessions.connection_peers(2,now).empty(),"transport: private session rejects uninvited player");
+    sessions.join(host,"Host",id);
     auto invitation=sessions.invite(host,"Host",id,{2},now).items[0].at("invitationId").text;
     sessions.accept(2,invitation,now);
     check(sessions.connection_peers(host,now)==std::set<std::uint64_t>{2} && sessions.connection_peers(2,now)==std::set<std::uint64_t>{host},
@@ -597,7 +598,7 @@ void test_connection_policy() {
     auto enroll=[&](const HostIdentity& who,const std::string& source,const std::string& name,unsigned playlist) {
         call(who,source,name,"mm_task",task(2,info));
         const auto reply=base64_decode(call(who,source,name,"mm_task",task(3)).at("reply").text);
-        const auto token=Reader(reply).values().back().value.as_u64();const auto account=std::to_string(user_id(name));
+        const auto token=Reader(reply).values().back().value.as_u64();const auto account=std::to_string(player_account(who.friend_code(),name));
         const std::string search=R"({"members":[)"+account+R"(],"tokens":[)"+std::to_string(token)+
             R"(],"lobby_slots":{"min":2,"max":8},"dedicated_server":{"request_level":"not_needed"},"team_balance":{"num_teams":0},"ruleset_payload":{"filter":{"matchmaking_version":200,"playlist_id":)"+
             std::to_string(playlist)+R"(}},"player_id_to_slots":{")"+account+R"(":0},"performance":{"game_type":1}})";
@@ -625,7 +626,129 @@ void test_connection_policy() {
     hub.stop();std::error_code ignored;std::filesystem::remove_all(root,ignored);
 }
 
+
+DWORD WINAPI parser_security_thread(void* opaque) {
+    const bool blob = opaque != nullptr;
+    try {
+        const std::string nested=std::string(64,'[')+"0"+std::string(64,']');
+        if(dump_json(parse_json(nested))!=nested) return 3;
+        std::string object;
+        for(int i=0;i<64;++i)object+="{\"x\":";
+        object+="0"+std::string(64,'}');
+        if(dump_json(parse_json(object))!=object) return 4;
+        if(blob) {
+            bool rejected=false; Bytes structure(60000,typed::STRUCT);
+            try { Reader(structure).value(); } catch(const ProtocolError&) {rejected=true;}
+            if(!rejected) return 5;
+        }
+    } catch(...) {return 6;}
+    try {
+        if(blob) { Bytes data(60000,typed::BLOB); Reader(data).value(); }
+        else parse_json(std::string(65536,'['));
+    } catch(const std::exception&) { return 0; }
+    return 1;
+}
+int parser_security_test(bool blob) {
+    HANDLE thread=CreateThread(nullptr,1024*1024,parser_security_thread,blob?reinterpret_cast<void*>(1):nullptr,STACK_SIZE_PARAM_IS_A_RESERVATION,nullptr);
+    if(!thread) return 2; WaitForSingleObject(thread,10000); DWORD code=2; GetExitCodeThread(thread,&code); CloseHandle(thread);
+    check(code==0,blob?"security: 60000 BLOB markers rejected on 1MB stack":"security: 65536 brackets rejected on 1MB stack");
+    // Exercise dump and destruction of the largest accepted nesting on the same small stack in a separate mode below.
+    return failures?1:0;
+}
+void test_http_security() {
+    WSADATA wd{}; WSAStartup(MAKEWORD(2,2),&wd);
+    const auto root=std::filesystem::path("runtime/user/security-test");
+    ServerConfig cfg; cfg.host="0.0.0.0"; cfg.http_port=28780; cfg.discovery_port=28781;
+    cfg.tcp_record_ports={}; cfg.udp_record_ports={}; cfg.relay_port=0; cfg.party_enabled=true;
+    cfg.state_dir=root/"online"; cfg.log_path=root/"logs/test.jsonl";
+    Server server(cfg); server.start();
+    SOCKET probe=socket(AF_INET,SOCK_DGRAM,0); sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
+    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr); connect(probe,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    int len=sizeof(lan); getsockname(probe,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(probe);
+    char ip[INET_ADDRSTRLEN]{}; inet_ntop(AF_INET,&lan.sin_addr,ip,sizeof(ip));
+    std::string reply;
+    check(game_http("127.0.0.1","GET","/ctr/v1/session-invitations","PlayerOne","",reply)==200,"security: local invitations allowed");
+    check(game_http(ip,"GET","/ctr/v1/session-invitations","PlayerOne","",reply,"application/json",ip)==403,"security: LAN invitations forbidden");
+    for(const char* path:{"/ctr/v1/config","/ctr/v1/traffic-key","/auth3","/webapi/test"})
+        check(game_http(ip,"GET",path,"PlayerOne","",reply,"application/json",ip)==403,"security: local route forbidden from LAN");
+    check(game_http(ip,"POST","/ctr/v1/peer","","{}",reply,"application/json",ip)==403,"security: peer route verifies unsigned request");
+    check(game_http(ip,"GET","/ctr/v1/identity?nonce=0123456789abcdef0123456789abcdef","","",reply,"application/json",ip)==200,"security: LAN identity route remains public");
+    const auto remote=HostIdentity::load_or_create(root/"remote.json");
+    Json signed_request=Json::object(); signed_request.set("action",Json::of("mm_leave")); signed_request.set("name",Json::of("RemotePlayer"));
+    signed_request.set("to",Json::of(server.friend_code())); signed_request.set("nonce",Json::of(hex(random_bytes(16))));
+    check(game_http(ip,"POST","/ctr/v1/peer","",dump_json(sign_peer_message(remote,signed_request)),reply,"application/json",ip)==200,"security: signed peer route works from LAN");
+    Json party_request=Json::object(); party_request.set("action",Json::of("status")); party_request.set("nonce",Json::of(hex(random_bytes(16))));
+    check(game_http(ip,"POST","/ctr/v1/party","",dump_json(sign_party_message(*server.host_identity(),party_request)),reply,"application/json",ip)==200,"security: signed party route works from LAN");
+    auto connect_http=[&](const char* source="127.0.0.1"){SOCKET s=socket(AF_INET,SOCK_STREAM,0); sockaddr_in bind_addr{}; bind_addr.sin_family=AF_INET; inet_pton(AF_INET,source,&bind_addr.sin_addr);
+        if(::bind(s,reinterpret_cast<sockaddr*>(&bind_addr),sizeof(bind_addr))) throw std::runtime_error("test source bind failed"); sockaddr_in dst{}; dst.sin_family=AF_INET; dst.sin_port=htons(28780); dst.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+        connect(s,reinterpret_cast<sockaddr*>(&dst),sizeof(dst)); DWORD timeout=6500; setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<char*>(&timeout),sizeof(timeout)); return s;};
+    SOCKET silent=connect_http(); char byte; auto begin=std::chrono::steady_clock::now();
+    int n=recv(silent,&byte,1,0); int error=WSAGetLastError();
+    check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(6),"security: silent HTTP closed before six seconds"); closesocket(silent);
+    std::vector<SOCKET> held; for(int i=0;i<8;++i)held.push_back(connect_http()); Sleep(100);
+    SOCKET excess=connect_http(); begin=std::chrono::steady_clock::now(); n=recv(excess,&byte,1,0); error=WSAGetLastError();
+    check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(1),"security: per-IP excess refused immediately"); closesocket(excess);
+    const std::string head="GET /ctr/v1/config HTTP/1.1\r\nHost: local\r\n\r\n";
+    send(held[0],head.data(),static_cast<int>(head.size()),0); char buf[512]; n=recv(held[0],buf,sizeof(buf),0);
+    check(n>0 && std::string(buf,buf+n).find("200")!=std::string::npos,"security: admitted connection remains served");
+    for(auto s:held)closesocket(s);
+    Sleep(100);
+    held.clear();
+    for(int group=1;group<=16;++group) {
+        const std::string source="127.0.1."+std::to_string(group);
+        for(int i=0;i<8;++i) held.push_back(connect_http(source.c_str()));
+    }
+    Sleep(100); excess=connect_http("127.0.1.17"); begin=std::chrono::steady_clock::now();
+    n=recv(excess,&byte,1,0); error=WSAGetLastError();
+    check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(1),"security: global connection limit refuses immediately"); closesocket(excess);
+    send(held[0],head.data(),static_cast<int>(head.size()),0); n=recv(held[0],buf,sizeof(buf),0);
+    check(n>0 && std::string(buf,buf+n).find("200")!=std::string::npos,"security: global saturation preserves admitted client");
+    for(auto s:held) closesocket(s); Sleep(100);
+    SOCKET body_client=connect_http();
+    const std::string body_head="POST /ctr/v1/peer HTTP/1.1\r\nHost: local\r\nContent-Length: 10\r\n\r\n";
+    send(body_client,body_head.data(),static_cast<int>(body_head.size()),0); begin=std::chrono::steady_clock::now();
+    n=recv(body_client,&byte,1,0); error=WSAGetLastError();
+    check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(6),"security: incomplete HTTP body times out"); closesocket(body_client);
+    SOCKET drip=connect_http(); begin=std::chrono::steady_clock::now();
+    for(int i=0;i<6;++i) {send(drip,"G",1,0); Sleep(1000);}
+    n=recv(drip,&byte,1,0); error=WSAGetLastError();
+    check((n==0 || (n<0 && error!=WSAETIMEDOUT)) && std::chrono::steady_clock::now()-begin<std::chrono::seconds(7),"security: header drip cannot reset absolute deadline"); closesocket(drip);
+    // A local game may remain in a menu longer than the HTTP deadline.
+    SOCKET lobby=socket(AF_INET,SOCK_STREAM,0); sockaddr_in lobby_addr{}; lobby_addr.sin_family=AF_INET;
+    lobby_addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK); lobby_addr.sin_port=htons(3074);
+    check(connect(lobby,reinterpret_cast<sockaddr*>(&lobby_addr),sizeof(lobby_addr))==0,"security: local lobby still reachable");
+    Sleep(5500); WSAPOLLFD poll{lobby,POLLRDNORM,0};
+    check(WSAPoll(&poll,1,0)==0,"security: lobby not given HTTP idle timeout"); closesocket(lobby);
+
+    check(game_http("127.0.0.1","POST","/ctr/v1/peer","",std::string(65536,'['),reply)==403,"security: deep JSON HTTP returns 403");
+    check(game_http("127.0.0.1","GET","/ctr/v1/config","","",reply)==200,"security: HTTP service survives deep JSON");
+    for(auto p:host_ports()) check(!(p.protocol=="TCP" && p.port==3074),"security: lobby excluded from UPnP");
+    server.stop();
+}
+
+
+void test_port_security() {
+    for(auto p:host_ports()) check(!(p.protocol=="TCP" && p.port==3074),"security: lobby excluded from UPnP");
+    ServerConfig config; config.http_port=28780; config.discovery_port=28781; config.relay_port=0;
+    config.state_dir="runtime/user/security-ports/online"; config.log_path="runtime/user/security-ports/logs/test.jsonl";
+    Server service(config); service.start();
+    SOCKET probe=socket(AF_INET,SOCK_DGRAM,0); sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
+    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr); connect(probe,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
+    int len=sizeof(lan); getsockname(probe,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(probe);
+    for(int type:{SOCK_STREAM,SOCK_DGRAM}) for(unsigned port: type==SOCK_STREAM ? std::vector<unsigned>{3074,3075} : std::vector<unsigned>{3075,3478,3479}) {
+        SOCKET own=socket(AF_INET,type,0); BOOL exclusive=TRUE;
+        setsockopt(own,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,reinterpret_cast<char*>(&exclusive),sizeof(exclusive));
+        lan.sin_port=htons(static_cast<unsigned short>(port));
+        check(::bind(own,reinterpret_cast<sockaddr*>(&lan),sizeof(lan))==0,"security: local-only service leaves LAN port unbound"); closesocket(own);
+    }
+    service.stop();
+}
+
 int run_tests(int argc, char* argv[]) {
+    if(argc>1 && std::string(argv[1])=="--security-ports") {test_port_security(); return failures?1:0;}
+    if(argc>1 && std::string(argv[1])=="--security-json") return parser_security_test(false);
+    if(argc>1 && std::string(argv[1])=="--security-blob") return parser_security_test(true);
+    if(argc>1 && std::string(argv[1])=="--security-http") {test_http_security(); return failures?1:0;}
     if(argc>=2 && std::string(argv[1])=="--connection-policy-only") {test_connection_policy();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--friend-restart-only") {test_friend_restart();return failures ? 1 : 0;}
     if(argc>=2 && std::string(argv[1])=="--peer-only") {test_peer_channel();test_friend_invitation();return failures ? 1 : 0;}
@@ -1063,6 +1186,7 @@ int run_tests(int argc, char* argv[]) {
         // Project transport: synthetic invitations, independent of a retail join.
         const auto sender = user_id("InviteHost");
         const auto session = sessions.create(sender, "multipart/mixed; boundary=B", bytes_of(body)).at("sessionId").text;
+        sessions.join(sender, "InviteHost", session);
         const auto sent = sessions.invite(sender, "InviteHost", session, {43,44}, 1000);
         check(sent.items.size() == 2 && sessions.invitations(43, 1001).items.size() == 1 &&
               sessions.invitations(45, 1001).items.empty(), "invitation: batch delivery isolated to recipients");
@@ -1070,6 +1194,7 @@ int run_tests(int argc, char* argv[]) {
               sent.items[0].at("invitationId"), "invitation: send retry reuses outstanding ID");
         const auto refused = [](auto action) { try { action(); return false; } catch (const std::exception&) { return true; } };
         check(refused([&] { sessions.invite(43, "Other", session, {44}, 1003); }) &&
+              refused([&] { sessions.invite(sender, "SpoofedName", session, {44}, 1003); }) &&
               refused([&] { sessions.invite(sender, "InviteHost", session, {45,45}, 1003); }) &&
               sessions.invitations(45,1003).items.empty(), "invitation: nonowner and duplicate batch rejected without delivery");
         check(refused([&] { sessions.dismiss(44, sent.items[0].at("invitationId").text, 1003); }),

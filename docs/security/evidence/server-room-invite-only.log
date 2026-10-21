@@ -1,0 +1,20 @@
+{"scope": "online_server_test", "check": "room: no invitation and no friendship denied", "ok": true}
+{"scope": "online_server_test", "check": "room: invitation roundtrip with surrounding whitespace", "ok": true}
+{"scope": "online_server_test", "check": "room: malformed invitation rejected", "ok": true}
+{"scope": "online_server_test", "check": "room: malformed invitation rejected", "ok": true}
+{"scope": "online_server_test", "check": "room: malformed invitation rejected", "ok": true}
+{"scope": "online_server_test", "check": "room: malformed invitation rejected", "ok": true}
+{"scope": "online_server_test", "check": "room: wrong token denied", "ok": true}
+{"scope": "online_server_test", "check": "room: token expires at fifteen minutes", "ok": true}
+{"scope": "online_server_test", "check": "room: invited non-friend receives the same retail matchmaking selector", "ok": true}
+{"scope": "online_server_test", "check": "room: roster never discloses sharing token", "ok": true}
+{"scope": "online_server_test", "check": "room: guest cannot mint an invitation", "ok": true}
+{"scope": "online_server_test", "check": "room: copying a fresh invitation revokes previous token", "ok": true}
+{"scope": "online_server_test", "check": "room: new room revokes old invitation", "ok": true}
+{"scope": "online_server_test", "check": "room: explicit leave updates roster", "ok": true}
+{"scope": "online_server_test", "check": "room: silent guest expires after 180 seconds", "ok": true}
+{"scope": "online_server_test", "check": "room: host plus seven guests admitted", "ok": true}
+{"scope": "online_server_test", "check": "room: ninth player rejected despite valid invitation", "ok": true}
+{"scope": "online_server_test", "check": "room: invitation host identity verified over HTTP", "ok": true}
+{"scope": "online_server_test", "check": "room: signed HTTP join without reciprocal address books", "ok": true}
+{"scope": "online_server_test", "check": "room: admitted guest revalidates membership at game launch without token", "ok": true}

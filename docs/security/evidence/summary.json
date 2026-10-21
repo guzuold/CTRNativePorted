@@ -1,0 +1,121 @@
+[
+  {
+    "suite": "server default",
+    "checks": 237,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server connection-policy-only",
+    "checks": 15,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server friend-restart-only",
+    "checks": 8,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server peer-only",
+    "checks": 34,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server party-migration-only",
+    "checks": 8,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server room-invite-only",
+    "checks": 20,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server invite-pull-only",
+    "checks": 11,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server security-json",
+    "checks": 1,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server security-blob",
+    "checks": 1,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server security-http",
+    "checks": 29,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "server security-ports",
+    "checks": 13,
+    "failed": 0,
+    "exception": false,
+    "exit_code": 0
+  },
+  {
+    "suite": "hle default",
+    "checks": 87,
+    "failed": 0,
+    "exit_code": 0
+  },
+  {
+    "suite": "hle ingress",
+    "checks": 11,
+    "failed": 0,
+    "exit_code": 0
+  },
+  {
+    "suite": "hle offline",
+    "checks": 2,
+    "failed": 0,
+    "exit_code": 0
+  },
+  {
+    "suite": "hle relay",
+    "checks": 18,
+    "failed": 0,
+    "exit_code": 0
+  },
+  {
+    "suite": "hle relay-block",
+    "checks": 4,
+    "failed": 0,
+    "exit_code": 0
+  },
+  {
+    "suite": "hle relay-auto-direct",
+    "checks": 8,
+    "failed": 0,
+    "exit_code": 0
+  },
+  {
+    "suite": "hle relay-auto-fallback",
+    "checks": 7,
+    "failed": 0,
+    "exit_code": 0
+  }
+]

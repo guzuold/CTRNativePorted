@@ -1,0 +1,66 @@
+{
+  "base": "b95b24e",
+  "branch": "security/v0.5.5",
+  "date": "2026-10-21",
+  "builds": [
+    {
+      "path": "build/CTRPort-claude/ctr_online_server.exe",
+      "sha256": "0bb928d23627f6da8c212e681babec496a1645d3b337dd6b80d519a919981202",
+      "bytes": 1359360
+    },
+    {
+      "path": "build/CTRPort-claude/ctr_online_server_test.exe",
+      "sha256": "03719d7cc595540f68afcdcf6b0b65f3f5d8d7c5438ce22d9c98f29afa97a3f3",
+      "bytes": 1810944
+    },
+    {
+      "path": "build/CTRPort-claude/launcher.exe",
+      "sha256": "3831265b39982bbbf55536b8b23cdb2cf6537cd4acf02f757938c27b7623614f",
+      "bytes": 3307008
+    },
+    {
+      "path": "build/CTRPort-gpu/ctr_hle.dll",
+      "sha256": "f7ec6212a7351ca21096949bd43dc9c2691208d44c432162cb9cceb8fb2d70df",
+      "bytes": 1129984
+    },
+    {
+      "path": "build/CTRPort-gpu/ctr_hle_online_test.exe",
+      "sha256": "e7488923d941a1dec862fc1b2bc9f6fb015a16f9e21aff8266a48ede7fbfb663",
+      "bytes": 245248
+    }
+  ],
+  "sources": [
+    {
+      "path": "ctrport/hle/net_socket.cpp",
+      "sha256": "17dc510851a7ede8619f152cd144fae98eb01692ad49fc8d065b2474db578498"
+    },
+    {
+      "path": "ctrport/hle/online_config.cpp",
+      "sha256": "be7f03b5828b7cde761a440e84b7c44c4a3300e85701f66a97b1ec43d996edd7"
+    },
+    {
+      "path": "ctrport/online_server/json.cpp",
+      "sha256": "abf70526c47b649c96ff3865b315a8beda8986ec1c797d00f32094e212a8e44e"
+    },
+    {
+      "path": "ctrport/online_server/protocol.cpp",
+      "sha256": "666e4e774ecaaf2b53306a0515386e43cd5ba558e999e3c0bd97c0adf8eef51e"
+    },
+    {
+      "path": "ctrport/online_server/server.cpp",
+      "sha256": "7ed11ced5e03ad50b27fe3bcf482927b5d25d91d0f6354ea1b39332bc7ef3f28"
+    },
+    {
+      "path": "ctrport/online_server/stores.cpp",
+      "sha256": "e8191101ed7e6693757f624f58244000a61bf0933ebff15a29ee01278558dad3"
+    },
+    {
+      "path": "ctrport/online_server/launcher_online.cpp",
+      "sha256": "3de3ae0944f47287a7c48b61263cec100dbf05b58e3798e3fe9c21cf8f796fa5"
+    },
+    {
+      "path": "ctrport/online_server/server_test.cpp",
+      "sha256": "7318357f80315bd012c6cc7f052085c1a08cb8d31b8937b2731e8a65711df054"
+    }
+  ]
+}
