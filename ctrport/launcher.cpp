@@ -10,6 +10,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include "online_server/launcher_online.hpp"
+#include "online_server/protocol.hpp"
 #include "online_server/local_backup.hpp"
 #include "online_server/friend_store.hpp"
 #include "online_server/friend_store.hpp"
@@ -1947,6 +1948,7 @@ void launch_game() {
             set[L"CTR_ONLINE_SERVER"]=widen(server_ip);
             set[L"CTR_ONLINE_TRAFFIC_KEY"]=key_path.wstring();
             set[L"CTR_ONLINE_PORT_OFFSET"]=std::to_wstring(ctr_online::kHostGamePortOffset);
+            set[L"CTR_ONLINE_ACCOUNT"]=std::to_wstring(ctr_online::player_account(g.host_status.friend_code,narrow(g.cfg.online_id)));
         } catch(const std::exception& e) {
             g.lock.release();g.friends_notice=widen(e.what());g.friends_notice_error=true;
             animate_friends(true);return;
@@ -1958,7 +1960,7 @@ void launch_game() {
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION",
         L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
         L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT",
-        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG"});
+        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG", L"CTR_ONLINE_ACCOUNT"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     const auto open_log = [&](const wchar_t* suffix) {

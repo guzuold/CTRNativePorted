@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.5.1](https://github.com/guzuold/CTRNativePorted/releases)**
+**Latest release: [v0.5.2](https://github.com/guzuold/CTRNativePorted/releases)**
 (experimental pre-release). The game is playable from start to finish. Online races
 between two PCs over the Internet work and complete, in private matches and in public
 matchmaking; see the [limits](#online-status-and-limits).
@@ -105,6 +105,8 @@ service; the services find each other and cooperate directly.
 
 **Identity and friends**
 - Every installation has its own key pair. Its **friend code** comes from the public key.
+- The account the game uses for a player comes from the friend code together with the player
+  name, so players with the same name on different PCs stay distinct.
 - Friends add each other by code in the launcher's friends drawer. Only mutual friends see
   each other's presence or receive invitations.
 - The same friends appear in the **game's own friends list**, with live status: in game,

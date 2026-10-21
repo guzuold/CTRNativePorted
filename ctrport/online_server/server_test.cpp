@@ -1397,18 +1397,18 @@ int run_tests(int argc, char* argv[]) {
         check(party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat).at("count").as_u64()==2,
               "signed HTTP heartbeat preserves party membership");
         MarketplaceStore backup_wallet(root / "runtime/user/online/marketplace.txt");
-        backup_wallet.set_balance(user_id("Guest"),10,8500);
-        backup_wallet.set_inventory(user_id("Guest"),139,1);
-        backup_wallet.set_balance(user_id("Another"),10,999);
+        backup_wallet.set_balance(player_account(status.friend_code,"Guest"),10,8500);
+        backup_wallet.set_inventory(player_account(status.friend_code,"Guest"),139,1);
+        backup_wallet.set_balance(player_account(status.friend_code,"Another"),10,999);
         auto copied = party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat);
         if (const auto* error=copied.find("backup_error")) std::fprintf(stderr,"Backup error: %s\n",error->text.c_str());
         const auto saved = copied.at("wallet_backup");
-        check(!copied.find("backup_error") && saved.at("account").as_u64()==user_id("Guest") &&
+        check(!copied.find("backup_error") && saved.at("account").as_u64()==player_account(status.friend_code,"Guest") &&
               saved.at("state").text.find("139 1")!=std::string::npos &&
-              saved.at("state").text.find(std::to_string(user_id("Another")))==std::string::npos,
+              saved.at("state").text.find(std::to_string(player_account(status.friend_code,"Another")))==std::string::npos,
               "backup: signed host response contains only authenticated member wallet");
         const auto archives = backup_io_path(guest_root / "runtime/user/online/backups/hosts" /
-            hex(sha256(bytes_of(status.friend_code))) / std::to_string(user_id("Guest")));
+            hex(sha256(bytes_of(status.friend_code))) / std::to_string(player_account(status.friend_code,"Guest")));
         const auto previous_copy = archives / (hex(sha256(bytes_of(dump_json(saved)))) + ".json");
         check(std::filesystem::exists(previous_copy), "backup: remote wallet actually persisted on guest disk");
         const auto count_files = [](const auto& folder) {
@@ -1417,13 +1417,13 @@ int run_tests(int argc, char* argv[]) {
         const auto before_count = count_files(archives);
         party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat);
         check(count_files(archives)==before_count, "backup: unchanged heartbeat deduplicates snapshot");
-        backup_wallet.set_inventory(user_id("Guest"),139,0);
-        backup_wallet.set_balance(user_id("Guest"),10,0);
+        backup_wallet.set_inventory(player_account(status.friend_code,"Guest"),139,0);
+        backup_wallet.set_balance(player_account(status.friend_code,"Guest"),10,0);
         party_request(guest_root,"127.0.0.1",status.friend_code,heartbeat);
         check(count_files(archives)==before_count+1 && std::filesystem::exists(previous_copy),
               "backup: reset inventory cannot overwrite earlier ownership snapshot");
-        auto forged=heartbeat;forged.set("account",Json::of(user_id("Another")));
-        check(party_request(guest_root,"127.0.0.1",status.friend_code,forged).at("wallet_backup").at("account").as_u64()==user_id("Guest"),
+        auto forged=heartbeat;forged.set("account",Json::of(player_account(status.friend_code,"Another")));
+        check(party_request(guest_root,"127.0.0.1",status.friend_code,forged).at("wallet_backup").at("account").as_u64()==player_account(status.friend_code,"Guest"),
               "backup: caller cannot select another account");
         const auto saves = guest_root / "runtime/user/savedata/test";
         std::filesystem::create_directories(saves);

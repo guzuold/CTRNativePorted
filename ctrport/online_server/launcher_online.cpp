@@ -448,7 +448,7 @@ Json party_request(const std::filesystem::path& root, const std::string& ip, con
             if (!wallet) throw std::runtime_error("Host needs an update: remote Pit Stop backup unavailable");
             if (wallet->at("format").text != "ctr-marketplace-account-v1" ||
                 !wallet->at("state").is_string() || wallet->at("state").text.size() > 8 * 1024 * 1024 ||
-                wallet->at("account").as_u64() != user_id(response.at("backup_name").text))
+                wallet->at("account").as_u64() != player_account(code, response.at("backup_name").text))
                 throw std::runtime_error("Invalid wallet backup response");
             const auto folder = root / "runtime/user/online/backups/hosts" /
                 hex(sha256(bytes_of(code))) / std::to_string(wallet->at("account").as_u64());

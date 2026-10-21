@@ -349,6 +349,12 @@ std::uint64_t user_id(const std::string& online_id) {
     for (const unsigned char byte : online_id) value = (value ^ byte) * 0x100000001b3ull;
     return value ? value : 1;
 }
+std::uint64_t player_account(const std::string& service_code, const std::string& online_id) {
+    if (service_code.empty()) return user_id(online_id);
+    std::uint64_t value = 0xcbf29ce484222325ull;
+    for (const unsigned char byte : "ctr-player-v1\n" + service_code + "\n" + online_id) value = (value ^ byte) * 0x100000001b3ull;
+    return value ? value : 1;
+}
 namespace {
 Bytes name64(const std::string& online_id) {
     Bytes name(online_id.begin(), online_id.begin() + std::min<std::size_t>(online_id.size(), 63));
@@ -357,7 +363,7 @@ Bytes name64(const std::string& online_id) {
 }
 } // namespace
 Bytes client_ticket(std::uint32_t title_id, const std::string& online_id, const Bytes& session_key,
-                    std::uint32_t now, std::uint32_t lifetime) {
+                    std::uint32_t now, std::uint32_t lifetime, std::uint64_t account) {
     Bytes ticket;
     put_le(ticket, 0xEFBDADDEu, 4);
     ticket.push_back(0);
@@ -365,17 +371,17 @@ Bytes client_ticket(std::uint32_t title_id, const std::string& online_id, const 
     put_le(ticket, now, 4);
     put_le(ticket, static_cast<std::uint32_t>(now + lifetime), 4);
     put_le(ticket, 0, 8);
-    put_le(ticket, user_id(online_id), 8);
+    put_le(ticket, account ? account : user_id(online_id), 8);
     append(ticket, name64(online_id));
     append(ticket, session_key);
     ticket.resize(ticket.size() + 7, 0);
     if (ticket.size() != 0x80) throw std::logic_error("client ticket size");
     return ticket;
 }
-Bytes server_ticket(const std::string& online_id, const Bytes& session_key) {
+Bytes server_ticket(const std::string& online_id, const Bytes& session_key, std::uint64_t account) {
     // Project format, read back by the project's lobby: session key | user ID | user name.
     Bytes ticket = session_key;
-    put_le(ticket, user_id(online_id), 8);
+    put_le(ticket, account ? account : user_id(online_id), 8);
     append(ticket, name64(online_id));
     ticket.resize(0x80, 0);
     return ticket;
@@ -407,7 +413,8 @@ Json python_int(const Json* value) {
     throw ProtocolError("int() argument must be a string or a number");
 }
 } // namespace
-Auth3Reply auth3_reply(const Json& request, const std::string& online_id, const RsaKey& key) {
+Auth3Reply auth3_reply(const Json& request, const std::string& online_id, const RsaKey& key, std::uint64_t account) {
+    if (!account) account = user_id(online_id);
     if (!request.is_object()) throw ProtocolError("auth3 request is not an object");
     Auth3Reply out;
     const Json task = python_int(request.find("auth_task"));
@@ -427,15 +434,15 @@ Auth3Reply auth3_reply(const Json& request, const std::string& online_id, const 
     body.set("code", Json::of("700"));
     body.set("iv_seed", Json::of(dump_json(iv_seed)));
     body.set("client_ticket", Json::of(base64_encode(client_ticket(title_id, online_id, session_key,
-                                                                   static_cast<std::uint32_t>(std::time(nullptr))))));
-    body.set("server_ticket", Json::of(base64_encode(server_ticket(online_id, session_key))));
+                                                                   static_cast<std::uint32_t>(std::time(nullptr)), 86400, account))));
+    body.set("server_ticket", Json::of(base64_encode(server_ticket(online_id, session_key, account))));
     body.set("client_id", Json::of(""));
     body.set("account_type", Json::of("psn"));
     body.set("extra_data", Json::of(dump_json_spaced(extra)));
     out.status = 200;
     out.body = dump_json(body);
     out.headers.emplace_back("X-Signature", base64_encode(key.sign_pss_sha256(bytes_of(out.body))));
-    out.session = AuthSession{online_id, user_id(online_id), title_id, session_key, {}};
+    out.session = AuthSession{online_id, account, title_id, session_key, {}};
     return out;
 }
 

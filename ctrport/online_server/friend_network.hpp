@@ -54,7 +54,7 @@ struct FriendState {
     std::string code;
     std::string nickname;          // name saved in the rubrica
     std::string name;              // online ID reported by the friend's service ("" until contact)
-    std::uint64_t account = 0;     // user_id(name), the account the game uses
+    std::uint64_t account = 0;     // player_account(code, name), the account the game uses
     bool online = false;           // the friend's service answered the last poll
     bool in_game = false;          // its game is connected to it
     std::string ip;
