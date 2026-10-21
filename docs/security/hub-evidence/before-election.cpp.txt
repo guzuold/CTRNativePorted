@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#include "hub_election.hpp"
+#include <cstdio>
+#include <map>
+#include <windows.h>
+using namespace ctr_online;
+int failures=0;
+void check(bool b,const char* s){std::printf("%s %s\n",b?"PASS":"FAIL",s);if(!b)++failures;}
+int main(){
+ const MatchHub self{"M","192.0.2.9"}, a{"A","192.0.2.1"}, b{"B","192.0.2.2"};
+ std::map<std::string,MatchHub> live{{"192.0.2.1:8780",a},{"192.0.2.2:8780",b}};
+ std::vector<std::string> ads;
+ auto search=[&]{return ads;};
+ auto identify=[&](const std::string& ep)->std::optional<MatchHub>{auto i=live.find(ep);return i==live.end()?std::nullopt:std::optional<MatchHub>(i->second);};
+ std::optional<MatchHub> chosen;
+ auto publish=[&](auto h,const std::string&,std::size_t){chosen=h;};
+ HubElection e(self,false);
+ bool stable=true;
+ for(unsigned i=0;i<10;++i){ads=i%5==0?std::vector<std::string>{"192.0.2.1:8780"}:std::vector<std::string>{};e.round(1000+i*60,search,identify,publish);stable &= chosen && chosen->code=="A";}
+ check(stable,"intermittent DHT: known live hub survives four empty searches");
+ ads={"192.0.2.2:8780"};e.round(1600,search,identify,publish);ads.clear();live.erase("192.0.2.1:8780");
+ e.round(1660,search,identify,publish);check(chosen && chosen->code=="A","one direct failure retains hub");
+ e.round(1720,search,identify,publish);check(chosen && chosen->code=="A","two direct failures retain hub");
+ e.round(1780,search,identify,publish);check(chosen && chosen->code=="B","third direct failure selects remaining live hub");
+ live["192.0.2.1:8780"]=a;
+ HubElection x(self,false),y(self,false);ads={"192.0.2.1:8780"};x.round(2000,search,identify,publish);
+ ads={"192.0.2.2:8780"};x.round(2060,search,identify,publish);const auto xc=chosen;
+ y.round(2000,search,identify,publish);ads={"192.0.2.1:8780"};y.round(2060,search,identify,publish);
+ check(xc && chosen && xc->code==chosen->code && chosen->code=="A","partial views converge on lowest verified code");
+ const auto file=std::filesystem::temp_directory_path()/("ctr-hub-election-"+std::to_string(GetCurrentProcessId())+".json");
+ check(x.save(file),"persist verified candidates");HubElection restarted(self,false);restarted.load(file,2070);ads.clear();chosen.reset();
+ restarted.round(2070,search,identify,publish);check(chosen && chosen->code=="A","restart directly verifies saved hub without DHT");
+ live.clear();HubElection dead(self,false);dead.load(file,2080);dead.round(2080,search,identify,publish);check(!chosen,"saved unresponsive candidate is never elected");
+ HubElection stale(self,false);stale.load(file,2500);live["192.0.2.1:8780"]=a;stale.round(2500,search,identify,publish);check(!chosen,"expired saved candidate ignored");
+ HubElection diverse(self,false);ads.assign(16,"192.0.2.8:1111");ads.push_back("192.0.2.1:8780");diverse.round(3000,search,identify,publish);check(chosen && chosen->code=="A","deduplicate IP before sixteen-address limit");
+ HubElection local(self,true);ads.clear();local.round(3000,search,identify,publish);check(chosen && chosen->code=="M","reachable self immediately eligible");
+ std::filesystem::remove(file);std::printf("failures=%d\n",failures);return failures?1:0;
+}

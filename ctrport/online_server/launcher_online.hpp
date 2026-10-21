@@ -3,6 +3,7 @@
 // (with automatic router port forwarding), resolving the server name a player typed, and
 // fetching the server's traffic key fresh at each launch.
 #pragma once
+#include "hub_gate.hpp"
 #include "upnp.hpp"
 #include "json.hpp"
 #include "friend_verifier.hpp"
@@ -76,10 +77,7 @@ public:
 
 private:
     void elect_hubs(std::filesystem::path root, MatchHub self, bool self_reachable);
-    mutable std::mutex hub_mutex_;
-    std::condition_variable hub_wake_;
-    bool hub_stop_ = false;
-    std::optional<MatchHub> hub_;
+    HubGate hub_gate_;
     std::thread hub_thread_;
     mutable std::mutex mutex_;
     std::unique_ptr<Server> server_;

@@ -35,6 +35,7 @@ struct MatchHub {
 struct ServerConfig {
     std::string host = "0.0.0.0";
     std::uint16_t http_port = 8780;
+    std::uint16_t lobby_port = 3074; // Allows isolated local protocol fixtures.
     std::vector<std::uint16_t> tcp_record_ports{3075};
     std::vector<std::uint16_t> udp_record_ports{3075, 3478, 3479};
     // Two-address discovery (development on one PC), used without public_host.
@@ -60,6 +61,10 @@ struct ServerConfig {
     // a public search (145/2, 145/3, 145/15, 145/18); nullopt or this service's own code: match
     // here. The hub then stays fixed for that player until its game disconnects or the hub fails.
     std::function<std::optional<MatchHub>()> match_hub;
+    // Optional bounded demand election, only for a nonreachable launcher with no hub.
+    std::function<std::optional<MatchHub>(std::chrono::milliseconds)> await_match_hub;
+    bool hub_reachable = true;
+    std::chrono::milliseconds hub_wait_budget{1000};
     // Called with each event's one-line summary (also written to stdout by the standalone server).
     std::function<void(const std::string&)> on_event;
 };
@@ -82,6 +87,7 @@ public:
     const HostIdentity* host_identity() const;
     // Friends of the rubrica with their last presence (empty without friend_network).
     std::vector<FriendState> friends() const;
+    void record_event(const char* name, Json fields);
     void poll_friends(); // one synchronous presence round
 
 private:

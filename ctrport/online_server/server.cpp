@@ -782,7 +782,17 @@ struct Server::Impl {
             if (const auto seat = hub_seats.find(user.user_id); seat != hub_seats.end()) hub = seat->second;
         }
         if (!hub) hub = config.match_hub();
-        if (!hub || hub->code == host_identity->friend_code()) return std::nullopt;
+        if (!hub && !config.hub_reachable && config.await_match_hub)
+            hub = config.await_match_hub(config.hub_wait_budget);
+        if (!hub) {
+            Json none=Json::object();none.set("service",Json::of(request.service));none.set("task",Json::of(request.task));
+            none.set("reason",Json::of(!config.hub_reachable && config.await_match_hub ? "wait_expired" : "no_candidates"));
+            none.set("reachable",Json::of(config.hub_reachable));
+            none.set("candidates",Json::of(0));
+            none.set("wait_ms",Json::of(!config.hub_reachable && config.await_match_hub ? static_cast<unsigned>(config.hub_wait_budget.count()) : 0u));
+            record("hub_none",std::move(none));return std::nullopt;
+        }
+        if (hub->code == host_identity->friend_code()) return std::nullopt;
         Json message = Json::object();
         message.set("action", Json::of("mm_task"));
         message.set("name", Json::of(user.online_id));
@@ -2175,7 +2185,7 @@ struct Server::Impl {
         SOCKET s;
         if (open("http/" + std::to_string(config.http_port), SOCK_STREAM, config.host, config.http_port, s))
             listener_threads.emplace_back([this, s] { accept_loop(s, [this](SOCKET c, std::string peer) { handle_http(c, peer); }); });
-        if (open("lobby/tcp/3074", SOCK_STREAM, local_host, 3074, s))
+        if (open("lobby/tcp/" + std::to_string(config.lobby_port), SOCK_STREAM, local_host, config.lobby_port, s))
             listener_threads.emplace_back([this, s] {
                 accept_loop(s, [this](SOCKET c, std::string peer) { handle_lobby(c, peer, peer.substr(0, peer.rfind(':'))); });
             });
@@ -2294,6 +2304,7 @@ std::string Server::friend_code() const {
 std::vector<FriendState> Server::friends() const {
     return impl_->friend_watcher ? impl_->friend_watcher->friends() : std::vector<FriendState>{};
 }
+void Server::record_event(const char* name, Json fields) { impl_->record(name,std::move(fields)); }
 void Server::poll_friends() {
     if (impl_->friend_watcher) impl_->friend_watcher->poll_now();
 }

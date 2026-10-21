@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "launcher_online.hpp"
+#include "hub_election.hpp"
 #include "local_backup.hpp"
 #include "protocol.hpp"
 #include "server.hpp"
@@ -72,6 +73,8 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
     config.friend_network = true;
     config.local_name = local_name;
     config.match_hub = [this] { return match_hub(); };
+    config.hub_reachable = status.address_source != "lan";
+    config.await_match_hub = [this](std::chrono::milliseconds budget) { return hub_gate_.acquire(budget); };
     // A friend's service: its last verified endpoint, else a DHT lookup (at most once per five seconds per
     // friend, so offline friends do not keep the DHT busy). A found endpoint is saved in the rubrica.
     const fs::path friends_path = config.state_dir / "friends.json";
@@ -143,11 +146,8 @@ HostStatus Host::start(const std::filesystem::path& root, const std::string& man
         dht_ = std::move(dht);
         status_ = status;
     }
-    {
-        std::lock_guard<std::mutex> lock(hub_mutex_);
-        hub_stop_ = false;
-        hub_.reset();
-    }
+    hub_gate_.reset(status.address_source != "lan" ?
+        std::optional<MatchHub>(MatchHub{status.friend_code,status.public_ip,8780}) : std::nullopt);
     hub_thread_ = std::thread([this, root, self = MatchHub{status.friend_code, status.public_ip, 8780},
                                reachable = status.address_source != "lan"] { elect_hubs(root, self, reachable); });
     return status;
@@ -166,47 +166,50 @@ std::optional<MatchHub> choose_hub(const MatchHub& self, bool self_reachable, co
     return best;
 }
 
-std::optional<MatchHub> Host::match_hub() const {
-    std::lock_guard<std::mutex> lock(hub_mutex_);
-    return hub_;
-}
+std::optional<MatchHub> Host::match_hub() const { return hub_gate_.current(); }
 
-// Every minute (sooner while no hub is known): the services announced on the public
-// matchmaking key, each verified by its own identity answer, and the elected hub.
 void Host::elect_hubs(std::filesystem::path root, MatchHub self, bool self_reachable) {
-    (void)root;
-    auto wait = std::chrono::seconds(3);
-    while (true) {
-        {
-            std::unique_lock<std::mutex> lock(hub_mutex_);
-            if (hub_wake_.wait_for(lock, wait, [this] { return hub_stop_; })) return;
+    HubElection election(self,self_reachable);
+    const auto path=root/"runtime/user/online/hub_candidates.json";
+    election.load(path,party_now());
+    HubEvents events;
+    const auto record=[this](const char* event,Json fields){
+        std::lock_guard lock(mutex_);if(server_)server_->record_event(event,std::move(fields));
+    };
+    const auto publish=[&](std::optional<MatchHub> chosen,const std::string& source,std::size_t count){
+        events.observe(election,chosen,source,count,record);
+        auto ttl=std::chrono::seconds(HubElection::max_age);
+        if(chosen && chosen->code!=self.code){
+            const auto verified=election.candidates.at(chosen->code).verified;
+            const auto now=party_now();
+            ttl=std::chrono::seconds(HubElection::recent(verified,now)?HubElection::max_age-(now-verified):0);
         }
-        std::vector<MatchHub> verified;
-        // Short timeouts with a stop check per candidate: the launcher stops the host on its UI thread.
-        const auto stopping = [this] { std::lock_guard<std::mutex> lock(hub_mutex_); return hub_stop_; };
-        if (DhtService* shared = dht()) {
-            const auto endpoints = shared->search(public_matchmaking_key(), 3000);
-            for (std::size_t i = 0; i < endpoints.size() && i < 16 && !stopping(); ++i) {
-                std::string code;
-                const VerifyResult result = identify_endpoint(endpoints[i], code, 1500);
-                if (result.status == VerifyStatus::Verified) verified.push_back(MatchHub{code, result.ip, result.port});
-            }
+        if(!hub_gate_.stopping())hub_gate_.publish(chosen,ttl);
+    };
+    while(!hub_gate_.stopping()){
+        const auto started=std::chrono::steady_clock::now();
+        election.round(party_now(),[&]{
+            if(hub_gate_.stopping())return std::vector<std::string>{};
+            if(auto shared=dht())return shared->search(public_matchmaking_key(),6000);
+            return std::vector<std::string>{};
+        },[&](const std::string& endpoint)->std::optional<MatchHub>{
+            if(hub_gate_.stopping())return std::nullopt;
+            std::string code;const auto result=identify_endpoint(endpoint,code,1500);
+            if(result.status!=VerifyStatus::Verified)return std::nullopt;
+            return MatchHub{code,result.ip,result.port};
+        },publish,[]{return party_now();});
+        if(!hub_gate_.stopping() && !election.save(path)){
+            Json f=Json::object();f.set("reason",Json::of("candidate_cache_write_failed"));record("hub_cache_error",std::move(f));
         }
-        const auto chosen = choose_hub(self, self_reachable, verified);
-        {
-            std::lock_guard<std::mutex> lock(hub_mutex_);
-            hub_ = chosen;
-        }
-        wait = chosen ? std::chrono::seconds(60) : std::chrono::seconds(20);
+        const auto interval=match_hub()?std::chrono::seconds(60):std::chrono::seconds(5);
+        // At least one second between rounds; demands during an active round are coalesced.
+        const auto next=std::max(started+interval,std::chrono::steady_clock::now()+std::chrono::seconds(1));
+        if(!hub_gate_.wait_until(next))return;
     }
 }
 
 void Host::stop() {
-    {
-        std::lock_guard<std::mutex> lock(hub_mutex_);
-        hub_stop_ = true;
-    }
-    hub_wake_.notify_all();
+    hub_gate_.stop();
     if (hub_thread_.joinable()) hub_thread_.join();
     std::unique_ptr<Server> server;
     std::unique_ptr<PortMapper> mapper;
