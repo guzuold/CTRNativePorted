@@ -1168,26 +1168,50 @@ Bytes room_update_event(std::uint64_t lobby, const Json& host, const Json& backe
     w.string(dump_json(host)).string(dump_json(backend));
     return w.data();
 }
+std::optional<std::uint64_t> MatchmakingStore::promote(std::uint64_t id, Lobby& lobby, std::uint64_t lost,
+                                                       const std::map<std::uint64_t, std::string>& connected) {
+    const auto candidate = std::find_if(lobby.members.begin(), lobby.members.end(), [&](auto a) { return a != lost && !lobby.departed.count(a) && connected.count(a) && connected.at(a)==lobby.selector && player_rooms_.count(a) && player_rooms_.at(a)==lobby.selector && player_info(a); });
+    if (candidate == lobby.members.end() || !documents_.count(id)) return std::nullopt;
+    const auto account = *candidate;
+    auto& docs = documents_.at(id);
+    const auto advertisement = parse_json(*player_info(account));
+    const auto& listen = advertisement.at("listen_server");
+    docs.host.find("listen_server")->set("host_player_id", Json::of(account));
+    docs.host.find("listen_server")->set("host_address", listen.at("local_address"));
+    ++docs.update_id;
+    docs.host.set("update_id", Json::of(docs.update_id));
+    docs.backend.set("update_id", Json::of(docs.update_id));
+    lobby.host = account;
+    lobby.departed.insert(lost);
+    docs.host.set("ctr_migration",Json::of(migration_routes(id)));
+    return account;
+}
 std::vector<LobbyPlan> MatchmakingStore::promote_disconnected(std::uint64_t lost, const std::map<std::uint64_t, std::string>& connected) {
     std::vector<LobbyPlan> changed;
     for (auto& [id, lobby] : lobbies_) {
         if (lobby.host != lost) continue;
-        const auto candidate = std::find_if(lobby.members.begin(), lobby.members.end(), [&](auto a) { return a != lost && !lobby.departed.count(a) && connected.count(a) && connected.at(a)==lobby.selector && player_rooms_.count(a) && player_rooms_.at(a)==lobby.selector && player_info(a); });
-        if (candidate == lobby.members.end() || !documents_.count(id)) continue;
-        const auto account = *candidate;
-        auto& docs = documents_.at(id);
-        const auto advertisement = parse_json(*player_info(account));
-        const auto& listen = advertisement.at("listen_server");
-        docs.host.find("listen_server")->set("host_player_id", Json::of(account));
-        docs.host.find("listen_server")->set("host_address", listen.at("local_address"));
-        ++docs.update_id;
-        docs.host.set("update_id", Json::of(docs.update_id));
-        docs.backend.set("update_id", Json::of(docs.update_id));
-        lobby.host = account;
-        lobby.departed.insert(lost);
-        docs.host.set("ctr_migration",Json::of(migration_routes(id)));
-        LobbyPlan plan; plan.lobby_id = id; plan.host = account; changed.push_back(plan);
+        if (const auto account = promote(id, lobby, lost, connected)) {
+            LobbyPlan plan; plan.lobby_id = id; plan.host = *account; changed.push_back(plan);
+        }
     }
     return changed;
+}
+std::optional<std::uint64_t> MatchmakingStore::leave_lobby(std::uint64_t account, std::uint64_t lobby,
+                                                           const std::map<std::uint64_t, std::string>& connected) {
+    const auto row = lobbies_.find(lobby);
+    if (row == lobbies_.end() || std::find(row->second.members.begin(), row->second.members.end(), account) == row->second.members.end())
+        throw Rejected("not a member of this lobby");
+    if (row->second.departed.count(account)) return std::nullopt;
+    const auto promoted = row->second.host == account ? promote(lobby, row->second, account, connected) : std::nullopt;
+    row->second.departed.insert(account);
+    return promoted;
+}
+void MatchmakingStore::cancel_search(std::uint64_t account, std::uint64_t search_id) {
+    for (Search& s : searches_)
+        if (s.id == search_id && s.account == account && s.status == "pending") s.status = "cancelled";
+}
+bool MatchmakingStore::departed(std::uint64_t lobby, std::uint64_t account) const {
+    const auto row = lobbies_.find(lobby);
+    return row != lobbies_.end() && row->second.departed.count(account) != 0;
 }
 } // namespace ctr_online
