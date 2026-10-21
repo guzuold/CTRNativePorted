@@ -18,8 +18,10 @@
     "sha256": {
       "gpu/shadps4/video_core/renderer_vulkan/vk_ctr_framegen.h": "2e59fc838efcba0dc482d1299354756c9a4a73c78a67d1fd05cfc2a8fc47dc64",
       "gpu/shadps4/video_core/renderer_vulkan/vk_ctr_framegen.cpp": "5bd8cfd3141a05d4d9a722b81693d12797102194f00218b5def44785e907a14e",
-      "gpu/shadps4/video_core/host_shaders/fg_convert.comp": "81c259bf1db4bb75704cec7acf6833a7c1e4806cc4b0fab904d6cdda1b28886c"
+      "gpu/shadps4/video_core/host_shaders/fg_convert.comp": "81c259bf1db4bb75704cec7acf6833a7c1e4806cc4b0fab904d6cdda1b28886c",
+      "gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp (CaptureHudless)": "see revision"
     },
-    "adaptation": "ctr_framegen.{h,cpp}: optical flow only (no game vectors, no HUD-less frame), convert shader inlined, CTR_FRAMEGEN switch; presenter hooks in make_patched.py."
+    "adaptation": "ctr_framegen.{h,cpp}: game depth/motion from CtrDlss (FSR 3 or DLSS) or optical flow alone, HUD-less source from the display pass (CaptureHudless in rasterizer_methods.inc), convert shader inlined, CTR_FRAMEGEN switch; presenter hooks in make_patched.py fill only the gap to the 30/60 FPS target or CTR_FRAMEGEN_TARGET.",
+    "patches": "ctrport/gpu/patches/fsr-vulkan: gpu/patches/fsr-vulkan 0003-0006 at the same revision, unchanged"
   }
 }

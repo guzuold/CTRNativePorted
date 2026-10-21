@@ -18,6 +18,14 @@ inline int Mode() {
     }();
     return value;
 }
+// AMD FSR 3.1.6 frame generation (CTR_FRAMEGEN=1).
+inline bool FrameGen() {
+    static const bool value = [] {
+        const char* v = std::getenv("CTR_FRAMEGEN");
+        return v && *v && std::strcmp(v, "0") != 0 && std::strcmp(v, "off") != 0;
+    }();
+    return value;
+}
 // Populated by successful video-out registration, never inferred from dimensions.
 inline std::array<std::atomic<uintptr_t>, 16> display_buffers{};
 inline bool IsDisplay(uintptr_t address) {

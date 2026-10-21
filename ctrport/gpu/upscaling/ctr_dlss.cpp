@@ -222,6 +222,40 @@ bool CtrDlss::EnsureFsr3(u32 w, u32 h, u32 ow, u32 oh) {
     std::fflush(stdout);
     return true;
 }
+void CtrDlss::CameraPlanes(float& near_plane, float& far_plane, float& fov) const {
+    // Planes from the retail projection (floats 48-63, column-major): [5] = 1/tan(fov/2),
+    // [10] = A, [14] = B, near = B/(A-1), far = B/(A+1); CTR's own values otherwise.
+    near_plane = 16.0f;
+    far_plane = 150000.0f;
+    fov = 1.2870f;
+    if (camera_valid) {
+        const float* p = &camera[48];
+        const float a = p[10], b = p[14];
+        if (p[5] > 0.0f && std::isfinite(a) && std::isfinite(b) && a != 1.0f && a != -1.0f) {
+            fov = 2.0f * std::atan(1.0f / p[5]);
+            near_plane = std::abs(b / (a - 1.0f));
+            far_plane = std::abs(b / (a + 1.0f));
+        }
+    }
+    if (!(near_plane > 0.0f) || !(far_plane > near_plane) || !(fov > 0.01f && fov < 3.1f)) {
+        near_plane = 16.0f;
+        far_plane = 150000.0f;
+        fov = 1.2870f;
+    }
+}
+
+void CtrDlss::NoteVectors(u32 w, u32 h) {
+    auto& v = last_vectors;
+    ++v.sequence;
+    v.depth = vk::Image(depth_image);
+    v.motion = vk::Image(motion_image);
+    v.width = w;
+    v.height = h;
+    v.jitter[0] = frame_jitter[0];
+    v.jitter[1] = frame_jitter[1];
+    CameraPlanes(v.near_plane, v.far_plane, v.fov);
+}
+
 bool CtrDlss::Enabled() const {
     return !failed && ((CtrUpscaling::Mode() == 2 && !dlss_failed) || (CtrUpscaling::Mode() == 3 && !fsr3_failed));
 }
@@ -780,6 +814,7 @@ vk::ImageView CtrDlss::Upscale(VideoCore::ImageId source_id, vk::Format view_for
             UpscaleReadback(instance, scheduler, vk::Image(depth_image), vk::ImageLayout::eGeneral, {w,h}, 4, "dlss_depth_r32f");
             UpscaleReadback(instance, scheduler, vk::Image(motion_image), vk::ImageLayout::eGeneral, {w,h}, 4, "dlss_motion_rg16f");
         }
+        NoteVectors(w, h);
         reset = false;
         if (dump) {
             const auto name = "dlss_seq"+std::to_string(dump_frame)+"_output_rgba8";
@@ -796,23 +831,8 @@ vk::ImageView CtrDlss::Upscale(VideoCore::ImageId source_id, vk::Format view_for
     // 3. FSR 3.1: the same inputs (General layout), the frame in shader-read layout.
     if (use_fsr3) {
         if (!EnsureFsr3(w, h, out.width, out.height)) return {};
-        // Planes from the retail projection (floats 48-63, column-major): [5] = 1/tan(fov/2),
-        // [10] = A, [14] = B, near = B/(A-1), far = B/(A+1); CTR's own values otherwise.
-        float near_plane = 16.0f, far_plane = 150000.0f, fov = 1.2870f;
-        if (camera_valid) {
-            const float* p = &camera[48];
-            const float a = p[10], b = p[14];
-            if (p[5] > 0.0f && std::isfinite(a) && std::isfinite(b) && a != 1.0f && a != -1.0f) {
-                fov = 2.0f * std::atan(1.0f / p[5]);
-                near_plane = std::abs(b / (a - 1.0f));
-                far_plane = std::abs(b / (a + 1.0f));
-            }
-        }
-        if (!(near_plane > 0.0f) || !(far_plane > near_plane) || !(fov > 0.01f && fov < 3.1f)) {
-            near_plane = 16.0f;
-            far_plane = 150000.0f;
-            fov = 1.2870f;
-        }
+        float near_plane, far_plane, fov;
+        CameraPlanes(near_plane, far_plane, fov);
         const auto describe = [](vk::Image image, vk::Format format, u32 iw, u32 ih, vk::ImageUsageFlags usage,
                                  FfxVkPortableResourceState state) {
             FfxVkPortableImage d{};
@@ -889,6 +909,7 @@ vk::ImageView CtrDlss::Upscale(VideoCore::ImageId source_id, vk::Format view_for
                         frame_jitter[0], frame_jitter[1]);
             std::fflush(stdout);
         }
+        NoteVectors(w, h);
         reset = false;
         if (last_skip) {
             last_skip = nullptr;
