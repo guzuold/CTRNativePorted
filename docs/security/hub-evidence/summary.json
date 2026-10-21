@@ -1,0 +1,98 @@
+{
+  "after-election.log": {
+    "checks": 22,
+    "failed": 0
+  },
+  "after-wait.log": {
+    "checks": 7,
+    "failed": 0
+  },
+  "before-election.log": {
+    "checks": 11,
+    "failed": 7
+  },
+  "before-wait.log": {
+    "checks": 7,
+    "failed": 7
+  },
+  "current-member-v054-hub.log": {
+    "checks": 7,
+    "failed": 0
+  },
+  "hle-default.log": {
+    "checks": 87,
+    "failed": 0
+  },
+  "hle-ingress.log": {
+    "checks": 11,
+    "failed": 0
+  },
+  "hle-offline.log": {
+    "checks": 2,
+    "failed": 0
+  },
+  "hle-relay-auto-direct.log": {
+    "checks": 8,
+    "failed": 0
+  },
+  "hle-relay-auto-fallback.log": {
+    "checks": 7,
+    "failed": 0
+  },
+  "hle-relay-block.log": {
+    "checks": 4,
+    "failed": 0
+  },
+  "hle-relay.log": {
+    "checks": 18,
+    "failed": 0
+  },
+  "server-connection-policy-only.log": {
+    "checks": 15,
+    "failed": 0
+  },
+  "server-default.log": {
+    "checks": 237,
+    "failed": 0
+  },
+  "server-friend-restart-only.log": {
+    "checks": 8,
+    "failed": 0
+  },
+  "server-invite-pull-only.log": {
+    "checks": 11,
+    "failed": 0
+  },
+  "server-party-migration-only.log": {
+    "checks": 8,
+    "failed": 0
+  },
+  "server-peer-only.log": {
+    "checks": 34,
+    "failed": 0
+  },
+  "server-room-invite-only.log": {
+    "checks": 20,
+    "failed": 0
+  },
+  "server-security-blob.log": {
+    "checks": 1,
+    "failed": 0
+  },
+  "server-security-http.log": {
+    "checks": 29,
+    "failed": 0
+  },
+  "server-security-json.log": {
+    "checks": 1,
+    "failed": 0
+  },
+  "server-security-ports.log": {
+    "checks": 13,
+    "failed": 0
+  },
+  "v054-member-current-hub.log": {
+    "checks": 3,
+    "failed": 0
+  }
+}

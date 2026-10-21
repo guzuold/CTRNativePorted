@@ -1,6 +1,6 @@
 # Matchmaking hub resistance — proposal only
 
-No hub election, DHT sampling, player quotas or wire formats are changed by this branch. A key-derived ranking does not resist an adversary who can cheaply generate keys. Unauthenticated DHT candidates and a four-player-per-key quota also do not establish independent operators.
+Original security-branch proposal, before hub-election. The hub-election branch now implements a retained verified pool and IP deduplication (see hub-election.md); quotas, witness selection and wire formats remain unchanged. A key-derived ranking does not resist an adversary who can cheaply generate keys. Unauthenticated DHT candidates and a four-player-per-key quota also do not establish independent operators.
 
 | Option | Design | Cost and limitations |
 | --- | --- | --- |
@@ -9,3 +9,14 @@ No hub election, DHT sampling, player quotas or wire formats are changed by this
 | 3. Explicit trust with optional community hubs | Let users pin vetted hub keys, use a maintained or user-owned list with independent operators, and optionally opt into open discovery. Apply IP quotas and diverse failover even for pinned hubs. | Operational moderation, key rotation and availability cost; less decentralized. Pinning prevents arbitrary key generation from winning election but trusted hubs still see names/IPs and can censor. Multiple pinned operators provide failover, not guaranteed honest matchmaking. |
 
 Suggested sequence for a future decision: first option 1 as bounded abuse mitigation; choose between option 2's new protocol/trust requirements and option 3's explicit operators before claiming election resistance. Tests should cover 10000 keys on one IP, port churn, multiple users behind NAT, poisoned first-16 announcements, candidate timeouts, a disappearing hub and conflicting signed assignments. Any new negotiation needs a legacy compatibility plan; none is implemented here.
+
+
+## External reachability confirmation (proposal, not implemented)
+
+UPnP returning a public address proves what the router reports, not that an unsolicited connection reaches this service. Double NAT, a missing mapping, a firewall or an incorrectly entered manual address can still split public matchmaking. Identity verification of a *remote* candidate does not validate our own inbound reachability.
+
+A future service could ask an already authenticated external peer to fetch its public `/ctr/v1/identity?nonce=...`. The witness must verify the nonce-bound signature against the requesting service's expected key and return a signed short-lived result bound to that key, endpoint, challenge and observation time. Require a genuinely external witness (not the same LAN/NAT), refresh the lease, and distinguish `confirmed`, `unconfirmed` and `failed` reachability. One witness can lie; independent witnesses improve confidence but do not establish Sybil resistance.
+
+Constrain callback destinations to the authenticated caller's observed public IP and the advertised service port; reject private, loopback, link-local and multicast destinations, redirects and arbitrary hostnames. Bound requests, concurrency and response size to avoid turning witnesses into scanners or amplifiers. An explicit opt-in/manual configuration is needed if another address must be tested. Never use a witness failure to silently drop an established room.
+
+v0.5.4 understands the existing identity GET but has no action asking it to perform a callback. Therefore this needs explicit capability/version negotiation and a new optional signed action; an unsupported action or missing capability means *unknown*, not success. Old peers must continue to exchange the existing identity and matchmaking messages. Keeping the legacy UPnP/manual heuristic for old peers preserves availability but also preserves its false-positive risk; requiring confirmed reachability globally would be a behavioral compatibility break. No new wire action or confirmation claim is introduced here. Before implementation, test an external witness, double NAT, stale/replayed evidence, a malicious destination, witness disagreement, and both mixed-version directions.

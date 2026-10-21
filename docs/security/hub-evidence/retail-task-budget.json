@@ -1,0 +1,43 @@
+{
+  "retail_eboot_sha256": "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5",
+  "flat_elf_sha256": "a12626f4b7547fb49e8ac810d881e2fe507d5abec38106a093165eb40e3f06cd",
+  "checks": [
+    {
+      "description": "base_task_initializer",
+      "elf_va": "0x3f0310",
+      "size": 33,
+      "equal_to_pinned_retail": true,
+      "sha256": "af9b8f606cb49d9852b1eba8c12be60e016e519140cf5133482626d750687009"
+    },
+    {
+      "description": "duration_registration",
+      "elf_va": "0x1711ed5",
+      "size": 32,
+      "equal_to_pinned_retail": true,
+      "sha256": "d235f27617f69f99a588b8afdc6bea586d53985fe0c7c84224820edb08f99897"
+    },
+    {
+      "description": "default_duration",
+      "elf_va": "0x1c385bc",
+      "size": 4,
+      "equal_to_pinned_retail": true,
+      "sha256": "80c8a717ccd70c8809eb78e6a9591c003e11c721fe0ccaf62fd592abda1a5593"
+    },
+    {
+      "description": "request_constructor",
+      "elf_va": "0x11f620",
+      "size": 315,
+      "equal_to_pinned_retail": true,
+      "sha256": "3752e9d14537c99788376c802042df935e889d3a87b0d0a3bbba22f2cbe831c4"
+    },
+    {
+      "description": "request_status",
+      "elf_va": "0x122c10",
+      "size": 101,
+      "equal_to_pinned_retail": true,
+      "sha256": "69edcdb4f3369b78432f3456ef03eb6cec48389ce774fe36208c2fe7a9702324"
+    }
+  ],
+  "default_seconds": 10.0,
+  "scope": "Static retail observations only; runtime overrides and UI cancellation not verified."
+}

@@ -68,3 +68,8 @@ Runtime milestones: build evidence only in this security task; no new title/menu
 - 2e8cb52 — JSON depth bound and nonrecursive typed lengths.
 - 868eefd — HTTP source boundary, connection deadlines/caps, local listeners/UPnP, invitation ownership correction and regression evidence.
 - The following documentation commit adds this report, route/parser audits, hub proposal, README and Unreleased changelog. Use `git log --oneline b95b24e..security/v0.5.5` for the complete immutable list including that commit.
+
+
+## Hub-election follow-up (2026-10-21)
+
+The `hub-election` branch starts at `f4d7cc6`, after this security work. See [hub-election.md](hub-election.md) for the retained candidate set, persistence, bounded task wait, deadline evidence, logging, before/after tests, mixed-version protocol checks and outstanding manual CGNAT acceptance. All 18 modes above were rerun successfully; `hub-evidence/suite-exits.json` and its per-mode logs preserve results. The ingress files are unchanged. The external-reachability witness remains a proposal.
