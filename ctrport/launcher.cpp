@@ -107,10 +107,6 @@ const wchar_t* const kSceneHeights[] = {L"720", L"900", L"1080", L"1440", L"1800
 constexpr int ID_UPSCALER = 905;
 const wchar_t* const kUpscalers[] = {L"off", L"fsr1", L"fsr3", L"dlss"};
 const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3.1", L"DLSS (experimental)"};
-// Frame generation: off, filling the gap to the game's own 30/60, or a higher target (at most
-// twice the real frame rate: one generated frame per real one).
-const wchar_t* const kFrameGen[] = {L"off", L"auto", L"90", L"120", L"144"};
-const wchar_t* const kFrameGenLabels[] = {L"Frame gen: off", L"Frame gen: fill gaps", L"Frame gen: 90 FPS", L"Frame gen: 120 FPS", L"Frame gen: 144 FPS"};
 const wchar_t* const kSceneLabels[] = {L"1280 x 720", L"1600 x 900", L"1920 x 1080", L"2560 x 1440", L"3200 x 1800", L"3840 x 2160 (4K)"};
 const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
@@ -127,7 +123,7 @@ int game_language_index(const std::wstring& code) {
 }
 
 enum : int {
-    ID_GAME_LANGUAGE = 193, ID_SPLIT_SCREEN = 194, ID_FRAMEGEN = 195,
+    ID_GAME_LANGUAGE = 193, ID_SPLIT_SCREEN = 194,
     ID_MINIMIZE = 191, ID_CLOSE,
     ID_XBOX_PROMPTS = 190,
     ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
@@ -160,7 +156,6 @@ struct Config {
     bool wumpa_x100 = false;
     bool xbox_prompts = true;
     bool split_screen = false;
-    std::wstring framegen = L"off";  // AMD FSR 3.1.6 frame generation, one of kFrameGen
     bool mods_enabled = true;
     std::wstring trophy_key;  // the user's PS4 trophy key (32 hex digits), optional
     // Controller of each player: "auto", "none", "keyboard", "xinput:N" or "hid:<device path>".
@@ -343,7 +338,6 @@ struct App {
     HWND window = nullptr, base_edit = nullptr, patch_edit = nullptr, width_edit = nullptr, height_edit = nullptr;
     HWND scene_combo = nullptr;
     HWND upscaler_combo = nullptr;
-    HWND framegen_combo = nullptr;
     HWND patch_browse = nullptr, fps_toggle = nullptr, launch = nullptr, hot = nullptr;
     HWND online_toggle = nullptr, online_id_edit = nullptr;
     // Friends drawer: the rubrica (runtime/user/online/friends.json) with each friend's presence
@@ -567,7 +561,7 @@ void load_config() {
             text(L"online_public_ip", g.cfg.online_public_ip); flag(L"online_host", g.cfg.online_host);
             text(L"public_server", g.cfg.public_server);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
-            flag(L"split_screen", g.cfg.split_screen); flag(L"mods_enabled", g.cfg.mods_enabled); flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen); text(L"framegen", g.cfg.framegen);
+            flag(L"split_screen", g.cfg.split_screen); flag(L"mods_enabled", g.cfg.mods_enabled); flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
             g.cfg.scene_height = g.cfg.native_4k ? L"2160" : (g.cfg.ps4_pro ? L"1440" : L"1080");
             text(L"scene_height", g.cfg.scene_height);
             text(L"upscaler", g.cfg.upscaler);
@@ -579,7 +573,6 @@ void load_config() {
     }
     if (std::find(std::begin(kSceneHeights), std::end(kSceneHeights), g.cfg.scene_height) == std::end(kSceneHeights)) g.cfg.scene_height = L"1440";
     if (std::find(std::begin(kUpscalers), std::end(kUpscalers), g.cfg.upscaler) == std::end(kUpscalers)) g.cfg.upscaler = L"off";
-    if (std::find(std::begin(kFrameGen), std::end(kFrameGen), g.cfg.framegen) == std::end(kFrameGen)) g.cfg.framegen = L"off";
     g.cfg.game_language = kGameLanguages[game_language_index(g.cfg.game_language)].code;
     launcher_text::set_language(g.cfg.game_language);
     if (g.cfg.online_id.empty()) g.cfg.online_id = L"CTRPlayer";
@@ -607,7 +600,7 @@ void save_config() {
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
     const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"scene_height\": " + json_string(g.cfg.scene_height) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
-        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"framegen\": " + json_string(g.cfg.framegen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) + ",\n  \"mods_enabled\": " + flag(g.cfg.mods_enabled) +
+        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) + ",\n  \"mods_enabled\": " + flag(g.cfg.mods_enabled) +
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
         ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) + ",\n  \"game_language\": " + json_string(g.cfg.game_language) +
         ",\n  \"online\": " + flag(g.cfg.online) +
@@ -1637,7 +1630,6 @@ void select_tab(int tab) {
     for (HWND combo : g.player_combo) if (combo) ShowWindow(combo, show_settings ? SW_SHOW : SW_HIDE);
     ShowWindow(g.scene_combo, show_settings ? SW_SHOW : SW_HIDE);
     ShowWindow(g.upscaler_combo, show_settings ? SW_SHOW : SW_HIDE);
-    ShowWindow(g.framegen_combo, show_settings ? SW_SHOW : SW_HIDE);
     if (g.online_id_edit) ShowWindow(g.online_id_edit, show_settings ? SW_SHOW : SW_HIDE);
 
     const bool show_custom = (show_settings && g.resolution == 4 && !g.cfg.fullscreen);
@@ -2184,8 +2176,6 @@ void launch_game() {
     set[L"CTR_NEO_MODE"] = L"1";
     set[L"CTR_SCENE_HEIGHT"] = g.cfg.scene_height;
     set[L"CTR_UPSCALER"] = g.cfg.upscaler;
-    set[L"CTR_FRAMEGEN"] = g.cfg.framegen == L"off" ? L"0" : L"1";
-    if (g.cfg.framegen != L"off" && g.cfg.framegen != L"auto") set[L"CTR_FRAMEGEN_TARGET"] = g.cfg.framegen;
     set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
     if (!g.cfg.trophy_key.empty()) set[L"CTR_TROPHY_KEY"] = g.cfg.trophy_key;
@@ -2417,13 +2407,6 @@ void create_controls() {
         SendMessageW(g.upscaler_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kUpscalerLabels[i]));
         if (g.cfg.upscaler == kUpscalers[i]) SendMessageW(g.upscaler_combo, CB_SETCURSEL, i, 0);
     }
-    g.framegen_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(542), px(190), px(170), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_FRAMEGEN)), nullptr, nullptr);
-    SendMessageW(g.framegen_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
-    for (int i = 0; i < static_cast<int>(std::size(kFrameGen)); ++i) {
-        SendMessageW(g.framegen_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(tr(kFrameGenLabels[i])));
-        if (g.cfg.framegen == kFrameGen[i]) SendMessageW(g.framegen_combo, CB_SETCURSEL, i, 0);
-    }
 
     // Online Section (Card 2)
     g.online_toggle = add_button(ID_ONLINE_TOGGLE, Kind::Toggle, rect(548, 196, 190, 26), L"Multiplayer Online", &g.cfg.online, -1, TAB_SETTINGS);
@@ -2543,12 +2526,6 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         if (id == ID_SCENE_RES && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.scene_combo, CB_GETCURSEL, 0, 0);
             if (selected >= 0 && selected < 6) g.cfg.scene_height = kSceneHeights[selected];
-            validate();
-            return 0;
-        }
-        if (id == ID_FRAMEGEN && code == CBN_SELCHANGE) {
-            const auto selected = SendMessageW(g.framegen_combo, CB_GETCURSEL, 0, 0);
-            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kFrameGen))) g.cfg.framegen = kFrameGen[selected];
             validate();
             return 0;
         }
