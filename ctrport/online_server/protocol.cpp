@@ -137,19 +137,25 @@ Param Reader::value() {
         return p;
     }
     if (kind == typed::BLOB) {
-        const Param length = value();
-        if (length.kind != typed::UINT32 || length.value.as_u64() > data_.size() - offset_)
+        if (raw_u8() != typed::UINT32 || data_.size() - offset_ < 4)
+            throw ProtocolError("expected UINT32 length");
+        const auto length = load_le(data_.data() + offset_, 4);
+        offset_ += 4;
+        if (length > data_.size() - offset_)
             throw ProtocolError("invalid typed blob length");
-        const std::size_t n = static_cast<std::size_t>(length.value.as_u64());
+        const std::size_t n = static_cast<std::size_t>(length);
         p.value = Json::of(hex(slice(data_, offset_, offset_ + n)));
         offset_ += n;
         return p;
     }
     if (kind == typed::STRUCT) {
-        const Param length = value();
-        if (length.kind != typed::UINT32 || length.value.as_u64() > data_.size() - offset_)
+        if (raw_u8() != typed::UINT32 || data_.size() - offset_ < 4)
+            throw ProtocolError("expected UINT32 length");
+        const auto length = load_le(data_.data() + offset_, 4);
+        offset_ += 4;
+        if (length > data_.size() - offset_)
             throw ProtocolError("invalid struct buffer length");
-        const std::size_t n = static_cast<std::size_t>(length.value.as_u64());
+        const std::size_t n = static_cast<std::size_t>(length);
         p.value = Json::of(hex(slice(data_, offset_, offset_ + n)));
         offset_ += n;
         return p;

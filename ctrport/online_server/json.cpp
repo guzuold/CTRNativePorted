@@ -100,7 +100,7 @@ struct Parser {
         return v;
     }
     std::string string() {
-        if (s[i] != '"') fail("expected string");
+        if (i >= s.size() || s[i] != '"') fail("expected string");
         ++i;
         std::string out;
         while (true) {
@@ -130,10 +130,12 @@ struct Parser {
             }
         }
     }
-    Json value() {
+    Json value(unsigned depth = 0) {
+        if (depth > 64) fail("nesting limit exceeded");
         space();
         if (i >= s.size()) fail("unexpected end");
         const char c = s[i];
+        if (depth >= 64 && (c == '{' || c == '[')) fail("nesting limit exceeded");
         if (c == '{') {
             ++i; Json object = Json::object(); space();
             if (i < s.size() && s[i] == '}') { ++i; return object; }
@@ -141,7 +143,7 @@ struct Parser {
                 space(); std::string key = string(); space();
                 if (i >= s.size() || s[i] != ':') fail("expected ':'");
                 ++i;
-                Json item = value();
+                Json item = value(depth + 1);
                 // Python json keeps the last duplicate key.
                 object.set(key, std::move(item));
                 space();
@@ -154,7 +156,7 @@ struct Parser {
             ++i; Json array = Json::array(); space();
             if (i < s.size() && s[i] == ']') { ++i; return array; }
             while (true) {
-                array.items.push_back(value()); space();
+                array.items.push_back(value(depth + 1)); space();
                 if (i < s.size() && s[i] == ',') { ++i; continue; }
                 if (i < s.size() && s[i] == ']') { ++i; return array; }
                 fail("expected ',' or ']'");
