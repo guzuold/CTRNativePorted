@@ -1,12 +1,17 @@
 # Scene upscaling
 
-Launcher Settings → Scene upscaling: **Off** (default), **AMD FSR 1**, or
-**DLSS (experimental)**. CLI: `python ctrport/play_gpu.py --1.21 --internal-res 1080
---upscaler dlss --res 1920 1080`. Environment: `CTR_UPSCALER=off|fsr1|dlss`.
+Launcher Settings → Scene upscaling: **Off** (default), **AMD FSR 1**, **AMD FSR 3.1**
+or **DLSS (experimental)**. CLI: `python ctrport/play_gpu.py --1.21 --internal-res 1080
+--upscaler fsr3 --res 1920 1080`. Environment: `CTR_UPSCALER=off|fsr1|fsr3|dlss`.
 Changing the setting requires restarting the game.
 
-FSR here means the spatial FSR 1 EASU + RCAS implementation already in pinned
-shadPS4 v0.18.0. This is not FSR 3, frame generation, or DLSS Ray Reconstruction.
+FSR 1 is the spatial EASU + RCAS implementation already in pinned shadPS4 v0.18.0.
+FSR 3.1 is AMD's temporal upscaler through FireBurn/FSR-Vulkan (MIT), pinned at
+`c64f093404125e960813f95f1996c14780f0dd69` by `tools/bootstrap.ps1` and patched by
+`build.ps1` (`patches/fsr-vulkan/README.md`). It receives exactly the inputs DLSS gets
+(scene color, R32F depth, RG16F motion, Halton jitter, the retail projection's near/far
+planes and field of view) and shares DLSS's object-motion limits below.
+`CTR_FSR3_SHARPNESS` (0–1, default 0.3) sets its sharpening.
 DLSS Super Resolution requires an RTX GPU, its driver, the bridge, and NVIDIA's DLL.
 
 ## Actual rendering path
@@ -142,6 +147,16 @@ Full evidence, build hashes, 21 active compatibility stubs and the 10 distinct
 called stubs per run: `reports/reconstruction/infra/race_upscaling_20261016.json`.
 All raw game-derived captures remain under ignored `runtime/user/instances`.
 Runtime race evidence advances; reconstructed replacements remain zero.
+
+## Frame generation (set aside)
+
+`upscaling/ctr_framegen.{h,cpp}` adapts GetLostIn's FSR 3.1.6 frame generation: it fills
+only the gap between the real frame rate and the target (the game's 30/60, or
+`CTR_FRAMEGEN_TARGET`), uses the upscaler's depth and motion when FSR 3 or DLSS ran, and
+interpolates a HUD-less copy of the frame captured between the scene stretch and the first
+HUD draw. It is off unless `CTR_FRAMEGEN=1` and has no launcher setting: in a race on
+2026-10-21 (FSR 3, 720p scene, 1920x1080 window) it reached about twice the real rate with
+game motion and the HUD kept out, but moving images still left visible trails.
 
 ## Portable release distribution
 

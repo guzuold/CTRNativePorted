@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.5.3](https://github.com/guzuold/CTRNativePorted/releases)**
+**Latest release: [v0.5.4](https://github.com/guzuold/CTRNativePorted/releases)**
 (experimental pre-release). The game is playable from start to finish. Online races
 between two PCs over the Internet work and complete, in private matches and in public
 matchmaking; see the [limits](#online-status-and-limits).
@@ -48,6 +48,8 @@ matchmaking; see the [limits](#online-status-and-limits).
 - **PS4 Pro rendering mode.**
 - **Upscaling:**
   - AMD FSR 1 for the 3D scene, applied before the HUD;
+  - AMD FSR 3.1 (temporal), through FireBurn/FSR-Vulkan, on the same depth, motion and jitter
+    as DLSS;
   - NVIDIA DLSS (experimental), which needs an NVIDIA SDK bridge that you build yourself.
   See [`ctrport/gpu/UPSCALING.md`](ctrport/gpu/UPSCALING.md).
 - **Window or full screen,** with resolution presets or a custom size.
@@ -328,6 +330,12 @@ players, and real implementations for the online compatibility stubs still activ
 - [shadPS4](https://github.com/shadps4-emu/shadPS4) v0.18.0 (GPL-2.0-or-later): renderer,
   GnmDriver, VideoOut, event queues and public NID names.
 - Bloodborne Windows port (bbport, revision `4fcdf770`, GPL-2.0): shims, reviewed per file.
+- [FireBurn/FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) (MIT, commit `c64f0934`):
+  AMD FSR 3.1 for Vulkan, with four patches from GetLostIn/CTR-NitroFueled-PC
+  ([`ctrport/gpu/patches/fsr-vulkan`](ctrport/gpu/patches/fsr-vulkan/README.md)).
+- [GetLostIn/CTR-NitroFueled-PC](https://github.com/GetLostIn/CTR-NitroFueled-PC)
+  (GPL-2.0-or-later): CTR scene-upscaling inputs, DLSS and frame-generation code
+  (revisions in `ctrport/gpu/upscaling/SOURCES.json`).
 - [jech/dht](https://github.com/jech/dht) (MIT): the Mainline DHT implementation
   ([`ctrport/dht/LICENCE`](ctrport/dht/LICENCE)).
 - 60 FPS patch: "60 FPS Unlock" 2.0 by **illusion**, from the
