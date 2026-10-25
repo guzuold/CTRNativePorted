@@ -13,10 +13,11 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.5.9](https://github.com/guzuold/CTRNativePorted/releases)**
-(experimental pre-release). The game is playable from start to finish. Online races
-between two PCs over the Internet work and complete, in private matches and in public
-matchmaking; see the [limits](#online-status-and-limits).
+**Latest release: [v0.6.0](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.6.0)**
+(experimental pre-release): PC Settings inside the game's own Options menu. The game is
+playable from start to finish. Online races between two PCs over the Internet work and
+complete, in private matches and in public matchmaking; see the
+[limits](#online-status-and-limits).
 
 ## Contents
 
@@ -42,6 +43,12 @@ matchmaking; see the [limits](#online-status-and-limits).
 - **Retail fonts and launcher background** come from your own dump. None are distributed.
 
 ### Graphics
+- **PC Settings in the game's Options menu** (v01.21): native pages in the game's language
+  for display, graphics, resolution and upscaling, quality, shadows and effects, and
+  quality presets. Anti-aliasing (FXAA, off, SMAA), bloom, motion blur, depth of field,
+  fur detail and view distance apply at once; the other settings at the next start. The
+  menu is built at startup from your own game archives, which are only read; nothing from
+  the game is distributed. See [`ctrport/settings/README.md`](ctrport/settings/README.md).
 - **Internal 3D resolution** from 720p to native 4K (720p, 900p, 1080p, 1440p, 1800p,
   2160p), independent of the window or display resolution.
 - **60 FPS** on v01.21, through the community "60 FPS Unlock" patch, applied in memory only.
@@ -109,6 +116,8 @@ matchmaking; see the [limits](#online-status-and-limits).
   crash. Signed snapshots of the Pit Stop wallet are kept too. See
   [`ctrport/LOCAL_BACKUPS.md`](ctrport/LOCAL_BACKUPS.md).
 - **Read-only game folders:** logs, saves, caches and settings stay in `runtime/user`.
+- **Logs with a size limit:** per game session and stream, the first 32 MB and the last
+  16 MB are kept; only the 8 most recent sessions stay in `runtime/user/logs`.
 
 ## Online play without a central server
 
@@ -321,6 +330,9 @@ Tests:
 - **`ctrport/gpu/`: `ctr_gpu.dll`.** The shadPS4 v0.18.0 command processor, shader
   recompiler and Vulkan renderer, compiled in place with shims adapted from the Bloodborne
   Windows port. Provenance is in [`ctrport/gpu/VENDOR.md`](ctrport/gpu/VENDOR.md).
+- **`ctrport/settings/`: PC Settings.** The in-game menu (generated from the retail
+  menu templates and served as virtual archives), the selector bridge to the shared
+  settings file, the live graphics options and the renderer controls they drive.
 - **`ctrport/hle/`: `ctr_hle.dll`.** System functions written directly in the game's SysV
   ABI: NP and online, sockets, trophies, save data and dialogs.
 - **`ctrport/online_server/`: the online service.** It runs inside the launcher and covers:
