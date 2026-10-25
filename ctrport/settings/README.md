@@ -38,6 +38,11 @@ those tools are not part of this repository.
 
 ## If the game does not start after a change
 
-Close the game and the launcher and run `Reset-PC-Graphics.cmd` in the installation
-folder. It restores the graphics settings without starting the game, keeps the
-previous file as `.bak` and leaves game paths, saves and other settings alone.
+Close the game and the launcher, open a command prompt in the installation folder and
+run:
+
+    build\CTRPort-gpu\ctrport.exe --settings-reset-graphics runtime\user\launcher_config.json
+
+It prints `SETTINGS_GRAPHICS_RESET` and restores the graphics settings without starting
+the game, keeps the previous file as `.bak` and leaves game paths, saves and other
+settings alone.

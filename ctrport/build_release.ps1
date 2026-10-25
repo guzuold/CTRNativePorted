@@ -74,9 +74,18 @@ Copy-Item "$PSScriptRoot/assets/xbox-default/*" (Join-Path $out 'assets/xbox-def
 Copy-Item "$PSScriptRoot/dht/LICENCE" (Join-Path $out 'licenses/jech-dht-LICENCE.txt') -Force
 foreach ($doc in 'README.md', 'LICENSE', 'CHANGELOG.md', 'FIRST_UPDATE.md') { Copy-Item (Join-Path $root $doc) $out -Force }
 Copy-Item "$PSScriptRoot/settings/README.md" (Join-Path $out 'PC_SETTINGS.md') -Force
-Copy-Item "$PSScriptRoot/settings/Reset-PC-Graphics.cmd" $out -Force
 foreach ($doc in 'ctrport/UPDATES.md', 'ctrport/MODS.md', 'ctrport/gpu/UPSCALING.md', 'ctrport/online_server/INVITATIONS.md', 'tools/online/HOST_MIGRATION.md', 'ctrport/LOCAL_BACKUPS.md') {
     $path = Join-Path $root $doc
     if (Test-Path -LiteralPath $path) { Copy-Item $path $out -Force }
+}
+Step 'package paths'
+# Installed launchers apply only the updater's closed list of paths (launcher_update.ps1,
+# Assert-PackagePath): any other file at the top makes Check updates refuse the whole ZIP.
+# Child scope: the updater's -Root parameter would otherwise replace $root here.
+& {
+    $base = (Resolve-Path -LiteralPath $out).Path
+    . "$PSScriptRoot/launcher_update.ps1" -Mode Library
+    Get-ChildItem -LiteralPath $base -Recurse -File | Where-Object { $_.FullName -notlike "$base\obj\*" } |
+        ForEach-Object { Assert-PackagePath $_.FullName.Substring($base.Length + 1).Replace('\', '/') }
 }
 Write-Output "release build ok: $out (start launcher.exe)"
