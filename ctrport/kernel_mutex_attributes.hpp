@@ -2,6 +2,7 @@
 // New owned attribute implementation. Public pinned shadPS4 behavior recorded in
 // (development notes)
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "kernel_mutex.hpp"
 namespace ctrport {
 struct KernelMutexAttributes { std::uint32_t type=1,protocol=0;std::int32_t ceiling=0; };

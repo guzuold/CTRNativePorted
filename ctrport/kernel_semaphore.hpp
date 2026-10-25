@@ -3,6 +3,7 @@
 // threads/semaphore.cpp316-329, e3ce810f3a653f43ac64ebab63023de281a4103a
 // GPL-2.0-or-later. Own implementation; delete/cancel remain missing.
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "kernel_time.hpp"
 #include "thread_identity.hpp"
 #include <map>
@@ -42,7 +43,7 @@ public:
         std::unique_lock<std::mutex> guard(object->operation);
         if(object->tokens>=need) {object->tokens-=need;return 0;}
         if(timeout && !*timeout) return static_cast<int>(0x8002003cU);
-        std::fprintf(stderr,"semaphore blocking id=%u need=%d attr=%u priority=%d thread=%lu\n",id,need,object->attribute,effective_guest_priority(),GetCurrentThreadId());std::fflush(stderr);
+        if(ctrport::settings::hot_trace()){std::fprintf(stderr,"semaphore blocking id=%u need=%d attr=%u priority=%d thread=%lu\n",id,need,object->attribute,effective_guest_priority(),GetCurrentThreadId());std::fflush(stderr);}
         KernelSemaphore::Waiter waiter{need,effective_guest_priority()};
         auto position=object->waiters.end();
         if(object->attribute!=1){position=object->waiters.begin();while(position!=object->waiters.end() && (*position)->priority<=waiter.priority)++position;}

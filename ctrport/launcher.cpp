@@ -39,6 +39,8 @@ namespace Gdiplus { using std::min; using std::max; }
 #include "xbox_prepare.hpp"
 #include "launcher_font.hpp"
 #include "launcher_update.hpp"
+#include "bounded_log.hpp"
+#include "settings/store.hpp"
 #include "guest_patch_xml.hpp"
 #include "launcher_text.hpp"
 #include "trophy_data.hpp"
@@ -536,6 +538,9 @@ std::wstring relative_to_root(const std::wstring& folder) {
     return relative.empty() || relative.native().starts_with(L"..") ? folder : relative.wstring();
 }
 
+ctr_online::Json settings_last_ui_snapshot = ctr_online::Json::object();
+ctr_online::Json settings_ui_snapshot();
+
 void load_config() {
     std::error_code ec;
     for (const fs::path candidate : {fs::path(L"dump\\CUSA14876")})
@@ -543,14 +548,28 @@ void load_config() {
     for (const fs::path candidate : {fs::path(L"dump\\CUSA14876-patch"),
                                      resolve(g.cfg.base_dir).parent_path() / L"CUSA14876-patch"})
         if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.patch_dir = candidate.wstring(); g.cfg.use_patch = true; break; }
-    std::ifstream in(config_path(), std::ios::binary);
-    if (in) {
-        std::stringstream buffer;
-        buffer << in.rdbuf();
+    ctr_online::Json document = ctr_online::Json::object();
+    try { document = ctrport::settings::Store(config_path()).read(); }
+    catch (const std::exception& error) {
+        const std::wstring message = L"Settings could not be loaded. The file has been preserved.\n" + widen(error.what()) +
+            L"\n\nRestore the previous settings? The current file will be preserved separately.";
+        if (MessageBoxW(nullptr, message.c_str(), L"Settings recovery", MB_YESNO | MB_ICONWARNING) == IDYES) {
+            try {
+                ctrport::settings::Store(config_path()).restore_backup();
+                document = ctrport::settings::Store(config_path()).read();
+            } catch (const std::exception& recovery) {
+                MessageBoxW(nullptr, widen(recovery.what()).c_str(), L"Settings recovery failed", MB_ICONERROR);
+            }
+        }
+    }
+    {
         std::map<std::wstring, std::wstring> strings;
         std::map<std::wstring, bool> bools;
-        bool parsed = false;
-        try { parsed = parse_flat_json(widen(buffer.str()), strings, bools); } catch (const std::exception&) {}
+        for (const auto& item : document.members) {
+            if (item.second.is_string()) strings.emplace(widen(item.first), widen(item.second.text));
+            else if (item.second.is_bool()) bools.emplace(widen(item.first), item.second.boolean);
+        }
+        const bool parsed = true;
         if (parsed) {
             auto text = [&](const wchar_t* key, std::wstring& out) { if (strings.count(key)) out = strings[key]; };
             auto flag = [&](const wchar_t* key, bool& out) { if (bools.count(key)) out = bools[key]; };
@@ -579,6 +598,7 @@ void load_config() {
     if (g.cfg.online_server.empty()) g.cfg.online_server = L"127.0.0.1";
     for (std::wstring* folder : {&g.cfg.base_dir, &g.cfg.patch_dir})
         if (!folder->empty()) *folder = fs::path(*folder).make_preferred().wstring();
+    settings_last_ui_snapshot = settings_ui_snapshot();
     g.resolution = 2; // Default 1440p
     for (int i = 0; i < 5; ++i)
         if (g.cfg.resolution == kResolutions[i] || (i == 4 && g.cfg.resolution == L"Personalizzata")) g.resolution = i;
@@ -591,12 +611,7 @@ std::wstring window_text(HWND control) {
     return text;
 }
 
-void save_config() {
-    g.cfg.base_dir = window_text(g.base_edit);
-    g.cfg.patch_dir = window_text(g.patch_edit);
-    g.cfg.resolution = kResolutions[g.resolution];
-    if (g.resolution == 4) { g.cfg.custom_w = window_text(g.width_edit); g.cfg.custom_h = window_text(g.height_edit); }
-    if (g.online_id_edit) g.cfg.online_id = window_text(g.online_id_edit);
+ctr_online::Json settings_ui_snapshot() {
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
     const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"scene_height\": " + json_string(g.cfg.scene_height) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
@@ -614,9 +629,26 @@ void save_config() {
         ",\n  \"trophy_key\": " + json_string(g.cfg.trophy_key) +
         ",\n  \"player1_pad\": " + json_string(g.cfg.player_pad[0]) + ",\n  \"player2_pad\": " + json_string(g.cfg.player_pad[1]) +
         ",\n  \"player3_pad\": " + json_string(g.cfg.player_pad[2]) + ",\n  \"player4_pad\": " + json_string(g.cfg.player_pad[3]) + "\n}";
-    std::error_code ec;
-    fs::create_directories(config_path().parent_path(), ec);
-    std::ofstream(config_path(), std::ios::binary | std::ios::trunc) << json;
+    return ctr_online::parse_json(json);
+}
+
+bool save_config() {
+    g.cfg.base_dir = window_text(g.base_edit);
+    g.cfg.patch_dir = window_text(g.patch_edit);
+    g.cfg.resolution = kResolutions[g.resolution];
+    if (g.resolution == 4) { g.cfg.custom_w = window_text(g.width_edit); g.cfg.custom_h = window_text(g.height_edit); }
+    if (g.online_id_edit) g.cfg.online_id = window_text(g.online_id_edit);
+    const auto json = ctr_online::dump_json(settings_ui_snapshot());
+    try {
+        auto snapshot = ctr_online::parse_json(json);
+        auto changes = ctrport::settings::changed_fields(settings_last_ui_snapshot, snapshot);
+        ctrport::settings::Store(config_path()).update(changes);
+        settings_last_ui_snapshot = std::move(snapshot);
+        return true;
+    } catch (const std::exception& error) {
+        MessageBoxW(g.window, widen(error.what()).c_str(), L"Settings were not saved", MB_ICONERROR);
+        return false;
+    }
 }
 
 // Drawing helpers
@@ -2135,12 +2167,13 @@ void launch_game() {
     if (g.cfg.xbox_prompts && !g.xbox_ready) { prepare_xbox_prompts(); return; }
     g.xbox_ready = false;
     if (!check_mods_before_launch(resolve(g.cfg.base_dir), g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path())) return;
-    save_config();
+    if (!save_config()) return;
     if (!g.lock.acquire(g.root, g.window)) return;
     std::error_code ec;
     const std::wstring stamp = timestamp();
     const fs::path logs = g.root / "runtime/user/logs";
     fs::create_directories(logs, ec);
+    ctrport::bounded_log::prune(logs);
     g.log_stem = logs / (L"play_" + stamp);
     try { ctr_online::backup_savedata(g.root, "before_launch"); }
     catch (const std::exception& error) {
@@ -2174,6 +2207,7 @@ void launch_game() {
     if (g.cfg.use_patch) set[L"CTR_PATCH_DIR"] = patch.wstring();
     if (g.cfg.use_patch && g.cfg.fps_60) set[L"CTR_60FPS_PATCH"] = L"1";
     set[L"CTR_NEO_MODE"] = L"1";
+    set[L"CTR_SETTINGS_PATH"] = config_path().wstring();
     set[L"CTR_SCENE_HEIGHT"] = g.cfg.scene_height;
     set[L"CTR_UPSCALER"] = g.cfg.upscaler;
     set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
@@ -2216,17 +2250,18 @@ void launch_game() {
     }
     auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR", L"CTR_STARTUP_MUTEX_DLL_DIR", L"CTR_PARK_MISSING_NID",
         L"CTR_PARK_MISSING_SERVICE", L"CTR_TILING_TIMING", L"CTR_60FPS_PATCH", L"CTR_NEO_MODE", L"CTR_NATIVE_4K", L"CTR_UNLOCK_ALL",
-        L"CTR_SCENE_HEIGHT", L"CTR_GPU_INTERNAL_WIDTH", L"CTR_GPU_INTERNAL_HEIGHT",
+        L"CTR_SETTINGS_PATH", L"CTR_SCENE_HEIGHT", L"CTR_GPU_INTERNAL_WIDTH", L"CTR_GPU_INTERNAL_HEIGHT",
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION",
         L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
         L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT",
         L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG", L"CTR_ONLINE_ACCOUNT", L"CTR_TROPHY_KEY", L"CTR_PAD_PLAYERS"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
-    const auto open_log = [&](const wchar_t* suffix) {
-        return CreateFileW((g.log_stem.wstring() + suffix).c_str(), GENERIC_WRITE, FILE_SHARE_READ, &inherit, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    };
-    const HANDLE out = open_log(L".stdout.log"), err = open_log(L".stderr.log");
+    // Bounded capture (bounded_log.hpp): the game writes into pipes, not into the files.
+    auto out_log = std::make_shared<ctrport::bounded_log::Capture>(g.log_stem.wstring() + L".stdout.log");
+    auto err_log = std::make_shared<ctrport::bounded_log::Capture>(g.log_stem.wstring() + L".stderr.log");
+    const HANDLE out = out_log->valid() ? out_log->write() : INVALID_HANDLE_VALUE;
+    const HANDLE err = err_log->valid() ? err_log->write() : INVALID_HANDLE_VALUE;
     const HANDLE nul = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &inherit, OPEN_EXISTING, 0, nullptr);
     STARTUPINFOW startup{sizeof(startup)};
     startup.dwFlags = STARTF_USESTDHANDLES;
@@ -2238,20 +2273,24 @@ void launch_game() {
         CreateProcessW(g.runtime_exe.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
                        environment.data(), g.root.c_str(), &startup, &info);
     const DWORD error = GetLastError();
-    for (HANDLE handle : {out, err, nul}) if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
+    out_log->close_writer(); err_log->close_writer();
+    if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
     if (!started) {
         g.lock.release();
         MessageBoxW(g.window, (L"Unable to start ctrport.exe (error " + std::to_wstring(error) + L").").c_str(), kTitle, MB_ICONERROR);
         return;
     }
     CloseHandle(info.hThread);
+    out_log->start(); err_log->start();
     g.process = info.hProcess;
     InvalidateRect(g.launch, nullptr, FALSE);
     ShowWindow(g.window, SW_HIDE);
-    std::thread([process = info.hProcess, window = g.window, root = g.root] {
+    std::thread([process = info.hProcess, window = g.window, root = g.root, out_log, err_log] {
         WaitForSingleObject(process, INFINITE);
         DWORD code = 0;
         GetExitCodeProcess(process, &code);
+        // The crash report reads the log tails: let both captures finish writing first.
+        out_log->wait(10000); err_log->wait(10000);
         try {
             ctr_online::backup_savedata(root, "after_exit");
         } catch (const std::exception& error) {
@@ -2265,6 +2304,13 @@ void game_finished(DWORD code) {
     CloseHandle(g.process);
     g.process = nullptr;
     g.lock.release();
+    load_config();
+    for (int i=0; i<static_cast<int>(std::size(kSceneHeights)); ++i)
+        if(g.cfg.scene_height==kSceneHeights[i]) SendMessageW(g.scene_combo,CB_SETCURSEL,i,0);
+    for (int i=0; i<static_cast<int>(std::size(kUpscalers)); ++i)
+        if(g.cfg.upscaler==kUpscalers[i]) SendMessageW(g.upscaler_combo,CB_SETCURSEL,i,0);
+    SendMessageW(g.language_combo,CB_SETCURSEL,game_language_index(g.cfg.game_language),0);
+    InvalidateRect(g.window, nullptr, FALSE);
     std::vector<std::string> reasons;
     for (const wchar_t* suffix : {L".stdout.log", L".stderr.log"}) {
         std::istringstream lines(read_tail(g.log_stem.wstring() + suffix, 8u << 20));
@@ -2798,6 +2844,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     g.logo.reset();
     g.art.reset();
     g.icon.reset();
+    g.trophy_icons.clear();
     if (font_load.valid()) { auto pending = font_load.get(); }
     retail_fonts = {};
     for (auto& cached : family_cache) cached.reset();

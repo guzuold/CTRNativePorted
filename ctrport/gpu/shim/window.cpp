@@ -1,3 +1,4 @@
+#include "pacing_controls/window_policy.hpp"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // ctrport: SDL3 window for the Vulkan swapchain (Win32 surface).
 // Adapted from bbport gpu/shim/window.cpp (GPL-2.0), without the text-entry and overlay parts.
@@ -30,10 +31,12 @@ WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
     const char* fullscreen = std::getenv("CTR_GPU_FULLSCREEN");
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN,
-                           fullscreen && fullscreen[0] == '1');
+                           !std::strcmp(ctrport::settings::pacing::setting("CTR_SETTINGS_WINDOW_MODE"), "original") && fullscreen && fullscreen[0] == '1');
     window = SDL_CreateWindowWithProperties(props);
     SDL_DestroyProperties(props);
     ASSERT_MSG(window, "Failed to create window: {}", SDL_GetError());
+    try { ctrport::settings::pacing::apply_window(window,width_,height_); }
+    catch (...) { SDL_DestroyWindow(window); window=nullptr; throw; }
 
     const SDL_PropertiesID wp = SDL_GetWindowProperties(window);
     window_info.type = WindowSystemType::Windows;

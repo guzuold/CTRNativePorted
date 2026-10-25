@@ -2,6 +2,7 @@
 // Independent implementation. Public contract: shadPS4 event_flag.cpp249-294,
 // revision e3ce810f3a653f43ac64ebab63023de281a4103a, GPL-2.0-or-later.
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "kernel_time.hpp"
 #include <map>
 #include <mutex>
@@ -52,7 +53,7 @@ public:
         KernelEventFlag::Waiter waiter;waiter.requested=requested;waiter.mode=mode;
         if(object->matches(waiter)){object->consume(waiter);if(output)*output=waiter.result;return 0;}
         object->waiters.push_back(&waiter);
-        std::fprintf(stderr,"event flag blocking id=%llu bits=%llu mode=%u thread=%lu\n",static_cast<unsigned long long>(id),static_cast<unsigned long long>(requested),mode,GetCurrentThreadId());std::fflush(stderr);
+        if(ctrport::settings::hot_trace()){std::fprintf(stderr,"event flag blocking id=%llu bits=%llu mode=%u thread=%lu\n",static_cast<unsigned long long>(id),static_cast<unsigned long long>(requested),mode,GetCurrentThreadId());std::fflush(stderr);}
         bool ready=true;
         if(timeout)ready=waiter.changed.wait_for(guard,std::chrono::microseconds(*timeout),[&]{return waiter.ready;});
         else waiter.changed.wait(guard,[&]{return waiter.ready;});

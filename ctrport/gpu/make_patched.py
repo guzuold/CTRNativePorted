@@ -630,3 +630,50 @@ s = replace_once(s, '''        if (buffer.group_index != attributeIndex) {
         CtrUpscaling::RemoveDisplay(buffer.address_left);
         buffer.group_index = -1;''', 'unregister display addresses')
 emit(p,s)
+
+# Settings controls: immutable startup settings, applied at actual Vulkan boundaries.
+raster = out/'video_core/renderer_vulkan/vk_rasterizer.cpp'
+raster.write_text('#include "renderer_controls/gpu_policy.hpp"\n'+raster.read_text(),encoding='utf-8')
+s = (src/'video_core/texture_cache/sampler.cpp').read_text()
+s = '#include "renderer_controls/gpu_policy.hpp"\n' + s
+start = s.index('    const bool anisotropy_enable =')
+end = s.index('    auto border_color =',start)
+s = s[:start] + '    const auto settings_sampler = ctrport::settings::renderer::sampler_policy(\n        instance.IsAnisotropicFilteringSupported(),\n        AmdGpu::IsAnisoFilter(sampler.xy_mag_filter) || AmdGpu::IsAnisoFilter(sampler.xy_min_filter),\n        sampler.MaxAniso(), instance.MaxSamplerAnisotropy(),\n        ctrport::settings::renderer::environment_anisotropy());\n    const bool anisotropy_enable = settings_sampler.enabled;\n    const float max_anisotropy = settings_sampler.maximum;\n' + s[end:]
+emit('video_core/texture_cache/sampler.cpp',s)
+
+# Display settings: generated sources only.
+p = src/'core/libraries/videoout/video_out.cpp'
+s = p.read_text()
+s = replace_once(s, 'if (Common::ElfInfo::Instance().GetPSFAttributes().support_hdr) {', 'if (presenter->IsHDRSupported() && Common::ElfInfo::Instance().GetPSFAttributes().support_hdr) {', 'HDR mode capability')
+s = replace_once(s, '            port->is_hdr = true;\n        }', '            port->is_hdr = true;\n        } else {\n            return ORBIS_VIDEO_OUT_ERROR_INVALID_VALUE;\n        }', 'HDR unsupported request')
+emit('core/libraries/videoout/video_out.cpp',s)
+p = src/'video_core/renderer_vulkan/vk_swapchain.cpp'
+s = p.read_text()
+s = '#include <cstdio>\n'+s
+s = replace_once(s, '    supports_hdr &= EmulatorSettings.IsHdrAllowed();', '    const bool display_hdr_format = supports_hdr;\n    supports_hdr &= EmulatorSettings.IsHdrAllowed();\n    std::printf("CTR_SETTINGS_HDR requested=%d surface_pq10=%d available=%d\\n", int(EmulatorSettings.IsHdrAllowed()), int(display_hdr_format), int(supports_hdr));', 'HDR surface acknowledgement')
+emit('video_core/renderer_vulkan/vk_swapchain.cpp',s)
+p = src/'video_core/renderer_vulkan/host_passes/pp_pass.h'
+s = p.read_text().replace('        u32 hdr = 0;', '        u32 hdr = 0;\n        float peak = 0;\n        float exposure = 1;')
+emit('video_core/renderer_vulkan/host_passes/pp_pass.h',s)
+s = (src/'video_core/renderer_vulkan/host_passes/pp_pass.cpp').read_text()
+s = '#include "display_controls/gpu_policy.hpp"\n'+s
+s = replace_once(s, '    cmdbuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);', '    static const auto calibration = ctrport::settings::display::calibration();\n    if (calibration.gamma != 0) settings.gamma = calibration.gamma;\n    settings.peak = calibration.peak;\n    settings.exposure = calibration.exposure;\n    cmdbuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);', 'calibration push constants')
+emit('video_core/renderer_vulkan/host_passes/pp_pass.cpp',s)
+
+raster = out/'video_core/renderer_vulkan/vk_rasterizer.cpp'
+raster.write_text('#include "display_controls/gpu_policy.hpp"\n'+raster.read_text())
+
+# Pace both generated and normal presentations before taking submit_mutex.
+p = out/'video_core/renderer_vulkan/vk_presenter.cpp'
+s = p.read_text()
+s = '#include "pacing_controls/gpu_policy.hpp"\n'+s
+s = replace_once(s, '            present_scheduler.Flush(fg_info);', '            present_scheduler.Flush(fg_info);\n            ctrport::settings::pacing::wait_before_present();', 'generated frame pacing')
+s = replace_once(s, '    // Present to swapchain.', '    ctrport::settings::pacing::wait_before_present();\n    // Present to swapchain.', 'normal frame pacing')
+p.write_text(s)
+
+p = out/'video_core/renderer_vulkan/vk_pipeline_cache.cpp'
+s = (src/'video_core/renderer_vulkan/vk_pipeline_cache.cpp').read_text()
+s = '#include "ao_controls/shader_override.hpp"\n#include "shadow_quality/hero_shader.hpp"\n#include <cstdlib>\n'+s
+s = replace_once(s, '    const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, profile);', '    static const bool ao_off = [] { const auto p=std::getenv("CTR_GPU_AO"); return ctrport::settings::ao::selected(p ? p : "original"); }();\n    static const bool hero_off = [] { const auto p=std::getenv("CTR_GPU_HERO_SHADOWS"); return ctrport::settings::ao::selected(p ? p : "original"); }();\n    auto ao_code=ctrport::settings::ao::override_code(info.pgm_hash, code, ao_off);\n    if(ao_code.empty()) ao_code=ctrport::settings::hero_shadows::override_code(info.pgm_hash, code, hero_off);\n    const auto translated_code=ao_code.empty() ? code : std::span<const u32>(ao_code);\n    const auto ir_program = Shader::TranslateProgram(translated_code, pools, info, runtime_info, profile);', 'AO shader input')
+s = replace_once(s, 'const bool is_patched = patch && EmulatorSettings.IsPatchShaders();', 'const bool is_patched = ao_code.empty() && patch && EmulatorSettings.IsPatchShaders();', 'AO patch precedence')
+p.write_text(s)

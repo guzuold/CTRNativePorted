@@ -1,3 +1,5 @@
+#include "settings/hot_trace.hpp"
+#include "settings/startup.hpp"
 #include "video_clock_binding.hpp"
 #include "gnm_frame_end.hpp"
 #include "flip_surface_lock.hpp"
@@ -159,11 +161,11 @@ extern "C" int ctr_random_bytes(unsigned char* output,std::size_t size,std::uint
     catch(const std::exception& error) {std::cerr<<"NID=PI7jIZj4pcE library=libSceRandom caller=0x"<<std::hex<<caller<<" unsupported: "<<error.what()<<'\n';ExitProcess(4);}
 }
 extern "C" int ctr_kernel_mutex_lock(std::uint64_t* cell,std::uint64_t caller) {
-    try { const auto result=ctrport::kernel_mutex_lock(cell);std::cout<<"{\"scope\":\"kernel_mutex_lock\",\"result\":"<<result<<"}\n"<<std::flush;return result; }
+    try { const auto result=ctrport::kernel_mutex_lock(cell);if(ctrport::settings::hot_trace()){std::cout<<"{\"scope\":\"kernel_mutex_lock\",\"result\":"<<result<<"}\n"<<std::flush;}return result; }
     catch(const std::exception& error) {std::cerr<<"NID=7H0iTOciTLo library=libkernel caller=0x"<<std::hex<<caller<<" unsupported: "<<error.what()<<'\n';ExitProcess(4);}
 }
 extern "C" int ctr_kernel_mutex_unlock(std::uint64_t* cell,std::uint64_t caller) {
-    try { const auto result=ctrport::kernel_mutex_unlock(cell);std::cout<<"{\"scope\":\"kernel_mutex_unlock\",\"result\":"<<result<<"}\n"<<std::flush;return result; }
+    try { const auto result=ctrport::kernel_mutex_unlock(cell);if(ctrport::settings::hot_trace()){std::cout<<"{\"scope\":\"kernel_mutex_unlock\",\"result\":"<<result<<"}\n"<<std::flush;}return result; }
     catch(const std::exception& error) {std::cerr<<"NID=2Z+PpY6CaJg library=libkernel caller=0x"<<std::hex<<caller<<" unsupported: "<<error.what()<<'\n';ExitProcess(4);}
 }
 
@@ -177,7 +179,7 @@ extern "C" int ctr_kernel_condition_broadcast(std::uint64_t* cell,std::uint64_t 
 }
 extern "C" int ctr_orbis_mutex_trylock(std::uint64_t* cell,std::uint64_t caller) {
  try{const int error=ctrport::kernel_mutex_trylock(cell);const int result=error?static_cast<int>(0x80020000U+static_cast<unsigned>(error)):0;
-  std::printf("{\"scope\":\"original_OrbisMutexTrylock_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);return result;
+  if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_OrbisMutexTrylock_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);}return result;
  }catch(const std::exception& error){std::cerr<<"NID=upoVrzMHFeE library=libkernel caller=0x"<<std::hex<<caller<<" unsupported: "<<error.what()<<'\n';ExitProcess(4);}
 }
 extern "C" int ctr_posix_mutex_trylock(std::uint64_t* cell,std::uint64_t caller) {
@@ -235,7 +237,7 @@ extern "C" int ctr_kernel_gettimeofday(ctrport::KernelTimeval* value,ctrport::Ke
     catch(const std::exception& error) {std::cerr<<"NID=n88vx3C5nW8 library=libkernel caller=0x"<<std::hex<<caller<<" gettimeofday unsupported: "<<error.what()<<'\n';ExitProcess(4);}
 }
 extern "C" int ctr_orbis_gettimeofday(ctrport::KernelTimeval* value,std::uint64_t caller){
- try{const int result=ctrport::kernel_gettimeofday(value,nullptr);std::printf("{\"scope\":\"owned_orbis_gettimeofday\",\"nid\":\"ejekcaNQNq0\",\"library\":\"libkernel\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);return result;}
+ try{const int result=ctrport::kernel_gettimeofday(value,nullptr);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"owned_orbis_gettimeofday\",\"nid\":\"ejekcaNQNq0\",\"library\":\"libkernel\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);}return result;}
  catch(const std::exception& e){std::fprintf(stderr,"NID=ejekcaNQNq0 library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" unsigned ctr_original_xmm_control();
@@ -385,7 +387,7 @@ extern "C" int ctr_posix_clock(unsigned id,ctrport::PosixTimespec* output,std::u
 // Public kernel/time.cpp288: POSIX clock result with errno->SCE conversion.
 extern "C" int ctr_kernel_clock(unsigned id,ctrport::PosixTimespec* output,uint64_t caller){
  try{const int result=ctrport::posix_clock(id,output);const int rc=result<0?static_cast<int>(0x80020000U+static_cast<unsigned>(*ctr_guest_errno())):0;
- std::printf("{\"scope\":\"original_KernelClockGettime_return\",\"clock_id\":%u,\"result\":%d,\"caller\":%llu}\n",id,rc,static_cast<unsigned long long>(caller));std::fflush(stdout);return rc;
+ if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_KernelClockGettime_return\",\"clock_id\":%u,\"result\":%d,\"caller\":%llu}\n",id,rc,static_cast<unsigned long long>(caller));std::fflush(stdout);}return rc;
  }catch(const std::exception& e){std::fprintf(stderr,"NID=QBi7HCK03hw library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 // Explicit unavailable-network error, from shadPS4 netctl.cpp offline branch.
@@ -460,6 +462,110 @@ extern "C" void* ctr_tls_address(const CtrTlsIndex* index,std::uint64_t caller) 
     } catch(const std::exception& error) {std::cerr<<"NID=vNe1w4diLCs library=libkernel caller=0x"<<std::hex<<caller<<" unsupported: "<<error.what()<<'\n';ExitProcess(4);}
 }
 int main(int argc, char** argv) {
+    if (argc == 3 && std::string(argv[1]) == "--settings-reset-graphics") {
+        try {
+            auto changes=ctr_online::Json::object();
+            changes.set("quality_preset",ctr_online::Json::of("original"));
+            for(const char* key:{"window_resolution","window_mode","display_refresh","presentation_limit","hdr_output","display_gamma","hdr_peak_nits","hdr_exposure","present_mode","fsr1_sharpen"})
+                changes.set(key,ctr_online::Json::of("original"));
+            changes.set("upscaler",ctr_online::Json::of("off"));
+            ctrport::settings::Store(std::filesystem::u8path(argv[2])).update(changes);
+            std::cout << "SETTINGS_GRAPHICS_RESET backup_preserved=true\n";
+            return 0;
+        } catch(const std::exception& error) { std::cerr << error.what() << "\n";return 2; }
+    }
+    if (argc == 3 && std::string(argv[1]) == "--settings-renderer-control") {
+        try {
+            ctrport::settings::prepare_renderer_environment();
+            const auto* document=ctrport::settings::runtime_snapshot();
+            if(!document) throw std::runtime_error("missing startup settings");
+            for(const auto& pair : ctrport::settings::renderer::environment(*document,true)) {
+                char current[128]{};
+                GetEnvironmentVariableA(pair.first.c_str(),current,sizeof(current));
+                if(std::string(current)!=pair.second) throw std::runtime_error("renderer environment mismatch");
+            }
+            for(const auto& pair : ctrport::settings::display::environment(*document,true)) {
+                char current[128]{};
+                GetEnvironmentVariableA(pair.first.c_str(),current,sizeof(current));
+                if(std::string(current)!=pair.second) throw std::runtime_error("display environment mismatch");
+            }
+            for(const auto& pair : ctrport::settings::pacing::environment(*document,true)) {
+                char current[128]{};
+                GetEnvironmentVariableA(pair.first.c_str(),current,sizeof(current));
+                if(std::string(current)!=pair.second) throw std::runtime_error("pacing environment mismatch");
+            }
+            char hero_env[64]{};
+            GetEnvironmentVariableA("CTR_GPU_HERO_SHADOWS",hero_env,sizeof(hero_env));
+            const auto* hero=document->find("hero_shadows");
+            if(std::string(hero_env)!=(hero && hero->text=="off" ? "off" : "")) throw std::runtime_error("hero environment mismatch");
+            char ao_env[64]{},up_env[64]{};
+            GetEnvironmentVariableA("CTR_GPU_AO",ao_env,sizeof(ao_env));
+            GetEnvironmentVariableA("CTR_UPSCALER",up_env,sizeof(up_env));
+            const auto* ao=document->find("ambient_occlusion");
+            const auto* up=document->find("upscaler");
+            if(std::string(ao_env)!=(ao && ao->text=="off" ? "off" : "")) throw std::runtime_error("AO environment mismatch");
+            if(std::string(up_env)!=(up ? up->text : "off")) throw std::runtime_error("upscaler environment mismatch");
+            char requested_width[32]{},requested_height[32]{};
+            GetEnvironmentVariableA("CTR_GPU_WIDTH",requested_width,sizeof(requested_width));
+            GetEnvironmentVariableA("CTR_GPU_HEIGHT",requested_height,sizeof(requested_height));
+            std::cout << "SETTINGS_WINDOW=" << requested_width << "x" << requested_height << "\n";
+            auto module=LoadLibraryA(argv[2]);
+            if(!module) throw std::runtime_error("renderer control library did not load");
+            try { ctrport::settings::confirm_renderer_extensions(module); }
+            catch(...) { FreeLibrary(module); throw; }
+            const bool extended=ctrport::settings::renderer_extensions_confirmed;
+            FreeLibrary(module);
+            std::cout << "SETTINGS_RENDERER_STARTUP_VERIFIED extended=" << extended << "\n";
+            return 0;
+        } catch(const std::exception& error) { std::cerr << error.what() << "\n"; return 2; }
+    }
+    if (argc == 3 && std::string(argv[1]) == "--settings-image-control") {
+        try {
+            const auto* document=ctrport::settings::runtime_snapshot();
+            if(!document) throw std::runtime_error("settings control requires configuration");
+            ctrport::ImageMetadata metadata;
+            auto image=ctrport::load_retail_image(argv[2],false,&metadata);
+            std::size_t extent=0;
+            for(const auto& span:metadata.spans) extent=(std::max)(extent,static_cast<std::size_t>(span.second));
+            const std::size_t patch_sites[]={0x348350,0x141be9c,0xeadfce,0x357794,0x357072,0x950781,0x950503,0xaf056e};
+            std::vector<std::vector<unsigned char>> patch_before;
+            for(auto site:patch_sites)patch_before.emplace_back(image.get()+site,image.get()+site+40);
+            auto adapter=ctrport::settings::install_startup(image.get(),extent,metadata.sha256,
+                ctrport::settings::startup_path(),*document,ctrport::settings::startup_hooks());
+            const auto* aa=document->find("antialiasing");
+            const bool disabled=aa && aa->text=="off";
+            if(disabled) ctrport::settings::graphics::rollback_aa(image.get(),extent,metadata.sha256);
+            ctrport::settings::graphics::require_gate(image.get(),extent,metadata.sha256,ctrport::settings::graphics::aa_gate_original);
+            const auto selected=ctrport::settings::retail_graphics_selection(*document);
+            ctrport::settings::retail_graphics::rollback(image.get(),extent,metadata.sha256,selected);
+            adapter->uninstall();
+            for(std::size_t n=0;n<patch_before.size();++n)
+                if(std::memcmp(image.get()+patch_sites[n],patch_before[n].data(),40))throw std::runtime_error("full-image rollback changed original bytes");
+            std::cout << "SETTINGS_IMAGE_BINDINGS_VERIFIED aa=" << (disabled ? "off" : "original") << "\n";
+            return 0;
+        } catch(const std::exception& error) { std::cerr << "settings image rejected: " << error.what() << "\n"; return 2; }
+    }
+    if (argc == 2 && std::string(argv[1]) == "--settings-snapshot-cache-control") {
+        try {
+            const int initial = ctrport::scene_height_selected();
+            wchar_t path[32768]{};
+            if (!GetEnvironmentVariableW(L"CTR_SETTINGS_PATH", path, 32768)) return 2;
+            auto changes = ctr_online::Json::object(); changes.set("scene_height", ctr_online::Json::of("900"));
+            ctrport::settings::Store(path).update(changes);
+            if (initial != 720 || ctrport::scene_height_selected() != initial) return 2;
+            std::cout << "SETTINGS_SNAPSHOT_STABLE requested=900 startup=720\n"; return 0;
+        } catch (const std::exception& error) { std::cerr << error.what() << "\n"; return 2; }
+    }
+    if (argc == 2 && std::string(argv[1]) == "--settings-scene-control") {
+        try {
+            const int selected = ctrport::scene_height_selected();
+            std::cout << "SETTINGS_RUNTIME_SCENE=" << selected << "\n";
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "settings rejected: " << error.what() << "\n";
+            return 2;
+        }
+    }
     if(argc==2 && std::string(argv[1])=="--observed-pm4-control")return ctrport::observed_pm4_control();
     if(argc==2 && std::string(argv[1])=="--direct-output-permission-control")return ctrport::direct_output_permission_control();
     if(argc==2 && std::string(argv[1])=="--shader-snapshot-owner-control")return ctrport::shader_snapshot_owner_control();

@@ -45,7 +45,11 @@ foreach ($asm in 'abi_probe', 'kernel_services', 'service_integer_dispatch') {
     & "$bin/ml64.exe" /nologo /c "/Fo$obj/$asm.obj" "$PSScriptRoot/$asm.asm" *> "$obj/$asm.log"
     if ($LASTEXITCODE -ne 0) { Get-Content "$obj/$asm.log" -Tail 20; throw "$asm assembly failed" }
 }
-& "$bin/cl.exe" /nologo /O2 /W4 /WX /EHsc /bigobj /std:c++17 "$PSScriptRoot/main.cpp" "/Fo$obj/main.obj" "/Fe$runtime/ctrport.exe" "$obj/abi_probe.obj" "$data/ctr_video.lib" user32.lib "$infra/audio_backend/Release/ctr_atrac9.lib" "$obj/kernel_services.obj" "$obj/service_integer_dispatch.obj" "$infra/font_backend/Release/ctr_font_backend.lib" "$infra/font_backend/freetype/Release/freetype.lib" *> "$obj/ctrport_build.log"
+# The in-game PC Settings menu: guest call transport and the settings hooks (ctrport/settings).
+& "$bin/ml64.exe" /nologo /c "/Fo$obj/settings_transport.obj" "$PSScriptRoot/settings/menu_bridge/transport.asm" *> "$obj/settings_transport.log"
+if ($LASTEXITCODE -ne 0) { Get-Content "$obj/settings_transport.log" -Tail 20; throw 'settings transport assembly failed' }
+$settings = 'settings/menu_bridge/bridge.cpp', 'settings/geometry_controls/distance_hook.cpp', 'settings/quality_controls/texture_hook.cpp', 'settings/quality_controls/world_hook.cpp', 'settings/shadow_quality/hook.cpp', 'online_server/json.cpp' | ForEach-Object { Join-Path $PSScriptRoot $_ }
+& "$bin/cl.exe" /nologo /O2 /W4 /WX /EHsc /bigobj /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "$PSScriptRoot/main.cpp" @settings "$obj/settings_transport.obj" "/Fo$obj/" "/Fe$runtime/ctrport.exe" "$obj/abi_probe.obj" "$data/ctr_video.lib" user32.lib "$infra/audio_backend/Release/ctr_atrac9.lib" "$obj/kernel_services.obj" "$obj/service_integer_dispatch.obj" "$infra/font_backend/Release/ctr_font_backend.lib" "$infra/font_backend/freetype/Release/freetype.lib" *> "$obj/ctrport_build.log"
 if ($LASTEXITCODE -ne 0) { Get-Content "$obj/ctrport_build.log" -Tail 30; throw 'ctrport.exe build failed' }
 
 Step 'ctr_gpu.dll and ctr_hle.dll (build/CTRPort-gpu)'
@@ -69,6 +73,8 @@ Copy-Item "$PSScriptRoot/assets/launcher/logo.png", "$PSScriptRoot/assets/launch
 Copy-Item "$PSScriptRoot/assets/xbox-default/*" (Join-Path $out 'assets/xbox-default') -Force
 Copy-Item "$PSScriptRoot/dht/LICENCE" (Join-Path $out 'licenses/jech-dht-LICENCE.txt') -Force
 foreach ($doc in 'README.md', 'LICENSE', 'CHANGELOG.md', 'FIRST_UPDATE.md') { Copy-Item (Join-Path $root $doc) $out -Force }
+Copy-Item "$PSScriptRoot/settings/README.md" (Join-Path $out 'PC_SETTINGS.md') -Force
+Copy-Item "$PSScriptRoot/settings/Reset-PC-Graphics.cmd" $out -Force
 foreach ($doc in 'ctrport/UPDATES.md', 'ctrport/MODS.md', 'ctrport/gpu/UPSCALING.md', 'ctrport/online_server/INVITATIONS.md', 'tools/online/HOST_MIGRATION.md', 'ctrport/LOCAL_BACKUPS.md') {
     $path = Join-Path $root $doc
     if (Test-Path -LiteralPath $path) { Copy-Item $path $out -Force }

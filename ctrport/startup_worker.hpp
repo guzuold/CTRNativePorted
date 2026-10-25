@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "guest_worker.hpp"
 #include <deque>
 #include "thread_create_domain.hpp"
@@ -122,7 +123,7 @@ inline int set_owned_worker_priority(uint64_t handle,int priority){
  ThreadAttributes attributes;attributes.priority=priority;worker->update_host_priority(startup_windows_priority(attributes),priority);return 0;
 }
 extern "C" int ctr_thread_set_priority(uint64_t handle,int priority,uint64_t caller){
- try{int rc=set_owned_worker_priority(handle,priority);std::printf("{\"scope\":\"original_PthreadSetprio_return\",\"caller\":%llu,\"priority\":%d,\"result\":%d,\"scheduler_equivalence\":false}\n",static_cast<unsigned long long>(caller),priority,rc);std::fflush(stdout);return rc;
+ try{int rc=set_owned_worker_priority(handle,priority);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_PthreadSetprio_return\",\"caller\":%llu,\"priority\":%d,\"result\":%d,\"scheduler_equivalence\":false}\n",static_cast<unsigned long long>(caller),priority,rc);std::fflush(stdout);}return rc;
  }catch(const std::exception& e){std::fprintf(stderr,"NID=W0Hpm2X0uPE library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 

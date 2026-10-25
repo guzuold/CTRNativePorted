@@ -1,0 +1,63 @@
+{
+  "retail_sha256": "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5",
+  "implemented": {
+    "racer_mesh_lod": {
+      "values": [
+        "original",
+        "highest"
+      ],
+      "function_rva": "0xeadf00",
+      "site_rva": "0xeadfce",
+      "original": "0f8509010000",
+      "selected": "e90a01000090",
+      "consumer_rva": "0xe21110",
+      "scope": "Racer and kart authored highest-detail path, multi-camera aggregation and resource scheduling retained; not world geometry"
+    },
+    "texture_quality": {
+      "values": [
+        "original",
+        "half",
+        "quarter"
+      ],
+      "function_rva": "0x141be40",
+      "site_rva": "0x141be9c",
+      "original": "488b83900000004885c074080fbe4063",
+      "drop_consumer_rva": "0x141ccb0",
+      "scope": "Minimum one or two mip drops for ordinary 2D textures >=256x256; original allocation, dimensions, ownership and format callbacks retained",
+      "exclusions": [
+        "small",
+        "cube_or_array",
+        "volume",
+        "negative_authored_sentinel",
+        "missing_directory_or_file_params"
+      ],
+      "single_mip": "Original clamp retains sole level"
+    },
+    "static_mesh_lod": {
+      "values": [
+        "original",
+        "reduced"
+      ],
+      "function_rva": "0x348350",
+      "site_rva": "0x348350",
+      "original": "554889e54157415641554154534883ec48",
+      "producer_rva": "0x3492e0",
+      "scope": "Compatible authored alternate mesh caches only; lower primitive count, same vertex-format handle and topology; no morph or baked vertex path; original fallback otherwise"
+    }
+  },
+  "open": {
+    "vram_budget": "Texture payload reduction is implemented; no arbitrary eviction/budget scheduler"
+  },
+  "visual_verified": false,
+  "reconstructed_functions": 0,
+  "fixture_boundaries": [
+    "registry_lookup",
+    "memory_pool_lookup",
+    "memory_allocation",
+    "format_size",
+    "format_validation",
+    "memcpy",
+    "material_shader_animation_lighting",
+    "precreated_geometry_resources"
+  ]
+}

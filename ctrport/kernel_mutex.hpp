@@ -3,6 +3,7 @@
 // mutex contract. Behavioral reference: pinned shadPS4 threads/mutex.cpp;
 // source hashes and revision are in kernel_mutex_original_contract.json.
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "kernel_time.hpp"
 #include <condition_variable>
 #include <memory>

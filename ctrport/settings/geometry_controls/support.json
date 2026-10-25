@@ -1,0 +1,15 @@
+{
+  "retail_sha256": "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5",
+  "implemented": {
+    "distance_scale": {"values": ["original", "0.5", "0.75"], "function_rva": "0x34f200", "scope": "Five authored render distance/fade classes, original culling retained; not geometric mesh LOD"},
+    "cascaded_shadows": {"values": ["original", "off"], "function_rva": "0x357540", "site_rva": "0x3576a1", "scope": "Native disabled cascade path; does not resize or release atlas, does not disable all local/hero shadows"}
+  },
+  "unavailable": {
+    "geometric_lod": "Distance/fade publisher is verified, but no verified mesh-selection producer/consumer contract or safe asset transitions.",
+    "shadow_quality": "Cascade viewport derives from target dimensions and per-scene scale; atlas allocation/recreation and shader consistency have not been validated.",
+    "local_shadow_quality": "Per-model cast-shadow setter changes a model flag and dirty revision; it is not a global local/hero shadow quality control.",
+    "vfx_quality": "Distance classifier is shared through virtual wrappers with visibility/lifecycle return codes; critical gameplay-effect classification and density/spawn budget contract remain unverified. No hide-all switch exposed."
+  },
+  "visual_verified": false,
+  "reconstructed_functions": 0
+}

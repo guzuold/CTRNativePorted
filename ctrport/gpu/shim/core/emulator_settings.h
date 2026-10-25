@@ -3,6 +3,7 @@
 // variables. Defaults are shadPS4 v0.18.0's defaults (core/emulator_settings.h).
 // Adapted from bbport gpu/shim/core/emulator_settings.h (GPL-2.0).
 #pragma once
+#include "display_controls/gpu_policy.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <string>
@@ -75,7 +76,7 @@ public:
         return value;
     }
     bool IsHdrAllowed() {
-        return false;
+        return ctrport::settings::display::native_hdr();
     }
     bool IsNullGPU() {
         static const auto value = Flag("CTR_GPU_NULL", false);
@@ -91,6 +92,10 @@ public:
     // Reloading it in a later run corrupted v01.21 geometry (Crash's fur on the title
     // screen became screen-wide streaks); runtime/user/probes 20261013_000804 vs 001718.
     bool IsPipelineCacheEnabled() {
+        for(const char* key : {"CTR_GPU_AO","CTR_GPU_HERO_SHADOWS"}) {
+            const auto value=std::getenv(key);
+            if(value && std::string(value)=="off") return false;
+        }
         static const auto value = Flag("CTR_GPU_PIPELINE_CACHE", false);
         return value;
     }

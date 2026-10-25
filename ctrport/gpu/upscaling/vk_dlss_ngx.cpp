@@ -1,3 +1,4 @@
+#include "display_controls/gpu_policy.hpp"
 // SPDX-FileCopyrightText: Copyright 2026 IFreemz
 // SPDX-License-Identifier: GPL-2.0-or-later
 // SacredFire: from IFreemz/shadPS4-Bloodborne-DLSS-FSR (vk_dlss_ngx); logging to stdout (the
@@ -89,6 +90,7 @@ struct DlssNgx::Impl {
 
     void Disable(std::string_view reason) {
         eligible = available = false;
+        ctrport::settings::display::temporal_capabilities.fetch_and(~2u, std::memory_order_relaxed);
         problem = std::string{reason};
         std::printf("DLSS: off (%s)\n", problem.c_str());
         std::fflush(stdout);
@@ -211,6 +213,7 @@ void DlssNgx::Initialize(vk::Instance instance, vk::PhysicalDevice physical, vk:
         return impl->Disable("NVIDIA NGX initialization failed (update the GPU driver)");
     }
     impl->available = true;
+    ctrport::settings::display::temporal_capabilities.fetch_or(2, std::memory_order_relaxed);
     std::printf("DLSS: ready\n");
     std::fflush(stdout);
 }
@@ -269,6 +272,7 @@ void DlssNgx::ReleaseFeatureAfterGpuDrain() {
 
 void DlssNgx::Shutdown() {
     impl->available = false;
+    ctrport::settings::display::temporal_capabilities.fetch_and(~2u, std::memory_order_relaxed);
     impl->feature.reset();
     if (impl->api && impl->initialized) {
         impl->api->Shutdown();

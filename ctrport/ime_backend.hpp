@@ -4,6 +4,7 @@
 // This activates real Win32 EDIT storage/message processing only. PS4 dialog
 // no-client status query is bound; active dialog exports remain explicit missing.
 #pragma once
+#include "settings/hot_trace.hpp"
 #include <Windows.h>
 #include <future>
 #include <mutex>
@@ -103,7 +104,7 @@ inline unsigned ime_dialog_status(){
     return 0;
 }
 extern "C" unsigned ctr_ime_dialog_status(std::uint64_t caller){
-    try{const auto status=ime_dialog_status();std::printf("{\"scope\":\"owned_ime_dialog_status\",\"caller\":%llu,\"client_present\":false,\"result\":%u}\n",static_cast<unsigned long long>(caller),status);std::fflush(stdout);return status;}
+    try{const auto status=ime_dialog_status();if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"owned_ime_dialog_status\",\"caller\":%llu,\"client_present\":false,\"result\":%u}\n",static_cast<unsigned long long>(caller),status);std::fflush(stdout);}return status;}
     catch(const std::exception& e){std::fprintf(stderr,"NID=IADmD4tScBY library=libSceImeDialog caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_ime_dialog_status();

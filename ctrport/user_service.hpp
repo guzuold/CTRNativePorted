@@ -4,6 +4,7 @@
 // Error values from pinned shadPS4 userservice_error.h (GPL-2.0-or-later),
 // revision e3ce810f3a653f43ac64ebab63023de281a4103a. No upstream dummy copied.
 #pragma once
+#include "settings/hot_trace.hpp"
 #include <mutex>
 #include <memory>
 #include <stdexcept>
@@ -151,7 +152,7 @@ extern "C" int ctr_user_login_list(std::int32_t* output,std::uint64_t caller) {
 }
 extern "C" void ctr_sysv_user_login_list();
 extern "C" int ctr_user_event(std::int32_t* output,uint64_t caller){
- try{const int result=user_service.get_event(output);std::printf("{\"scope\":\"original_UserServiceGetEvent_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);return result;
+ try{const int result=user_service.get_event(output);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_UserServiceGetEvent_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);}return result;
  }catch(const std::exception& e){std::fprintf(stderr,"NID=yH17Q6NWtVg library=libSceUserService caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_user_event();

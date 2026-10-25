@@ -1,3 +1,4 @@
+#include "settings/renderer_startup.hpp"
 // SPDX-License-Identifier: GPL-2.0-only
 // Optional GPU library (ctrport/gpu, build/CTRPort-gpu/ctr_gpu.dll): shadPS4 v0.18.0's
 // Liverpool command processor, Vulkan renderer, GnmDriver, VideoOut and kernel event
@@ -52,11 +53,13 @@ inline void gpu_map_guest(std::uint64_t address,std::uint64_t bytes){
 }
 inline std::wstring gpu_library_path;
 inline void load_gpu_library(std::uint32_t sdk_version){
+    settings::prepare_renderer_environment();
     for (const wchar_t* candidate : {L"ctr_gpu.dll", L"build/CTRPort-gpu/ctr_gpu.dll"}) {
         gpu_library.module = LoadLibraryW(candidate);
         if (gpu_library.module) { gpu_library_path = candidate; break; }
     }
     if(!gpu_library.module)throw std::runtime_error("CTR_GPU_LIBRARY=1 but ctr_gpu.dll did not load (searched . and build/CTRPort-gpu/)");
+    settings::confirm_renderer_extensions(gpu_library.module);
     auto get=[&](const char* name){auto* p=GetProcAddress(gpu_library.module,name);if(!p)throw std::runtime_error(std::string("ctr_gpu export missing: ")+name);return p;};
     gpu_library.init=reinterpret_cast<int(*)(const CtrGpuConfigV1*)>(get("ctr_gpu_init"));
     gpu_library.resolve=reinterpret_cast<std::uintptr_t(*)(const char*,const char*)>(get("ctr_gpu_resolve"));

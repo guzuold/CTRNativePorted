@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "kernel_time.hpp"
+#include "settings/native_graphics.hpp"
 #include <Xinput.h>
 #include <algorithm>
 #include <cctype>
@@ -516,7 +518,8 @@ inline int pad_open_control(){
 
 namespace ctrport {
 extern "C" int ctr_pad_read_state(int handle,void* output,uint64_t caller){
- try{const int result=pad_backend.read_state(handle,output);std::printf("{\"scope\":\"original_PadReadState_return\",\"caller\":%llu,\"result\":%d,\"connected\":%s}\n",static_cast<unsigned long long>(caller),result,(!result && static_cast<unsigned char*>(output)[76])?"true":"false");std::fflush(stdout);return result;
+ settings::native_graphics::apply();
+ try{const int result=pad_backend.read_state(handle,output);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_PadReadState_return\",\"caller\":%llu,\"result\":%d,\"connected\":%s}\n",static_cast<unsigned long long>(caller),result,(!result && static_cast<unsigned char*>(output)[76])?"true":"false");std::fflush(stdout);}return result;
  }catch(const std::exception& e){std::fprintf(stderr,"NID=YndgXqQVV7c library=libScePad caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_pad_read_state();
@@ -651,7 +654,7 @@ inline int pad_light_bar_control(){
 
 namespace ctrport {
 extern "C" int ctr_pad_information(int handle,void* output,uint64_t caller){
- try{const int result=pad_backend.information(handle,output);std::printf("{\"scope\":\"original_PadGetControllerInformation_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);return result;}
+ try{const int result=pad_backend.information(handle,output);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_PadGetControllerInformation_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);}return result;}
  catch(const std::exception& e){std::fprintf(stderr,"NID=gjP9-KQzoUk library=libScePad caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_pad_information();

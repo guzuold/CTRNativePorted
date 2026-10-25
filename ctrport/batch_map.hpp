@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "owned_guest_copy.hpp"
 #include "direct_memory.hpp"
 #include "query_mapping_records.hpp"
@@ -58,7 +59,7 @@ inline int runtime_batch_map(uint64_t address,int count,uint64_t output){
  publish();return 0;
 }
 extern "C" int ctr_batch_map(uint64_t address,int count,uint64_t output,uint64_t caller){
- try{const int result=runtime_batch_map(address,count,output);std::printf("{\"scope\":\"original_BatchMap_return\",\"caller\":%llu,\"count\":%d,\"result\":%d,\"type_protection_path\":true}\n",static_cast<unsigned long long>(caller),count,result);std::fflush(stdout);return result;
+ try{const int result=runtime_batch_map(address,count,output);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_BatchMap_return\",\"caller\":%llu,\"count\":%d,\"result\":%d,\"type_protection_path\":true}\n",static_cast<unsigned long long>(caller),count,result);std::fflush(stdout);}return result;
  }catch(const std::exception& error){std::fprintf(stderr,"NID=2SKEx6bSq-4 library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_batch_map();

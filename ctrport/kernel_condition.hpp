@@ -2,6 +2,7 @@
 // New implementation; behavioral reference and license recorded in
 // kernel_condition_original_contract.json (pinned shadPS4 condvar.cpp).
 #pragma once
+#include "settings/hot_trace.hpp"
 #include "kernel_mutex.hpp"
 #include "cancellation_control.hpp"
 #include <atomic>
@@ -96,7 +97,7 @@ inline int kernel_condition_signal(std::uint64_t* cell){
     ++object->generation;object->changed.notify_one();return 0;
 }
 extern "C" int ctr_condition_signal(std::uint64_t* cell,std::uint64_t caller){
-    try{const int rc=kernel_condition_signal(cell);std::printf("{\"scope\":\"original_CondSignal_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),rc);std::fflush(stdout);return rc;}
+    try{const int rc=kernel_condition_signal(cell);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"original_CondSignal_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),rc);std::fflush(stdout);}return rc;}
     catch(const std::exception& e){std::fprintf(stderr,"NID=kDh-NfxgMtE library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_condition_signal();
@@ -110,7 +111,7 @@ inline int kernel_condition_wait(std::uint64_t* condition,std::uint64_t* mutex,s
     const auto generation=cv->generation;
     if(kernel_mutex_unlock(mutex))throw std::runtime_error("Condition wait release failed");
     ++cv->waiters;std::exception_ptr failure;bool signaled=true;
-    std::fprintf(stderr,"condition blocking thread=%lu saved_depth=%u\n",GetCurrentThreadId(),depth);std::fflush(stderr);
+    if(ctrport::settings::hot_trace()){std::fprintf(stderr,"condition blocking thread=%lu saved_depth=%u\n",GetCurrentThreadId(),depth);std::fflush(stderr);}
     try{if(usec==UINT64_MAX)cv->changed.wait(guard,[&]{return cv->generation!=generation;});else signaled=cv->changed.wait_for(guard,std::chrono::microseconds(usec),[&]{return cv->generation!=generation;});}catch(...){failure=std::current_exception();}
     --cv->waiters;guard.unlock();
     if(kernel_mutex_lock(mutex))throw std::runtime_error("Condition wait reacquire failed");
@@ -438,7 +439,7 @@ inline int kernel_condition_control() {
 namespace ctrport {
 // Pinned condvar.cpp219-224,453-454: Orbis NID wraps relative microseconds, not timespec.
 extern "C" int ctr_condition_timedwait(std::uint64_t* condition,std::uint64_t* mutex,std::uint64_t usec,std::uint64_t caller){
- try{const int result=kernel_condition_wait(condition,mutex,usec);std::printf("{\"scope\":\"owned_condition_timedwait\",\"nid\":\"BmMjYxmew1w\",\"library\":\"libkernel\",\"caller\":%llu,\"usec\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),static_cast<unsigned long long>(usec),result);std::fflush(stdout);return result;}
+ try{const int result=kernel_condition_wait(condition,mutex,usec);if(ctrport::settings::hot_trace()){std::printf("{\"scope\":\"owned_condition_timedwait\",\"nid\":\"BmMjYxmew1w\",\"library\":\"libkernel\",\"caller\":%llu,\"usec\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),static_cast<unsigned long long>(usec),result);std::fflush(stdout);}return result;}
  catch(const std::exception& e){std::fprintf(stderr,"NID=BmMjYxmew1w library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_condition_timedwait();

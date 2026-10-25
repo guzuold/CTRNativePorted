@@ -1,3 +1,13 @@
+## v0.6.0 — 2026-10-25
+
+PC Settings inside the game's own Options menu, a launcher that no longer crashes on close, less CPU spent on logging, and logs with a size limit.
+
+- **PC Settings in the game menu:** Options has a new PC Settings entry with six native pages (Display, Graphics, Resolution and upscaling, Quality, Shadows and effects, Quality presets), in the game's language. The Graphics page (anti-aliasing FXAA/off/SMAA, bloom, motion blur, depth of field, fur detail, view distance) applies at once; settings marked "(restart)" apply at the next start. Saving runs in the background and does not slow the menu. See PC_SETTINGS.md; `Reset-PC-Graphics.cmd` restores the graphics settings if the game no longer starts.
+- **Built from your own game:** the menu is generated in memory at startup from your retail 01.21 archives and served to the game with them; no game data is distributed and no archive is copied or changed. With another game version, or a mod that replaces those archives, the menu is left out and the game runs unchanged. `CTR_PC_MENU=0` turns it off.
+- **Launcher crash on close fixed:** closing the launcher crashed (access violation) because the trophy icons were released after the graphics library had shut down. They are released first now.
+- **Less CPU on logging:** per-call lines of the busiest services (mutexes, clock, waits, pad and file polling) are written only with `CTR_TRACE_HOT=1`. On the title screen the game used about 12% less CPU; errors and all other logs are unchanged.
+- **Logs with a size limit:** the launcher now reads the game's output itself and keeps, per stream, the first 32 MB and the last 16 MB of a session with a line saying how much was left out. Only the 8 most recent game sessions are kept in `runtime/user/logs`; older `play_*` logs are deleted at the next start. Before, single logs could reach several GB.
+
 ## v0.5.9 — 2026-10-21
 
 Leaving the matchmaking screen frees the player, and a new host takes over the lobby.

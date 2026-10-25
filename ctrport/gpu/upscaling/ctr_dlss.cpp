@@ -1,3 +1,4 @@
+#include "display_controls/gpu_policy.hpp"
 #include "ctr_inputs.h"
 #include "readback.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -169,7 +170,7 @@ CtrDlss::CtrDlss(const Instance& instance_, Scheduler& scheduler_,
     : instance{instance_}, scheduler{scheduler_}, texture_cache{texture_cache_} {}
 
 CtrDlss::~CtrDlss() {
-    if (fsr3_context) ffxVkPortableUpscaleContextDestroy(fsr3_context);
+    if (fsr3_context) ffxVkPortableUpscaleContextDestroy(fsr3_context); ctrport::settings::display::temporal_capabilities.fetch_and(~1u, std::memory_order_relaxed);
 }
 
 // The FSR 3 context for these sizes; made again when they change. A failure turns FSR 3 off
@@ -179,7 +180,7 @@ bool CtrDlss::EnsureFsr3(u32 w, u32 h, u32 ow, u32 oh) {
     if (fsr3_context && fsr3_size == size) return true;
     scheduler.Finish();
     if (fsr3_context) {
-        ffxVkPortableUpscaleContextDestroy(fsr3_context);
+        ffxVkPortableUpscaleContextDestroy(fsr3_context); ctrport::settings::display::temporal_capabilities.fetch_and(~1u, std::memory_order_relaxed);
         fsr3_context = nullptr;
     }
     const auto physical = instance.GetPhysicalDevice();
@@ -207,15 +208,16 @@ bool CtrDlss::EnsureFsr3(u32 w, u32 h, u32 ow, u32 oh) {
     if (const u64 issues = ffxVkPortableValidateUpscaleCreateInfo(&create_info)) {
         std::printf("FSR 3: sizes %ux%u -> %ux%u not supported (issues 0x%llx); off for this session\n", w, h, ow, oh,
                     static_cast<unsigned long long>(issues));
-        fsr3_failed = true;
+        fsr3_failed = true; ctrport::settings::display::temporal_capabilities.fetch_and(~1u, std::memory_order_relaxed);
         return false;
     }
     if (ffxVkPortableUpscaleContextCreate(&device_info, &create_info, &fsr3_context) != FFX_VK_PORTABLE_OK) {
         std::printf("FSR 3: context creation failed for %ux%u -> %ux%u; off for this session\n", w, h, ow, oh);
         fsr3_context = nullptr;
-        fsr3_failed = true;
+        fsr3_failed = true; ctrport::settings::display::temporal_capabilities.fetch_and(~1u, std::memory_order_relaxed);
         return false;
     }
+    ctrport::settings::display::temporal_capabilities.fetch_or(1, std::memory_order_relaxed);
     fsr3_size = size;
     reset = true;
     std::printf("FSR 3: %ux%u -> %ux%u\n", w, h, ow, oh);
@@ -887,12 +889,12 @@ vk::ImageView CtrDlss::Upscale(VideoCore::ImageId source_id, vk::Format view_for
         limits.maxOutputSize = {fsr3_size[2], fsr3_size[3]};
         if (const u64 issues = ffxVkPortableValidateUpscaleDispatchInfo(&limits, &info)) {
             std::printf("FSR 3: dispatch rejected (issues 0x%llx); off for this session\n", static_cast<unsigned long long>(issues));
-            fsr3_failed = true;
+            fsr3_failed = true; ctrport::settings::display::temporal_capabilities.fetch_and(~1u, std::memory_order_relaxed);
             return {};
         }
         if (ffxVkPortableUpscaleContextRecordDispatch(fsr3_context, &info) != FFX_VK_PORTABLE_OK) {
             std::printf("FSR 3: dispatch failed; off for this session\n");
-            fsr3_failed = true;
+            fsr3_failed = true; ctrport::settings::display::temporal_capabilities.fetch_and(~1u, std::memory_order_relaxed);
             return {};
         }
         scheduler.GetDynamicState().Invalidate(); // FSR records its own Vulkan state

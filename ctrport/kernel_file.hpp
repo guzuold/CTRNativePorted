@@ -2,6 +2,8 @@
 // Independent read-only open; public shadPS4 file_system.cpp open/sceKernelOpen,
 // e3ce810f3a653f43ac64ebab63023de281a4103a (GPL-2.0-or-later).
 #pragma once
+#include "settings/hot_trace.hpp"
+#include "settings/menu_overlay.hpp"
 #include "app0.hpp"
 #include "kernel_time.hpp"
 #include "gpu_hooks.hpp"
@@ -9,7 +11,11 @@
 #include <memory>
 #include <fstream>
 namespace ctrport {
-struct KernelFile {bool writable=false;std::mutex position_lock;HANDLE handle=INVALID_HANDLE_VALUE;std::filesystem::path path;~KernelFile(){if(handle!=INVALID_HANDLE_VALUE)CloseHandle(handle);}};
+// view: the PC Settings menu archive served instead of the file bytes (settings/menu_overlay.hpp),
+// with its own cursor.
+struct KernelFile {bool writable=false;std::mutex position_lock;HANDLE handle=INVALID_HANDLE_VALUE;std::filesystem::path path;
+    std::shared_ptr<const settings::menu_overlay::View> view;std::uint64_t cursor=0;
+    ~KernelFile(){if(handle!=INVALID_HANDLE_VALUE)CloseHandle(handle);}};
 class KernelFiles {
     std::filesystem::path base,patch,user;std::mutex mutex;int next=3;
     std::map<int,std::shared_ptr<KernelFile>> owned;
@@ -62,6 +68,9 @@ public:
         if(fs::exists(target) && (fs::is_symlink(fs::symlink_status(target)) || !fs::is_regular_file(target)))throw std::runtime_error("Writable target is not owned regular file");
         return target;
     }
+    std::shared_ptr<const settings::menu_overlay::View> menu_view(const std::string& relative,const std::filesystem::path& host){
+        return settings::menu_overlay::overlay.find(relative,host,[&](const std::string& r){return app0_read_path(base,patch,r);});
+    }
     std::filesystem::path metadata_path(const std::string& guest){
         if(guest=="/app0" || guest=="/app0/"){if(base.empty())throw std::runtime_error("File base mount missing");return patch.empty()?base:patch;}
         if(guest.rfind("/app0/",0)==0){if(base.empty())throw std::runtime_error("File base mount missing");return app0_read_path(base,patch,guest.substr(6),false);}
@@ -94,6 +103,12 @@ public:
         auto file=std::make_shared<KernelFile>();file->path=host;file->writable=(access&GENERIC_WRITE)!=0;
         file->handle=CreateFileW(host.c_str(),access,FILE_SHARE_READ,nullptr,creation,FILE_ATTRIBUTE_NORMAL|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
         if(file->handle==INVALID_HANDLE_VALUE){const auto error=GetLastError();if(error==ERROR_FILE_NOT_FOUND || error==ERROR_PATH_NOT_FOUND)return int(0x80020002U);if(error==ERROR_FILE_EXISTS || error==ERROR_ALREADY_EXISTS)return int(0x80020011U);if(error==ERROR_ACCESS_DENIED)return int(0x8002000dU);throw std::runtime_error("Native owned-file open failed");}
+        if(guest.rfind("/app0/",0)==0)if(auto view=menu_view(guest.substr(6),host)){
+            LARGE_INTEGER size{};
+            if(!GetFileSizeEx(file->handle,&size))throw std::runtime_error("Native file size query failed");
+            if(view->source_size && std::uint64_t(size.QuadPart)!=view->source_size){std::fprintf(stderr,"ctrport: PC Settings menu not applied to %s: file changed\n",guest.c_str());std::fflush(stderr);}
+            else file->view=view;
+        }
         std::lock_guard<std::mutex> guard(mutex);if(next==INT_MAX)throw std::runtime_error("File descriptor domain exhausted");const auto fd=next++;owned.emplace(fd,file);return fd;
     }
     int close(int fd){
@@ -164,7 +179,7 @@ inline int kernel_fstat(KernelFiles& files,int fd,GuestFileStat* output){
        !GetFileInformationByHandleEx(file->handle,FileBasicInfo,&basic,sizeof(basic)))throw std::runtime_error("Native file metadata query failed");
     if(standard.Directory || standard.EndOfFile.QuadPart<0)throw std::runtime_error("Only owned regular-file stat supported");
     GuestFileStat result{};result.mode=0100777;result.blocksize=512;
-    result.size=standard.EndOfFile.QuadPart;result.blocks=result.size/512+(result.size%512!=0);
+    result.size=file->view?std::int64_t(file->view->size()):standard.EndOfFile.QuadPart;result.blocks=result.size/512+(result.size%512!=0);
     result.access=file_timestamp(basic.LastAccessTime.QuadPart);result.modified=file_timestamp(basic.LastWriteTime.QuadPart);
     result.changed=file_timestamp(basic.ChangeTime.QuadPart);result.birth=file_timestamp(basic.CreationTime.QuadPart);
     *output=result;
@@ -192,7 +207,9 @@ inline int kernel_stat(KernelFiles& files,const char* path,GuestFileStat* output
  if(basic.FileAttributes&FILE_ATTRIBUTE_REPARSE_POINT)throw std::runtime_error("Stat reparse target rejected");
  GuestFileStat result{};
  if(standard.Directory){result.mode=0040777;result.size=65536;result.blocksize=65536;result.blocks=128;}
- else{if(standard.EndOfFile.QuadPart<0)throw std::runtime_error("Stat negative native size");result.mode=0100777;result.size=standard.EndOfFile.QuadPart;result.blocksize=512;result.blocks=result.size/512+(result.size%512!=0);}
+ else{if(standard.EndOfFile.QuadPart<0)throw std::runtime_error("Stat negative native size");result.mode=0100777;result.size=standard.EndOfFile.QuadPart;
+  if(guest.rfind("/app0/",0)==0)if(const auto view=files.menu_view(guest.substr(6),host))result.size=std::int64_t(view->size());
+  result.blocksize=512;result.blocks=result.size/512+(result.size%512!=0);}
  result.access=file_timestamp(basic.LastAccessTime.QuadPart);result.modified=file_timestamp(basic.LastWriteTime.QuadPart);result.changed=file_timestamp(basic.ChangeTime.QuadPart);result.birth=file_timestamp(basic.CreationTime.QuadPart);
  *output=result;return 0;
 }
@@ -229,6 +246,19 @@ inline int kernel_fstat_control(){
     std::cout<<"{\"scope\":\"file_stat_control\",\"size513\":true,\"blocks2\":true,\"timestamp_roundtrip\":true,\"guard_bytes\":true,\"null_unknown_errors\":true}\n";return 0;
 }
 
+// Positioned read of the original bytes through a reopened overlapped handle (see pread).
+inline std::uint64_t native_read_at(HANDLE handle,std::uint64_t offset,unsigned char* target,std::uint64_t count){
+    if(!count)return 0;
+    KernelFile read;read.handle=ReOpenFile(handle,GENERIC_READ,FILE_SHARE_READ,FILE_FLAG_OVERLAPPED);
+    if(read.handle==INVALID_HANDLE_VALUE)throw std::runtime_error("Pread reopen failed");
+    OVERLAPPED operation{};operation.Offset=static_cast<DWORD>(offset);operation.OffsetHigh=static_cast<DWORD>(offset>>32);
+    DWORD received=0;const auto okay=ReadFile(read.handle,target,static_cast<DWORD>(count),&received,&operation);
+    if(!okay){const auto error=GetLastError();if(error==ERROR_HANDLE_EOF)return 0;if(error!=ERROR_IO_PENDING)throw std::runtime_error("Native pread failed");if(!GetOverlappedResult(read.handle,&operation,&received,TRUE)){if(GetLastError()==ERROR_HANDLE_EOF)return 0;throw std::runtime_error("Native pread completion failed");}}
+    return received;
+}
+inline std::uint64_t menu_view_read(const KernelFile& file,std::uint64_t offset,unsigned char* target,std::uint64_t count){
+    return settings::menu_overlay::read(*file.view,offset,target,count,[&](std::uint64_t at,unsigned char* out,std::uint64_t n){return native_read_at(file.handle,at,out,n);});
+}
 // Independent regular-file read, public pinned file_system.cpp523-570.
 // Synchronous original handle + position_lock share the real cursor with write/seek.
 inline std::int64_t kernel_read(KernelFiles& files,int fd,void* output,std::uint64_t count){
@@ -242,7 +272,9 @@ inline std::int64_t kernel_read(KernelFiles& files,int fd,void* output,std::uint
  thread_local std::vector<unsigned char> staged;void* target=output;
  if(guest_cpu_write_hook && count){guest_cpu_write_hook(output,count);staged.resize(static_cast<std::size_t>(count));target=staged.data();}
  const auto copy_back=[&]{if(target!=output && received)std::memcpy(output,target,received);};
- if(!ReadFile(file->handle,target,static_cast<DWORD>(count),&received,nullptr)){
+ if(file->view){
+  received=static_cast<DWORD>(menu_view_read(*file,file->cursor,static_cast<unsigned char*>(target),count));file->cursor+=received;
+ }else if(!ReadFile(file->handle,target,static_cast<DWORD>(count),&received,nullptr)){
   const auto error=GetLastError();if(error==ERROR_ACCESS_DENIED)return std::int64_t(int(0x80020009U));if(error==ERROR_HANDLE_EOF)return 0;throw std::runtime_error("Native regular-file read failed");
  }
  copy_back();
@@ -269,6 +301,13 @@ inline std::int64_t kernel_pread(KernelFiles& files,int fd,void* output,std::uin
     if(count && !output)return std::int64_t(int(0x8002000eU));
     if(count)require_time_output(output,static_cast<std::size_t>(count));
     if(!count)return 0;
+    if(file->view){
+        thread_local std::vector<unsigned char> staged_view;unsigned char* out=static_cast<unsigned char*>(output);
+        if(guest_cpu_write_hook){guest_cpu_write_hook(output,count);staged_view.resize(static_cast<std::size_t>(count));out=staged_view.data();}
+        const auto received=menu_view_read(*file,static_cast<std::uint64_t>(offset),out,count);
+        if(out!=output && received)std::memcpy(output,out,static_cast<std::size_t>(received));
+        return std::int64_t(received);
+    }
     KernelFile read;read.handle=ReOpenFile(file->handle,GENERIC_READ,FILE_SHARE_READ,FILE_FLAG_OVERLAPPED);
     if(read.handle==INVALID_HANDLE_VALUE)throw std::runtime_error("Pread reopen failed");
     OVERLAPPED operation{};operation.Offset=static_cast<DWORD>(offset);operation.OffsetHigh=static_cast<DWORD>(static_cast<std::uint64_t>(offset)>>32);
@@ -277,7 +316,7 @@ inline std::int64_t kernel_pread(KernelFiles& files,int fd,void* output,std::uin
     DWORD received=0;const auto okay=ReadFile(read.handle,target,static_cast<DWORD>(count),&received,&operation);
     if(!okay){const auto error=GetLastError();if(error==ERROR_HANDLE_EOF)return 0;if(error!=ERROR_IO_PENDING)throw std::runtime_error("Native pread failed");if(!GetOverlappedResult(read.handle,&operation,&received,TRUE)){if(GetLastError()==ERROR_HANDLE_EOF)return 0;throw std::runtime_error("Native pread completion failed");}}
     if(target!=output && received)std::memcpy(output,target,received);
-    std::cout<<"{\"scope\":\"owned_file_pread\",\"fd\":"<<fd<<",\"offset\":"<<offset<<",\"requested\":"<<count<<",\"received\":"<<received<<"}\n"<<std::flush;return received;
+    if(ctrport::settings::hot_trace()){std::cout<<"{\"scope\":\"owned_file_pread\",\"fd\":"<<fd<<",\"offset\":"<<offset<<",\"requested\":"<<count<<",\"received\":"<<received<<"}\n"<<std::flush;}return received;
 }
 // sceKernelLseek (shadPS4 file_system.cpp454-521): SET/CUR/END on the shared cursor;
 // whence 3/4 (POSIX extensions) ENOTTY, others EINVAL; returns the new position.
@@ -286,6 +325,11 @@ inline std::int64_t kernel_lseek(KernelFiles& files,int fd,std::int64_t offset,i
     if(whence==3 || whence==4)return std::int64_t(int(0x80020019U));
     if(whence<0 || whence>2)return std::int64_t(int(0x80020016U));
     std::lock_guard<std::mutex> lock(file->position_lock);
+    if(file->view){
+        const std::int64_t origin=whence==0?0:whence==1?std::int64_t(file->cursor):std::int64_t(file->view->size());
+        if((offset>0 && origin>INT64_MAX-offset) || origin+offset<0)return std::int64_t(int(0x80020016U));
+        file->cursor=std::uint64_t(origin+offset);return std::int64_t(file->cursor);
+    }
     LARGE_INTEGER distance{},position{};distance.QuadPart=offset;
     if(!SetFilePointerEx(file->handle,distance,&position,whence==0?FILE_BEGIN:whence==1?FILE_CURRENT:FILE_END))return std::int64_t(int(0x80020016U));
     return position.QuadPart;

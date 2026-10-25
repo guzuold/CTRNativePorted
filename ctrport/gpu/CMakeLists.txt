@@ -73,9 +73,13 @@ set(HOST_SHADER_HEADERS "")
 foreach(FILENAME IN ITEMS ${HOST_SHADER_FILES})
     string(REPLACE "." "_" SHADER_NAME ${FILENAME})
     set(OUT ${HOST_SHADER_DIR}/${SHADER_NAME}.h)
+    set(SETTINGS_SHADER_INPUT ${HOST_SHADER_SRC}/${FILENAME})
+    if(FILENAME STREQUAL "post_process.frag")
+        set(SETTINGS_SHADER_INPUT ${CMAKE_CURRENT_SOURCE_DIR}/display_controls/post_process.frag)
+    endif()
     add_custom_command(OUTPUT ${OUT}
-        COMMAND ${CMAKE_COMMAND} -P ${HOST_SHADER_SRC}/StringShaderHeader.cmake ${HOST_SHADER_SRC}/${FILENAME} ${OUT} ${HOST_SHADER_SRC}/source_shader.h.in
-        MAIN_DEPENDENCY ${HOST_SHADER_SRC}/${FILENAME} DEPENDS ${HOST_SHADER_SRC}/source_shader.h.in)
+        COMMAND ${CMAKE_COMMAND} -P ${HOST_SHADER_SRC}/StringShaderHeader.cmake ${SETTINGS_SHADER_INPUT} ${OUT} ${HOST_SHADER_SRC}/source_shader.h.in
+        MAIN_DEPENDENCY ${SETTINGS_SHADER_INPUT} DEPENDS ${HOST_SHADER_SRC}/source_shader.h.in)
     list(APPEND HOST_SHADER_HEADERS ${OUT})
 endforeach()
 add_custom_target(host_shaders DEPENDS ${HOST_SHADER_HEADERS})
@@ -120,7 +124,8 @@ set(LIBRARIES
     ${SHAD}/src/core/libraries/kernel/equeue.cpp)
 file(GLOB_RECURSE SHIM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shim/*.cpp)
 
-add_library(ctr_gpu SHARED ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${LIBRARIES} ${SHIM_SOURCES})
+# json.cpp: the settings schema (../settings/control_schema.hpp) compares JSON values.
+add_library(ctr_gpu SHARED ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${LIBRARIES} ${SHIM_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/../online_server/json.cpp)
 add_dependencies(ctr_gpu host_shaders)
 target_include_directories(ctr_gpu BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/shim)
 target_include_directories(ctr_gpu BEFORE PRIVATE ${PATCHED})
@@ -161,3 +166,22 @@ endif()
 # Unit test of the online services (R8): loads ctr_hle.dll with CTR_ONLINE=1.
 add_executable(ctr_hle_online_test ${CMAKE_CURRENT_SOURCE_DIR}/../hle_tests/online_services_test.cpp)
 target_link_libraries(ctr_hle_online_test PRIVATE ws2_32 crypt32)
+
+# Settings GPU extension ABI; absence means controls must remain unavailable.
+get_target_property(SETTINGS_GPU_SOURCES ctr_gpu SOURCES)
+list(FILTER SETTINGS_GPU_SOURCES EXCLUDE REGEX "texture_cache/sampler\\.cpp$")
+set_property(TARGET ctr_gpu PROPERTY SOURCES "${SETTINGS_GPU_SOURCES}")
+target_sources(ctr_gpu PRIVATE ${PATCHED}/video_core/texture_cache/sampler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/renderer_controls/capability.cpp)
+
+get_target_property(DISPLAY_GPU_SOURCES ctr_gpu SOURCES)
+list(FILTER DISPLAY_GPU_SOURCES EXCLUDE REGEX "(host_passes/pp_pass|libraries/videoout/video_out|renderer_vulkan/vk_swapchain)\\.cpp$")
+set_property(TARGET ctr_gpu PROPERTY SOURCES "${DISPLAY_GPU_SOURCES}")
+target_sources(ctr_gpu PRIVATE ${PATCHED}/video_core/renderer_vulkan/host_passes/pp_pass.cpp ${PATCHED}/core/libraries/videoout/video_out.cpp ${PATCHED}/video_core/renderer_vulkan/vk_swapchain.cpp ${CMAKE_CURRENT_SOURCE_DIR}/display_controls/capability.cpp)
+
+target_sources(ctr_gpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pacing_controls/capability.cpp)
+
+get_target_property(AO_GPU_SOURCES ctr_gpu SOURCES)
+list(FILTER AO_GPU_SOURCES EXCLUDE REGEX "renderer_vulkan/vk_pipeline_cache[.]cpp$")
+set_property(TARGET ctr_gpu PROPERTY SOURCES "${AO_GPU_SOURCES}")
+target_sources(ctr_gpu PRIVATE ${PATCHED}/video_core/renderer_vulkan/vk_pipeline_cache.cpp)

@@ -290,6 +290,7 @@ namespace {
 std::mutex g_window_mutex;
 std::condition_variable g_window_cv;
 bool g_window_ready;
+bool g_window_failed;
 
 LONG CALLBACK GpuFaultHandler(EXCEPTION_POINTERS* exception) {
     if (exception->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION ||
@@ -328,7 +329,14 @@ extern "C" CTR_GPU_API int ctr_gpu_init(const CtrGpuConfig* config) {
     const s32 width = config->width, height = config->height;
     std::thread([title, width, height] {
         Common::SetCurrentThreadName("ctr_gpu:window");
-        auto* window = new Frontend::WindowSDL(width, height, title.c_str());
+        Frontend::WindowSDL* window=nullptr;
+        try { window=new Frontend::WindowSDL(width,height,title.c_str()); }
+        catch (const std::exception& error) {
+            std::fprintf(stderr, "CTR_SETTINGS_WINDOW rejected: %s\n",error.what());
+            { std::scoped_lock lock{g_window_mutex}; g_window_failed=true; g_window_ready=true; }
+            g_window_cv.notify_all();
+            return;
+        }
         {
             std::scoped_lock lock{g_window_mutex};
             g_window = window;
@@ -346,6 +354,7 @@ extern "C" CTR_GPU_API int ctr_gpu_init(const CtrGpuConfig* config) {
     {
         std::unique_lock lock{g_window_mutex};
         g_window_cv.wait(lock, [] { return g_window_ready; });
+        if (g_window_failed) return -3;
     }
     Libraries::Kernel::service_thread = std::jthread{Libraries::Kernel::KernelServiceThread};
     // Frame-rate log: flips, submissions and draws per second every two seconds.

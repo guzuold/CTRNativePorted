@@ -17,18 +17,24 @@ vk::ImageView Rasterizer::UpscaleScene(VideoCore::ImageId id, vk::ImageView view
     // DLSS and FSR 3 are temporal: CtrDlss feeds both from the same inputs.
     if (CtrUpscaling::Mode() == 2 || CtrUpscaling::Mode() == 3) {
         upscale_view = ctr_dlss->Upscale(id, format, mapping, out, upscale_layout);
-        return upscale_view;
+        if (upscale_view) { ctrport::settings::display::note_temporal(1, CtrUpscaling::Mode()); return upscale_view; }
+        upscale_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
-    if (CtrUpscaling::Mode() != 1 || in.width >= out.width || in.height >= out.height ||
+    if (CtrUpscaling::Mode() == 0 || in.width >= out.width || in.height >= out.height ||
         in.width * 4 < out.width ||
-        std::abs(double(in.width) / in.height - double(out.width) / out.height) > 0.02) return {};
+        std::abs(double(in.width) / in.height - double(out.width) / out.height) > 0.02) { if (CtrUpscaling::Mode() >= 2) ctrport::settings::display::note_temporal(3, CtrUpscaling::Mode()); return {}; }
     scheduler.EndRendering();
     if (!scene_fsr_created) {
         scene_fsr.Create(instance.GetDevice(), instance.GetAllocator(), 3);
         scene_fsr_created = true;
     }
     source.Transit(vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderRead, {});
-    upscale_view = scene_fsr.Render(scheduler.CommandBuffer(), view, in, out, {}, false);
+    const auto sharpness = ctrport::settings::renderer::environment_sharpness();
+    HostPasses::FsrPass::Settings scene_settings{};
+    scene_settings.use_rcas = sharpness.enabled;
+    scene_settings.rcas_attenuation = sharpness.attenuation;
+    upscale_view = scene_fsr.Render(scheduler.CommandBuffer(), view, in, out, scene_settings, false);
+    if (CtrUpscaling::Mode() == 2 || CtrUpscaling::Mode() == 3) ctrport::settings::display::note_temporal(upscale_view ? 2 : 3, CtrUpscaling::Mode());
     if (upscale_frames == 29) {
         UpscaleReadback(instance, scheduler, source.GetImage(), source.backing->state.layout, in, 4, "fsr1_input_rgba8");
         UpscaleReadback(instance, scheduler, scene_fsr.LastOutputImage(), upscale_layout, out, 8, "fsr1_output_rgba16f");

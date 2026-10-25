@@ -2887,6 +2887,16 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     // applied after the built-in patches above so that they win where both write.
     if(continue_after_libc_init)
         guest_patches::apply_from_environment(images.front().get(),metadata.front().spans,profile->title_id,profile->version);
+    if(continue_after_libc_init) {
+        if(const auto* document=settings::runtime_snapshot()) {
+            std::size_t extent=0;
+            for(const auto& span:metadata.front().spans) extent=(std::max)(extent,static_cast<std::size_t>(span.second));
+            auto adapter=settings::install_startup(images.front().get(),extent,metadata.front().sha256,
+                settings::startup_path(),*document,settings::startup_hooks());
+            // Non-returning native entry: callbacks remain installed for process lifetime.
+            (void)adapter.release();
+        }
+    }
     for(const auto& span:metadata.front().executable_spans) {
         DWORD previous=0;
         if(!VirtualProtect(images.front().get()+span.first,static_cast<SIZE_T>(span.second-span.first),PAGE_EXECUTE_READ,&previous)) throw std::runtime_error("Entry code protection failed");
