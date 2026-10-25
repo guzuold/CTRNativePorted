@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Crash Team Racing Native Ported: launcher (CTRNativePorted.exe), native Win32 + GDI+.
-// Implementation of Claude Design 2a ("Pit Lane — slanted nav stack, art cut on a diagonal").
-// Features: 1040x640 arcade kart frame, slanted navigation stack (-10 deg), diagonal stage cut
-// with key art / speed stripes, tactile 3D PLAY! button, and full ArcadePanes for Mods, Settings, and Advanced.
+// Nitro Cinema presentation. Native launcher services and runtime integration retained.
+// Presentation lives in nitro_*.hpp; game data is loaded read-only from the user dump.
 // Zero external runtime dependencies (no Python). 100% compatible with launcher_config.json, lane lock, and ctrport.exe.
 #ifndef UNICODE
 #define UNICODE
 #endif
 #define NOMINMAX
 #include <windows.h>
+#include "nitro_layout.hpp"
+#include "launcher_appearance.hpp"
 #include "online_server/launcher_online.hpp"
 #include "online_server/protocol.hpp"
 #include "online_server/local_backup.hpp"
@@ -67,25 +68,27 @@ using launcher_text::tr;
 using launcher_text::trf;
 
 namespace {
-constexpr wchar_t kTitle[] = L"Crash Team Racing Native Ported";
-constexpr float kWidth = 1040, kHeight = 640;
+constexpr wchar_t kTitle[] = L"CTR Native Ported";
+bool classic_skin = false;
+constexpr int ID_LAUNCHER_SKIN = 909;
+float kWidth = nitro::width, kHeight = nitro::height;
 constexpr UINT WM_APP_FINISHED = WM_APP + 1;
 constexpr UINT WM_APP_HOST_READY = WM_APP + 2;
 constexpr UINT WM_APP_XBOX_READY = WM_APP + 3;
 
 // Design 2a Pit Lane Palette (from Claude Design token specification)
-constexpr ARGB kArcadeBg      = 0xFF1B1446;  // Deep arcade purple/indigo
-constexpr ARGB kArcadeDark    = 0xFF120C30;  // Dark ink outline & hard drop shadow
-constexpr ARGB kArcadeCard    = 0xFF2A2170;  // Card surface
-constexpr ARGB kArcadeCardSub = 0xFF1B1446;  // Inset card surface
+ARGB kArcadeBg      = 0xFF10152C;  // Deep arcade purple/indigo
+ARGB kArcadeDark    = 0xFF0A1025;  // Dark ink outline & hard drop shadow
+ARGB kArcadeCard    = 0xFF1B233D;  // Card surface
+ARGB kArcadeCardSub = 0xFF10152C;  // Inset card surface
 constexpr ARGB kArcadeGold    = 0xFFFFC93C;  // Trophy gold
 constexpr ARGB kArcadeCyan    = 0xFF2FD3FF;  // Nitro cyan
 constexpr ARGB kArcadeLime    = 0xFF8BE83A;  // Speed green
 constexpr ARGB kArcadePink    = 0xFFFF3D8B;  // Accent pink
 constexpr ARGB kArcadeOrange  = 0xFFFF7A1A;  // Warning orange
 constexpr ARGB kTextLight     = 0xFFFFF8EC;  // Warm light text
-constexpr ARGB kTextMuted     = 0xFFB9B0F0;  // Indigo muted text
-constexpr ARGB kTextOff       = 0xFF5A5196;  // Disabled / toggle off
+ARGB kTextMuted     = 0xFFB9C2DA;  // Indigo muted text
+ARGB kTextOff       = 0xFF56617D;  // Disabled / toggle off
 
 enum Tab : int {
     TAB_HOME = 0,
@@ -522,6 +525,8 @@ void poll_launcher_update() {
     }
 }
 
+#include "nitro_state.hpp"
+
 int px(float logical) { return static_cast<int>(std::lround(logical * g.scale)); }
 RectF rect(float x, float y, float w, float h) { return RectF(x, y, w, h); }
 
@@ -723,7 +728,8 @@ int usable_style(const FontFamily& font_family, int style) {
 }
 void text(Graphics& gr, const std::wstring& value, int which, float size, int style, const RectF& r, ARGB color,
           StringAlignment align = StringAlignmentNear) {
-    const auto* retail = which == 0 ? retail_fonts.title.get() : retail_fonts.body.get();
+    gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
+    const auto* retail = which == 0 ? retail_fonts.title.get() : classic_skin ? retail_fonts.body.get() : nullptr;
     if (retail && retail->draw(gr, value, which == 0 ? size : size * 1.25f, r, color, align)) return;
     Font font(&family(which), size, usable_style(family(which), style), UnitPixel);
     StringFormat format;
@@ -733,6 +739,14 @@ void text(Graphics& gr, const std::wstring& value, int which, float size, int st
     if (value.find(L'\n') == std::wstring::npos) format.SetFormatFlags(StringFormatFlagsNoWrap);
     SolidBrush brush{Color(color)};
     gr.DrawString(value.c_str(), -1, &font, r, &format, &brush);
+}
+void nitro_resolve(HDC target,HBITMAP high,int w,int h) {
+    // Resolve via GDI+ rather than display-driver-dependent GDI HALFTONE.
+    Bitmap image(high,nullptr);Graphics output(target);
+    output.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+    output.SetPixelOffsetMode(PixelOffsetModeHalf);
+    ImageAttributes attr;attr.SetWrapMode(WrapModeTileFlipXY);
+    output.DrawImage(&image,Rect(0,0,w,h),0,0,w*nitro::samples,h*nitro::samples,UnitPixel,&attr);
 }
 void draw_cover(Graphics& gr, Bitmap& image, const RectF& dest) {
     const float iw = static_cast<float>(image.GetWidth()), ih = static_cast<float>(image.GetHeight());
@@ -746,92 +760,8 @@ void draw_cover(Graphics& gr, Bitmap& image, const RectF& dest) {
 void select_tab(int tab);
 void sync_mod_rows();
 
-// Static layer: Left aside background, diagonal cut, outer frame
-void render_base_layer() {
-    const int w = px(kWidth), h = px(kHeight);
-    HDC screen = GetDC(nullptr);
-    if (g.base_layer) DeleteObject(g.base_layer);
-    g.base_layer = CreateCompatibleBitmap(screen, w, h);
-    HDC dc = CreateCompatibleDC(screen);
-    const HGDIOBJ previous = SelectObject(dc, g.base_layer);
-    {
-        Graphics gr(dc);
-        gr.SetSmoothingMode(SmoothingModeAntiAlias);
-        gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-        gr.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-        gr.SetPixelOffsetMode(PixelOffsetModeHalf);
-        gr.ScaleTransform(g.scale, g.scale);
-
-        // Window background: #1b1446
-        SolidBrush bg{Color(kArcadeBg)};
-        gr.FillRectangle(&bg, 0.f, 0.f, kWidth, kHeight);
-
-        // Repeating subtle pinstripes (-60 deg)
-        Pen stripe_pen(Color(9, 255, 255, 255), 24.0f);
-        for (float x = -kHeight * 2; x < kWidth + kHeight * 2; x += 70.0f) {
-            gr.DrawLine(&stripe_pen, x, 0.0f, x - kHeight * 0.577f, kHeight);
-        }
-
-        if (g.logo) {
-            const float ratio = std::min(236.f / g.logo->GetWidth(), 140.f / g.logo->GetHeight());
-            const float lw = g.logo->GetWidth() * ratio, lh = g.logo->GetHeight() * ratio;
-            gr.DrawImage(g.logo.get(), RectF(12.f + (236.f - lw) / 2, 20.f + (140.f - lh) / 2, lw, lh));
-        } else {
-        text(gr, L"CRASH TEAM", 0, 26, FontStyleBold, rect(26, 28, 220, 36), kArcadeGold);
-        text(gr, L"RACING", 0, 40, FontStyleBold, rect(26, 60, 220, 52), kTextLight);
-        draw_slanted_box(gr, rect(28, 120, 188, 28), .14f, 4, SolidBrush(Color(kArcadeCyan)), kArcadeDark, 2);
-        text(gr, L"NATIVE PORTED", 1, 12, FontStyleBold, rect(28, 120, 188, 28), kArcadeDark, StringAlignmentCenter);
-        }
-
-        text(gr, L"Launcher " + ctr_update::wide(ctr_update::version), 1, 11.5f, FontStyleRegular,
-             rect(24, 550, 210, 24), kTextMuted);
-        // Aside bottom tag (slanted -8 deg)
-        draw_slanted_box(gr, rect(24, kHeight - 50, 80, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeCyan)), kArcadeDark, 2.0f);
-        text(gr, L"V1.21", 1, 11.5f, FontStyleBold, rect(24, kHeight - 50, 80, 26), kArcadeDark, StringAlignmentCenter);
-
-        if (g.current_tab == TAB_HOME) {
-        // Main Stage diagonal background cut (clip-path: polygon(14% 0, 100% 0, 100% 100%, 0 100%))
-        // Top-left at x ~ 370, bottom-left at x ~ 260
-        GraphicsPath cut_path;
-        PointF cut_pts[] = {
-            PointF(370.f, 0.f),
-            PointF(kWidth, 0.f),
-            PointF(kWidth, kHeight),
-            PointF(260.f, kHeight)
-        };
-        cut_path.AddPolygon(cut_pts, 4);
-
-        gr.SetClip(&cut_path);
-        // Stage cyan background
-        SolidBrush cyan_stage{Color(kArcadeCyan)};
-        gr.FillRectangle(&cyan_stage, 260.f, 0.f, kWidth - 260.f, kHeight);
-
-        if (g.art) {
-            // Original user-supplied artwork stays in the dump, loaded read-only.
-            draw_cover(gr, *g.art, rect(260, 0, kWidth - 260, kHeight));
-        } else {
-        // Procedural waving chequered flag when no dump artwork is available.
-        const auto point = [](int col, int row) {
-            const float x = 170.f + col * 72.f;
-            return PointF(x, -100.f + row * 72.f + 30.f * std::sin(col * .52f + row * .18f));
-        };
-        for (int row = 0; row < 12; ++row) for (int col = 0; col < 14; ++col) {
-            PointF tile[] = {point(col,row), point(col+1,row), point(col+1,row+1), point(col,row+1)};
-            const BYTE shade = static_cast<BYTE>(210 + 35 * std::cos(col * .52f + row * .18f));
-            SolidBrush fill((row + col) % 2 ? Color(255, shade, static_cast<BYTE>(shade-6), static_cast<BYTE>(shade-16)) : Color(255, 27, 20, 62));
-            gr.FillPolygon(&fill, tile, 4);
-            Pen seam(&fill, 1.f);
-            gr.DrawPolygon(&seam, tile, 4);
-        }
-        }
-        gr.ResetClip();
-        }
-        stroke_round(gr, rect(2, 2, kWidth - 4, kHeight - 4), 26, kArcadeDark, 4);
-    }
-    SelectObject(dc, previous);
-    DeleteDC(dc);
-    ReleaseDC(nullptr, screen);
-}
+#include "classic_shell.hpp"
+#include "nitro_shell.hpp"
 
 void draw_check(Graphics& gr, float x, float y, int kind) {
     const ARGB color = kind == 1 ? kArcadeLime : kArcadeOrange;
@@ -900,7 +830,7 @@ std::wstring friend_label(const ctr_online::FriendState& row) {
 }
 void paint_window(HDC target);
 constexpr UINT_PTR kFriendsTimer = 1;
-constexpr float kFriendsTravel = 320.f;
+float kFriendsTravel = 378.f;
 void friend_action(int action);
 void update_friend_controls();
 
@@ -929,27 +859,20 @@ void update_friend_controls() {
 constexpr float kFriendsDuration = 320.f;
 
 // Match Brief2's CSS cubic-bezier(.3,1.4,.5,1), including its gentle overshoot.
-float friends_ease(float progress) {
-    float lo = 0, hi = 1;
-    for (int i = 0; i < 16; ++i) {
-        const float t = (lo + hi) * .5f, u = 1 - t;
-        const float x = 3*u*u*t*.3f + 3*u*t*t*.5f + t*t*t;
-        if (x < progress) lo = t; else hi = t;
-    }
-    const float t = (lo + hi) * .5f, u = 1 - t;
-    return 3*u*u*t*1.4f + 3*u*t*t + t*t*t;
-}
+float friends_ease(float progress) { return nitro::ease(progress); }
 void position_friends() {
     // Keep a full-size surface while translating it; the parent clips its right
     // edge. No binary HRGN cuts through the antialiased rounded outlines.
-    SetWindowPos(g.friends_drawer, HWND_TOP, px(kWidth - 38 - g.friends_reveal), px(62),
+    SetWindowPos(g.friends_drawer, HWND_TOP, px(kWidth - (classic_skin?38.f:0.f) - g.friends_reveal), px(classic_skin?62.f:100.f),
                  px(370), px(530), SWP_NOACTIVATE | SWP_NOCOPYBITS);
     ShowWindow(g.friends_drawer, g.current_tab == TAB_HOME ? SW_SHOWNA : SW_HIDE);
     const bool show=g.current_tab==TAB_HOME && g.friends_open && !g.friends_animating;
     for(HWND control:{g.friends_manage,g.friend_code_edit,g.friend_add,g.friend_remove})
         ShowWindow(control,show ? SW_SHOWNA : SW_HIDE);
     update_friend_controls();
-    RedrawWindow(g.window, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
+    RECT damage{px(kWidth-kFriendsTravel-38),px(classic_skin?62.f:100.f),px(kWidth),px(classic_skin?592.f:630.f)};
+    InvalidateRect(g.window,&damage,FALSE);
+    InvalidateRect(g.friends_drawer,nullptr,FALSE);
 }
 void animate_friends(bool open) {
     if (g.current_tab != TAB_HOME) return;
@@ -959,7 +882,8 @@ void animate_friends(bool open) {
     g.friends_started = GetTickCount64();
     g.friends_animating = true;
     reload_friends();
-    SetTimer(g.friends_drawer, kFriendsTimer, 15, nullptr);
+    if(!nitro_motion) {g.friends_reveal=open?kFriendsTravel:0;g.friends_animating=false;}
+    else SetTimer(g.friends_drawer, kFriendsTimer, 15, nullptr);
     position_friends();
 }
 void reset_friends() {
@@ -1042,9 +966,9 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
         const HGDIOBJ previous = SelectObject(dc, bitmap);
         // Composite onto the exact Home background so curves have smooth edge
         // pixels instead of the old mismatched GDI region radius (diameter).
-        SetViewportOrgEx(dc, -px(kWidth - 38 - g.friends_reveal), -px(62), nullptr);
-        paint_window(dc);
-        SetViewportOrgEx(dc, 0, 0, nullptr);
+        HDC backdrop=CreateCompatibleDC(target);const auto backdrop_old=SelectObject(backdrop,g.base_layer);
+        BitBlt(dc,0,0,px(370),px(530),backdrop,px(kWidth-(classic_skin?38.f:0.f)-g.friends_reveal),px(classic_skin?62.f:100.f),SRCCOPY);
+        SelectObject(backdrop,backdrop_old);DeleteDC(backdrop);
         {
             Graphics gr(dc);
             gr.ScaleTransform(g.scale, g.scale);
@@ -1163,299 +1087,11 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
     return DefWindowProcW(window,message,wp,lp);
 }
 
-void paint_window(HDC target) {
-    const int w = px(kWidth), h = px(kHeight);
-    HDC dc = CreateCompatibleDC(target);
-    HBITMAP buffer = CreateCompatibleBitmap(target, w, h);
-    const HGDIOBJ previous = SelectObject(dc, buffer);
-    HDC source = CreateCompatibleDC(target);
-    const HGDIOBJ previous_source = SelectObject(source, g.base_layer);
-    BitBlt(dc, 0, 0, w, h, source, 0, 0, SRCCOPY);
-    SelectObject(source, previous_source);
-    DeleteDC(source);
-    {
-        Graphics gr(dc);
-        gr.SetSmoothingMode(SmoothingModeAntiAlias);
-        gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-        gr.SetPixelOffsetMode(PixelOffsetModeHalf);
-        gr.ScaleTransform(g.scale, g.scale);
-
-        // Render contents based on active tab
-        if (g.current_tab == TAB_HOME) {
-            // Action cluster bottom-right: STATUS badge
-            draw_slanted_box(gr, rect(kWidth - 184, kHeight - 150, 140, 30), 0.176f, 4.0f, SolidBrush(Color(kArcadeDark)), kArcadeGold, 2.0f);
-            text(gr, tr(g.can_launch ? L"READY" : L"SETUP REQUIRED"), 1, 11.5f, FontStyleBold, rect(kWidth - 184, kHeight - 150, 140, 30), kArcadeGold, StringAlignmentCenter);
-
-            fill_round(gr, rect(280, kHeight - 37, 720, 26), 8, SolidBrush(Color(kArcadeDark)));
-            // Small version summary line in bottom corner
-            text(gr, g.global.text, 1, 11.0f, FontStyleRegular, rect(292, kHeight - 34, 692, 20), kTextMuted);
-        } else {
-            // Sub-pane background container: rect(270, 56, 746, 560)
-            // 3a/3b/3c share the uninterrupted purple Pit Lane shell.
-
-            if (g.current_tab == TAB_MODS) {
-                text(gr, L"MODS", 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
-                int active = 0;
-                for (const auto& mod : g.mod_list) active += mod.enabled;
-                for (std::size_t i = 0; i < g.patch_list.size(); ++i)
-                    active += !g.patch_warn[i] && ctrport::guest_patches::selected(g.patch_list[i], g.patch_selection);
-                draw_slanted_box(gr, rect(410, 84, 120, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
-                text(gr, g.cfg.mods_enabled ? trf(L"{0} ENABLED", std::to_wstring(active)) : std::wstring(tr(L"ALL OFF")), 1, 11.0f, FontStyleBold,
-                     rect(410, 84, 120, 26), g.cfg.mods_enabled && active ? kArcadeLime : kTextMuted, StringAlignmentCenter);
-
-                const bool files = g.mods_view == 0;
-                const int count = files ? static_cast<int>(g.mod_list.size()) : static_cast<int>(g.patch_list.size());
-                const float alpha = g.cfg.mods_enabled ? 1.f : 0.5f;
-                if (count == 0) {
-                    const RectF empty_card = rect(296, 176, 694, 100);
-                    fill_round(gr, empty_card, 16, SolidBrush(Color(kArcadeCard)));
-                    stroke_round(gr, empty_card, 16, kArcadeDark, 3.0f);
-                    text(gr, tr(files ? L"No mods yet" : L"No patch files yet"), 0, 22.0f, FontStyleBold, rect(320, 196, 640, 30), kTextLight);
-                    text(gr, trf(L"Folder: {0}", files ? L"runtime/mods" : L"runtime/patches"), 1, 12.0f, FontStyleRegular, rect(320, 236, 640, 20), kArcadeCyan);
-                }
-                for (int row = 0; row < kModRows; ++row) {
-                    const int i = g.mods_page * kModRows + row;
-                    if (i >= count) break;
-                    const float y = 176.f + row * 52.f;
-                    const bool on = g.mod_row_on[row];
-                    const bool warn = files ? g.mod_bad[i] : g.patch_warn[i];
-                    fill_round(gr, rect(296, y, 694, 44), 14, SolidBrush(Color(kArcadeCard)));
-                    stroke_round(gr, rect(296, y, 694, 44), 14, kArcadeDark, 3.0f);
-                    PointF badge_pts[] = {PointF(296.f, y), PointF(344.f, y), PointF(335.f, y + 44.f), PointF(296.f, y + 44.f)};
-                    SolidBrush badge_br(Color(fade(on && g.cfg.mods_enabled ? (warn ? kArcadeOrange : files ? kArcadeLime : kArcadeCyan) : kTextOff, alpha)));
-                    gr.FillPolygon(&badge_br, badge_pts, 4);
-                    Pen badge_pen(Color(kArcadeDark), 3.0f);
-                    gr.DrawPolygon(&badge_pen, badge_pts, 4);
-                    text(gr, std::to_wstring(i + 1), 0, 18.0f, FontStyleBold, rect(296, y + 8, 42, 28), kArcadeDark, StringAlignmentCenter);
-                    const std::wstring name = files ? g.mod_list[i].name : widen(g.patch_list[i].name);
-                    const std::wstring& detail = files ? g.mod_details[i] : g.patch_details[i];
-                    text(gr, name, 1, 13.5f, FontStyleBold, rect(354, y + 4, files ? 470.f : 560.f, 20), fade(kTextLight, alpha));
-                    text(gr, detail, 1, 10.5f, FontStyleRegular, rect(354, y + 24, files ? 470.f : 560.f, 18), fade(warn ? kArcadeOrange : kTextMuted, alpha));
-                }
-                const int pages = std::max(1, (count + kModRows - 1) / kModRows);
-                const std::wstring footer = trf(L"Page {0} / {1}", std::to_wstring(g.mods_page + 1), std::to_wstring(pages));
-                text(gr, footer, 1, 11.5f, FontStyleBold, rect(396, 544, 494, 30), kTextMuted, StringAlignmentCenter);
-                const std::wstring notice = !g.mods_notice.empty() ? g.mods_notice
-                    : g.mods_game.empty() ? std::wstring(tr(L"Game version unknown")) : trf(L"Game: {0}", g.mods_game);
-                text(gr, notice, 1, 11.0f, FontStyleRegular, rect(296, 582, 694, 22), g.mods_notice_error ? kArcadePink : kTextMuted, StringAlignmentCenter);
-            } else if (g.current_tab == TAB_TROPHIES) {
-                text(gr, tr(L"TROPHIES"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
-                const auto total = g.trophy_set.trophies.size();
-                draw_slanted_box(gr, rect(870, 84, 120, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
-                text(gr, std::to_wstring(g.trophy_unlocked.size()) + L" / " + std::to_wstring(total), 1, 11.0f, FontStyleBold,
-                     rect(870, 84, 120, 26), g.trophy_unlocked.empty() ? kTextMuted : kArcadeLime, StringAlignmentCenter);
-                ColorMatrix gray = {{{0.2f, 0.2f, 0.2f, 0, 0}, {0.4f, 0.4f, 0.4f, 0, 0}, {0.1f, 0.1f, 0.1f, 0, 0}, {0, 0, 0, 0.35f, 0}, {0, 0, 0, 0, 1}}};
-                ImageAttributes locked;
-                locked.SetColorMatrix(&gray);
-                for (std::size_t i = 0; i < total && i < g.trophy_icons.size(); ++i) {
-                    const float x = kTrophyLeft + (i % kTrophyColumns) * kTrophyCell, y = kTrophyTop + (i / kTrophyColumns) * kTrophyCell;
-                    const bool unlocked = g.trophy_unlocked.count(g.trophy_set.trophies[i].id) > 0;
-                    if (static_cast<int>(i) == g.trophy_hot) fill_round(gr, rect(x - 3, y - 3, kTrophyIcon + 6, kTrophyIcon + 6), 8, SolidBrush(Color(kArcadeGold)));
-                    if (Bitmap* icon = g.trophy_icons[i].get()) {
-                        const RectF r = rect(x, y, kTrophyIcon, kTrophyIcon);
-                        if (unlocked) gr.DrawImage(icon, r);
-                        else gr.DrawImage(icon, r, 0, 0, static_cast<REAL>(icon->GetWidth()), static_cast<REAL>(icon->GetHeight()), UnitPixel, &locked);
-                    } else {
-                        fill_round(gr, rect(x, y, kTrophyIcon, kTrophyIcon), 8, SolidBrush(Color(kArcadeCard)));
-                    }
-                }
-                if (total == 0) {
-                    text(gr, tr(L"No trophy file in the dump"), 1, 13.0f, FontStyleRegular, rect(296, 140, 694, 24), kTextMuted);
-                } else {
-                    const int shown = g.trophy_hot >= 0 && g.trophy_hot < static_cast<int>(total) ? g.trophy_hot : 0;
-                    const auto& t = g.trophy_set.trophies[static_cast<std::size_t>(shown)];
-                    const auto when = g.trophy_unlocked.find(t.id);
-                    const RectF card = rect(296, 362, 694, 100);
-                    fill_round(gr, card, 14, SolidBrush(Color(kArcadeCard)));
-                    stroke_round(gr, card, 14, kArcadeDark, 3.0f);
-                    if (static_cast<std::size_t>(shown) < g.trophy_icons.size() && g.trophy_icons[static_cast<std::size_t>(shown)])
-                        gr.DrawImage(g.trophy_icons[static_cast<std::size_t>(shown)].get(), rect(310, 372, 80, 80));
-                    std::wstring name = t.name.empty() ? trf(L"Trophy {0}", std::to_wstring(t.id)) : widen(t.name);
-                    std::wstring detail = widen(t.detail);
-                    if (t.hidden && when == g.trophy_unlocked.end() && g.trophy_set.texts) { name = tr(L"Hidden trophy"); detail.clear(); }
-                    const wchar_t* grade = t.grade == 'P' ? L"Platinum" : t.grade == 'G' ? L"Gold" : t.grade == 'S' ? L"Silver" : t.grade == 'B' ? L"Bronze" : nullptr;
-                    text(gr, name, 1, 15.0f, FontStyleBold, rect(404, 370, 440, 22), kTextLight);
-                    if (grade) text(gr, tr(grade), 1, 11.0f, FontStyleBold, rect(850, 372, 130, 18), kArcadeGold, StringAlignmentFar);
-                    text(gr, detail, 1, 11.5f, FontStyleRegular, rect(404, 394, 576, 34), kTextMuted);
-                    std::wstring state = tr(L"Locked");
-                    if (when != g.trophy_unlocked.end()) {
-                        const std::time_t at = static_cast<std::time_t>(when->second);
-                        std::tm local{};
-                        wchar_t date[32]{};
-                        if (!localtime_s(&local, &at)) std::wcsftime(date, 32, L"%Y-%m-%d %H:%M", &local);
-                        state = trf(L"Unlocked {0}", date);
-                    }
-                    text(gr, state, 1, 11.0f, FontStyleBold, rect(404, 432, 576, 20), when != g.trophy_unlocked.end() ? kArcadeLime : kTextMuted);
-                }
-                text(gr, tr(L"Trophy key (optional):"), 1, 11.5f, FontStyleBold, rect(296, 478, 520, 18), kTextMuted);
-                draw_field(gr, rect(296, 500, 520, 34), g.trophy_key_edit);
-                const std::wstring note = !g.trophy_notice.empty() ? g.trophy_notice
-                    : g.trophy_set.texts ? std::wstring() : std::wstring(tr(L"Names and descriptions need your PS4 trophy key."));
-                text(gr, note, 1, 11.0f, FontStyleRegular, rect(296, 544, 694, 22), g.trophy_notice_error ? kArcadePink : kTextMuted);
-            } else if (g.current_tab == TAB_SETTINGS) {
-                text(gr, tr(L"SETTINGS"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
-
-                // Card 1: GRAPHICS
-                const RectF g_card = rect(296, 126, 222, 450);
-                fill_round(gr, g_card, 18, SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr, g_card, 18, kArcadeDark, 3.0f);
-                text(gr, tr(L"GRAPHICS"), 0, 18.0f, FontStyleBold, rect(312, 142, 190, 24), kArcadeCyan);
-                text(gr, tr(L"Display resolution:"), 1, 11.5f, FontStyleBold, rect(312, 172, 190, 18), kTextMuted);
-
-                if (g.resolution == 4 && !g.cfg.fullscreen) {
-                    draw_field(gr, rect(312, 314, 88, 28), g.width_edit);
-                    draw_field(gr, rect(412, 314, 88, 28), g.height_edit);
-                    text(gr, L"x", 1, 12.0f, FontStyleBold, rect(400, 314, 12, 28), kTextMuted, StringAlignmentCenter);
-                }
-
-                text(gr, tr(L"Internal 3D resolution:"), 1, 11.5f, FontStyleBold, rect(312, 420, 190, 20), kTextMuted);
-                text(gr, tr(L"Scene upscaling:"), 1, 11.5f, FontStyleBold, rect(312, 482, 190, 20), kTextMuted);
-
-                // Card 2: ONLINE & MULTIPLAYER
-                const RectF o_card = rect(532, 126, 222, 450);
-                fill_round(gr, o_card, 18, SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr, o_card, 18, kArcadeDark, 3.0f);
-                text(gr, L"ONLINE & MULTI", 0, 18.0f, FontStyleBold, rect(548, 142, 190, 24), kArcadeGold);
-                text(gr, tr(L"Network mode:"), 1, 11.5f, FontStyleBold, rect(548, 172, 190, 18), kTextMuted);
-
-                text(gr, tr(L"Player name:"), 1, 11.5f, FontStyleBold, rect(548, 230, 190, 18), kTextMuted);
-                draw_field(gr, rect(548, 252, 190, 32), g.online_id_edit);
-
-                text(gr,g.cfg.online ? L"ONLINE" : L"OFFLINE",0,18,FontStyleBold,rect(548,490,190,28),g.cfg.online ? kArcadeLime : kTextMuted);
-
-                // Card 3: CONTROLLER & AUDIO
-                const RectF c_card = rect(768, 126, 222, 300);
-                fill_round(gr, c_card, 18, SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr, c_card, 18, kArcadeDark, 3.0f);
-                text(gr, tr(L"CONTROLLER"), 0, 18.0f, FontStyleBold, rect(784, 142, 190, 24), kArcadePink);
-                for (int player = 0; player < 4; ++player)
-                    text(gr, trf(L"Player {0}", std::to_wstring(player + 1)), 1, 10.5f, FontStyleBold, rect(784, 168.f + player * 46.f, 190, 16), kTextMuted);
-
-                fill_round(gr, rect(768, 436, 222, 140), 18, SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr, rect(768, 436, 222, 140), 18, kArcadeDark, 3);
-
-                text(gr, tr(L"Game language:"), 1, 11, FontStyleBold, rect(784, 516, 190, 20), kTextMuted);
-                text(gr, L"AUDIO", 0, 18.0f, FontStyleBold, rect(784, 446, 100, 24), kArcadeLime);
-            } else if (g.current_tab == TAB_ADVANCED) {
-                text(gr, tr(L"ADVANCED"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
-
-                text(gr, tr(L"Base game folder (CUSA14876 v01.00):"), 1, 11.5f, FontStyleBold, rect(296, 122, 600, 18), kTextMuted);
-                draw_field(gr, rect(296, 144, 580, 34), g.base_edit);
-                draw_status(gr, g.base_status, 296, 182, 580);
-
-                text(gr, tr(L"Update folder (v01.21 CUSA14876-patch):"), 1, 11.5f, FontStyleBold, rect(296, 208, 600, 18), kTextMuted);
-                draw_field(gr, rect(296, 230, 580, 34), g.patch_edit);
-                draw_status(gr, g.patch_status, 296, 268, 580);
-
-                // Logs pre box
-                const RectF log_box = rect(296, 364, 694, 216);
-                fill_round(gr, log_box, 14, SolidBrush(Color(0xFF0C0824)));
-                stroke_round(gr, log_box, 14, kArcadeDark, 3.0f);
-
-                text(gr, tr(L"SESSION LOG"), 1, 12, FontStyleBold, rect(312, 378, 660, 24), kArcadeCyan);
-                std::wstring log = tr(L"No session yet.");
-                if (!g.log_stem.empty()) {
-                    log = widen(read_tail(g.log_stem.wstring() + L".stdout.log", 1400));
-                    if (log.empty()) log = tr(L"Waiting for the game...");
-                }
-                text(gr, log, 1, 11, FontStyleRegular, rect(312, 412, 660, 150), kTextMuted);
-            }
-        }
-    }
-    BitBlt(target, 0, 0, w, h, dc, 0, 0, SRCCOPY);
-    SelectObject(dc, previous);
-    DeleteObject(buffer);
-    DeleteDC(dc);
-}
-
-void draw_control(const DRAWITEMSTRUCT& item) {
-    const auto found = g.controls.find(item.hwndItem);
-    if (found == g.controls.end()) return;
-    const Control& control = found->second;
-    const int w = item.rcItem.right - item.rcItem.left, h = item.rcItem.bottom - item.rcItem.top;
-    POINT origin{0, 0};
-    MapWindowPoints(item.hwndItem, g.window, &origin, 1);
-    HDC dc = CreateCompatibleDC(item.hDC);
-    HBITMAP buffer = CreateCompatibleBitmap(item.hDC, w, h);
-    const HGDIOBJ previous = SelectObject(dc, buffer);
-    HDC source = CreateCompatibleDC(item.hDC);
-    const HGDIOBJ previous_source = SelectObject(source, g.base_layer);
-    BitBlt(dc, 0, 0, w, h, source, origin.x, origin.y, SRCCOPY);
-    const int control_id = GetDlgCtrlID(item.hwndItem);
-    if (control.tab == TAB_SETTINGS || (control_id >= ID_MOD_ROW_TOGGLE && control_id < ID_MOD_ROW_DOWN + kModRows)) {
-        HBRUSH card = CreateSolidBrush(RGB(42, 33, 112));
-        FillRect(dc, &item.rcItem, card);
-        DeleteObject(card);
-    }
-    SelectObject(source, previous_source);
-    DeleteDC(source);
-    {
-        Graphics gr(dc);
-        gr.SetSmoothingMode(SmoothingModeAntiAlias);
-        gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-        gr.SetPixelOffsetMode(PixelOffsetModeHalf);
-        gr.ScaleTransform(g.scale, g.scale);
-        const float lw = static_cast<float>(w) / g.scale, lh = static_cast<float>(h) / g.scale;
-        const bool disabled = (item.itemState & ODS_DISABLED) != 0, pressed = (item.itemState & ODS_SELECTED) != 0;
-        const bool hot = g.hot == item.hwndItem && !disabled;
-        const float alpha = disabled ? 0.45f : 1.f;
-        const RectF full = rect(0.5f, 0.5f + (pressed ? 2.f : 0.f), lw - 1, lh - (pressed ? 3.f : 1.f));
-
-        switch (control.kind) {
-        case Kind::TabBtn: {
-            const bool active = g.current_tab == control.pill;
-            const bool is_disabled = disabled;
-            const float shadow_d = is_disabled ? 2.0f : pressed ? 1.0f : 5.0f;
-            const float btn_alpha = is_disabled ? 0.35f : 1.0f;
-            SolidBrush fill(Color(fade(active ? kArcadeGold : hot && !is_disabled ? 0xFF372C8F : kArcadeCard, btn_alpha)));
-            draw_slanted_box(gr, rect(2.f, 2.f, lw - 14.f, lh - 8.f), 0.176f, shadow_d, fill, is_disabled ? fade(kArcadeDark, 0.4f) : kArcadeDark, is_disabled ? 2.0f : 3.0f);
-            text(gr, tr(control.label), 0, 20.0f, FontStyleBold, rect(2.f, 2.f + (pressed && !is_disabled ? 2.f : 0.f), lw - 14.f, lh - 8.f),
-                 is_disabled ? fade(kTextOff, 0.8f) : active ? kArcadeDark : kTextLight, StringAlignmentCenter);
-            break;
-        }
-        case Kind::Launch: {
-            // The giant PLAY! button from Design 2a
-            const float shadow_d = pressed ? 2.0f : 8.0f;
-            SolidBrush fill(Color(disabled ? 0xFF4A4068 : hot ? 0xFFFFD766 : kArcadeGold));
-            draw_slanted_box(gr, rect(2.f, 2.f, lw - 20.f, lh - 12.f), 0.176f, shadow_d, fill, kArcadeDark, 4.0f);
-            const wchar_t* btn_text = tr(g.process ? L"RACING" : g.xbox_busy ? L"PLEASE WAIT" : L"PLAY!");
-            text(gr, btn_text, 0, 44.0f, FontStyleBold, rect(2.f, 2.f + (pressed ? 3.f : 0.f), lw - 20.f, lh - 12.f),
-                 disabled ? kTextMuted : kArcadeDark, StringAlignmentCenter);
-            break;
-        }
-        case Kind::ActionBtn:
-        case Kind::Browse: {
-            fill_round(gr, full, 10, SolidBrush(Color(fade(GetDlgCtrlID(item.hwndItem) == ID_CLOSE ? kArcadePink : hot ? 0xFF6BE1FF : kArcadeCyan, alpha))));
-            stroke_round(gr, full, 10, kArcadeDark, 3.0f);
-            text(gr, tr(control.label), 1, 12.0f, FontStyleBold, full, kArcadeDark, StringAlignmentCenter);
-            break;
-        }
-        case Kind::Segment:
-        case Kind::Pill: {
-            const bool selected = control.kind == Kind::Segment ? g.mods_view == control.pill : g.resolution == control.pill;
-            fill_round(gr, full, 8, SolidBrush(Color(fade(selected ? kArcadeGold : kArcadeCardSub, alpha))));
-            stroke_round(gr, full, 8, selected ? kArcadeDark : fade(kArcadeDark, 0.6f), selected ? 2.5f : 1.5f);
-            text(gr, tr(control.label), 1, 11.5f, FontStyleBold, full, selected ? kArcadeDark : kTextLight, StringAlignmentCenter);
-            break;
-        }
-        case Kind::Toggle: {
-            const bool on = *control.value;
-            // Pill track
-            const RectF track = rect(1, (lh - 24) / 2, 44, 24);
-            fill_round(gr, track, 12, SolidBrush(Color(fade(on ? kArcadeLime : kTextOff, alpha))));
-            stroke_round(gr, track, 12, kArcadeDark, 2.5f);
-            SolidBrush knob{Color(kTextLight)};
-            gr.FillEllipse(&knob, on ? track.X + 22 : track.X + 3, track.Y + 3, 16.f, 16.f);
-            text(gr, tr(control.label), 1, 12.5f, FontStyleBold, rect(52, 0, lw - 52, lh), fade(hot ? 0xFFFFFFFF : kTextLight, alpha));
-            break;
-        }
-        }
-    }
-    BitBlt(item.hDC, 0, 0, w, h, dc, 0, 0, SRCCOPY);
-    SelectObject(dc, previous);
-    DeleteObject(buffer);
-    DeleteDC(dc);
-}
+#include "classic_pages.hpp"
+#include "nitro_pages.hpp"
+#include "classic_controls.hpp"
+#include "nitro_controls.hpp"
+#include "nitro_transition.hpp"
 
 // Artwork loading
 std::unique_ptr<Bitmap> load_png(const fs::path& path) {
@@ -1637,11 +1273,13 @@ void select_resolution(int index) {
     validate();
 }
 
-void select_tab(int tab) {
+void select_tab(int tab) { if(classic_skin)select_tab_now(tab);else nitro_begin(tab); }
+
+void select_tab_now(int tab) {
     if (tab < 0 || tab >= TAB_COUNT) return;
     if (g.friends_drawer && tab != g.current_tab) reset_friends();
     g.current_tab = tab;
-    render_base_layer();
+    render_base_layer(true);
     if (g.friends_drawer) position_friends();
 
     // Show/hide child controls based on active tab
@@ -2367,7 +2005,7 @@ LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM wparam, LPARAM l
 }
 
 HWND add_button(int id, Kind kind, const RectF& box, const wchar_t* label, bool* value = nullptr, int pill = -1, int tab = -1) {
-    HWND button = CreateWindowExW(0, L"BUTTON", label, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, px(box.X), px(box.Y),
+    HWND button = CreateWindowExW(0, L"BUTTON", tr(label), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, px(box.X), px(box.Y),
                                   px(box.Width), px(box.Height), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
     SetWindowSubclass(button, control_proc, 1, 0);
     g.controls[button] = Control{kind, label, value, pill, box, tab};
@@ -2389,117 +2027,21 @@ HWND add_edit(int id, const RectF& field, const std::wstring& value, DWORD extra
     return edit;
 }
 
-void create_controls() {
-    g.edit_font = CreateFontW(-px(14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                              CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-
-    // 4 Slanted Nav Buttons on Left Aside
-    for (int i = 0; i < static_cast<int>(TAB_COUNT); ++i) {
-        HWND tab_btn = add_button(ID_TAB_BASE + i, Kind::TabBtn, rect(24, 180.f + i * 66.f, 204, 54), kTabNames[i], nullptr, i, -1);
-        g.tab_buttons.push_back(tab_btn);
-    }
-
-    add_button(ID_MINIMIZE, Kind::ActionBtn, rect(948, 14, 32, 32), L"–", nullptr, -1, -1);
-    add_button(ID_CLOSE, Kind::ActionBtn, rect(988, 14, 32, 32), L"×", nullptr, -1, -1);
-    update_button = add_button(ID_CHECK_UPDATE, Kind::ActionBtn, rect(24, 510, 204, 34), update_label.c_str(), nullptr, -1, -1);
-
-    // --- TAB 0: HOME ---
-    // The giant PLAY! button in the bottom right of the stage
-    g.launch = add_button(ID_LAUNCH, Kind::Launch, rect(kWidth - 364, kHeight - 110, 320, 68), L"PLAY!", nullptr, -1, TAB_HOME);
-
-    // --- TAB 1: MODS ---
-    add_button(ID_MODS_REFRESH, Kind::ActionBtn, rect(738, 78, 106, 36), L"REFRESH", nullptr, -1, TAB_MODS);
-    add_button(ID_OPEN_MODS, Kind::ActionBtn, rect(854, 78, 136, 36), L"OPEN FOLDER", nullptr, -1, TAB_MODS);
-    add_button(ID_MODS_FILES, Kind::Segment, rect(296, 128, 140, 32), L"FILE MODS", nullptr, 0, TAB_MODS);
-    add_button(ID_MODS_PATCHES, Kind::Segment, rect(442, 128, 140, 32), L"PATCHES", nullptr, 1, TAB_MODS);
-    add_button(ID_MODS_MASTER, Kind::Toggle, rect(770, 130, 220, 28), L"Use mods and patches", &g.cfg.mods_enabled, -1, TAB_MODS);
-    for (int row = 0; row < kModRows; ++row) {
-        const float y = 176.f + row * 52.f;
-        g.mod_row_up[row] = add_button(ID_MOD_ROW_UP + row, Kind::ActionBtn, rect(836, y + 8, 36, 28), L"▲", nullptr, -1, TAB_MODS);
-        g.mod_row_down[row] = add_button(ID_MOD_ROW_DOWN + row, Kind::ActionBtn, rect(878, y + 8, 36, 28), L"▼", nullptr, -1, TAB_MODS);
-        g.mod_row_toggle[row] = add_button(ID_MOD_ROW_TOGGLE + row, Kind::Toggle, rect(930, y + 6, 54, 32), L"", &g.mod_row_on[row], -1, TAB_MODS);
-    }
-    g.mods_prev = add_button(ID_MODS_PREV, Kind::ActionBtn, rect(296, 544, 90, 30), L"◀", nullptr, -1, TAB_MODS);
-    g.mods_next = add_button(ID_MODS_NEXT, Kind::ActionBtn, rect(900, 544, 90, 30), L"▶", nullptr, -1, TAB_MODS);
-    reload_mods();
-
-    // --- TROPHIES ---
-    g.trophy_key_edit = add_edit(ID_TROPHY_KEY_EDIT, rect(296, 500, 520, 34), g.cfg.trophy_key, ES_PASSWORD);
-    add_button(ID_TROPHY_IMPORT, Kind::ActionBtn, rect(830, 500, 160, 34), L"IMPORT FROM shadPS4", nullptr, -1, TAB_TROPHIES);
-    reload_trophies();
-
-    // --- TAB 2: SETTINGS ---
-    // Graphics: Resolution pills
-    for (int i = 0; i < 5; ++i)
-        g.pills.push_back(add_button(ID_PILL + i, Kind::Pill, rect(312 + (i % 2) * 96.f, 196.f + (i / 2) * 36.f, 90, 30), kPills[i], nullptr, i, TAB_SETTINGS));
-
-    g.width_edit = add_edit(ID_WIDTH, rect(312, 314, 88, 28), g.cfg.custom_w, ES_NUMBER | ES_CENTER);
-    g.height_edit = add_edit(ID_HEIGHT, rect(412, 314, 88, 28), g.cfg.custom_h, ES_NUMBER | ES_CENTER);
-
-    g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(312, 356, 190, 26), L"60 FPS Unlock", &g.cfg.fps_60, -1, TAB_SETTINGS);
-    add_button(ID_FULLSCREEN, Kind::Toggle, rect(312, 388, 190, 26), L"Fullscreen Mode", &g.cfg.fullscreen, -1, TAB_SETTINGS);
-    g.scene_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(444), px(190), px(220), g.window, reinterpret_cast<HMENU>(ID_SCENE_RES), nullptr, nullptr);
-    SendMessageW(g.scene_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
-    for (int i=0; i<6; ++i) {
-        SendMessageW(g.scene_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kSceneLabels[i]));
-        if (g.cfg.scene_height == kSceneHeights[i]) SendMessageW(g.scene_combo, CB_SETCURSEL, i, 0);
-    }
-
-    g.upscaler_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(506), px(190), px(170), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_UPSCALER)), nullptr, nullptr);
-    SendMessageW(g.upscaler_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
-    for (int i = 0; i < static_cast<int>(std::size(kUpscalers)); ++i) {
-        SendMessageW(g.upscaler_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kUpscalerLabels[i]));
-        if (g.cfg.upscaler == kUpscalers[i]) SendMessageW(g.upscaler_combo, CB_SETCURSEL, i, 0);
-    }
-
-    // Online Section (Card 2)
-    g.online_toggle = add_button(ID_ONLINE_TOGGLE, Kind::Toggle, rect(548, 196, 190, 26), L"Multiplayer Online", &g.cfg.online, -1, TAB_SETTINGS);
-    g.online_id_edit = add_edit(ID_ONLINE_ID_EDIT, rect(548, 252, 190, 32), g.cfg.online_id);
-    SendMessageW(g.online_id_edit, EM_LIMITTEXT, 16, 0);
-
-
-    add_button(ID_WUMPA_X100, Kind::Toggle, rect(548, 426, 190, 26), L"Wumpa Coins x100", &g.cfg.wumpa_x100, -1, TAB_SETTINGS);
-
-    // Controller & Audio (Card 3)
-    for (int player = 0; player < 4; ++player) {
-        g.player_combo[player] = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-            px(784), px(185.f + player * 46.f), px(190), px(220), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_PLAYER_PAD + player)), nullptr, nullptr);
-        SendMessageW(g.player_combo[player], WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
-    }
-    refresh_pads();
-    add_button(ID_XBOX_PROMPTS, Kind::Toggle, rect(784, 362, 190, 26), L"Colored Xbox icons", &g.cfg.xbox_prompts, -1, TAB_SETTINGS);
-    add_button(ID_SPLIT_SCREEN, Kind::Toggle, rect(784, 392, 190, 26), L"Split screen (2-4)", &g.cfg.split_screen, -1, TAB_SETTINGS);
-    add_button(ID_AUDIO_TEST, Kind::ActionBtn, rect(850, 444, 126, 30), L"Test audio", nullptr, -1, TAB_SETTINGS);
-
-    g.language_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(784), px(538), px(190), px(200), g.window, reinterpret_cast<HMENU>(ID_GAME_LANGUAGE), nullptr, nullptr);
-    SendMessageW(g.language_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
-    for (const auto& language : kGameLanguages) SendMessageW(g.language_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(language.label));
-    SendMessageW(g.language_combo, CB_SETCURSEL, game_language_index(g.cfg.game_language), 0);
-
-    // --- TAB 3: ADVANCED ---
-    g.base_edit = add_edit(ID_BASE_EDIT, rect(296, 144, 580, 34), g.cfg.base_dir);
-    add_button(ID_BASE_BROWSE, Kind::ActionBtn, rect(890, 144, 100, 34), L"BROWSE", nullptr, -1, TAB_ADVANCED);
-
-    g.patch_edit = add_edit(ID_PATCH_EDIT, rect(296, 230, 580, 34), g.cfg.patch_dir);
-    g.patch_browse = add_button(ID_PATCH_BROWSE, Kind::ActionBtn, rect(890, 230, 100, 34), L"BROWSE", nullptr, -1, TAB_ADVANCED);
-
-    add_button(ID_SAVE_BACKUP, Kind::ActionBtn, rect(296, 304, 210, 36), L"Back up saves", nullptr, -1, TAB_ADVANCED);
-    add_button(ID_OPEN_SAVES, Kind::ActionBtn, rect(520, 304, 210, 36), L"Open saves", nullptr, -1, TAB_ADVANCED);
-    add_button(ID_OPEN_LOGS, Kind::ActionBtn, rect(744, 304, 246, 36), L"Open logs folder", nullptr, -1, TAB_ADVANCED);
-}
+#include "classic_create.hpp"
+#include "nitro_create.hpp"
+#include "launcher_skin_switch.hpp"
 
 LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
     case WM_CREATE: {
         g.window = window;
-        g.field_brush = CreateSolidBrush(RGB(27, 20, 70));
+        g.field_brush = CreateSolidBrush(RGB(16, 21, 44));
         g.field_off_brush = CreateSolidBrush(RGB(13, 10, 34));
         render_base_layer();
         g.updating = true;
         create_controls();
+        for(HWND child=GetWindow(window,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT))
+            SetWindowLongPtrW(child,GWL_STYLE,GetWindowLongPtrW(child,GWL_STYLE)|WS_CLIPSIBLINGS);
         g.updating = false;
         WNDCLASSW friends_class{};
         friends_class.lpfnWndProc = friends_drawer_proc;
@@ -2508,7 +2050,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         friends_class.hCursor = LoadCursorW(nullptr, IDC_HAND);
         RegisterClassW(&friends_class);
         g.friends_drawer = CreateWindowExW(WS_EX_CONTROLPARENT, friends_class.lpszClassName, L"Friends",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP,0,0,0,0,window,nullptr,friends_class.hInstance,nullptr);
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS,0,0,0,0,window,nullptr,friends_class.hInstance,nullptr);
         SetTimer(window,20,1000,nullptr); // friends' presence, fonts
         reload_friends();
         position_friends();
@@ -2516,6 +2058,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         select_resolution(g.resolution);
         if (g.cfg.online) host_toggled(true);
         SetFocus(IsWindowEnabled(g.launch) ? g.launch : g.window);
+        SendMessageW(window,WM_CHANGEUISTATE,MAKEWPARAM(UIS_SET,UISF_HIDEFOCUS),0);
         SetTimer(window, 31, 250, nullptr);
         if (ctr_update::portable(g.root, g.exe_dir)) check_launcher_update(false);
         return 0;
@@ -2525,9 +2068,11 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         break;
     case WM_MOUSEMOVE:
         if (g.current_tab == TAB_TROPHIES) {
-            const float x = static_cast<short>(LOWORD(lparam)) / g.scale - kTrophyLeft, y = static_cast<short>(HIWORD(lparam)) / g.scale - kTrophyTop;
+            const float mouse_x=static_cast<short>(LOWORD(lparam))/g.scale, mouse_y=static_cast<short>(HIWORD(lparam))/g.scale;
+            const float x=(classic_skin?mouse_x:(mouse_x-40)/1.73f+296)-kTrophyLeft;
+            const float y=mouse_y-(classic_skin?0.f:40.f)-kTrophyTop;
             int hot = -1;
-            if (x >= 0 && y >= 0 && std::fmod(x, kTrophyCell) < kTrophyIcon && std::fmod(y, kTrophyCell) < kTrophyIcon) {
+            if (x >= 0 && y >= 0 && std::fmod(x, kTrophyCell) < kTrophyIcon/(classic_skin?1.f:1.73f) && std::fmod(y, kTrophyCell) < kTrophyIcon) {
                 const int index = static_cast<int>(y / kTrophyCell) * kTrophyColumns + static_cast<int>(x / kTrophyCell);
                 if (static_cast<int>(x / kTrophyCell) < kTrophyColumns && index < static_cast<int>(g.trophy_set.trophies.size())) hot = index;
             }
@@ -2537,7 +2082,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_NCHITTEST: {
         POINT pt{static_cast<short>(LOWORD(lparam)), static_cast<short>(HIWORD(lparam))};
         ScreenToClient(window, &pt);
-        if (pt.y < px(160) && pt.x < px(240)) return HTCAPTION;
+        if (pt.y < px(24) || (!classic_skin && pt.y<px(nitro::header) && pt.x<px(215))) return HTCAPTION;
         return HTCLIENT;
     }
     case WM_ERASEBKGND:
@@ -2545,7 +2090,21 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_PAINT: {
         PAINTSTRUCT paint;
         HDC dc = BeginPaint(window, &paint);
-        paint_window(dc);
+        const bool indicator=nitro_animating && paint.rcPaint.top>=px(51) && paint.rcPaint.bottom<=px(nitro::header);
+        const bool drawer=!classic_skin && g.current_tab==TAB_HOME && paint.rcPaint.left>=px(kWidth-kFriendsTravel)
+            && paint.rcPaint.top>=px(100) && paint.rcPaint.bottom<=px(630);
+        if(nitro_finishing && nitro_to_dc){BitBlt(dc,0,0,px(kWidth),px(kHeight),nitro_to_dc,0,0,SRCCOPY);}
+        else if(indicator||drawer){
+            HDC source=CreateCompatibleDC(dc);const auto old=SelectObject(source,g.base_layer);
+            const auto& r=paint.rcPaint;BitBlt(dc,r.left,r.top,r.right-r.left,r.bottom-r.top,source,r.left,r.top,SRCCOPY);
+            SelectObject(source,old);DeleteDC(source);
+            if(indicator){Graphics gr(dc);gr.ScaleTransform(g.scale,g.scale);gr.SetSmoothingMode(SmoothingModeAntiAlias);
+                const float n=nitro_nav_from+(nitro_nav_to-nitro_nav_from)*nitro_progress();
+                fill_round(gr,rect(nitro::nav_center(n)-33,53,66,5),2.5f,SolidBrush(Color(kArcadeGold)));}
+        } else if(nitro_preparing && nitro_page_background && nitro_page_background_tab==g.current_tab){
+            HDC cache=CreateCompatibleDC(dc);const auto old=SelectObject(cache,nitro_page_background);
+            BitBlt(dc,0,0,px(kWidth),px(kHeight),cache,0,0,SRCCOPY);SelectObject(cache,old);DeleteDC(cache);
+        } else paint_window(dc);
         EndPaint(window, &paint);
         return 0;
     }
@@ -2557,11 +2116,15 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         const bool enabled = IsWindowEnabled(reinterpret_cast<HWND>(lparam)) != FALSE;
         HDC dc = reinterpret_cast<HDC>(wparam);
         SetTextColor(dc, enabled ? RGB(255, 248, 236) : RGB(185, 176, 240));
-        SetBkColor(dc, enabled ? RGB(27, 20, 70) : RGB(13, 10, 34));
+        SetBkColor(dc, enabled ? RGB(16, 21, 44) : RGB(13, 10, 34));
         return reinterpret_cast<LRESULT>(enabled ? g.field_brush : g.field_off_brush);
     }
     case WM_COMMAND: {
         const int id = LOWORD(wparam), code = HIWORD(wparam);
+        if(g.updating)return 0;
+        if(id==ID_LAUNCHER_SKIN && code==BN_CLICKED){switch_launcher_skin();return 0;}
+        if(id==ID_NITRO_FRIENDS) {nitro_finish();if(g.current_tab!=TAB_HOME)select_tab_now(TAB_HOME);nitro_nav_from=nitro_nav_to=0;animate_friends(!g.friends_open);return 0;}
+        if(id==ID_NITRO_MOTION) {nitro_motion=!nitro_motion;nitro_finish();if(!save_launcher_appearance())nitro_motion=!nitro_motion;InvalidateRect(reinterpret_cast<HWND>(lparam),nullptr,FALSE);return 0;}
         if (id == ID_CHECK_UPDATE) {
             if (update_offer.is_object()) offer_launcher_update(); else check_launcher_update(true);
             return 0;
@@ -2721,6 +2284,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 0;
     }
     case WM_TIMER:
+        if(wparam==kNitroTimer) {nitro_tick();return 0;}
         if(wparam==31) poll_launcher_update();
         if(wparam==20) {
             reload_friends();
@@ -2739,6 +2303,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 0;
     case WM_CLOSE:
         if (g.process || g.host_busy || g.xbox_busy || update_preparing) return 0;
+        nitro_finish();
         save_config();
         KillTimer(window,20);
         KillTimer(window,31);
@@ -2806,7 +2371,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     } else {
         g.runtime_exe = g.root / "build/CTRPort-dev/ctrport.exe";
     }
+    { std::ifstream prefs(g.root/"runtime/user/nitro-ui.txt");
+      std::string data((std::istreambuf_iterator<char>(prefs)),{});
+      const auto appearance=ctrport::launcher_appearance::parse(data);
+      classic_skin=appearance.classic;nitro_motion=appearance.motion; }
+    apply_launcher_palette();
     g.scale = static_cast<float>(GetDpiForSystem()) / 96.f;
+    {RECT work{};SystemParametersInfoW(SPI_GETWORKAREA,0,&work,0);g.scale=std::min(g.scale,std::min((work.right-work.left-32)/kWidth,(work.bottom-work.top-40)/kHeight));}
     load_config();
     g.logo = load_launcher_logo();
 
@@ -2825,13 +2396,14 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     HWND window = CreateWindowExW(0, window_class.lpszClassName, kTitle, style, work.left + (work.right - work.left - fw) / 2,
                                   work.top + std::max(0L, (work.bottom - work.top - fh) / 2), fw, fh, nullptr, nullptr, instance, nullptr);
 
-    SetWindowRgn(window, CreateRoundRectRgn(0, 0, px(kWidth) + 1, px(kHeight) + 1, px(56), px(56)), TRUE);
+    SetWindowRgn(window, CreateRoundRectRgn(0, 0, px(kWidth) + 1, px(kHeight) + 1, px(24), px(24)), TRUE);
     const BOOL dark = TRUE;
     const COLORREF caption = RGB(18, 12, 48), caption_text = RGB(255, 248, 236), border = RGB(18, 12, 48);
     DwmSetWindowAttribute(window, 20, &dark, sizeof(dark));
     DwmSetWindowAttribute(window, 35, &caption, sizeof(caption));
     DwmSetWindowAttribute(window, 36, &caption_text, sizeof(caption_text));
     DwmSetWindowAttribute(window, 34, &border, sizeof(border));
+    SetWindowTextW(window,classic_skin?L"CTR Native Ported — Classico":L"CTR Native Ported — Nitro Cinema");
     ShowWindow(window, show);
     UpdateWindow(window);
 
@@ -2841,6 +2413,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         TranslateMessage(&message);
         DispatchMessageW(&message);
     }
+    nitro_finish();
+    nitro_clear_surfaces();
     g.logo.reset();
     g.art.reset();
     g.icon.reset();

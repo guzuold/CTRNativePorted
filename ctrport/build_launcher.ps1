@@ -28,6 +28,15 @@ if($LASTEXITCODE -ne 0){throw 'launcher logo resource build failed'}
 $objects += @("$out/launcher.res")
 & $cl /nologo /O2 /W4 /WX /EHsc /utf-8 /std:c++20 /DUNICODE /D_UNICODE "/DCTR_LAUNCHER_VERSION_TOKEN=$Version" "$PSScriptRoot/launcher.cpp" @objects "/Fo$out/launcher.obj" "/Fe$out/launcher.exe" /link /SUBSYSTEM:WINDOWS *>> "$out/launcher_build.log"
 if($LASTEXITCODE -ne 0){Get-Content "$out/launcher_build.log" -Tail 30;throw 'launcher build failed'}
+# Verify the presentation geometry and original-art crop before packaging.
+& $cl /nologo /EHsc /W4 /WX /std:c++20 "$PSScriptRoot/nitro_layout_control.cpp" "/Fo$out/nitro_layout_control.obj" "/Fe$out/nitro_layout_control.exe" *>> "$out/launcher_build.log"
+if($LASTEXITCODE -ne 0){throw 'Nitro layout control build failed'}
+& "$out/nitro_layout_control.exe"
+if($LASTEXITCODE -ne 0){throw 'Nitro layout control failed'}
+& $cl /nologo /EHsc /W4 /WX /std:c++20 "$PSScriptRoot/launcher_appearance_control.cpp" "/Fo$out/launcher_appearance_control.obj" "/Fe$out/launcher_appearance_control.exe" *>> "$out/launcher_build.log"
+if($LASTEXITCODE -ne 0){throw 'Launcher appearance control build failed'}
+& "$out/launcher_appearance_control.exe"
+if($LASTEXITCODE -ne 0){throw 'Launcher appearance control failed'}
 New-Item -ItemType Directory -Force "$out/assets/launcher" | Out-Null
 Copy-Item "$PSScriptRoot/assets/launcher/logo.png" "$out/assets/launcher/logo.png" -Force
 Copy-Item "$out/launcher.exe" "$out/CTRNativePorted.exe" -Force

@@ -1,3 +1,14 @@
+## v0.6.1 — 2026-10-25
+
+Two launcher skins, with Nitro Cinema selected by default, retain the v0.6.0 runtime and in-game PC Settings.
+
+- Horizontal navigation, antialiased text and controls, and the original artwork read from your own dump with a bottom-centered crop that hides its embedded logo.
+- **Switch skins in Advanced:** click the Appearance button to switch immediately between Nitro Cinema and the original Classic launcher. Your choice is saved, and both skins share the same settings, saves, mods and launcher actions.
+- Nitro Cinema has animated tab transitions and a Friends panel, with cached rendering to reduce click delay and prevent controls flashing during transitions. Animations can be disabled in Advanced; tab transitions also respect Windows' client-area animation setting.
+- Corrected circular arrows beside Updates. Existing launch, mods, trophies, options and update actions are retained.
+- Update through Check updates with the game closed. The package preserves saves and settings under `runtime/user` and mods under `runtime/mods`. No game files, background artwork, trophy keys or user data are included.
+- Runtime binaries are unchanged from v0.6.0; this release adds no runtime or reconstruction milestone.
+
 ## v0.6.0 — 2026-10-25
 
 PC Settings inside the game's own Options menu, a launcher that no longer crashes on close, less CPU spent on logging, and logs with a size limit.

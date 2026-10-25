@@ -13,8 +13,16 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.6.0](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.6.0)**
-(experimental pre-release): PC Settings inside the game's own Options menu. The game is
+**Latest release: [v0.6.1](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.6.1)**
+
+The **Nitro Cinema launcher** adds horizontal tabs, antialiased controls and animated
+transitions, with background artwork read directly from your own dump. It is selected
+by default; switch to the original **Classic** skin immediately with the Appearance
+button in **Advanced**. Your choice is saved. Disable Nitro Cinema animations there
+if preferred. Use **Check updates** with the game closed to
+update from v0.6.0 or earlier; your saves, settings and mods are preserved.
+
+This is an experimental pre-release, with PC Settings inside the game's own Options menu. The game is
 playable from start to finish. Online races between two PCs over the Internet work and
 complete, in private matches and in public matchmaking; see the
 [limits](#online-status-and-limits).
