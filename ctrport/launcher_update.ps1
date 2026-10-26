@@ -80,7 +80,7 @@ function Assert-PackagePath([string]$Name) {
     $allowed = $Name -match '^(launcher\.exe|CTRNativePorted\.exe|launcher_update\.ps1|update-version\.json|LICENSE|[A-Za-z0-9_-]+\.(md|txt))$' -or
         $Name -match '^licenses/[A-Za-z0-9_. -]+\.(txt|md)$' -or
         $Name -match '^assets/(launcher|xbox-default)/[A-Za-z0-9_. -]+\.(png|json|md|txt)$' -or
-        $Name -match '^build/CTRPort-gpu/(ctr_gpu\.dll|ctr_hle\.dll|ctr_online_server\.exe|ctrport\.exe|msvcp140\.dll|msvcp140_atomic_wait\.dll|vcruntime140\.dll|vcruntime140_1\.dll)$'
+        $Name -match '^build/CTRPort-gpu/(ctr_gpu\.dll|ctr_d3d\.dll|ctr_shaders\.exe|ctr_hle\.dll|ctr_online_server\.exe|ctrport\.exe|msvcp140\.dll|msvcp140_atomic_wait\.dll|vcruntime140\.dll|vcruntime140_1\.dll)$'
     if (-not $allowed) { throw "Package contains an unmanaged path: $Name" }
 }
 function Select-Update($Releases, [string]$Installed) {
