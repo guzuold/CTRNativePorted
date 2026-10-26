@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -82,7 +83,11 @@ LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_CLOSE:
         LOG("window closed - exiting");
         LogFlush();
-        ExitProcess(0);
+        std::fflush(nullptr);
+        // Not ExitProcess: unloading the DLLs while guest threads still run can fault and turn
+        // the exit code into an error (the launcher then reports a crash).
+        TerminateProcess(GetCurrentProcess(), 0);
+        return 0;
     case WM_PAINT:
         if (GfxActive()) {
             ValidateRect(h, nullptr);

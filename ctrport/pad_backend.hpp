@@ -223,6 +223,12 @@ inline std::string pad_device_name(std::uint32_t id){
 // XInput API/types from installed Windows SDK. No fabricated connected device, motion data,
 // PS4 read/open behavior or game input state. Up to four local users each open a port
 // (CTR_SPLIT_SCREEN=1); without split screen every device drives the one primary user.
+// The loaded renderer library, which reads PlayStation controllers: ctr_gpu.dll (Vulkan) or
+// ctr_d3d.dll (Direct3D 11).
+inline HMODULE renderer_library(){
+ if(auto library=GetModuleHandleW(L"ctr_gpu.dll"))return library;
+ return GetModuleHandleW(L"ctr_d3d.dll");
+}
 class PadBackend {
  using GetState=DWORD (WINAPI*)(DWORD,XINPUT_STATE*);
  HMODULE module=nullptr;GetState get_state=nullptr;std::mutex mutex;
@@ -243,11 +249,11 @@ class PadBackend {
   void(*light)(std::uint32_t,std::uint8_t,std::uint8_t,std::uint8_t)=nullptr;
   int(*path)(std::uint32_t,char*,int)=nullptr;
  };
- // ctr_gpu.dll reads PlayStation controllers through SDL's HID drivers in the XINPUT_GAMEPAD
+ // The renderer library reads PlayStation controllers through SDL's HID drivers in the XINPUT_GAMEPAD
  // layout (ctrport/gpu/ctr_gpu.h). Looked up until the DLL is loaded.
  static const PlayStationApi& playstation(){
   static PlayStationApi api;
-  if(!api.merged)if(auto library=GetModuleHandleW(L"ctr_gpu.dll")){
+  if(!api.merged)if(auto library=renderer_library()){
    api.list=reinterpret_cast<int(*)(void*,int)>(GetProcAddress(library,"ctr_gpu_gamepad_list"));
    api.rumble_all=reinterpret_cast<void(*)(std::uint16_t,std::uint16_t)>(GetProcAddress(library,"ctr_gpu_gamepad_rumble"));
    api.rumble_one=reinterpret_cast<void(*)(std::uint32_t,std::uint16_t,std::uint16_t)>(GetProcAddress(library,"ctr_gpu_gamepad_rumble_one"));
@@ -404,7 +410,7 @@ public:
    if(port->index==0)apply_pad_test_input(pad);
    // Host exit confirmation consumes input; preserve physical connection and time.
    using CaptureQuery=int(*)();
-   static CaptureQuery capture=[] {auto library=GetModuleHandleW(L"ctr_gpu.dll");return library?reinterpret_cast<CaptureQuery>(GetProcAddress(library,"ctr_gpu_input_captured")):nullptr;}();
+   static CaptureQuery capture=[] {auto library=renderer_library();return library?reinterpret_cast<CaptureQuery>(GetProcAddress(library,"ctr_gpu_input_captured")):nullptr;}();
    if(capture && capture())pad={};
    if(!port->connected){if(port->connections!=255)++port->connections;}
    sample=pad_connected_sample(pad,port->connections,ctr_kernel_process_time());

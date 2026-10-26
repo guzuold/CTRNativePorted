@@ -2,12 +2,14 @@
 // PlayStation controllers through SDL's HIDAPI drivers (DualShock 4, DualSense), without DS4Windows
 // or Steam Input, for the Direct3D 11 renderer: the same reading, merge and exports as the GPU
 // library's (ctrport/gpu/shim/controller_exit.cpp), polled on a thread of its own because this
-// renderer has no SDL window. Xbox controllers stay on the runtime's XInput.
+// renderer has no SDL window. Xbox controllers stay on the runtime's XInput. The same thread watches
+// for the keyboard and controller exit (Escape held; View + Menu, then A).
 #define CTR_GPU_BUILD
 #include <windows.h>
 #include <Xinput.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -17,6 +19,8 @@
 #include <SDL3/SDL.h>
 
 #include "../gpu/ctr_gpu.h"
+#include "../gpu/shim/controller_exit_state.h"
+#include "videoout.h"
 
 static_assert(sizeof(CtrGpuGamepad) == sizeof(XINPUT_GAMEPAD), "CtrGpuGamepad keeps the XINPUT_GAMEPAD layout");
 
@@ -116,28 +120,158 @@ void update_gamepads() {
     pad_snapshot = merged;
     pad_count = count;
 }
+
+// Closing the game from the keyboard or a controller (gpu/shim/controller_exit.cpp): Escape held
+// for two seconds, or View + Menu (Share/touch pad + Options) held, then A to confirm.
+Frontend::ExitGesture gesture;
+std::atomic<bool> captured{false};
+HWND dialog{};
+bool requested = false;
+void dismiss() {
+    if (dialog) {
+        DestroyWindow(dialog);
+        dialog = nullptr;
+    }
+}
+LRESULT CALLBACK exit_proc(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
+    if (message == WM_COMMAND) {
+        if (LOWORD(w) == IDOK) {
+            requested = true;
+            return 0;
+        }
+        if (LOWORD(w) == IDCANCEL) {
+            gesture.cancel();
+            dismiss();
+            return 0;
+        }
+    }
+    if (message == WM_CLOSE) {
+        gesture.cancel();
+        dismiss();
+        return 0;
+    }
+    return DefWindowProcW(hwnd, message, w, l);
+}
+void show(HWND owner) {
+    static bool registered = [] {
+        WNDCLASSW c{};
+        c.lpfnWndProc = exit_proc;
+        c.hInstance = GetModuleHandleW(nullptr);
+        c.lpszClassName = L"CTRPortExitConfirmation";
+        c.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+        c.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
+        return RegisterClassW(&c) != 0;
+    }();
+    if (!registered) {
+        gesture.cancel();
+        std::fputs("ctrport: exit dialog registration failed\n", stderr);
+        return;
+    }
+    RECT r{};
+    GetWindowRect(owner, &r);
+    dialog = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"CTRPortExitConfirmation", L"Esci dal gioco", WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+                             r.left + (r.right - r.left - 520) / 2, r.top + (r.bottom - r.top - 220) / 2, 520, 220, owner, nullptr,
+                             GetModuleHandleW(nullptr), nullptr);
+    if (!dialog) {
+        gesture.cancel();
+        return;
+    }
+    auto child = [&](const wchar_t* type, const wchar_t* text, int x, int y, int width, int height, int id) {
+        HWND h = CreateWindowW(type, text, WS_CHILD | WS_VISIBLE | (id ? WS_TABSTOP : 0), x, y, width, height, dialog,
+                               reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), GetModuleHandleW(nullptr), nullptr);
+        SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
+        return h;
+    };
+    child(L"STATIC", L"Vuoi chiudere il gioco?\nAttendi la fine di eventuali salvataggi.\nRilascia i pulsanti, poi premi A per uscire o B per annullare.",
+          20, 20, 475, 80, 0);
+    child(L"BUTTON", L"A - Esci", 40, 125, 190, 36, IDOK);
+    HWND cancel = child(L"BUTTON", L"B - Annulla", 270, 125, 190, 36, IDCANCEL);
+    SetForegroundWindow(dialog);
+    SetFocus(cancel);
+    std::fputs("ctrport: controller exit confirmation opened\n", stderr);
+}
+// True when the game should close (the caller closes the game window).
+bool poll_exit() {
+    using GetState = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
+    static auto poll = [] {
+        auto module = LoadLibraryExW(L"xinput1_4.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        return module ? reinterpret_cast<GetState>(GetProcAddress(module, "XInputGetState")) : nullptr;
+    }();
+    const HWND owner = VideoOutHwnd();
+    if (!owner) return false;
+    const HWND foreground = GetForegroundWindow();
+    const bool focused = foreground == owner || (dialog && foreground == dialog);
+    static Frontend::KeyHoldExit escape;
+    if (escape.update((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0, foreground == owner, GetTickCount64())) {
+        std::fputs("ctrport: Escape held, closing the game\n", stderr);
+        dismiss();
+        return true;
+    }
+    WORD buttons = 0;
+    bool connected = false;
+    for (DWORD slot = 0; poll && slot < 4; ++slot) {
+        XINPUT_STATE state{};
+        if (poll(slot, &state) == ERROR_SUCCESS) {
+            connected = true;
+            buttons |= state.Gamepad.wButtons;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> guard(pad_lock);
+        if (pad_count) {
+            connected = true;
+            buttons |= pad_snapshot.buttons;
+        }
+    }
+    const auto action = gesture.update(buttons, connected, focused, GetTickCount64());
+    if (action == Frontend::ExitGesture::Action::Open) show(owner);
+    if (action == Frontend::ExitGesture::Action::Cancel) {
+        dismiss();
+        std::fputs("ctrport: controller exit cancelled\n", stderr);
+    }
+    if (action == Frontend::ExitGesture::Action::Confirm) requested = true;
+    captured.store(gesture.captured, std::memory_order_relaxed);
+    if (requested) {
+        std::fputs("ctrport: controller exit confirmed\n", stderr);
+        dismiss();
+        return true;
+    }
+    return false;
+}
 }  // namespace
 
-// ctr_gpu_init: the SDL gamepad subsystem and its polling thread (every 4 ms).
+// ctr_gpu_init: the SDL gamepad subsystem and its polling thread (every 4 ms), which also owns the
+// exit confirmation window.
 void StartPads() {
     static std::once_flag once;
     std::call_once(once, [] {
         std::thread([] {
             SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-            if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
-                std::fprintf(stderr, "ctrport: SDL gamepad subsystem unavailable: %s\n", SDL_GetError());
-                return;
-            }
-            for (;;) {
-                SDL_Event event;
-                while (SDL_PollEvent(&event)) gamepad_event(event);
-                update_gamepads();
-                SDL_Delay(4);
+            const bool sdl = SDL_InitSubSystem(SDL_INIT_GAMEPAD);
+            if (!sdl) std::fprintf(stderr, "ctrport: SDL gamepad subsystem unavailable: %s\n", SDL_GetError());
+            for (bool closing = false;;) {
+                if (sdl) {
+                    SDL_Event event;
+                    while (SDL_PollEvent(&event)) gamepad_event(event);
+                    update_gamepads();
+                }
+                MSG message;
+                while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+                    TranslateMessage(&message);
+                    DispatchMessageW(&message);
+                }
+                if (!closing && poll_exit()) {
+                    closing = true;
+                    PostMessageW(VideoOutHwnd(), WM_CLOSE, 0, 0);  // the window's own close path
+                }
+                Sleep(4);
             }
         }).detach();
     });
 }
 
+// The exit confirmation takes the controllers' input while it is shown.
+extern "C" CTR_GPU_API int ctr_gpu_input_captured() { return captured.load(std::memory_order_relaxed) ? 1 : 0; }
 extern "C" CTR_GPU_API int ctr_gpu_gamepad_state(CtrGpuGamepad* out) {
     std::lock_guard<std::mutex> guard(pad_lock);
     if (out) *out = pad_count ? pad_snapshot : CtrGpuGamepad{};

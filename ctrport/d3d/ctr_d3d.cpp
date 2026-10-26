@@ -175,6 +175,5 @@ extern "C" CTR_GPU_API void ctr_gpu_invalidate_memory(uint64_t, uint64_t) {}
 extern "C" CTR_GPU_API unsigned ctr_gpu_symbol_count(void) { return (unsigned)Exports().size(); }
 extern "C" CTR_GPU_API uint64_t ctr_gpu_flip_count(void) { return VideoOutFlipCount(); }
 extern "C" CTR_GPU_API uint64_t ctr_gpu_submit_count(void) { return GnmSubmitCount(); }
-// No host overlay takes the game's input.
-extern "C" CTR_GPU_API int ctr_gpu_input_captured(void) { return 0; }
-// PlayStation controllers through SDL: pads.cpp; XInput pads are read by the runtime.
+// PlayStation controllers through SDL and the exit confirmation (ctr_gpu_input_captured): pads.cpp;
+// XInput pads are read by the runtime.
