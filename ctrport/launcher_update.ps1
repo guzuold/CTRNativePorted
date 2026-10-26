@@ -10,9 +10,18 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+# Release tags: vMAJOR.MINOR.PATCH, or vMAJOR.MINOR.PATCH-uN for a release whose package needs update
+# helper generation N (it adds program files that older helpers refuse). Helpers of 0.6.1 and older
+# accept only the plain form, so they skip such releases and install the step release that brings
+# a helper of the needed generation (UPDATES.md, "New program files").
+$UpdaterGeneration = 2
 function Get-ReleaseVersion([string]$Text) {
-    if ($Text -cnotmatch '^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw "Unsupported release version: $Text" }
-    return [version]($Text.TrimStart('v'))
+    if ($Text -cnotmatch '^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-u[1-9][0-9]*)?$') { throw "Unsupported release version: $Text" }
+    return [version]"$($Matches[1]).$($Matches[2]).$($Matches[3])"
+}
+function Get-ReleaseGeneration([string]$Text) {
+    if ($Text -cmatch '-u([1-9][0-9]*)$') { return [int]$Matches[1] }
+    return 1
 }
 function Write-JsonFile([string]$Path, $Value) {
     $temp = "$Path.new"
@@ -89,6 +98,7 @@ function Select-Update($Releases, [string]$Installed) {
     foreach ($release in $Releases) {
         if ($release.draft) { continue }
         try { $version = Get-ReleaseVersion ([string]$release.tag_name) } catch { continue }
+        if ((Get-ReleaseGeneration ([string]$release.tag_name)) -gt $UpdaterGeneration) { continue }
         if ($version -le $current -or ($null -ne $best -and $version -le (Get-ReleaseVersion $best.version))) { continue }
         $tag = [string]$release.tag_name
         $name = "CTRNativePorted-$tag-win64.zip"
