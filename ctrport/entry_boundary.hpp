@@ -2888,7 +2888,15 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     // applied after the built-in patches above so that they win where both write.
     if(continue_after_libc_init)
         guest_patches::apply_from_environment(images.front().get(),metadata.front().spans,profile->title_id,profile->version);
-    if(continue_after_libc_init) {
+    // The in-game PC Settings menu and the graphics switches patch addresses of the EU 1.21
+    // eboot (CUSA14876); another eboot (US CUSA13795, 1.00) runs with the original settings.
+    const bool settings_eboot=metadata.front().sha256==settings::retail_graphics::retail_sha256;
+    if(continue_after_libc_init && !settings_eboot) settings::menu_overlay::overlay.disable_menu();
+    if(continue_after_libc_init && !settings_eboot && settings::runtime_snapshot()) {
+        std::fprintf(stderr,"Settings: PC Settings menu and graphics switches are not available for eboot %s; the game uses its original settings\n",metadata.front().sha256.c_str());
+        std::fflush(stderr);
+    }
+    if(continue_after_libc_init && settings_eboot) {
         if(const auto* document=settings::runtime_snapshot()) {
             std::size_t extent=0;
             for(const auto& span:metadata.front().spans) extent=(std::max)(extent,static_cast<std::size_t>(span.second));
