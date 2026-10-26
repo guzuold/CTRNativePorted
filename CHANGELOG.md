@@ -1,3 +1,11 @@
+## v0.7.3 — 2026-10-26
+
+Two fixes for the Direct3D 11 renderer.
+
+- **PlayStation controllers:** DualShock 4 and DualSense pads work again with Direct3D 11, without DS4Windows or Steam Input. The renderer now reads them through SDL like the Vulkan one, with rumble, light bar and split screen; Xbox controllers stay on XInput.
+- **Black screen in exclusive fullscreen:** when the game window lost the foreground (the launcher at start, Alt+Tab), presentation failed and the game kept running on a black screen. The window now comes in front at start, and fullscreen is taken again when it is back in front.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.2 — 2026-10-26
 
 Faster first shader translation for Direct3D 11 on hard disks.
