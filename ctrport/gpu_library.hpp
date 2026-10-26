@@ -127,7 +127,8 @@ inline void configure_gpu_backend(const Images& images,const Metadata& metadata)
     for(std::size_t i=0;i<metadata.size();++i)for(const auto& s:metadata[i].executable_spans)if(s.second-s.first>best_size){best_size=s.second-s.first;best=i;}
     for(const auto& s:metadata[best].spans)if(s.second>extent)extent=s.second;
     const int status=set(images[best].get(),extent,metadata[best].sha256.c_str());
-    if(status)throw std::runtime_error("ctr_d3d rejected eboot "+metadata[best].sha256+" (status "+std::to_string(status)+")");
+    if(status)throw std::runtime_error("STOP: Direct3D 11 does not support this game version (eboot "+metadata[best].sha256+", status "+std::to_string(status)+
+                                       "): choose Vulkan as the renderer in Settings");
     std::printf("{\"scope\":\"gpu_backend_d3d11\",\"eboot_sha256\":\"%s\",\"image_extent\":%llu}\n",metadata[best].sha256.c_str(),static_cast<unsigned long long>(extent));std::fflush(stdout);
 }
 // ctr_hle.dll (ctrport/hle): system library functions written in the guest SysV ABI.

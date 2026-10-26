@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Layout of the Alchemy PS4 render objects of CUSA14876 1.00 and 1.21: field offsets read from
+// Layout of the Alchemy PS4 render objects of CTR Nitro-Fueled (EU CUSA14876 and US CUSA13795,
+// 1.00 and 1.21): field offsets read from
 // the retail field registration of igPS4GraphicsDevice / igPS4GraphicsDeviceContext /
 // igPS4ShaderHeader and checked on live objects during draws ((development notes)), the
 // same as FrankHUN88453's engine.h for CUSA13795 (MIT). Addresses are per eboot SHA256.
@@ -18,12 +19,21 @@ struct Version {
     u32 clear_prologue[4];      // first 16 code bytes, checked before hooking
     u32 copy_prologue[4];
 };
-// Device globals: located by the engine-state probe (metaobject vtables). clear / copyTexture: the
-// callees of igCommandStreamDecoder's clear and copy commands and of igWorkflowGpuPicking::getPixel.
+// EU: device globals located by the engine-state probe (metaobject vtables); clear / copyTexture:
+// the callees of igCommandStreamDecoder's clear and copy commands and of
+// igWorkflowGpuPicking::getPixel. US 1.00: FrankHUN88453's engine.h (written for CUSA13795 1.00),
+// the EU 1.00 functions 0x10 lower. US 1.21: the EU 1.21 functions 0x10 higher, the shift every
+// recorded US 1.21 code site between them has (retail_profiles.hpp); not yet run here. For every
+// eboot the prologues are checked before hooking and the device global on the live objects
+// (renderer.cpp EngineDevice), which searches the nearby data when the recorded offset is wrong.
 inline constexpr Version kVersions[] = {
     {"ca9c94411375ebec52de70fbc62f605ac8e2cea95595c627029969b5b9d9b5b1", 0x26e7920, 0x1306ba0, 0x1307f20,
      {0xe5894855, 0x56415741, 0x54415541, 0xec834853}, {0xe5894855, 0x56415741, 0x54415541, 0xe4834853}},
     {"39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5", 0x2aebce0, 0x13c9e40, 0x13cb1c0,
+     {0xe5894855, 0x56415741, 0x54415541, 0xec834853}, {0xe5894855, 0x56415741, 0x54415541, 0xe4834853}},
+    {"23ddf3909d87a42a4c74be395865b130e4128b892de59d71082d8620cd8cd858", 0x26e7920, 0x1306b90, 0x1307f10,
+     {0xe5894855, 0x56415741, 0x54415541, 0xec834853}, {0xe5894855, 0x56415741, 0x54415541, 0xe4834853}},
+    {"e3b7a068b5e7be0f976102aa223a74425e7817c67e26e21416163291750c1b83", 0x2aebce0, 0x13c9e50, 0x13cb1d0,
      {0xe5894855, 0x56415741, 0x54415541, 0xec834853}, {0xe5894855, 0x56415741, 0x54415541, 0xe4834853}},
 };
 const Version* CurrentVersion();

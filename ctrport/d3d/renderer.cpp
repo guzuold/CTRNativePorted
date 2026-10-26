@@ -215,6 +215,45 @@ bool Readable(u64 a, u64 n) {
     return GuestReadable(a, n);
 }
 
+// The igGraphicsDevice*, from the eboot's device global. The recorded offset is accepted once the
+// live objects confirm it (the device's context points back to the device); otherwise the data
+// around it is searched for the global that does, as the offsets of an eboot not yet run here are
+// derived. 0 until the game has created its device.
+u64 EngineDevice() {
+    static u64 offset = 0;
+    static u64 attempts = 0;
+    const u64 base = (u64)g_eboot.base;
+    if (offset) return Q(base + offset);
+    const auto valid = [](u64 dev) {
+        if (!dev || (dev & 7) || !Readable(dev + DEV_CONTEXT, 8)) return false;
+        const u64 ctx = Q(dev + DEV_CONTEXT);
+        return ctx && !(ctx & 7) && Readable(ctx + CTX_DEVICE, 8) && Q(ctx + CTX_DEVICE) == dev;
+    };
+    const u64 recorded = CurrentVersion()->device_global;
+    if (Readable(base + recorded, 8) && valid(Q(base + recorded))) {
+        offset = recorded;
+        LOG("gfx: device global +%llx confirmed", (unsigned long long)recorded);
+        return Q(base + offset);
+    }
+    // the device exists only after the game's graphics start: search now and then until found
+    if (attempts++ % 256) return 0;
+    constexpr u64 window = 0x40000;
+    const u64 first = recorded > window ? recorded - window : 0, last = std::min(recorded + window, g_eboot.size);
+    for (u64 o = first & ~7ull; o + 8 <= last; o += 8) {
+        if (!Readable(base + o, 8)) {
+            o = ((base + o + 0x1000) & ~0xfffull) - base - 8;  // next page
+            continue;
+        }
+        if (valid(Q(base + o))) {
+            offset = o;
+            LOG("gfx: device global found at +%llx (recorded +%llx)", (unsigned long long)o, (unsigned long long)recorded);
+            return Q(base + offset);
+        }
+    }
+    if (attempts == 1) LOG("gfx: device global +%llx not confirmed yet", (unsigned long long)recorded);
+    return 0;
+}
+
 u64 Fnv(const u8* p, size_t n) {
     u64 h = 0xCBF29CE484222325ull;
     for (size_t i = 0; i < n; i++) h = (h ^ p[i]) * 0x100000001B3ull;
@@ -1930,7 +1969,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     DrawTimer timer;
     double sec_t = NowMs();
     g_stats.draws++;
-    u64 dev = Q((u64)g_eboot.base + CurrentVersion()->device_global);
+    u64 dev = EngineDevice();
     u64 ctx = dev ? Q(dev + DEV_CONTEXT) : 0;
     if (!ctx) return;
     if (!g_backbuffer_w) g_backbuffer_w = R<u32>(dev + DEV_BB_W);
@@ -2804,7 +2843,7 @@ void GfxDrawIndexOffset(u32 index_offset, u32 count) {
     u32 isize = 2, offset = 0;
     {
         std::lock_guard lk(g_mutex);
-        u64 dev = Q((u64)g_eboot.base + CurrentVersion()->device_global);
+        u64 dev = EngineDevice();
         u64 ctx = dev ? Q(dev + DEV_CONTEXT) : 0;
         if (!ctx) return;
         u64 ib = Q(ctx + CTX_INDEX_BUFFER);
