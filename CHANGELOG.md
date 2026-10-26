@@ -2,6 +2,7 @@
 
 The graphics settings follow the layout of current PC games: display, upscaling method and mode, geometry and textures, effects and lighting.
 
+- **Direct3D 11 is now the default renderer.** After the update every installation switches to it once; you can go back to Vulkan (shadPS4) in **Settings → Renderer** and the choice is kept. The first game start with Direct3D 11 translates the shaders from your dump (a few minutes, once). PlayStation controllers through SDL work only with Vulkan; Xbox/XInput controllers work with both.
 - **Upscaling, as in recent games:** choose the **method** (Off, AMD FSR 1, AMD FSR 3, NVIDIA DLSS) and the **mode**: Native (100%), Quality (67%), Balanced (58%), Performance (50%), Ultra performance (33%). The mode is a share of your output resolution: on a 1440p monitor Quality renders the 3D scene at 960p and reconstructs it. NVIDIA DLSS in Native mode is DLAA. A **Sharpness** setting from 0 to 100% (changes at once with FSR 1) replaces the FSR 1 sharpness levels. The internal 3D resolution of earlier versions is gone; your setting becomes the nearest mode.
 - **Display page:** Resolution (as in the launcher, your monitor's native resolution, or 720p to 2160p), Display mode, V-Sync, Frame rate limit, Refresh rate, 60 FPS mode.
 - **Geometry and textures:** Texture quality (High is the game's own textures), Anisotropic filtering, a single **Shadow quality** (Off, Low, Medium, High, Ultra with Direct3D 11) instead of four shadow settings, kart and scenery detail, view distance, effects quality.

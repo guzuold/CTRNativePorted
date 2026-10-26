@@ -15,7 +15,7 @@ servers with a small service that runs inside every player's launcher.
 
 **Latest release: [v0.7.1](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.1-u2)**
 
-v0.7.1 lays out the graphics settings like current PC games: upscaling method (FSR 1, FSR 3,
+v0.7.1 makes the **Direct3D 11 renderer** the default and lays out the graphics settings like current PC games: upscaling method (FSR 1, FSR 3,
 DLSS) with Quality/Balanced/Performance modes and sharpness, a single shadow quality, and the
 effects pages. v0.7.0 added a **Direct3D 11 renderer** that does not use shadPS4 (launcher
 Settings → Renderer); see the [changelog](CHANGELOG.md). From v0.6.1 or older, install v0.6.2

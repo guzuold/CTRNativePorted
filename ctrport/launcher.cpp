@@ -165,7 +165,7 @@ struct Config {
     std::wstring game_language = L"en";
     std::wstring upscaling_mode = L"native";
     std::wstring upscaler = L"off";
-    std::wstring renderer = L"vulkan";
+    std::wstring renderer = L"d3d11";  // v0.7.1: Direct3D 11 is the default renderer
     bool use_patch = true, fps_60 = true, ps4_pro = true, native_4k = false, unlock_all = false, fullscreen = false;
     bool online = false;
     bool wumpa_x100 = false;
@@ -613,7 +613,19 @@ void load_config() {
     }
     if (std::find(std::begin(kModes), std::end(kModes), g.cfg.upscaling_mode) == std::end(kModes)) g.cfg.upscaling_mode = L"native";
     if (std::find(std::begin(kUpscalers), std::end(kUpscalers), g.cfg.upscaler) == std::end(kUpscalers)) g.cfg.upscaler = L"off";
-    if (std::find(std::begin(kRenderers), std::end(kRenderers), g.cfg.renderer) == std::end(kRenderers)) g.cfg.renderer = L"vulkan";
+    if (std::find(std::begin(kRenderers), std::end(kRenderers), g.cfg.renderer) == std::end(kRenderers)) g.cfg.renderer = L"d3d11";
+    // v0.7.1 makes Direct3D 11 the default. The v0.7.0 launcher saved its renderer (Vulkan unless
+    // changed) in every file, so each file switches once; renderer_default records it, and a
+    // later choice of Vulkan stays. A package without ctr_d3d.dll keeps Vulkan (validate).
+    if (!document.find("renderer_default")) {
+        g.cfg.renderer = L"d3d11";
+        try {
+            auto changes = ctr_online::Json::object();
+            changes.set("renderer", ctr_online::Json::of("d3d11"));
+            changes.set("renderer_default", ctr_online::Json::of("d3d11"));
+            ctrport::settings::Store(config_path()).update(changes);
+        } catch (const std::exception&) {}
+    }
     g.cfg.game_language = kGameLanguages[game_language_index(g.cfg.game_language)].code;
     launcher_text::set_language(g.cfg.game_language);
     if (g.cfg.online_id.empty()) g.cfg.online_id = L"CTRPlayer";
