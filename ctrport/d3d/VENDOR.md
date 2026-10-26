@@ -23,6 +23,9 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
 - FSR 1: `fsr/ffx_a.h`, `fsr/ffx_fsr1.h` (AMD FidelityFX, MIT), copied unchanged from shadPS4 v0.18.0
   `src/video_core/host_shaders/fsr` (SHA256 `94d8d663…`, `4dc2022e…`). `fsr/fsr1.hlsl` is the D3D11 form
   of shadPS4's `fsr.comp` (32-bit float path); CMake embeds the three into the DLL.
+- `pads.cpp` (GPL-2.0-only): PlayStation controllers through SDL 3 (zlib licence, linked statically from
+  the GPU library's pinned `engine/shadPS4/externals/sdl3`), the same reading and exports as
+  `ctrport/gpu/shim/controller_exit.cpp`, polled on a thread of its own.
 - `shaders/variants.cpp` (GPL-2.0-only) reuses the GPU library's recognised-shader contracts
   (`ctrport/gpu/ao_controls`, `ctrport/gpu/shadow_quality`).
 
@@ -72,5 +75,5 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
   A call stops the process.
 - **2D macro-tiled textures:** only met as render targets sampled before their first draw. They read
   as transparent black.
-- **Not available on this backend:** PlayStation controllers through SDL, the temporal upscalers
+- **Not available on this backend:** the temporal upscalers
   (FSR 3, DLSS); supersampling is available with `CTR_D3D_RenderScale`.

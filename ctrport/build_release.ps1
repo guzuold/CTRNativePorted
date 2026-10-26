@@ -86,6 +86,7 @@ Copy-Item "$PSScriptRoot/dht/LICENCE" (Join-Path $out 'licenses/jech-dht-LICENCE
 if (-not $WithoutDirect3D11) {  # MIT code in ctr_d3d.dll / ctr_shaders.exe
     Copy-Item "$PSScriptRoot/d3d/LICENSE.FrankHUN88453" (Join-Path $out 'licenses/FrankHUN88453-CTR-NitroFueled-PC-LICENSE.txt') -Force
     Copy-Item "$PSScriptRoot/d3d/fsr/LICENSE.AMD-FidelityFX" (Join-Path $out 'licenses/AMD-FidelityFX-FSR1-LICENSE.txt') -Force
+    Copy-Item "$root/engine/shadPS4/externals/sdl3/LICENSE.txt" (Join-Path $out 'licenses/SDL3-LICENSE.txt') -Force  # SDL in ctr_d3d.dll
 }
 foreach ($doc in 'README.md', 'LICENSE', 'CHANGELOG.md', 'FIRST_UPDATE.md') { Copy-Item (Join-Path $root $doc) $out -Force }
 Copy-Item "$PSScriptRoot/settings/README.md" (Join-Path $out 'PC_SETTINGS.md') -Force

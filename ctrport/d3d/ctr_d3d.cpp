@@ -20,6 +20,7 @@
 #include "videoout.h"
 
 Eboot g_eboot;
+void StartPads();  // pads.cpp
 
 namespace {
 struct Export {
@@ -117,6 +118,7 @@ extern "C" CTR_GPU_API int ctr_gpu_init(const CtrGpuConfig* config) {
         Fatal("display settings: %s", e.what());
     }
     VideoOutStartWindow(config->title, config->width, config->height);
+    StartPads();
     return 0;
 }
 
@@ -175,6 +177,4 @@ extern "C" CTR_GPU_API uint64_t ctr_gpu_flip_count(void) { return VideoOutFlipCo
 extern "C" CTR_GPU_API uint64_t ctr_gpu_submit_count(void) { return GnmSubmitCount(); }
 // No host overlay takes the game's input.
 extern "C" CTR_GPU_API int ctr_gpu_input_captured(void) { return 0; }
-// PlayStation controllers are read through SDL only by ctr_gpu.dll; XInput pads work directly.
-extern "C" CTR_GPU_API int ctr_gpu_gamepad_state(CtrGpuGamepad*) { return 0; }
-extern "C" CTR_GPU_API void ctr_gpu_gamepad_rumble(uint16_t, uint16_t) {}
+// PlayStation controllers through SDL: pads.cpp; XInput pads are read by the runtime.
