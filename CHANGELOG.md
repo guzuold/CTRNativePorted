@@ -1,3 +1,12 @@
+## v0.7.6 — 2026-10-26
+
+Direct3D 11 for the US version of the game.
+
+- **US game (CUSA13795, 1.00 and 1.21):** the Direct3D 11 renderer knew the engine addresses only of the EU version (CUSA14876), so with a US dump the game stopped at start with "exit code 4". It now has the US addresses as well. US 1.21 has not been run by us yet: reports are welcome.
+- The renderer checks the engine's device address on the live game objects before using it, and looks for it nearby when the recorded one does not match.
+- When Direct3D 11 does not support a game version, the launcher now says so and suggests Vulkan.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.5 — 2026-10-26
 
 Localization review: the launcher and the game's own windows follow the chosen language.
