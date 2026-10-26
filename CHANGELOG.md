@@ -14,6 +14,7 @@ A second renderer, Direct3D 11, that does not use shadPS4; upscaling quality pre
 Step release before v0.7.0: the updater learns the program files of the new Direct3D 11 renderer.
 
 - **Why this release exists:** an installed launcher installs updates with its own update helper, which accepts only a closed list of program files. The 0.6.1 helper does not know `ctr_d3d.dll` and `ctr_shaders.exe`, so it would refuse the whole v0.7.0 package. v0.6.2 installs the helper that knows them; **Check updates** then offers v0.7.0.
+- Releases that need this helper are tagged `vX.Y.Z-uN` (v0.7.0 is `v0.7.0-u2`). Older helpers skip such tags, so they offer v0.6.2 first instead of a package they would refuse.
 - Nothing else changes: the runtime, the GPU library and the launcher features are those of v0.6.1. Saves, settings and mods are preserved.
 
 ## v0.6.1 — 2026-10-25
