@@ -50,7 +50,7 @@ void classic_create_controls() {
     g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(312, 356, 190, 26), L"60 FPS Unlock", &g.cfg.fps_60, -1, TAB_SETTINGS);
     add_button(ID_FULLSCREEN, Kind::Toggle, rect(312, 388, 190, 26), L"Fullscreen Mode", &g.cfg.fullscreen, -1, TAB_SETTINGS);
     g.scene_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(444), px(190), px(220), g.window, reinterpret_cast<HMENU>(ID_SCENE_RES), nullptr, nullptr);
+        px(312), px(436), px(190), px(220), g.window, reinterpret_cast<HMENU>(ID_SCENE_RES), nullptr, nullptr);
     SendMessageW(g.scene_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
     for (int i=0; i<6; ++i) {
         SendMessageW(g.scene_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kSceneLabels[i]));
@@ -58,11 +58,18 @@ void classic_create_controls() {
     }
 
     g.upscaler_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(506), px(190), px(170), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_UPSCALER)), nullptr, nullptr);
+        px(312), px(488), px(190), px(170), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_UPSCALER)), nullptr, nullptr);
     SendMessageW(g.upscaler_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
     for (int i = 0; i < static_cast<int>(std::size(kUpscalers)); ++i) {
         SendMessageW(g.upscaler_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kUpscalerLabels[i]));
         if (g.cfg.upscaler == kUpscalers[i]) SendMessageW(g.upscaler_combo, CB_SETCURSEL, i, 0);
+    }
+    g.renderer_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+        px(312), px(540), px(190), px(120), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_RENDERER)), nullptr, nullptr);
+    SendMessageW(g.renderer_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
+    for (int i = 0; i < static_cast<int>(std::size(kRenderers)); ++i) {
+        SendMessageW(g.renderer_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kRendererLabels[i]));
+        if (g.cfg.renderer == kRenderers[i]) SendMessageW(g.renderer_combo, CB_SETCURSEL, i, 0);
     }
 
     // Online Section (Card 2)

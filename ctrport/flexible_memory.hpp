@@ -3,6 +3,7 @@
 // sceKernelMapNamedFlexibleMemory; CPU protection bits from core/memory.h.
 #pragma once
 #include "original_register_call.hpp"
+#include "gpu_hooks.hpp"
 namespace ctrport {
 class FlexibleMemory {
  struct Mapping{void* base=nullptr;size_t bytes=0;int protection=0;std::string name;~Mapping(){if(base)VirtualFree(base,0,MEM_RELEASE);}};
@@ -21,7 +22,7 @@ public:
   auto mapping=std::make_unique<Mapping>();mapping->bytes=static_cast<size_t>(bytes);mapping->protection=prot;mapping->name=std::move(copied);
   std::lock_guard<std::mutex> lock(mutex);
   for(uint64_t candidate=0x2000000000ULL;candidate+bytes<=0xfbffffffffULL;candidate+=0x10000000ULL){
-   mapping->base=VirtualAlloc(reinterpret_cast<void*>(static_cast<uintptr_t>(candidate)),static_cast<SIZE_T>(bytes),MEM_RESERVE|MEM_COMMIT,protection);if(mapping->base)break;
+   mapping->base=VirtualAlloc(reinterpret_cast<void*>(static_cast<uintptr_t>(candidate)),static_cast<SIZE_T>(bytes),MEM_RESERVE|MEM_COMMIT|guest_write_watch_flag(),protection);if(mapping->base)break;
   }
   if(!mapping->base)throw std::runtime_error("Flexible mapping VirtualAlloc failed");
   auto* base=mapping->base;mappings.emplace(reinterpret_cast<uint64_t>(base),std::move(mapping));*output=base;return 0;

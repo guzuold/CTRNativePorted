@@ -140,8 +140,9 @@ void paint_window(HDC target) {
                     text(gr, L"x", 1, 12.0f, FontStyleBold, page_rect(400, 314, 12, 28), kTextMuted, StringAlignmentCenter);
                 }
 
-                text(gr, tr(L"Internal 3D resolution:"), 1, 11.5f, FontStyleBold, page_rect(312, 420, 190, 20), kTextMuted);
-                text(gr, tr(L"Scene upscaling:"), 1, 11.5f, FontStyleBold, page_rect(312, 482, 190, 20), kTextMuted);
+                text(gr, tr(L"Internal 3D resolution:"), 1, 11.5f, FontStyleBold, page_rect(312, 416, 190, 20), kTextMuted);
+                text(gr, tr(L"Scene upscaling:"), 1, 11.5f, FontStyleBold, page_rect(312, 468, 190, 20), kTextMuted);
+                text(gr, tr(L"Renderer:"), 1, 11.5f, FontStyleBold, page_rect(312, 520, 190, 20), kTextMuted);
 
                 // Card 2: ONLINE & MULTIPLAYER
                 const RectF o_card = page_rect(532, 126, 222, 450);

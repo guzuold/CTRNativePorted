@@ -46,7 +46,7 @@ inline void validate(const Json& doc, bool complete=true) {
             throw std::invalid_argument("settings: unsupported schema; document preserved");
     }
     for (const char* key : {"base_dir", "patch_dir", "resolution", "custom_w", "custom_h",
-                            "scene_height", "upscaler", "antialiasing", "game_language", "online_id",
+                            "scene_height", "upscaler", "renderer", "antialiasing", "game_language", "online_id",
                             "online_server", "online_friend_code", "public_server", "online_public_ip",
                             "trophy_key", "player1_pad", "player2_pad", "player3_pad", "player4_pad"}) {
         const auto* v = doc.find(key);
@@ -63,6 +63,9 @@ inline void validate(const Json& doc, bool complete=true) {
     if (const auto* v = doc.find("upscaler"))
         if (!one_of(v->text, {"off", "fsr1", "fsr3", "dlss"}))
             throw std::invalid_argument("settings: invalid upscaler");
+    if (const auto* v = doc.find("renderer"))
+        if (!one_of(v->text, {"vulkan", "d3d11"}))
+            throw std::invalid_argument("settings: invalid renderer");
     if (const auto* refresh=doc.find("display_refresh")) {
         const auto* mode=doc.find("window_mode");
         if(refresh->text!="original" && ((mode && mode->text!="exclusive") || (!mode && complete)))

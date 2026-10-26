@@ -6,6 +6,8 @@
 // then every guest import of libSceGnmDriver and libSceVideoOut, and the libkernel event
 // queue functions, bind to the library instead of ctrport's own graphics path.
 // Imports the library does not provide keep their ctrport binding or missing trap.
+// CTR_GPU_BACKEND=d3d11 selects ctr_d3d.dll (ctrport/d3d) instead: the engine-state Direct3D 11
+// backend with the same C interface and settings ABIs, which needs no shadPS4 code.
 #pragma once
 #include <windows.h>
 #include <cstdint>
@@ -39,8 +41,12 @@ struct GpuLibrary {
     std::uint64_t (*submit_count)()=nullptr;
 };
 inline GpuLibrary gpu_library;
+inline bool gpu_backend_d3d11(){
+    static const bool selected=[]{char value[8]{};return GetEnvironmentVariableA("CTR_GPU_BACKEND",value,sizeof(value))==5 && std::string(value)=="d3d11";}();
+    return selected;
+}
 inline bool gpu_library_requested(){
-    char value[4]{};return GetEnvironmentVariableA("CTR_GPU_LIBRARY",value,sizeof(value))==1 && value[0]=='1';
+    char value[4]{};return gpu_backend_d3d11() || (GetEnvironmentVariableA("CTR_GPU_LIBRARY",value,sizeof(value))==1 && value[0]=='1');
 }
 inline bool gpu_library_active(){return gpu_library.module!=nullptr;}
 // CPU writes to guest memory done by ctrport services (file reads) must reach the
@@ -54,11 +60,14 @@ inline void gpu_map_guest(std::uint64_t address,std::uint64_t bytes){
 inline std::wstring gpu_library_path;
 inline void load_gpu_library(std::uint32_t sdk_version){
     settings::prepare_renderer_environment();
-    for (const wchar_t* candidate : {L"ctr_gpu.dll", L"build/CTRPort-gpu/ctr_gpu.dll"}) {
+    const auto candidates=gpu_backend_d3d11()?std::vector<const wchar_t*>{L"ctr_d3d.dll",L"build/CTRPort-d3d/ctr_d3d.dll"}
+                                             :std::vector<const wchar_t*>{L"ctr_gpu.dll",L"build/CTRPort-gpu/ctr_gpu.dll"};
+    for (const wchar_t* candidate : candidates) {
         gpu_library.module = LoadLibraryW(candidate);
         if (gpu_library.module) { gpu_library_path = candidate; break; }
     }
-    if(!gpu_library.module)throw std::runtime_error("CTR_GPU_LIBRARY=1 but ctr_gpu.dll did not load (searched . and build/CTRPort-gpu/)");
+    if(!gpu_library.module)throw std::runtime_error(gpu_backend_d3d11()?"CTR_GPU_BACKEND=d3d11 but ctr_d3d.dll did not load (searched . and build/CTRPort-d3d/)"
+                                                       :"CTR_GPU_LIBRARY=1 but ctr_gpu.dll did not load (searched . and build/CTRPort-gpu/)");
     settings::confirm_renderer_extensions(gpu_library.module);
     auto get=[&](const char* name){auto* p=GetProcAddress(gpu_library.module,name);if(!p)throw std::runtime_error(std::string("ctr_gpu export missing: ")+name);return p;};
     gpu_library.init=reinterpret_cast<int(*)(const CtrGpuConfigV1*)>(get("ctr_gpu_init"));
@@ -106,6 +115,20 @@ inline void route_gpu_imports(const std::vector<ImageMetadata>& metadata,std::ve
         std::printf("{\"scope\":\"gpu_library_binding\",\"nid\":\"%s\",\"library\":\"%s\",\"module\":\"%s\"}\n",symbol.nid.c_str(),symbol.library.c_str(),symbol.module.c_str());
     }
     std::printf("{\"scope\":\"gpu_library_routing\",\"routed_imports\":%u,\"replaced_ctrport_bindings\":%u}\n",routed,replaced);std::fflush(stdout);
+}
+// ctr_d3d reads the engine's render state from the eboot (the image with the largest executable
+// span): its address and SHA256 select the recorded engine addresses.
+template<class Images,class Metadata>
+inline void configure_gpu_backend(const Images& images,const Metadata& metadata){
+    if(!gpu_backend_d3d11())return;
+    const auto set=reinterpret_cast<int(*)(void*,std::uint64_t,const char*)>(GetProcAddress(gpu_library.module,"ctr_d3d_set_eboot"));
+    if(!set)throw std::runtime_error("ctr_d3d export missing: ctr_d3d_set_eboot");
+    std::size_t best=0;std::uint64_t best_size=0,extent=0;
+    for(std::size_t i=0;i<metadata.size();++i)for(const auto& s:metadata[i].executable_spans)if(s.second-s.first>best_size){best_size=s.second-s.first;best=i;}
+    for(const auto& s:metadata[best].spans)if(s.second>extent)extent=s.second;
+    const int status=set(images[best].get(),extent,metadata[best].sha256.c_str());
+    if(status)throw std::runtime_error("ctr_d3d rejected eboot "+metadata[best].sha256+" (status "+std::to_string(status)+")");
+    std::printf("{\"scope\":\"gpu_backend_d3d11\",\"eboot_sha256\":\"%s\",\"image_extent\":%llu}\n",metadata[best].sha256.c_str(),static_cast<unsigned long long>(extent));std::fflush(stdout);
 }
 // ctr_hle.dll (ctrport/hle): system library functions written in the guest SysV ABI.
 // Loaded together with the GPU library; every import it provides is bound to it.

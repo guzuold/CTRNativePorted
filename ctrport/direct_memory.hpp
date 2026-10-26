@@ -65,7 +65,7 @@ public:
             candidate<=guest_end_limit-reservation_size;candidate+=0x200000000ULL) {
             region.reset(static_cast<unsigned char*>(VirtualAlloc(
                 reinterpret_cast<void*>(static_cast<std::uintptr_t>(candidate)),
-                static_cast<SIZE_T>(reservation_size),MEM_RESERVE,PAGE_NOACCESS)));
+                static_cast<SIZE_T>(reservation_size),MEM_RESERVE|guest_write_watch_flag(),PAGE_NOACCESS)));
             if(region) break;
         }
         if(!region) throw std::runtime_error("Direct backing reservation failed");

@@ -2739,6 +2739,7 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
         // process parameters (OrbisProcParam.sdk_version at offset 0x10).
         std::uint32_t sdk_version=0;if(process_parameter)std::memcpy(&sdk_version,static_cast<const unsigned char*>(process_parameter)+0x10,4);
         load_gpu_library(sdk_version);route_gpu_imports(metadata,services);gpu_library_present=true;
+        configure_gpu_backend(images,metadata);
         route_hle_imports(metadata,services);
         direct_memory_map_hook=[](std::uint64_t address,std::uint64_t bytes){gpu_map_guest(address,bytes);};
         guest_cpu_write_hook=[](const void* address,std::uint64_t bytes){gpu_invalidate_guest(address,bytes);};
