@@ -46,7 +46,7 @@ void create_controls() {
         px(nitro::page_x(312)), px(nitro::page_y(436)), px(nitro::page_w(190)), px(220), g.window, reinterpret_cast<HMENU>(ID_SCENE_RES), nullptr, nullptr);
     SendMessageW(g.scene_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
     for (int i=0; i<6; ++i) {
-        SendMessageW(g.scene_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kSceneLabels[i]));
+        SendMessageW(g.scene_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(tr(kSceneLabels[i])));
         if (g.cfg.scene_height == kSceneHeights[i]) SendMessageW(g.scene_combo, CB_SETCURSEL, i, 0);
     }
 

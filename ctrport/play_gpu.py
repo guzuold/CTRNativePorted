@@ -63,10 +63,10 @@ env['CTR_GPU_FSR'] = '0'
 if '--internal-res' in sys.argv:
     index = sys.argv.index('--internal-res')
     if index + 1 >= len(sys.argv):
-        sys.exit('--internal-res requires 720, 900, 1080, 1440, 1800 or 2160')
+        sys.exit('--internal-res requires 720, 900, 1080, 1260, 1440, 1800 or 2160')
     scene_height = sys.argv[index + 1]
 if scene_height is not None:
-    if scene_height not in ('720', '900', '1080', '1440', '1800', '2160'):
+    if scene_height not in ('720', '900', '1080', '1260', '1440', '1800', '2160'):
         sys.exit('Invalid internal resolution: ' + scene_height)
     env['CTR_SCENE_HEIGHT'] = scene_height
 use_pro = bool(scene_height) or '--pro' in sys.argv or '--neo' in sys.argv or use_native_4k or os.environ.get('CTR_NEO_MODE') == '1'

@@ -35,6 +35,7 @@ enum class Option : std::uint32_t {
     hdr_exposure = 0x43540019,
     shadow_resolution = 0x4354001a,
     shadow_cascade_limit = 0x4354001b,
+    shadow_map_quality = 0x43540029,
     static_mesh_lod = 0x4354001c,
     hero_shadows = 0x4354001d,
     vfx_quality = 0x4354001e,
@@ -49,7 +50,7 @@ enum class Option : std::uint32_t {
     native_fur_detail = 0x43540027,
     native_view_distance = 0x43540028,
 };
-inline constexpr Option options[] = {Option::scene_height,Option::upscaler,Option::fps_60,Option::fullscreen,Option::game_language,Option::xbox_prompts,Option::antialiasing,Option::present_mode,Option::anisotropy,Option::fsr1_sharpen,Option::screen_space_reflections,Option::bloom,Option::motion_blur,Option::window_resolution,Option::vignette,Option::depth_of_field,Option::distance_scale,Option::cascaded_shadows,Option::ambient_occlusion,Option::racer_mesh_lod,Option::texture_quality,Option::hdr_output,Option::display_gamma,Option::hdr_peak_nits,Option::hdr_exposure,Option::shadow_resolution,Option::shadow_cascade_limit,Option::static_mesh_lod,Option::hero_shadows,Option::vfx_quality,Option::quality_preset,Option::presentation_limit,Option::window_mode,Option::display_refresh,Option::native_antialiasing,Option::native_bloom,Option::native_motion_blur,Option::native_depth_of_field,Option::native_fur_detail,Option::native_view_distance};
+inline constexpr Option options[] = {Option::scene_height,Option::upscaler,Option::fps_60,Option::fullscreen,Option::game_language,Option::xbox_prompts,Option::antialiasing,Option::present_mode,Option::anisotropy,Option::fsr1_sharpen,Option::screen_space_reflections,Option::bloom,Option::motion_blur,Option::window_resolution,Option::vignette,Option::depth_of_field,Option::distance_scale,Option::cascaded_shadows,Option::ambient_occlusion,Option::racer_mesh_lod,Option::texture_quality,Option::hdr_output,Option::display_gamma,Option::hdr_peak_nits,Option::hdr_exposure,Option::shadow_resolution,Option::shadow_cascade_limit,Option::shadow_map_quality,Option::static_mesh_lod,Option::hero_shadows,Option::vfx_quality,Option::quality_preset,Option::presentation_limit,Option::window_mode,Option::display_refresh,Option::native_antialiasing,Option::native_bloom,Option::native_motion_blur,Option::native_depth_of_field,Option::native_fur_detail,Option::native_view_distance};
 constexpr bool owns(std::uint32_t id) {
     for (auto option : options) if (static_cast<std::uint32_t>(option) == id) return true;
     return false;
@@ -83,6 +84,7 @@ inline const char* key(Option option) {
     case Option::hdr_exposure: return "hdr_exposure";
     case Option::shadow_resolution: return "shadow_resolution";
     case Option::shadow_cascade_limit: return "shadow_cascade_limit";
+    case Option::shadow_map_quality: return "shadow_map_quality";
     case Option::static_mesh_lod: return "static_mesh_lod";
     case Option::hero_shadows: return "hero_shadows";
     case Option::vfx_quality: return "vfx_quality";
@@ -101,7 +103,7 @@ inline const char* key(Option option) {
 }
 inline unsigned count(Option option) {
     switch (option) {
-    case Option::scene_height: return 6;
+    case Option::scene_height: return 7;
     case Option::upscaler: return 4;
     case Option::fps_60: return 2;
     case Option::fullscreen: return 2;
@@ -128,6 +130,7 @@ inline unsigned count(Option option) {
     case Option::hdr_exposure: return 4;
     case Option::shadow_resolution: return 3;
     case Option::shadow_cascade_limit: return 4;
+    case Option::shadow_map_quality: return 2;
     case Option::static_mesh_lod: return 2;
     case Option::hero_shadows: return 2;
     case Option::vfx_quality: return 3;
@@ -150,9 +153,10 @@ inline Json value(Option option, unsigned index) {
         case 0: return Json::of("720");
         case 1: return Json::of("900");
         case 2: return Json::of("1080");
-        case 3: return Json::of("1440");
-        case 4: return Json::of("1800");
-        case 5: return Json::of("2160");
+        case 3: return Json::of("1260");
+        case 4: return Json::of("1440");
+        case 5: return Json::of("1800");
+        case 6: return Json::of("2160");
         } break;
     case Option::upscaler: switch(index) {
         case 0: return Json::of("off");
@@ -288,6 +292,10 @@ inline Json value(Option option, unsigned index) {
         case 1: return Json::of("1");
         case 2: return Json::of("2");
         case 3: return Json::of("3");
+        } break;
+    case Option::shadow_map_quality: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("high");
         } break;
     case Option::static_mesh_lod: switch(index) {
         case 0: return Json::of("original");

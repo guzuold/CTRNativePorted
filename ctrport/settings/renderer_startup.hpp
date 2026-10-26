@@ -13,6 +13,7 @@ inline bool display_extensions_confirmed = false;
 inline bool ao_extensions_confirmed = false;
 inline bool hero_extensions_confirmed = false;
 inline bool pacing_extensions_confirmed = false;
+inline bool d3d_extensions_confirmed = false;  // Direct3D 11 renderer settings (shadow map detail)
 
 // Loader-thread only, before LoadLibrary and its CRT initialization. The public
 // startup document is authoritative over inherited process environment values.
@@ -34,6 +35,10 @@ inline void prepare_renderer_environment() {
     if(!SetEnvironmentVariableA("CTR_GPU_AO",ao && ao->text=="off" ? "off" : nullptr)) win_error("settings AO environment");
     const auto* hero=document->find("hero_shadows");
     if(!SetEnvironmentVariableA("CTR_GPU_HERO_SHADOWS",hero && hero->text=="off" ? "off" : nullptr)) win_error("settings hero environment");
+    // Direct3D 11 shadow maps at twice the PS4 size (renderer ShadowQuality 2); the setting is
+    // offered only by that renderer (d3d_extensions_confirmed)
+    const auto* shadow_maps=document->find("shadow_map_quality");
+    if(!SetEnvironmentVariableA("CTR_D3D_ShadowQuality",shadow_maps && shadow_maps->text=="high" ? "2" : nullptr)) win_error("settings shadow map environment");
     auto values = renderer::environment(*document, true);
     const auto display_values=display::environment(*document,true);
     values.insert(values.end(),display_values.begin(),display_values.end());
@@ -66,6 +71,8 @@ inline void confirm_renderer_extensions(HMODULE module) {
     hero_extensions_confirmed=hero_query && hero_query()==1;
     if(const auto* hero=document->find("hero_shadows"))
         if(hero->text!="original" && !hero_extensions_confirmed) throw std::runtime_error("hero shadows require GPU hero ABI 1");
+    auto d3d_query=reinterpret_cast<unsigned(*)()>(GetProcAddress(module,"ctr_gpu_d3d_abi"));
+    d3d_extensions_confirmed=d3d_query && d3d_query()==1;
     auto ao_query=reinterpret_cast<unsigned(*)()>(GetProcAddress(module,"ctr_gpu_ao_abi"));
     ao_extensions_confirmed=ao_query && ao_query()==1;
     if(const auto* ao=document->find("ambient_occlusion"))

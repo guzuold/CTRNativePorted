@@ -110,7 +110,7 @@ const wchar_t* const kTabNames[TAB_COUNT] = {
 };
 
 const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)", L"3840x2160 (4K)", L"Custom"};
-const wchar_t* const kSceneHeights[] = {L"720", L"900", L"1080", L"1440", L"1800", L"2160"};
+const wchar_t* const kSceneHeights[] = {L"720", L"900", L"1080", L"1260", L"1440", L"1800", L"2160"};
 constexpr int ID_UPSCALER = 905;
 const wchar_t* const kUpscalers[] = {L"off", L"fsr1", L"fsr3", L"dlss"};
 const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3.1", L"DLSS (experimental)"};
@@ -118,7 +118,9 @@ const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3.1", 
 constexpr int ID_RENDERER = 910;
 const wchar_t* const kRenderers[] = {L"vulkan", L"d3d11"};
 const wchar_t* const kRendererLabels[] = {L"Vulkan (shadPS4)", L"Direct3D 11 (native)"};
-const wchar_t* const kSceneLabels[] = {L"1280 x 720", L"1600 x 900", L"1920 x 1080", L"2560 x 1440", L"3200 x 1800", L"3840 x 2160 (4K)"};
+// the upscaling quality presets of the 3840 x 2160 display canvas, by name, and the other heights
+const wchar_t* const kSceneLabels[] = {L"Ultra performance - 1280 x 720", L"1600 x 900", L"Performance - 1920 x 1080",
+    L"Balanced - 2240 x 1260", L"Quality - 2560 x 1440", L"3200 x 1800", L"Native - 3840 x 2160 (4K)"};
 const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
 
@@ -2280,7 +2282,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) { launch_game(); return 0; }
         if (id == ID_SCENE_RES && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.scene_combo, CB_GETCURSEL, 0, 0);
-            if (selected >= 0 && selected < 6) g.cfg.scene_height = kSceneHeights[selected];
+            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kSceneHeights))) g.cfg.scene_height = kSceneHeights[selected];
             validate();
             return 0;
         }

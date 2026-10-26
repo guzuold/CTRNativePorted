@@ -58,7 +58,7 @@ inline void validate(const Json& doc, bool complete=true) {
         if (v && !v->is_bool()) throw std::invalid_argument(std::string("settings: expected boolean: ") + key);
     }
     if (const auto* v = doc.find("scene_height"))
-        if (!one_of(v->text, {"720", "900", "1080", "1440", "1800", "2160"}))
+        if (!one_of(v->text, {"720", "900", "1080", "1260", "1440", "1800", "2160"}))
             throw std::invalid_argument("settings: invalid internal resolution");
     if (const auto* v = doc.find("upscaler"))
         if (!one_of(v->text, {"off", "fsr1", "fsr3", "dlss"}))

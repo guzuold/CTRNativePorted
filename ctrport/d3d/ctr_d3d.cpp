@@ -130,6 +130,8 @@ extern "C" __declspec(dllexport) unsigned ctr_gpu_pacing_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_live_settings_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_ao_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_hero_abi() { return 1; }
+// Settings only this renderer provides: shadow map detail (CTR_D3D_ShadowQuality).
+extern "C" __declspec(dllexport) unsigned ctr_gpu_d3d_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_live_settings_set(unsigned key, unsigned value) {
     return ctrport::settings::live_gpu::set(key, value);
 }

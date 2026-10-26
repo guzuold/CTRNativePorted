@@ -54,6 +54,7 @@ inline bridge::Hooks startup_hooks() {
         if(option==menu::Option::hero_shadows) return index==0 || hero_extensions_confirmed;
         if(option==menu::Option::quality_preset) return index<2 || renderer_extensions_confirmed;
         if(option==menu::Option::ambient_occlusion) return index==0 || ao_extensions_confirmed;
+        if(option==menu::Option::shadow_map_quality) return index==0 || d3d_extensions_confirmed;
         if(option==menu::Option::hdr_output || option==menu::Option::display_gamma ||
            option==menu::Option::hdr_peak_nits || option==menu::Option::hdr_exposure)
             return index==0 || display_extensions_confirmed;

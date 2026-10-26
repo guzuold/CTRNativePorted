@@ -56,7 +56,7 @@ slot (`tls_storage.hpp`), so later executions no longer fault. Same length, same
 
 ### Configurable scene resolution: CTR_SCENE_HEIGHT
 
-`CTR_SCENE_HEIGHT=720|900|1080|1440|1800|2160` generalizes the same verified
+`CTR_SCENE_HEIGHT=720|900|1080|1260|1440|1800|2160` generalizes the same verified
 Neo scale site below. The launcher exposes it as **Internal 3D resolution**;
 `play_gpu.py --internal-res 720 --res 1920 1080` selects a 1280x720 scene in a
 1920x1080 host window. Changes apply on the next game launch. Invalid values
