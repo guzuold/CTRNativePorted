@@ -81,7 +81,13 @@ int read_archive(const fs::path& pak, const std::string& prefix, bool only_shade
         const auto& e = directory.files[k];
         std::string lower = e.path.empty() ? e.full_path : e.path;
         for (char& c : lower) c = char(tolower((unsigned char)c));
-        if (lower.size() >= 4 && !lower.compare(lower.size() - 4, 4, ".igz")) todo.push_back(k);
+        for (char& c : lower)
+            if (c == '\\') c = '/';
+        if (lower.size() < 4 || lower.compare(lower.size() - 4, 4, ".igz")) continue;
+        // patch archives (several GB of textures and models): only their shader folder. Reading
+        // every IGZ file to look for shader buffers took a long time on a hard disk.
+        if (only_shaders && lower.rfind("shaders/", 0) != 0 && lower.find("/shaders/") == std::string::npos) continue;
+        todo.push_back(k);
     }
     enum State { Skipped, Unreadable, Used };
     std::vector<State> state(todo.size(), Skipped);
