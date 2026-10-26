@@ -82,6 +82,7 @@ void nitro_paint_chrome(Graphics& gr) {
 }
 void nitro_paint_home(Graphics& gr) {
     const auto color=g.can_launch ? kArcadeCyan : kArcadeOrange;
-    text(gr,g.process ? L"Gioco in esecuzione" : g.xbox_busy ? L"Preparazione in corso" : g.can_launch ? L"Pronto a giocare" : L"Configura il percorso del gioco",2,25,FontStyleBold|FontStyleItalic,rect(70,476,560,38),color);
+    const std::wstring shaders=L"Traduzione shader "+std::to_wstring(g.shaders_percent)+L"%";
+    text(gr,g.process ? L"Gioco in esecuzione" : g.shaders_busy ? shaders.c_str() : g.xbox_busy ? L"Preparazione in corso" : g.can_launch ? L"Pronto a giocare" : L"Configura il percorso del gioco",2,25,FontStyleBold|FontStyleItalic,rect(70,476,560,38),color);
     if(!g.can_launch) text(gr,L"Apri Avanzate per selezionare il tuo dump.",2,13,FontStyleRegular,rect(48,627,670,24),kTextMuted);
 }

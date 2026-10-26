@@ -44,7 +44,7 @@ void draw_control(const DRAWITEMSTRUCT& item) {
             Pen shine(Color(0xfffff38a),4);gr.DrawLine(&shine,26.f,8.f,lw-30,8.f);gr.Restore(clipped);
             Pen edge(Color(0xffffe97c),1.5f);gr.DrawPath(&edge,&face);
             PointF triangle[]={{84,28},{78,69},{113,49}};gr.FillPolygon(&ink,triangle,3);
-            const wchar_t* label=g.process?L"IN GIOCO":g.xbox_busy?L"ATTENDI":L"GIOCA";
+            const wchar_t* label=g.process?L"IN GIOCO":(g.xbox_busy||g.shaders_busy)?L"ATTENDI":L"GIOCA";
             text(gr,label,0,62,FontStyleBold,rect(128,9,lw-166,lh-25),kArcadeDark,StringAlignmentCenter);
             gr.Restore(saved);
             break;

@@ -28,3 +28,10 @@ add_library(ctr_hle SHARED ${HLE_SOURCES})
 target_compile_definitions(ctr_hle PRIVATE CTR_HLE_BUILD)
 target_compile_options(ctr_hle PRIVATE -Wno-unused-command-line-argument)
 target_link_libraries(ctr_hle PRIVATE ${CLANG_RT})
+
+# ctr_shaders.exe: the shader translator (GCN -> HLSL -> DXBC) run on the user's own dump
+add_executable(ctr_shaders shaders/ctr_shaders.cpp)
+target_compile_options(ctr_shaders PRIVATE /EHsc -Wno-unused-function -Wno-unused-variable -Wno-unused-command-line-argument)
+target_link_libraries(ctr_shaders PRIVATE bcrypt)
+# the settings headers it shares with the launcher are C++17 (u8string returns std::string)
+set_target_properties(ctr_shaders PROPERTIES CXX_STANDARD 17)

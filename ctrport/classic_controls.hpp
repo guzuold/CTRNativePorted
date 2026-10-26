@@ -50,8 +50,9 @@ void classic_draw_control(const DRAWITEMSTRUCT& item) {
             const float shadow_d = pressed ? 2.0f : 8.0f;
             SolidBrush fill(Color(disabled ? 0xFF4A4068 : hot ? 0xFFFFD766 : kArcadeGold));
             draw_slanted_box(gr, rect(2.f, 2.f, lw - 20.f, lh - 12.f), 0.176f, shadow_d, fill, kArcadeDark, 4.0f);
-            const wchar_t* btn_text = tr(g.process ? L"RACING" : g.xbox_busy ? L"PLEASE WAIT" : L"PLAY!");
-            text(gr, btn_text, 0, 44.0f, FontStyleBold, rect(2.f, 2.f + (pressed ? 3.f : 0.f), lw - 20.f, lh - 12.f),
+            std::wstring btn_text = tr(g.process ? L"RACING" : g.xbox_busy || g.shaders_busy ? L"PLEASE WAIT" : L"PLAY!");
+            if (g.shaders_busy) btn_text += L" " + std::to_wstring(g.shaders_percent) + L"%";
+            text(gr, btn_text.c_str(), 0, g.shaders_busy ? 30.0f : 44.0f, FontStyleBold, rect(2.f, 2.f + (pressed ? 3.f : 0.f), lw - 20.f, lh - 12.f),
                  disabled ? kTextMuted : kArcadeDark, StringAlignmentCenter);
             break;
         }

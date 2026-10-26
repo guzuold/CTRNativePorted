@@ -75,6 +75,8 @@ float kWidth = nitro::width, kHeight = nitro::height;
 constexpr UINT WM_APP_FINISHED = WM_APP + 1;
 constexpr UINT WM_APP_HOST_READY = WM_APP + 2;
 constexpr UINT WM_APP_XBOX_READY = WM_APP + 3;
+constexpr UINT WM_APP_SHADERS_PROGRESS = WM_APP + 4;
+constexpr UINT WM_APP_SHADERS_READY = WM_APP + 5;
 
 // Design 2a Pit Lane Palette (from Claude Design token specification)
 ARGB kArcadeBg      = 0xFF10152C;  // Deep arcade purple/indigo
@@ -369,6 +371,9 @@ struct App {
     bool host_busy = false;           // server starting or stopping in the background
     bool xbox_busy = false;           // Xbox prompt archives being prepared in the background
     bool xbox_ready = false;          // prepared for the launch that requested them
+    bool shaders_busy = false;        // Direct3D 11 shaders being translated by ctr_shaders.exe
+    bool shaders_ready = false;       // translated for the launch that requested them
+    int shaders_percent = 0;
     ctr_online::HostStatus host_status;
     std::vector<HWND> pills;
     HWND language_combo = nullptr;
@@ -438,7 +443,7 @@ void set_update_label(const wchar_t* label) {
     }
 }
 bool update_session_busy() {
-    return g.process || g.host_busy || g.xbox_busy || g.cfg.online || g.host.running();
+    return g.process || g.host_busy || g.xbox_busy || g.shaders_busy || g.cfg.online || g.host.running();
 }
 void check_launcher_update(bool manual) {
     if (update_job.valid()) return;
@@ -1804,16 +1809,116 @@ void xbox_prompts_ready(std::wstring* raw_error) {
     launch_game();
 }
 
+// Translates the game's shaders from the user's dump (ctr_shaders.exe: GCN -> HLSL -> DXBC) into
+// runtime/user/gpu_d3d/shaders.bin, then resumes the launch. The first build takes minutes; later
+// ones (new shaders met at run time, a newer translator) reuse the compiled bytecode cache.
+void prepare_d3d_shaders() {
+    const fs::path user = g.root / "runtime/user/gpu_d3d", logs = g.root / "runtime/user/logs";
+    std::error_code ec;
+    fs::create_directories(logs, ec);
+    std::wstring command = L"\"" + (g.runtime_exe.parent_path() / "ctr_shaders.exe").wstring() + L"\" --base \"" +
+                           resolve(g.cfg.base_dir).wstring() + L"\" --user \"" + user.wstring() + L"\"";
+    if (g.cfg.use_patch && !g.cfg.patch_dir.empty()) command += L" --patch \"" + resolve(g.cfg.patch_dir).wstring() + L"\"";
+    g.shaders_busy = true;
+    g.shaders_percent = 0;
+    InvalidateRect(g.launch, nullptr, FALSE);
+    InvalidateRect(g.window, nullptr, FALSE);
+    std::thread([command, log = logs / "ctr_shaders.log", cwd = g.root, window = g.window]() mutable {
+        auto* error = new std::wstring;
+        DWORD code = 1;
+        SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+        HANDLE read = nullptr, write = nullptr;
+        STARTUPINFOW si{};
+        PROCESS_INFORMATION pi{};
+        si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESTDHANDLES;
+        if (CreatePipe(&read, &write, &sa, 0) && SetHandleInformation(read, HANDLE_FLAG_INHERIT, 0)) {
+            si.hStdOutput = si.hStdError = write;
+            if (CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, cwd.c_str(), &si, &pi)) {
+                CloseHandle(write);
+                write = nullptr;
+                std::ofstream out(log, std::ios::binary);
+                std::string pending, last_error;
+                char buffer[4096];
+                DWORD n = 0;
+                while (ReadFile(read, buffer, sizeof(buffer), &n, nullptr) && n) {
+                    out.write(buffer, n);
+                    out.flush();
+                    pending.append(buffer, n);
+                    for (size_t end; (end = pending.find('\n')) != std::string::npos;) {
+                        std::string line = pending.substr(0, end);
+                        pending.erase(0, end + 1);
+                        if (!line.empty() && line.back() == '\r') line.pop_back();
+                        unsigned done = 0, total = 0;
+                        if (sscanf_s(line.c_str(), "progress %u %u", &done, &total) == 2 && total)
+                            PostMessageW(window, WM_APP_SHADERS_PROGRESS, done * 100 / total, 0);
+                        else if (line.rfind("error", 0) == 0)
+                            last_error = line;
+                    }
+                }
+                WaitForSingleObject(pi.hProcess, INFINITE);
+                GetExitCodeProcess(pi.hProcess, &code);
+                CloseHandle(pi.hProcess);
+                CloseHandle(pi.hThread);
+                if (code) *error = widen(last_error.empty() ? "exit code " + std::to_string(code) : last_error);
+            } else {
+                *error = L"ctr_shaders.exe did not start (error " + std::to_wstring(GetLastError()) + L")";
+            }
+        } else {
+            *error = L"pipe creation failed";
+        }
+        if (write) CloseHandle(write);
+        if (read) CloseHandle(read);
+        PostMessageW(window, WM_APP_SHADERS_READY, code, reinterpret_cast<LPARAM>(error));
+    }).detach();
+}
+
+void d3d_shaders_ready(DWORD code, std::wstring* raw_error) {
+    const std::unique_ptr<std::wstring> error(raw_error);
+    g.shaders_busy = false;
+    InvalidateRect(g.launch, nullptr, FALSE);
+    InvalidateRect(g.window, nullptr, FALSE);
+    std::error_code ec;
+    if (code || !fs::exists(g.root / "runtime/user/gpu_d3d/shaders.bin", ec)) {
+        const std::wstring log = (g.root / "runtime/user/logs/ctr_shaders.log").wstring();
+        MessageBoxW(g.window, trf(L"The Direct3D 11 shaders could not be built from your dump:\n{0}\n\nLog: {1}", *error, log).c_str(),
+                    tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
+        return;
+    }
+    g.shaders_ready = true;
+    launch_game();
+}
+
+// shaders.bin is rebuilt when ctr_d3d has met shaders it lacks, or the translator is newer
+bool d3d_shaders_outdated(const fs::path& shaders) {
+    std::error_code ec;
+    const auto built = fs::last_write_time(shaders, ec);
+    if (ec) return true;
+    if (fs::last_write_time(g.runtime_exe.parent_path() / "ctr_shaders.exe", ec) > built && !ec) return true;
+    for (const auto& item : fs::directory_iterator(g.root / "runtime/user/gpu_d3d/missing_shaders", ec))
+        if (item.path().extension() == ".gnm" && item.last_write_time(ec) > built) return true;
+    return false;
+}
+
 // Direct3D 11: the backend DLL, the shaders translated from this dump, and no PC setting that only
 // the Vulkan renderer provides (with them the runtime would refuse to start).
 bool d3d11_ready() {
     std::error_code ec;
-    if (!fs::exists(g.runtime_exe.parent_path() / "ctr_d3d.dll", ec)) {
-        MessageBoxW(g.window, tr(L"Direct3D 11 needs ctr_d3d.dll next to ctrport.exe."), tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
+    const fs::path runtime = g.runtime_exe.parent_path();
+    if (!fs::exists(runtime / "ctr_d3d.dll", ec) || !fs::exists(runtime / "ctr_shaders.exe", ec)) {
+        MessageBoxW(g.window, tr(L"Direct3D 11 needs ctr_d3d.dll and ctr_shaders.exe next to ctrport.exe."), tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
         return false;
     }
-    if (!fs::exists(g.root / "runtime/user/gpu_d3d/shaders.bin", ec)) {
-        MessageBoxW(g.window, tr(L"The Direct3D 11 shaders have not been built from your dump yet."), tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
+    const fs::path shaders = g.root / "runtime/user/gpu_d3d/shaders.bin";
+    if (g.shaders_ready) {
+        g.shaders_ready = false;
+    } else if (!fs::exists(shaders, ec)) {
+        if (MessageBoxW(g.window, tr(L"Direct3D 11 first translates the game's shaders from your dump. This takes a few minutes and is done once. Translate them now?"),
+                        tr(L"Direct3D 11"), MB_OKCANCEL | MB_ICONINFORMATION) == IDOK)
+            prepare_d3d_shaders();
+        return false;
+    } else if (d3d_shaders_outdated(shaders)) {
+        prepare_d3d_shaders();
         return false;
     }
     try {
@@ -1832,7 +1937,7 @@ bool d3d11_ready() {
 void launch_game() {
     if (update_preparing || update_handoff) return;
     validate();
-    if (!g.can_launch || g.process || g.xbox_busy) return;
+    if (!g.can_launch || g.process || g.xbox_busy || g.shaders_busy) return;
     if (g.cfg.upscaler == L"dlss" &&
         (!fs::exists(g.runtime_exe.parent_path() / "ctr_dlss.dll") ||
          !fs::exists(g.runtime_exe.parent_path() / "nvngx_dlss.dll"))) {
@@ -2349,8 +2454,16 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_APP_XBOX_READY:
         xbox_prompts_ready(reinterpret_cast<std::wstring*>(lparam));
         return 0;
+    case WM_APP_SHADERS_PROGRESS:
+        g.shaders_percent = static_cast<int>(wparam);
+        InvalidateRect(g.launch, nullptr, FALSE);
+        InvalidateRect(g.window, nullptr, FALSE);
+        return 0;
+    case WM_APP_SHADERS_READY:
+        d3d_shaders_ready(static_cast<DWORD>(wparam), reinterpret_cast<std::wstring*>(lparam));
+        return 0;
     case WM_CLOSE:
-        if (g.process || g.host_busy || g.xbox_busy || update_preparing) return 0;
+        if (g.process || g.host_busy || g.xbox_busy || g.shaders_busy || update_preparing) return 0;
         nitro_finish();
         save_config();
         KillTimer(window,20);

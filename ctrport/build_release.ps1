@@ -2,7 +2,7 @@
 # Builds the whole program from a fresh clone, after tools/bootstrap.ps1, into one folder laid
 # out like the release package (launcher.exe at the top, the runtime in build/CTRPort-gpu).
 #   powershell -File ctrport/build_release.ps1 [-OutputDirectory build/release-local]
-# Steps: audio and font backends, ctr_video.lib, ctrport.exe, ctr_gpu.dll and ctr_hle.dll, ctr_d3d.dll,
+# Steps: audio and font backends, ctr_video.lib, ctrport.exe, ctr_gpu.dll and ctr_hle.dll, ctr_d3d.dll and ctr_shaders.exe,
 # ctr_online_server.exe, the launcher, the Visual C++ runtime DLLs, assets and documents.
 # ctr_video.lib is compiled here without the GPU control suite of ctrport/video/build.ps1,
 # which needs local evidence that is not in this repository; its sources are the same.
@@ -56,9 +56,9 @@ Step 'ctr_gpu.dll and ctr_hle.dll (build/CTRPort-gpu)'
 & "$PSScriptRoot/gpu/build.ps1" -Jobs $Jobs
 foreach ($dll in 'ctr_gpu.dll', 'ctr_hle.dll') { Copy-Item (Join-Path $root "build/CTRPort-gpu/$dll") $runtime -Force }
 
-Step 'ctr_d3d.dll (build/CTRPort-d3d): the Direct3D 11 renderer'
+Step 'ctr_d3d.dll and ctr_shaders.exe (build/CTRPort-d3d): the Direct3D 11 renderer and its shader translator'
 & "$PSScriptRoot/d3d/build.ps1" -Jobs $Jobs -DllOnly
-Copy-Item (Join-Path $root 'build/CTRPort-d3d/ctr_d3d.dll') $runtime -Force
+foreach ($file in 'ctr_d3d.dll', 'ctr_shaders.exe') { Copy-Item (Join-Path $root "build/CTRPort-d3d/$file") $runtime -Force }
 
 Step 'ctr_online_server.exe'
 & "$PSScriptRoot/online_server/build_online_server.ps1" -OutputDirectory "$OutputDirectory/obj/online_server"

@@ -15,7 +15,11 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
   `videoout.h`, `ctr_d3d.cpp`, `CMakeLists.txt`, `build.ps1`.
   - Behaviour of a few calls follows shadPS4's documented semantics: Gnm query return values,
     event data encoding, VideoOut mode structures. No shadPS4 code is compiled or linked.
-- Shader translator: `tools/gpu_d3d/gcn` (FrankHUN88453, MIT, unchanged, `SOURCES.json`).
+- Shader translator: `shaders/gcn_decode.hpp`, `shaders/gcn_hlsl.hpp`, `shaders/shader_export.hpp` are C++
+  ports (MIT) of FrankHUN88453's `tools/gcn.py`, `gcn2hlsl.py`, `igz.py`, `export_shaders.py`,
+  `import_runtime_shaders.py`. Their output is byte-identical to the Python translator: same HLSL and
+  same DXBC for all 3202 shaders it handles. They also read one more shader, the Fur GS of
+  `update2.pak`, which the Python IGA reader could not read. `shaders/ctr_shaders.cpp` (GPL-2.0-or-later) is the tool.
 
 ## Engine addresses (per eboot SHA256, `engine.h`)
 
@@ -33,10 +37,13 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
 ## Build and data
 
 - `powershell -File ctrport/d3d/build.ps1`
-  builds `build/CTRPort-d3d/ctr_d3d.dll` and `ctr_hle.dll`.
-- `python -B tools/gpu_d3d/build_shaders.py` builds `runtime/user/gpu_d3d/shaders.bin` from the dump.
-  It includes the eboot-embedded shaders that the backend saved into `runtime/user/gpu_d3d/missing_shaders`
-  when it met them; rerun it after a run reports `no translated shader`.
+  builds `build/CTRPort-d3d/ctr_d3d.dll`, `ctr_shaders.exe` and `ctr_hle.dll`.
+- `ctr_shaders.exe --base <CUSA14876> [--patch <patch>] [--user runtime/user/gpu_d3d]` builds
+  `runtime/user/gpu_d3d/shaders.bin` from the dump, with no Python. It includes the eboot-embedded
+  shaders that the backend saved into `missing_shaders` when it met them. Compiled bytecode is cached
+  in `dxbc_cache`: the first build takes about 6 minutes on 20 threads (fxc), a rebuild about 10 seconds.
+  The launcher runs it when Direct3D 11 is selected and `shaders.bin` is missing, older than
+  `ctr_shaders.exe`, or older than a newly dumped shader. `--hlsl <dir>` writes the translated sources.
 - Writable data stays in `runtime/user/gpu_d3d`; nothing of the game is in the repository.
 
 ## Not implemented (reported, never silent)
