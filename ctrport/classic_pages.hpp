@@ -53,39 +53,7 @@ void classic_paint_window(HDC target) {
                         fill_round(gr, rect(x, y, kTrophyIcon, kTrophyIcon), 8, SolidBrush(Color(kArcadeCard)));
                     }
                 }
-                if (total == 0) {
-                    text(gr, tr(L"No trophy file in the dump"), 1, 13.0f, FontStyleRegular, rect(296, 140, 694, 24), kTextMuted);
-                } else {
-                    const int shown = g.trophy_hot >= 0 && g.trophy_hot < static_cast<int>(total) ? g.trophy_hot : 0;
-                    const auto& t = g.trophy_set.trophies[static_cast<std::size_t>(shown)];
-                    const auto when = g.trophy_unlocked.find(t.id);
-                    const RectF card = rect(296, 362, 694, 100);
-                    fill_round(gr, card, 14, SolidBrush(Color(kArcadeCard)));
-                    stroke_round(gr, card, 14, kArcadeDark, 3.0f);
-                    if (static_cast<std::size_t>(shown) < g.trophy_icons.size() && g.trophy_icons[static_cast<std::size_t>(shown)])
-                        gr.DrawImage(g.trophy_icons[static_cast<std::size_t>(shown)].get(), rect(310, 372, 80, 80));
-                    std::wstring name = t.name.empty() ? trf(L"Trophy {0}", std::to_wstring(t.id)) : widen(t.name);
-                    std::wstring detail = widen(t.detail);
-                    if (t.hidden && when == g.trophy_unlocked.end() && g.trophy_set.texts) { name = tr(L"Hidden trophy"); detail.clear(); }
-                    const wchar_t* grade = t.grade == 'P' ? L"Platinum" : t.grade == 'G' ? L"Gold" : t.grade == 'S' ? L"Silver" : t.grade == 'B' ? L"Bronze" : nullptr;
-                    text(gr, name, 1, 15.0f, FontStyleBold, rect(404, 370, 440, 22), kTextLight);
-                    if (grade) text(gr, tr(grade), 1, 11.0f, FontStyleBold, rect(850, 372, 130, 18), kArcadeGold, StringAlignmentFar);
-                    text(gr, detail, 1, 11.5f, FontStyleRegular, rect(404, 394, 576, 34), kTextMuted);
-                    std::wstring state = tr(L"Locked");
-                    if (when != g.trophy_unlocked.end()) {
-                        const std::time_t at = static_cast<std::time_t>(when->second);
-                        std::tm local{};
-                        wchar_t date[32]{};
-                        if (!localtime_s(&local, &at)) std::wcsftime(date, 32, L"%Y-%m-%d %H:%M", &local);
-                        state = trf(L"Unlocked {0}", date);
-                    }
-                    text(gr, state, 1, 11.0f, FontStyleBold, rect(404, 432, 576, 20), when != g.trophy_unlocked.end() ? kArcadeLime : kTextMuted);
-                }
-                text(gr, tr(L"Trophy key (optional):"), 1, 11.5f, FontStyleBold, rect(296, 478, 520, 18), kTextMuted);
-                draw_field(gr, rect(296, 500, 520, 34), g.trophy_key_edit);
-                const std::wstring note = !g.trophy_notice.empty() ? g.trophy_notice
-                    : g.trophy_set.texts ? std::wstring() : std::wstring(tr(L"Names and descriptions need your PS4 trophy key."));
-                text(gr, note, 1, 11.0f, FontStyleRegular, rect(296, 544, 694, 22), g.trophy_notice_error ? kArcadePink : kTextMuted);
+                trophy_card_paint(gr);  // launcher_trophies.hpp
             } else if (g.current_tab == TAB_SETTINGS) {
                 // the tab scrolls (mouse wheel): clipped to the page, shifted by the scroll position
                 const GraphicsState unscrolled = gr.Save();

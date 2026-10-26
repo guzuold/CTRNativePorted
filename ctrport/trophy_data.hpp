@@ -33,7 +33,8 @@ using Bytes = std::vector<unsigned char>;
 
 struct Trophy {
     int id = 0;
-    std::string name, detail;  // empty without the trophy key
+    std::string name, detail;  // empty without the trophy key (the launcher may fill them from trophy_wiki.hpp)
+    std::string tip;           // how to unlock it, from the wiki only
     char grade = 0;            // 'P', 'G', 'S', 'B'; 0 when unknown
     bool hidden = false;
     int group = -1;            // -1: base game

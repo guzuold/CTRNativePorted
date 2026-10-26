@@ -109,8 +109,11 @@ complete, in private matches and in public matchmaking; see the
 - **TROPHIES tab** in the launcher: every trophy icon, unlocked or locked, with the unlock
   date and the progress.
 - **Names and descriptions:** with your own PS4 trophy key, typed in the tab or imported
-  from shadPS4's `keys.json`, they are shown in the game language. Without the key,
-  trophies are shown by number.
+  from shadPS4's `keys.json`, they are shown in the game language. Without the key, the
+  launcher shows them in English from the
+  [Crash Bandicoot Wiki](https://crashbandicoot.fandom.com/wiki/Crash_Team_Racing_Nitro-Fueled)
+  (CC BY-SA), with a tip on how to unlock each one; a copy is kept in
+  `runtime/user/trophies/wiki.json` for offline use.
 
 ### Wumpa Coins and Pit Stop
 - **Wumpa Coins** are earned in races, Adventure included, and kept by your own local

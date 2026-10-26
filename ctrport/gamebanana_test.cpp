@@ -3,6 +3,7 @@
 // temporary folder; no network, no game files. Build and run: powershell -File ctrport/test_mods.ps1
 #include "app0.hpp"
 #include "gamebanana.hpp"
+#include "trophy_wiki.hpp"
 #include <iostream>
 
 namespace fs = std::filesystem;
@@ -136,6 +137,67 @@ int main() {
     check(fs::exists(patches_dir), "recorded names with separators are ignored");
 
     check(gb::size_text(1536) == L"2 KB" && gb::size_text(7751189) == L"7.4 MB", "size text");
+
+    // --- Trophy texts from the wiki (trophy_wiki.hpp) ----------------------------------------
+    {
+        namespace wiki = ctr_trophy::wiki;
+        const std::string table = R"W(==Trophies/Achievements==
+{|class="article-table"
+|+
+!Trophy Name
+!Image
+!Trophy Value
+!Description
+!Criteria
+|-
+|Woah!
+|[[File:1Lcae65b.png|60px]]
+|[[File:IMG 4262.PNG]]
+|Earn all the other trophies.
+|Earn every Trophy in the game.
+|-
+|Spare Change
+|[[File:10L81ad53.png|60px]]
+|[[File:IMG 4263.PNG]]
+|Win a CTR challenge in the ''Adventure Mode''.
+|Win a CTR Challenge in Crash Cove, or any track in [[N. Sanity Island]].<br>Also [[Gem Cup|Gem Cups]] &amp; more.
+|}
+)W";
+        const auto rows = wiki::parse_table(table, {{"IMG 4262.PNG", 'P'}, {"IMG 4263.PNG", 'B'}});
+        check(rows.size() == 2 && rows[0].name == "Woah!" && rows[0].grade == 'P' && rows[1].grade == 'B', "wiki table rows and grades");
+        check(rows.size() == 2 && rows[1].detail == "Win a CTR challenge in the Adventure Mode." &&
+              rows[1].tip == "Win a CTR Challenge in Crash Cove, or any track in N. Sanity Island. Also Gem Cups & more.",
+              "wiki markup to plain text: links, italics, line breaks, entities");
+        check(wiki::grade_of("File:Platinum Trophy.PNG") == 'P' && wiki::grade_of("File:Bronze_Trophy.png") == 'B' && wiki::grade_of("File:x.png") == 0,
+              "grade from the redirect target");
+        std::vector<std::string> values = {"P.png", "G.png", "G.png"};
+        values.insert(values.end(), 10, "IMG 4264.PNG");
+        values.insert(values.end(), 35, "IMG 4263.PNG");
+        std::map<std::string, char> grades = {{"P.png", 'P'}, {"G.png", 'G'}, {"IMG 4263.PNG", '\0'}, {"IMG 4264.PNG", '\0'}};
+        wiki::complete_grades(values, grades);
+        check(grades["IMG 4263.PNG"] == 'B' && grades["IMG 4264.PNG"] == 'S', "bronze and silver from frequency, checked by points (1185)");
+        std::vector<std::string> odd = {"P.png", "A.png", "B.png", "B.png"};
+        std::map<std::string, char> unsure = {{"P.png", 'P'}};
+        wiki::complete_grades(odd, unsure);
+        check(!unsure.count("A.png") && !unsure.count("B.png"), "grades left unknown when the points do not fit");
+        ctr_trophy::Set set;
+        set.trophies = {{0}, {1}};
+        check(wiki::apply(set, rows) && set.trophies[1].name == "Spare Change" && !set.trophies[1].tip.empty() && set.platinum() == 0,
+              "wiki rows fill a set read without the key");
+        ctr_trophy::Set bigger;
+        bigger.trophies = {{0}, {1}, {2}};
+        check(!wiki::apply(bigger, rows) && bigger.trophies[0].name.empty(), "a table of another size is not used");
+        ctr_trophy::Set keyed;
+        keyed.trophies = {{0}, {1}};
+        keyed.texts = true;
+        check(!wiki::apply(keyed, rows), "the key's own texts are kept");
+        const auto cache = fs::temp_directory_path() / ("ctr_wiki_test_" + std::to_string(GetCurrentProcessId()) + ".json");
+        wiki::write_cache(cache, rows);
+        std::int64_t fetched = 0;
+        const auto again_rows = wiki::read_cache(cache, &fetched);
+        check(again_rows.size() == 2 && again_rows[1].tip == rows[1].tip && again_rows[0].grade == 'P' && fetched > 0, "wiki.json round trip");
+        fs::remove(cache);
+    }
     fs::remove_all(gb::long_path(root));
     std::cout << passes << " passed, " << failures << " failed\n";
     return failures ? 1 : 0;

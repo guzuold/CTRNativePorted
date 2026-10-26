@@ -47,6 +47,7 @@ namespace Gdiplus { using std::min; using std::max; }
 #include "gamebanana.hpp"
 #include "launcher_text.hpp"
 #include "trophy_data.hpp"
+#include "trophy_wiki.hpp"
 #include <shlwapi.h>
 #include <setupapi.h>
 #include <hidsdi.h>
@@ -82,6 +83,7 @@ constexpr UINT WM_APP_SHADERS_READY = WM_APP + 5;
 constexpr UINT WM_APP_GB_CATALOG = WM_APP + 6;
 constexpr UINT WM_APP_GB_PROGRESS = WM_APP + 7;
 constexpr UINT WM_APP_GB_DONE = WM_APP + 8;
+constexpr UINT WM_APP_TROPHY_WIKI = WM_APP + 9;
 
 // Design 2a Pit Lane Palette (from Claude Design token specification)
 ARGB kArcadeBg      = 0xFF10152C;  // Deep arcade purple/indigo
@@ -421,6 +423,9 @@ struct App {
     std::wstring trophy_notice;
     bool trophy_notice_error = false;
     int trophy_hot = -1;
+    // Without the trophy key the texts come from the Crash Bandicoot Wiki (trophy_wiki.hpp).
+    bool trophy_wiki = false, trophy_wiki_loading = false, trophy_wiki_tried = false;
+    std::wstring trophy_wiki_error;
     HWND trophy_key_edit = nullptr;
     // Controllers found on this PC, and the four player menus.
     struct PadOption { std::wstring value, label; };
@@ -1147,6 +1152,7 @@ inline float settings_scroll = 0;
 void validate();
 #include "launcher_graphics.hpp"
 #include "launcher_mods.hpp"
+#include "launcher_trophies.hpp"
 #include "classic_pages.hpp"
 #include "nitro_pages.hpp"
 #include "classic_controls.hpp"
@@ -1693,6 +1699,7 @@ void refresh_pads() {
 }
 
 // --- TROPHIES tab -----------------------------------------------------------------------------
+void load_trophy_wiki();
 void reload_trophies() {
     g.trophy_set = {};
     g.trophy_unlocked.clear();
@@ -1719,10 +1726,40 @@ void reload_trophies() {
             g.trophy_icons.push_back(std::move(image));
         }
         if (!g.trophy_set.error.empty()) { g.trophy_notice = widen(g.trophy_set.error); g.trophy_notice_error = true; }
+        // No key: the wiki's texts, from the local copy, refreshed at most once a week.
+        g.trophy_wiki = false;
+        if (!g.trophy_set.texts && !g.trophy_set.trophies.empty()) {
+            std::int64_t fetched = 0;
+            std::vector<ctr_trophy::wiki::Row> rows;
+            try { rows = ctr_trophy::wiki::read_cache(ctr_trophy::wiki::cache_file(user), &fetched); } catch (const std::exception&) {}
+            g.trophy_wiki = ctr_trophy::wiki::apply(g.trophy_set, rows);
+            if (!g.trophy_wiki_tried && (!g.trophy_wiki || std::time(nullptr) - fetched > 7 * 24 * 3600)) load_trophy_wiki();
+        }
     } catch (const std::exception&) {
         g.trophy_set = {};
     }
     if (g.trophy_hot >= static_cast<int>(g.trophy_set.trophies.size())) g.trophy_hot = -1;
+}
+
+// Downloads the wiki's trophy table in the background (WM_APP_TROPHY_WIKI), once per run.
+void load_trophy_wiki() {
+    if (g.trophy_wiki_loading) return;
+    g.trophy_wiki_loading = g.trophy_wiki_tried = true;
+    const HWND window = g.window;
+    const fs::path file = ctr_trophy::wiki::cache_file(g.root / "runtime/user");
+    std::thread([window, file] {
+        auto* error = new std::wstring;
+        try { ctr_trophy::wiki::write_cache(file, ctr_trophy::wiki::fetch()); }
+        catch (const std::exception& e) { *error = widen(e.what()); }
+        if (!PostMessageW(window, WM_APP_TROPHY_WIKI, 0, reinterpret_cast<LPARAM>(error))) delete error;
+    }).detach();
+}
+void trophy_wiki_ready(std::wstring* raw_error) {
+    std::unique_ptr<std::wstring> error(raw_error);
+    g.trophy_wiki_loading = false;
+    g.trophy_wiki_error = *error;
+    reload_trophies();
+    InvalidateRect(g.window, nullptr, FALSE);
 }
 
 // The trophy key shadPS4 keeps in %APPDATA%/shadPS4/keys.json (TrophyKeySet.ReleaseTrophyKey).
@@ -2727,6 +2764,9 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 0;
     case WM_APP_GB_DONE:
         mods_install_done(reinterpret_cast<ModsJob*>(lparam));
+        return 0;
+    case WM_APP_TROPHY_WIKI:
+        trophy_wiki_ready(reinterpret_cast<std::wstring*>(lparam));
         return 0;
     case WM_CLOSE:
         if (g.process || g.host_busy || g.xbox_busy || g.shaders_busy || g.mods_busy || update_preparing) return 0;
