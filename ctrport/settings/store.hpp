@@ -11,6 +11,8 @@
 #include <windows.h>
 #include <algorithm>
 #include <atomic>
+#include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -121,6 +123,62 @@ inline Json read_document(const fs::path& path, bool missing_ok = true) {
     return doc;
 }
 
+// Output height: the Resolution setting, else the launcher's window size, else the display.
+inline int monitor_height() {
+    DEVMODEW mode{};
+    mode.dmSize = sizeof(mode);
+    return EnumDisplaySettingsW(nullptr, ENUM_CURRENT_SETTINGS, &mode) && mode.dmPelsHeight ? int(mode.dmPelsHeight) : 1080;
+}
+inline int output_height(const Json& doc) {
+    if (const auto* r = doc.find("window_resolution")) {
+        if (r->text == "native") return monitor_height();
+        if (r->text != "original") return std::stoi(r->text.substr(r->text.find('x') + 1));
+    }
+    char height[16]{};
+    if (GetEnvironmentVariableA("CTR_GPU_HEIGHT", height, sizeof(height)) && std::atoi(height) > 0) return std::atoi(height);
+    return monitor_height();  // fullscreen: the launcher passes no window size
+}
+// Share of the output height rendered by the 3D scene for each upscaling mode.
+inline double upscaling_scale(const std::string& mode) {
+    if (mode == "quality") return 2.0 / 3.0;
+    if (mode == "balanced") return 0.58;
+    if (mode == "performance") return 0.5;
+    if (mode == "ultra_performance") return 1.0 / 3.0;
+    return 1.0;
+}
+
+// Composite and replaced controls (2026-10 settings layout). shadow_quality sets the four shadow
+// controls their consumers read; a document without it gets the level its old controls give.
+// A document without upscaling_mode gets the mode nearest to its old scene height.
+inline Json effective(Json doc) {
+    const auto text = [&](const char* key, const char* fallback) {
+        const auto* v = doc.find(key);
+        return std::string(v && v->is_string() ? v->text : fallback);
+    };
+    if (!doc.find("shadow_quality")) {
+        const auto resolution = text("shadow_resolution", "original");
+        doc.set("shadow_quality", Json::of(text("cascaded_shadows", "original") == "off" ? "off"
+            : resolution == "0.5" ? "low" : resolution == "0.75" ? "medium"
+            : text("shadow_map_quality", "original") == "high" ? "ultra" : "high"));
+    }
+    const auto shadows = text("shadow_quality", "high");
+    doc.set("cascaded_shadows", Json::of(shadows == "off" ? "off" : "original"));
+    doc.set("shadow_resolution", Json::of(shadows == "low" ? "0.5" : shadows == "medium" ? "0.75" : "original"));
+    doc.set("shadow_cascade_limit", Json::of(shadows == "low" ? "2" : shadows == "medium" ? "3" : "original"));
+    doc.set("shadow_map_quality", Json::of(shadows == "ultra" ? "high" : "original"));
+    if (!doc.find("upscaling_mode") && doc.find("scene_height")) {
+        const double ratio = std::stod(text("scene_height", "1440")) / output_height(doc);
+        doc.set("upscaling_mode", Json::of(ratio >= 0.95 ? "native" : ratio >= 0.62 ? "quality" : ratio >= 0.54 ? "balanced"
+                                           : ratio >= 0.42 ? "performance" : "ultra_performance"));
+    }
+    if (!doc.find("upscaling_sharpness")) {
+        const auto old = text("fsr1_sharpen", "original");
+        doc.set("upscaling_sharpness", Json::of(old == "off" ? "0" : old == "low" ? "20" : old == "medium" ? "60"
+                                                : old == "high" ? "100" : "original"));
+    }
+    return doc;
+}
+
 // One immutable startup snapshot: menu edits are requested for the next launch.
 inline const Json* runtime_snapshot() {
     static const std::optional<Json> snapshot = []() -> std::optional<Json> {
@@ -129,7 +187,7 @@ inline const Json* runtime_snapshot() {
         const auto count = GetEnvironmentVariableW(L"CTR_SETTINGS_PATH", configured, 32768);
         if (!count && GetLastError() == ERROR_ENVVAR_NOT_FOUND) return std::nullopt;
         if (!count || count >= 32768) throw std::invalid_argument("settings: invalid CTR_SETTINGS_PATH");
-        return read_document(configured, false);
+        return effective(read_document(configured, false));
     }();
     return snapshot ? &*snapshot : nullptr;
 }
@@ -138,6 +196,14 @@ inline const Json* runtime_snapshot() {
 // Read migration is side-effect free; the next successful write records schema 1.
 inline int scene_height(const Json& doc) {
     validate(doc);
+    // Upscaling mode: that share of the output height (none with the upscaler off), rounded so the
+    // 16:9 scene width stays a whole multiple of 32 pixels.
+    if (const auto* mode = doc.find("upscaling_mode")) {
+        const auto* up = doc.find("upscaler");
+        const double share = up && up->text != "off" ? upscaling_scale(mode->text) : 1.0;
+        const int height = int(std::lround(output_height(doc) * share / 18.0)) * 18;
+        return std::clamp(height, 540, 2160);
+    }
     if (const auto* value = doc.find("scene_height")) return std::stoi(value->text);
     const auto flag = [&](const char* key, bool fallback) {
         const auto* v = doc.find(key); return v ? v->boolean : fallback;

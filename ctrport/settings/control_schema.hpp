@@ -8,27 +8,43 @@
 namespace ctrport::settings::control_schema {
 using ctr_online::Json;
 enum class Option : std::uint32_t {
-    scene_height = 0x43540001,
-    upscaler = 0x43540002,
+    window_resolution = 0x4354000e,
+    window_mode = 0x43540021,
+    present_mode = 0x43540008,
+    presentation_limit = 0x43540020,
+    display_refresh = 0x43540022,
     fps_60 = 0x43540003,
+    upscaler = 0x43540002,
+    upscaling_mode = 0x4354002a,
+    upscaling_sharpness = 0x4354002b,
+    texture_quality = 0x43540015,
+    anisotropy = 0x43540009,
+    shadow_quality = 0x4354002c,
+    racer_mesh_lod = 0x43540014,
+    static_mesh_lod = 0x4354001c,
+    native_view_distance = 0x43540028,
+    vfx_quality = 0x4354001e,
+    native_antialiasing = 0x43540023,
+    ambient_occlusion = 0x43540013,
+    hero_shadows = 0x4354001d,
+    native_bloom = 0x43540024,
+    native_motion_blur = 0x43540025,
+    native_depth_of_field = 0x43540026,
+    native_fur_detail = 0x43540027,
+    quality_preset = 0x4354001f,
+    scene_height = 0x43540001,
     fullscreen = 0x43540004,
     game_language = 0x43540005,
     xbox_prompts = 0x43540006,
     antialiasing = 0x43540007,
-    present_mode = 0x43540008,
-    anisotropy = 0x43540009,
     fsr1_sharpen = 0x4354000a,
     screen_space_reflections = 0x4354000b,
     bloom = 0x4354000c,
     motion_blur = 0x4354000d,
-    window_resolution = 0x4354000e,
     vignette = 0x4354000f,
     depth_of_field = 0x43540010,
     distance_scale = 0x43540011,
     cascaded_shadows = 0x43540012,
-    ambient_occlusion = 0x43540013,
-    racer_mesh_lod = 0x43540014,
-    texture_quality = 0x43540015,
     hdr_output = 0x43540016,
     display_gamma = 0x43540017,
     hdr_peak_nits = 0x43540018,
@@ -36,48 +52,51 @@ enum class Option : std::uint32_t {
     shadow_resolution = 0x4354001a,
     shadow_cascade_limit = 0x4354001b,
     shadow_map_quality = 0x43540029,
-    static_mesh_lod = 0x4354001c,
-    hero_shadows = 0x4354001d,
-    vfx_quality = 0x4354001e,
-    quality_preset = 0x4354001f,
-    presentation_limit = 0x43540020,
-    window_mode = 0x43540021,
-    display_refresh = 0x43540022,
-    native_antialiasing = 0x43540023,
-    native_bloom = 0x43540024,
-    native_motion_blur = 0x43540025,
-    native_depth_of_field = 0x43540026,
-    native_fur_detail = 0x43540027,
-    native_view_distance = 0x43540028,
 };
-inline constexpr Option options[] = {Option::scene_height,Option::upscaler,Option::fps_60,Option::fullscreen,Option::game_language,Option::xbox_prompts,Option::antialiasing,Option::present_mode,Option::anisotropy,Option::fsr1_sharpen,Option::screen_space_reflections,Option::bloom,Option::motion_blur,Option::window_resolution,Option::vignette,Option::depth_of_field,Option::distance_scale,Option::cascaded_shadows,Option::ambient_occlusion,Option::racer_mesh_lod,Option::texture_quality,Option::hdr_output,Option::display_gamma,Option::hdr_peak_nits,Option::hdr_exposure,Option::shadow_resolution,Option::shadow_cascade_limit,Option::shadow_map_quality,Option::static_mesh_lod,Option::hero_shadows,Option::vfx_quality,Option::quality_preset,Option::presentation_limit,Option::window_mode,Option::display_refresh,Option::native_antialiasing,Option::native_bloom,Option::native_motion_blur,Option::native_depth_of_field,Option::native_fur_detail,Option::native_view_distance};
+inline constexpr Option options[] = {Option::window_resolution,Option::window_mode,Option::present_mode,Option::presentation_limit,Option::display_refresh,Option::fps_60,Option::upscaler,Option::upscaling_mode,Option::upscaling_sharpness,Option::texture_quality,Option::anisotropy,Option::shadow_quality,Option::racer_mesh_lod,Option::static_mesh_lod,Option::native_view_distance,Option::vfx_quality,Option::native_antialiasing,Option::ambient_occlusion,Option::hero_shadows,Option::native_bloom,Option::native_motion_blur,Option::native_depth_of_field,Option::native_fur_detail,Option::quality_preset,Option::scene_height,Option::fullscreen,Option::game_language,Option::xbox_prompts,Option::antialiasing,Option::fsr1_sharpen,Option::screen_space_reflections,Option::bloom,Option::motion_blur,Option::vignette,Option::depth_of_field,Option::distance_scale,Option::cascaded_shadows,Option::hdr_output,Option::display_gamma,Option::hdr_peak_nits,Option::hdr_exposure,Option::shadow_resolution,Option::shadow_cascade_limit,Option::shadow_map_quality};
 constexpr bool owns(std::uint32_t id) {
     for (auto option : options) if (static_cast<std::uint32_t>(option) == id) return true;
     return false;
 }
 inline const char* key(Option option) {
     switch (option) {
-    case Option::scene_height: return "scene_height";
-    case Option::upscaler: return "upscaler";
+    case Option::window_resolution: return "window_resolution";
+    case Option::window_mode: return "window_mode";
+    case Option::present_mode: return "present_mode";
+    case Option::presentation_limit: return "presentation_limit";
+    case Option::display_refresh: return "display_refresh";
     case Option::fps_60: return "fps_60";
+    case Option::upscaler: return "upscaler";
+    case Option::upscaling_mode: return "upscaling_mode";
+    case Option::upscaling_sharpness: return "upscaling_sharpness";
+    case Option::texture_quality: return "texture_quality";
+    case Option::anisotropy: return "anisotropy";
+    case Option::shadow_quality: return "shadow_quality";
+    case Option::racer_mesh_lod: return "racer_mesh_lod";
+    case Option::static_mesh_lod: return "static_mesh_lod";
+    case Option::native_view_distance: return "native_view_distance";
+    case Option::vfx_quality: return "vfx_quality";
+    case Option::native_antialiasing: return "native_antialiasing";
+    case Option::ambient_occlusion: return "ambient_occlusion";
+    case Option::hero_shadows: return "hero_shadows";
+    case Option::native_bloom: return "native_bloom";
+    case Option::native_motion_blur: return "native_motion_blur";
+    case Option::native_depth_of_field: return "native_depth_of_field";
+    case Option::native_fur_detail: return "native_fur_detail";
+    case Option::quality_preset: return "quality_preset";
+    case Option::scene_height: return "scene_height";
     case Option::fullscreen: return "fullscreen";
     case Option::game_language: return "game_language";
     case Option::xbox_prompts: return "xbox_prompts";
     case Option::antialiasing: return "antialiasing";
-    case Option::present_mode: return "present_mode";
-    case Option::anisotropy: return "anisotropy";
     case Option::fsr1_sharpen: return "fsr1_sharpen";
     case Option::screen_space_reflections: return "screen_space_reflections";
     case Option::bloom: return "bloom";
     case Option::motion_blur: return "motion_blur";
-    case Option::window_resolution: return "window_resolution";
     case Option::vignette: return "vignette";
     case Option::depth_of_field: return "depth_of_field";
     case Option::distance_scale: return "distance_scale";
     case Option::cascaded_shadows: return "cascaded_shadows";
-    case Option::ambient_occlusion: return "ambient_occlusion";
-    case Option::racer_mesh_lod: return "racer_mesh_lod";
-    case Option::texture_quality: return "texture_quality";
     case Option::hdr_output: return "hdr_output";
     case Option::display_gamma: return "display_gamma";
     case Option::hdr_peak_nits: return "hdr_peak_nits";
@@ -85,45 +104,48 @@ inline const char* key(Option option) {
     case Option::shadow_resolution: return "shadow_resolution";
     case Option::shadow_cascade_limit: return "shadow_cascade_limit";
     case Option::shadow_map_quality: return "shadow_map_quality";
-    case Option::static_mesh_lod: return "static_mesh_lod";
-    case Option::hero_shadows: return "hero_shadows";
-    case Option::vfx_quality: return "vfx_quality";
-    case Option::quality_preset: return "quality_preset";
-    case Option::presentation_limit: return "presentation_limit";
-    case Option::window_mode: return "window_mode";
-    case Option::display_refresh: return "display_refresh";
-    case Option::native_antialiasing: return "native_antialiasing";
-    case Option::native_bloom: return "native_bloom";
-    case Option::native_motion_blur: return "native_motion_blur";
-    case Option::native_depth_of_field: return "native_depth_of_field";
-    case Option::native_fur_detail: return "native_fur_detail";
-    case Option::native_view_distance: return "native_view_distance";
     }
     throw std::invalid_argument("settings: unknown PC option");
 }
 inline unsigned count(Option option) {
     switch (option) {
-    case Option::scene_height: return 7;
-    case Option::upscaler: return 4;
+    case Option::window_resolution: return 8;
+    case Option::window_mode: return 4;
+    case Option::present_mode: return 4;
+    case Option::presentation_limit: return 5;
+    case Option::display_refresh: return 7;
     case Option::fps_60: return 2;
+    case Option::upscaler: return 4;
+    case Option::upscaling_mode: return 5;
+    case Option::upscaling_sharpness: return 12;
+    case Option::texture_quality: return 3;
+    case Option::anisotropy: return 5;
+    case Option::shadow_quality: return 5;
+    case Option::racer_mesh_lod: return 2;
+    case Option::static_mesh_lod: return 2;
+    case Option::native_view_distance: return 3;
+    case Option::vfx_quality: return 3;
+    case Option::native_antialiasing: return 3;
+    case Option::ambient_occlusion: return 2;
+    case Option::hero_shadows: return 2;
+    case Option::native_bloom: return 2;
+    case Option::native_motion_blur: return 2;
+    case Option::native_depth_of_field: return 2;
+    case Option::native_fur_detail: return 4;
+    case Option::quality_preset: return 6;
+    case Option::scene_height: return 7;
     case Option::fullscreen: return 2;
     case Option::game_language: return 6;
     case Option::xbox_prompts: return 2;
     case Option::antialiasing: return 2;
-    case Option::present_mode: return 4;
-    case Option::anisotropy: return 5;
     case Option::fsr1_sharpen: return 5;
     case Option::screen_space_reflections: return 2;
     case Option::bloom: return 2;
     case Option::motion_blur: return 2;
-    case Option::window_resolution: return 5;
     case Option::vignette: return 2;
     case Option::depth_of_field: return 2;
     case Option::distance_scale: return 3;
     case Option::cascaded_shadows: return 2;
-    case Option::ambient_occlusion: return 2;
-    case Option::racer_mesh_lod: return 2;
-    case Option::texture_quality: return 3;
     case Option::hdr_output: return 3;
     case Option::display_gamma: return 5;
     case Option::hdr_peak_nits: return 5;
@@ -131,24 +153,156 @@ inline unsigned count(Option option) {
     case Option::shadow_resolution: return 3;
     case Option::shadow_cascade_limit: return 4;
     case Option::shadow_map_quality: return 2;
-    case Option::static_mesh_lod: return 2;
-    case Option::hero_shadows: return 2;
-    case Option::vfx_quality: return 3;
-    case Option::quality_preset: return 6;
-    case Option::presentation_limit: return 5;
-    case Option::window_mode: return 4;
-    case Option::display_refresh: return 7;
-    case Option::native_antialiasing: return 3;
-    case Option::native_bloom: return 2;
-    case Option::native_motion_blur: return 2;
-    case Option::native_depth_of_field: return 2;
-    case Option::native_fur_detail: return 4;
-    case Option::native_view_distance: return 3;
     }
     throw std::invalid_argument("settings: unknown PC option");
 }
 inline Json value(Option option, unsigned index) {
     switch (option) {
+    case Option::window_resolution: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("native");
+        case 2: return Json::of("1280x720");
+        case 3: return Json::of("1600x900");
+        case 4: return Json::of("1920x1080");
+        case 5: return Json::of("2560x1440");
+        case 6: return Json::of("3200x1800");
+        case 7: return Json::of("3840x2160");
+        } break;
+    case Option::window_mode: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("windowed");
+        case 2: return Json::of("borderless");
+        case 3: return Json::of("exclusive");
+        } break;
+    case Option::present_mode: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("fifo");
+        case 2: return Json::of("mailbox");
+        case 3: return Json::of("immediate");
+        } break;
+    case Option::presentation_limit: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("30");
+        case 2: return Json::of("60");
+        case 3: return Json::of("90");
+        case 4: return Json::of("120");
+        } break;
+    case Option::display_refresh: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("60");
+        case 2: return Json::of("90");
+        case 3: return Json::of("120");
+        case 4: return Json::of("144");
+        case 5: return Json::of("165");
+        case 6: return Json::of("240");
+        } break;
+    case Option::fps_60: switch(index) {
+        case 0: return Json::of(false);
+        case 1: return Json::of(true);
+        } break;
+    case Option::upscaler: switch(index) {
+        case 0: return Json::of("off");
+        case 1: return Json::of("fsr1");
+        case 2: return Json::of("fsr3");
+        case 3: return Json::of("dlss");
+        } break;
+    case Option::upscaling_mode: switch(index) {
+        case 0: return Json::of("native");
+        case 1: return Json::of("quality");
+        case 2: return Json::of("balanced");
+        case 3: return Json::of("performance");
+        case 4: return Json::of("ultra_performance");
+        } break;
+    case Option::upscaling_sharpness: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("0");
+        case 2: return Json::of("10");
+        case 3: return Json::of("20");
+        case 4: return Json::of("30");
+        case 5: return Json::of("40");
+        case 6: return Json::of("50");
+        case 7: return Json::of("60");
+        case 8: return Json::of("70");
+        case 9: return Json::of("80");
+        case 10: return Json::of("90");
+        case 11: return Json::of("100");
+        } break;
+    case Option::texture_quality: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("half");
+        case 2: return Json::of("quarter");
+        } break;
+    case Option::anisotropy: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("2");
+        case 2: return Json::of("4");
+        case 3: return Json::of("8");
+        case 4: return Json::of("16");
+        } break;
+    case Option::shadow_quality: switch(index) {
+        case 0: return Json::of("off");
+        case 1: return Json::of("low");
+        case 2: return Json::of("medium");
+        case 3: return Json::of("high");
+        case 4: return Json::of("ultra");
+        } break;
+    case Option::racer_mesh_lod: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("highest");
+        } break;
+    case Option::static_mesh_lod: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("reduced");
+        } break;
+    case Option::native_view_distance: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("40000");
+        case 2: return Json::of("100000");
+        } break;
+    case Option::vfx_quality: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("low");
+        case 2: return Json::of("high");
+        } break;
+    case Option::native_antialiasing: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("off");
+        case 2: return Json::of("smaa");
+        } break;
+    case Option::ambient_occlusion: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("off");
+        } break;
+    case Option::hero_shadows: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("off");
+        } break;
+    case Option::native_bloom: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("off");
+        } break;
+    case Option::native_motion_blur: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("off");
+        } break;
+    case Option::native_depth_of_field: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("off");
+        } break;
+    case Option::native_fur_detail: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("5");
+        case 2: return Json::of("3");
+        case 3: return Json::of("1");
+        } break;
+    case Option::quality_preset: switch(index) {
+        case 0: return Json::of("custom");
+        case 1: return Json::of("original");
+        case 2: return Json::of("low");
+        case 3: return Json::of("medium");
+        case 4: return Json::of("high");
+        case 5: return Json::of("ultra");
+        } break;
     case Option::scene_height: switch(index) {
         case 0: return Json::of("720");
         case 1: return Json::of("900");
@@ -157,16 +311,6 @@ inline Json value(Option option, unsigned index) {
         case 4: return Json::of("1440");
         case 5: return Json::of("1800");
         case 6: return Json::of("2160");
-        } break;
-    case Option::upscaler: switch(index) {
-        case 0: return Json::of("off");
-        case 1: return Json::of("fsr1");
-        case 2: return Json::of("fsr3");
-        case 3: return Json::of("dlss");
-        } break;
-    case Option::fps_60: switch(index) {
-        case 0: return Json::of(false);
-        case 1: return Json::of(true);
         } break;
     case Option::fullscreen: switch(index) {
         case 0: return Json::of(false);
@@ -188,19 +332,6 @@ inline Json value(Option option, unsigned index) {
         case 0: return Json::of("original");
         case 1: return Json::of("off");
         } break;
-    case Option::present_mode: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("fifo");
-        case 2: return Json::of("mailbox");
-        case 3: return Json::of("immediate");
-        } break;
-    case Option::anisotropy: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("2");
-        case 2: return Json::of("4");
-        case 3: return Json::of("8");
-        case 4: return Json::of("16");
-        } break;
     case Option::fsr1_sharpen: switch(index) {
         case 0: return Json::of("original");
         case 1: return Json::of("off");
@@ -220,13 +351,6 @@ inline Json value(Option option, unsigned index) {
         case 0: return Json::of("original");
         case 1: return Json::of("off");
         } break;
-    case Option::window_resolution: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("1280x720");
-        case 2: return Json::of("1920x1080");
-        case 3: return Json::of("2560x1440");
-        case 4: return Json::of("3840x2160");
-        } break;
     case Option::vignette: switch(index) {
         case 0: return Json::of("original");
         case 1: return Json::of("off");
@@ -243,19 +367,6 @@ inline Json value(Option option, unsigned index) {
     case Option::cascaded_shadows: switch(index) {
         case 0: return Json::of("original");
         case 1: return Json::of("off");
-        } break;
-    case Option::ambient_occlusion: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("off");
-        } break;
-    case Option::racer_mesh_lod: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("highest");
-        } break;
-    case Option::texture_quality: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("half");
-        case 2: return Json::of("quarter");
         } break;
     case Option::hdr_output: switch(index) {
         case 0: return Json::of("original");
@@ -296,77 +407,6 @@ inline Json value(Option option, unsigned index) {
     case Option::shadow_map_quality: switch(index) {
         case 0: return Json::of("original");
         case 1: return Json::of("high");
-        } break;
-    case Option::static_mesh_lod: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("reduced");
-        } break;
-    case Option::hero_shadows: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("off");
-        } break;
-    case Option::vfx_quality: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("low");
-        case 2: return Json::of("high");
-        } break;
-    case Option::quality_preset: switch(index) {
-        case 0: return Json::of("custom");
-        case 1: return Json::of("original");
-        case 2: return Json::of("low");
-        case 3: return Json::of("medium");
-        case 4: return Json::of("high");
-        case 5: return Json::of("ultra");
-        } break;
-    case Option::presentation_limit: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("30");
-        case 2: return Json::of("60");
-        case 3: return Json::of("90");
-        case 4: return Json::of("120");
-        } break;
-    case Option::window_mode: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("windowed");
-        case 2: return Json::of("borderless");
-        case 3: return Json::of("exclusive");
-        } break;
-    case Option::display_refresh: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("60");
-        case 2: return Json::of("90");
-        case 3: return Json::of("120");
-        case 4: return Json::of("144");
-        case 5: return Json::of("165");
-        case 6: return Json::of("240");
-        } break;
-    case Option::native_antialiasing: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("off");
-        case 2: return Json::of("smaa");
-        } break;
-    case Option::native_bloom: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("off");
-        } break;
-    case Option::native_motion_blur: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("off");
-        } break;
-    case Option::native_depth_of_field: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("off");
-        } break;
-    case Option::native_fur_detail: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("5");
-        case 2: return Json::of("3");
-        case 3: return Json::of("1");
-        } break;
-    case Option::native_view_distance: switch(index) {
-        case 0: return Json::of("original");
-        case 1: return Json::of("40000");
-        case 2: return Json::of("100000");
         } break;
     }
     throw std::invalid_argument("settings: selection outside verified domain");

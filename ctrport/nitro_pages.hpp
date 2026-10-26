@@ -125,13 +125,17 @@ void paint_window(HDC target) {
                     : g.trophy_set.texts ? std::wstring() : std::wstring(tr(L"Names and descriptions need your PS4 trophy key."));
                 text(gr, note, 1, 11.0f, FontStyleRegular, page_rect(296, 544, 694, 22), g.trophy_notice_error ? kArcadePink : kTextMuted);
             } else if (g.current_tab == TAB_SETTINGS) {
+                // the tab scrolls (mouse wheel): clipped to the page, shifted by the scroll position
+                const GraphicsState unscrolled = gr.Save();
+                gr.SetClip(RectF(0.f, nitro::header, kWidth, nitro::footer - nitro::header));
+                gr.TranslateTransform(0, -settings_scroll);
                 text(gr, tr(L"SETTINGS"), 0, 36.0f, FontStyleBold, page_rect(296, 76, 300, 40), kArcadeGold);
 
                 // Card 1: GRAPHICS
                 const RectF g_card = page_rect(296, 126, 222, 450);
                 fill_round(gr, g_card, 18, SolidBrush(Color(kArcadeCard)));
                 stroke_round(gr, g_card, 18, kArcadeDark, 3.0f);
-                text(gr, tr(L"GRAPHICS"), 0, 18.0f, FontStyleBold, page_rect(312, 142, 190, 24), kArcadeCyan);
+                text(gr, tr(L"WINDOW & RENDERER"), 0, 15.0f, FontStyleBold, page_rect(312, 142, 190, 24), kArcadeCyan);
                 text(gr, tr(L"Display resolution:"), 1, 11.5f, FontStyleBold, page_rect(312, 172, 190, 18), kTextMuted);
 
                 if (g.resolution == 4 && !g.cfg.fullscreen) {
@@ -140,9 +144,7 @@ void paint_window(HDC target) {
                     text(gr, L"x", 1, 12.0f, FontStyleBold, page_rect(400, 314, 12, 28), kTextMuted, StringAlignmentCenter);
                 }
 
-                text(gr, tr(L"Internal 3D resolution:"), 1, 11.5f, FontStyleBold, page_rect(312, 416, 190, 20), kTextMuted);
-                text(gr, tr(L"Scene upscaling:"), 1, 11.5f, FontStyleBold, page_rect(312, 468, 190, 20), kTextMuted);
-                text(gr, tr(L"Renderer:"), 1, 11.5f, FontStyleBold, page_rect(312, 520, 190, 20), kTextMuted);
+                text(gr, tr(L"Renderer:"), 1, 11.5f, FontStyleBold, page_rect(312, 400, 190, 20), kTextMuted);
 
                 // Card 2: ONLINE & MULTIPLAYER
                 const RectF o_card = page_rect(532, 126, 222, 450);
@@ -169,6 +171,9 @@ void paint_window(HDC target) {
 
                 text(gr, tr(L"Game language:"), 1, 11, FontStyleBold, page_rect(784, 516, 190, 20), kTextMuted);
                 text(gr, L"AUDIO", 0, 18.0f, FontStyleBold, page_rect(784, 446, 100, 24), kArcadeLime);
+                graphics_section_paint(gr);
+                gr.Restore(unscrolled);
+                graphics_section_paint_scrollbar(gr);
             } else if (g.current_tab == TAB_ADVANCED) {
                 text(gr, tr(L"ADVANCED"), 0, 36.0f, FontStyleBold, page_rect(296, 76, 300, 40), kArcadeGold);
 

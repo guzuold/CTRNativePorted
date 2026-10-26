@@ -1,3 +1,15 @@
+## v0.7.1 — 2026-10-26
+
+The graphics settings follow the layout of current PC games: display, upscaling method and mode, geometry and textures, effects and lighting.
+
+- **Upscaling, as in recent games:** choose the **method** (Off, AMD FSR 1, AMD FSR 3, NVIDIA DLSS) and the **mode**: Native (100%), Quality (67%), Balanced (58%), Performance (50%), Ultra performance (33%). The mode is a share of your output resolution: on a 1440p monitor Quality renders the 3D scene at 960p and reconstructs it. NVIDIA DLSS in Native mode is DLAA. A **Sharpness** setting from 0 to 100% (changes at once with FSR 1) replaces the FSR 1 sharpness levels. The internal 3D resolution of earlier versions is gone; your setting becomes the nearest mode.
+- **Display page:** Resolution (as in the launcher, your monitor's native resolution, or 720p to 2160p), Display mode, V-Sync, Frame rate limit, Refresh rate, 60 FPS mode.
+- **Geometry and textures:** Texture quality (High is the game's own textures), Anisotropic filtering, a single **Shadow quality** (Off, Low, Medium, High, Ultra with Direct3D 11) instead of four shadow settings, kart and scenery detail, view distance, effects quality.
+- **Effects and lighting:** Anti-aliasing (FXAA, Off, SMAA), Ambient occlusion and Character shadows (now in the game menu), bloom, motion blur, depth of field, fur detail.
+- **Launcher:** the Settings tab has a **GRAPHICS** section below its cards with every setting of the game menu, on the same pages and in your language; a choice is saved at once. The tab scrolls with the mouse wheel. The first card keeps the launcher's own window size, fullscreen and renderer. Fixed: v0.7.0 listed only six of the seven render resolutions.
+- Each choice appears only where the renderer provides it (Direct3D 11: FSR 1 and Ultra shadows; Vulkan: FSR 3 and DLSS).
+- **How to update:** with **Check updates**. From v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.0 — 2026-10-26
 
 A second renderer, Direct3D 11, that does not use shadPS4; upscaling quality presets; sharper shadow maps.

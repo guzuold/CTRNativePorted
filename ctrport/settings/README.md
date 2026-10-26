@@ -5,12 +5,27 @@ native pages built from the game's menu templates, in the game's language:
 
 | Page | Settings |
 |---|---|
-| Display | 60 FPS, fullscreen, window size, window mode, refresh rate, vertical sync, frame limit |
-| Graphics | anti-aliasing (FXAA, off, SMAA), bloom, motion blur, depth of field, fur detail, view distance |
-| Resolution and upscaling | render resolution, upscaler (FSR 1, FSR 3, DLSS), FSR 1 sharpness |
-| Quality | texture filtering, texture quality, kart and driver detail, scenery detail |
-| Shadows and effects | shadows, shadow resolution, shadow cascades, effects quality |
+| Display | resolution (as in the launcher, the monitor's native one, or 720p to 2160p), display mode (windowed, borderless window, exclusive fullscreen), V-Sync, frame rate limit, refresh rate in exclusive fullscreen, 60 FPS mode |
+| Upscaling | method (off, AMD FSR 1, AMD FSR 3, NVIDIA DLSS), mode (Native 100%, Quality 67%, Balanced 58%, Performance 50%, Ultra performance 33%), sharpness (0-100%) |
+| Geometry and textures | texture quality, anisotropic filtering, shadow quality (off, low, medium, high, ultra), kart and driver detail, scenery detail, view distance, effects quality |
+| Effects and lighting | anti-aliasing (FXAA, off, SMAA), ambient occlusion, character shadows, bloom, motion blur, depth of field, fur detail |
 | Quality presets | Original, Low, Medium, High, Ultra |
+
+The launcher shows the same pages in the GRAPHICS section of its Settings tab (scroll with the
+mouse wheel); a choice there is saved at once to the same file.
+
+The upscaling mode is a share of the output resolution: the 3D scene is rendered at that share
+of the Resolution height and reconstructed by the chosen method (with no method the scene is
+rendered at the output resolution). NVIDIA DLSS in Native mode is DLAA. Each method and level
+appears only where the renderer provides it: with Direct3D 11 the methods are Off and AMD FSR 1
+and Ultra shadows are available (shadow maps at twice the PS4 size); with Vulkan, FSR 3 and DLSS.
+Sharpness drives FSR 1 RCAS (0% turns it off) and FSR 3; DLSS has no sharpness control.
+
+Shadow quality sets the shadow controls of earlier versions: Off = no cascaded shadows, Low = 50%
+resolution and 2 cascades, Medium = 75% and 3 cascades, High = the original shadows, Ultra = High
+with Direct3D 11 shadow maps at 2x. Settings files of earlier versions are converted when read:
+the internal 3D resolution becomes the nearest upscaling mode, the four shadow settings the
+nearest shadow quality, FSR 1 sharpness a percentage.
 
 Settings marked "(restart)" apply at the next start of the game; the others apply at
 once. Graphics page settings write the same values as the game's own graphics debug

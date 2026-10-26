@@ -17,13 +17,15 @@ inline void validate(const ctr_online::Json& doc) {
         throw std::invalid_argument("invalid presentation mode");
     anisotropy_request(value(doc,"anisotropy").c_str());
     sharpness_policy(value(doc,"fsr1_sharpen").c_str());
+    sharpness_policy(value(doc,"upscaling_sharpness").c_str());
 }
 // Call before loading the renderer DLL. An empty value means remove a stale
 // process variable, restoring the renderer's original default on next launch.
 inline std::vector<std::pair<std::string,std::string>> environment(
         const ctr_online::Json& doc,bool extended_gpu) {
     validate(doc);
-    const auto mode=value(doc,"present_mode"), aniso=value(doc,"anisotropy"), sharp=value(doc,"fsr1_sharpen");
+    const auto mode=value(doc,"present_mode"), aniso=value(doc,"anisotropy");
+    const auto sharp=doc.find("upscaling_sharpness") ? value(doc,"upscaling_sharpness") : value(doc,"fsr1_sharpen");
     if(!extended_gpu && (aniso!="original" || sharp!="original"))
         throw std::runtime_error("selected controls require the settings GPU build");
     return {{"CTR_GPU_PRESENT_MODE",mode=="fifo"?"Fifo":mode=="mailbox"?"Mailbox":mode=="immediate"?"Immediate":""},

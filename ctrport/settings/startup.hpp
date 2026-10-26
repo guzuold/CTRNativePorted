@@ -36,10 +36,11 @@ inline bridge::Hooks startup_hooks() {
     hooks.publish_live=[](menu::Option option,const Json& value) noexcept {
         // Native retail graphics fields: applied by the per-frame native_graphics pass.
         try { if(native_graphics::set(menu::key(option),value)) return true; } catch(...) { return false; }
-        if((option==menu::Option::presentation_limit || option==menu::Option::fsr1_sharpen) && live_gpu_set) {
+        if((option==menu::Option::presentation_limit || option==menu::Option::upscaling_sharpness) && live_gpu_set) {
             const bool pacing=option==menu::Option::presentation_limit;
+            // sharpness: the index in its domain (original, 0, 10, ..., 100), as live_gpu::sharp reads it
             const unsigned index=pacing ? (value.text=="30" ? 1u : value.text=="60" ? 2u : value.text=="90" ? 3u : value.text=="120" ? 4u : 0u) :
-                (value.text=="off" ? 1u : value.text=="low" ? 2u : value.text=="medium" ? 3u : value.text=="high" ? 4u : 0u);
+                (value.text=="original" ? 0u : unsigned(std::stoi(value.text)/10+1));
             if(!live_gpu_set(option==menu::Option::presentation_limit ? 1u : 2u,index)) {
                 std::fprintf(stderr,"settings live update rejected key=%s; saved for restart\n",menu::key(option));return false;
             }
@@ -47,7 +48,11 @@ inline bridge::Hooks startup_hooks() {
         std::printf("settings_saved key=%s application=live\n",menu::key(option));std::fflush(stdout);return true;
     };
     hooks.available=[](menu::Option option,unsigned index) noexcept {
-        if(option==menu::Option::presentation_limit || option==menu::Option::fsr1_sharpen) return live_gpu_set!=nullptr;
+        if(option==menu::Option::presentation_limit) return live_gpu_set!=nullptr;
+        if(option==menu::Option::upscaling_sharpness) return index==0 || (live_gpu_set!=nullptr && renderer_extensions_confirmed);
+        // Direct3D 11: FSR 1 is its only upscaler; Ultra shadows are its 2x shadow maps
+        if(option==menu::Option::upscaler && d3d_extensions_confirmed) return index<2;
+        if(option==menu::Option::shadow_quality) return index<4 || d3d_extensions_confirmed;
         if(option==menu::Option::presentation_limit || option==menu::Option::window_mode || option==menu::Option::display_refresh)
             return index==0 || pacing_extensions_confirmed;
         if(option==menu::Option::upscaler) return index<2 || display_extensions_confirmed;

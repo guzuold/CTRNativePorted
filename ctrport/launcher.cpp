@@ -42,6 +42,7 @@ namespace Gdiplus { using std::min; using std::max; }
 #include "launcher_update.hpp"
 #include "bounded_log.hpp"
 #include "settings/store.hpp"
+#include "settings/menu_catalog.hpp"
 #include "guest_patch_xml.hpp"
 #include "launcher_text.hpp"
 #include "trophy_data.hpp"
@@ -110,17 +111,17 @@ const wchar_t* const kTabNames[TAB_COUNT] = {
 };
 
 const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)", L"3840x2160 (4K)", L"Custom"};
-const wchar_t* const kSceneHeights[] = {L"720", L"900", L"1080", L"1260", L"1440", L"1800", L"2160"};
+// Upscaling mode: the share of the output resolution the 3D scene is rendered at
+// (ctrport/settings/store.hpp upscaling_scale); used only with an upscaling method.
+const wchar_t* const kModes[] = {L"native", L"quality", L"balanced", L"performance", L"ultra_performance"};
 constexpr int ID_UPSCALER = 905;
 const wchar_t* const kUpscalers[] = {L"off", L"fsr1", L"fsr3", L"dlss"};
-const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3.1", L"DLSS (experimental)"};
+const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3", L"NVIDIA DLSS"};
 // Renderer: the GPU library (shadPS4 Vulkan) or the engine-state Direct3D 11 backend (ctrport/d3d).
 constexpr int ID_RENDERER = 910;
 const wchar_t* const kRenderers[] = {L"vulkan", L"d3d11"};
 const wchar_t* const kRendererLabels[] = {L"Vulkan (shadPS4)", L"Direct3D 11 (native)"};
-// the upscaling quality presets of the 3840 x 2160 display canvas, by name, and the other heights
-const wchar_t* const kSceneLabels[] = {L"Ultra performance - 1280 x 720", L"1600 x 900", L"Performance - 1920 x 1080",
-    L"Balanced - 2240 x 1260", L"Quality - 2560 x 1440", L"3200 x 1800", L"Native - 3840 x 2160 (4K)"};
+const wchar_t* const kModeLabels[] = {L"Native (100%)", L"Quality (67%)", L"Balanced (58%)", L"Performance (50%)", L"Ultra performance (33%)"};
 const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
 
@@ -162,7 +163,7 @@ constexpr float kTrophyLeft = 296, kTrophyTop = 124, kTrophyCell = 57, kTrophyIc
 struct Config {
     std::wstring base_dir, patch_dir, resolution = L"2560x1440 (1440p)", custom_w = L"1920", custom_h = L"1080";
     std::wstring game_language = L"en";
-    std::wstring scene_height = L"1440";
+    std::wstring upscaling_mode = L"native";
     std::wstring upscaler = L"off";
     std::wstring renderer = L"vulkan";
     bool use_patch = true, fps_60 = true, ps4_pro = true, native_4k = false, unlock_all = false, fullscreen = false;
@@ -599,8 +600,9 @@ void load_config() {
             text(L"public_server", g.cfg.public_server);
             flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
             flag(L"split_screen", g.cfg.split_screen); flag(L"mods_enabled", g.cfg.mods_enabled); flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
-            g.cfg.scene_height = g.cfg.native_4k ? L"2160" : (g.cfg.ps4_pro ? L"1440" : L"1080");
-            text(L"scene_height", g.cfg.scene_height);
+            // older files: the mode nearest to their internal 3D resolution
+            const auto migrated = ctrport::settings::effective(document);
+            if (const auto* mode = migrated.find("upscaling_mode")) g.cfg.upscaling_mode = widen(mode->text);
             text(L"upscaler", g.cfg.upscaler);
             text(L"renderer", g.cfg.renderer);
             text(L"trophy_key", g.cfg.trophy_key);
@@ -609,7 +611,7 @@ void load_config() {
             flag(L"online", g.cfg.online); flag(L"wumpa_x100", g.cfg.wumpa_x100);
         }
     }
-    if (std::find(std::begin(kSceneHeights), std::end(kSceneHeights), g.cfg.scene_height) == std::end(kSceneHeights)) g.cfg.scene_height = L"1440";
+    if (std::find(std::begin(kModes), std::end(kModes), g.cfg.upscaling_mode) == std::end(kModes)) g.cfg.upscaling_mode = L"native";
     if (std::find(std::begin(kUpscalers), std::end(kUpscalers), g.cfg.upscaler) == std::end(kUpscalers)) g.cfg.upscaler = L"off";
     if (std::find(std::begin(kRenderers), std::end(kRenderers), g.cfg.renderer) == std::end(kRenderers)) g.cfg.renderer = L"vulkan";
     g.cfg.game_language = kGameLanguages[game_language_index(g.cfg.game_language)].code;
@@ -633,7 +635,7 @@ std::wstring window_text(HWND control) {
 
 ctr_online::Json settings_ui_snapshot() {
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
-    const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"renderer\": " + json_string(g.cfg.renderer) + ",\n  \"scene_height\": " + json_string(g.cfg.scene_height) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
+    const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"renderer\": " + json_string(g.cfg.renderer) + ",\n  \"upscaling_mode\": " + json_string(g.cfg.upscaling_mode) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
         ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
         ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) + ",\n  \"mods_enabled\": " + flag(g.cfg.mods_enabled) +
         ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
@@ -1102,6 +1104,10 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
     return DefWindowProcW(window,message,wp,lp);
 }
 
+// Settings tab scroll position (page coordinates), launcher_graphics.hpp
+inline float settings_scroll = 0;
+void validate();
+#include "launcher_graphics.hpp"
 #include "classic_pages.hpp"
 #include "nitro_pages.hpp"
 #include "classic_controls.hpp"
@@ -1265,9 +1271,11 @@ void validate() {
         summary += g.cfg.use_patch ? L"v01.21 (Nitro Tour)" : L"v01.00 (Classic)";
         if (g.cfg.use_patch && g.cfg.fps_60) summary += L" · 60 FPS";
         summary += g.cfg.fullscreen ? L" \u00b7 " + std::wstring(tr(L"Fullscreen")) : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
-        summary += L" · 3D " + g.cfg.scene_height + L"p";
         if (g.cfg.renderer == L"d3d11") summary += L" · Direct3D 11";
-        else if (g.cfg.upscaler != L"off") summary += L" · " + g.cfg.upscaler;
+        for (size_t i = 0; i < std::size(kUpscalers); ++i)
+            if (g.cfg.upscaler != L"off" && g.cfg.upscaler == kUpscalers[i]) summary += std::wstring(L" · ") + kUpscalerLabels[i];
+        for (size_t i = 0; i < std::size(kModes); ++i)
+            if (g.cfg.upscaler != L"off" && g.cfg.upscaling_mode == kModes[i]) summary += std::wstring(L" ") + tr(kModeLabels[i]);
         if (g.cfg.online) {
             const std::wstring id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
             summary += L" · Online (" + (id.empty() ? L"CTRPlayer" : id) + L")";
@@ -1277,6 +1285,11 @@ void validate() {
     EnableWindow(g.online_toggle,!g.process && !g.host_busy);
     EnableWindow(g.online_id_edit,!g.process);
     EnableWindow(g.launch, g.can_launch);
+    for (const auto& row : graphics_section::rows) {  // 60 FPS mode: v01.21; upscaling mode: with a method
+        if (row.control->key == "fps_60") EnableWindow(row.combo, g.cfg.use_patch);
+        if (row.control->key == "upscaling_mode") EnableWindow(row.combo, g.cfg.upscaler != L"off");
+    }
+    graphics_section_apply_scroll();
     refresh_artwork();
     InvalidateRect(g.window, nullptr, FALSE);
 }
@@ -1300,6 +1313,7 @@ void select_tab(int tab) { if(classic_skin)select_tab_now(tab);else nitro_begin(
 
 void select_tab_now(int tab) {
     if (tab < 0 || tab >= TAB_COUNT) return;
+    if (tab != g.current_tab) settings_scroll = 0;
     if (g.friends_drawer && tab != g.current_tab) reset_friends();
     g.current_tab = tab;
     render_base_layer(true);
@@ -1321,14 +1335,16 @@ void select_tab_now(int tab) {
     const bool show_settings = (tab == TAB_SETTINGS);
     ShowWindow(g.language_combo, show_settings ? SW_SHOW : SW_HIDE);
     for (HWND combo : g.player_combo) if (combo) ShowWindow(combo, show_settings ? SW_SHOW : SW_HIDE);
-    ShowWindow(g.scene_combo, show_settings ? SW_SHOW : SW_HIDE);
-    ShowWindow(g.upscaler_combo, show_settings ? SW_SHOW : SW_HIDE);
+    // upscaling method and mode: in the GRAPHICS section (launcher_graphics.hpp)
+    ShowWindow(g.scene_combo, SW_HIDE);
+    ShowWindow(g.upscaler_combo, SW_HIDE);
     ShowWindow(g.renderer_combo, show_settings ? SW_SHOW : SW_HIDE);
     if (g.online_id_edit) ShowWindow(g.online_id_edit, show_settings ? SW_SHOW : SW_HIDE);
 
     const bool show_custom = (show_settings && g.resolution == 4 && !g.cfg.fullscreen);
     ShowWindow(g.width_edit, show_custom ? SW_SHOW : SW_HIDE);
     ShowWindow(g.height_edit, show_custom ? SW_SHOW : SW_HIDE);
+    graphics_section_apply_scroll();
 
     for (const auto& entry : g.controls) InvalidateRect(entry.first, nullptr, FALSE);
     InvalidateRect(g.window, nullptr, FALSE);
@@ -1991,7 +2007,7 @@ void launch_game() {
     if (g.cfg.use_patch && g.cfg.fps_60) set[L"CTR_60FPS_PATCH"] = L"1";
     set[L"CTR_NEO_MODE"] = L"1";
     set[L"CTR_SETTINGS_PATH"] = config_path().wstring();
-    set[L"CTR_SCENE_HEIGHT"] = g.cfg.scene_height;
+    // CTR_SCENE_HEIGHT: set by the runtime from the upscaling mode and the output resolution
     set[L"CTR_UPSCALER"] = g.cfg.upscaler;
     if (g.cfg.renderer == L"d3d11") set[L"CTR_GPU_BACKEND"] = L"d3d11";
     set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
@@ -2089,8 +2105,8 @@ void game_finished(DWORD code) {
     g.process = nullptr;
     g.lock.release();
     load_config();
-    for (int i=0; i<static_cast<int>(std::size(kSceneHeights)); ++i)
-        if(g.cfg.scene_height==kSceneHeights[i]) SendMessageW(g.scene_combo,CB_SETCURSEL,i,0);
+    for (int i=0; i<static_cast<int>(std::size(kModes)); ++i)
+        if(g.cfg.upscaling_mode==kModes[i]) SendMessageW(g.scene_combo,CB_SETCURSEL,i,0);
     for (int i=0; i<static_cast<int>(std::size(kUpscalers)); ++i)
         if(g.cfg.upscaler==kUpscalers[i]) SendMessageW(g.upscaler_combo,CB_SETCURSEL,i,0);
     for (int i=0; i<static_cast<int>(std::size(kRenderers)); ++i)
@@ -2181,6 +2197,9 @@ HWND add_edit(int id, const RectF& field, const std::wstring& value, DWORD extra
 
 LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
+    case WM_MOUSEWHEEL:
+        if (graphics_section_wheel(GET_WHEEL_DELTA_WPARAM(wparam))) return 0;
+        break;
     case WM_CREATE: {
         g.window = window;
         g.field_brush = CreateSolidBrush(RGB(16, 21, 44));
@@ -2271,6 +2290,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         const int id = LOWORD(wparam), code = HIWORD(wparam);
         if(g.updating)return 0;
         if(id==ID_LAUNCHER_SKIN && code==BN_CLICKED){switch_launcher_skin();return 0;}
+        if(graphics_section_command(id,code))return 0;
         if(id==ID_NITRO_FRIENDS) {nitro_finish();if(g.current_tab!=TAB_HOME)select_tab_now(TAB_HOME);nitro_nav_from=nitro_nav_to=0;animate_friends(!g.friends_open);return 0;}
         if(id==ID_NITRO_MOTION) {nitro_motion=!nitro_motion;nitro_finish();if(!save_launcher_appearance())nitro_motion=!nitro_motion;InvalidateRect(reinterpret_cast<HWND>(lparam),nullptr,FALSE);return 0;}
         if (id == ID_CHECK_UPDATE) {
@@ -2282,7 +2302,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) { launch_game(); return 0; }
         if (id == ID_SCENE_RES && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.scene_combo, CB_GETCURSEL, 0, 0);
-            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kSceneHeights))) g.cfg.scene_height = kSceneHeights[selected];
+            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kModes))) g.cfg.upscaling_mode = kModes[selected];
             validate();
             return 0;
         }
@@ -2295,6 +2315,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         if (id == ID_RENDERER && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.renderer_combo, CB_GETCURSEL, 0, 0);
             if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kRenderers))) g.cfg.renderer = kRenderers[selected];
+            graphics_section_refresh();  // the choices this renderer provides
             validate();
             InvalidateRect(g.window, nullptr, FALSE);
             return 0;
@@ -2419,6 +2440,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             MessageBeep(MB_ICONASTERISK);
             return 0;
         }
+
 
         if(id==ID_ONLINE_FRIENDS){animate_friends(true);return 0;}
 

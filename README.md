@@ -13,11 +13,13 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.7.0](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.0-u2)**
+**Latest release: [v0.7.1](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.1-u2)**
 
-v0.7.0 adds a **Direct3D 11 renderer** that does not use shadPS4 (launcher Settings → Renderer),
-upscaling quality presets and sharper shadow maps; see the [changelog](CHANGELOG.md). From v0.6.1
-or older, install v0.6.2 with **Check updates** first, then v0.7.0.
+v0.7.1 lays out the graphics settings like current PC games: upscaling method (FSR 1, FSR 3,
+DLSS) with Quality/Balanced/Performance modes and sharpness, a single shadow quality, and the
+effects pages. v0.7.0 added a **Direct3D 11 renderer** that does not use shadPS4 (launcher
+Settings → Renderer); see the [changelog](CHANGELOG.md). From v0.6.1 or older, install v0.6.2
+with **Check updates** first, then the latest version.
 
 The **Nitro Cinema launcher** adds horizontal tabs, antialiased controls and animated
 transitions, with background artwork read directly from your own dump. It is selected

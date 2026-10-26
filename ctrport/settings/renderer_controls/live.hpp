@@ -22,13 +22,14 @@ struct Slot {
 inline Slot presentation, sharpness;
 inline unsigned set(unsigned key,unsigned index) noexcept {
     if(key==presentation_limit)return presentation.set(index,5)?1u:0u;
-    if(key==fsr1_sharpen)return sharpness.set(index,5)?1u:0u;
+    if(key==fsr1_sharpen)return sharpness.set(index,12)?1u:0u;
     return 0;
 }
 inline unsigned cap(unsigned index) noexcept {
     constexpr unsigned values[]{0,30,60,90,120};return index<5?values[index]:0;
 }
+// index in the upscaling_sharpness domain: original, 0%, 10%, ..., 100%
 inline const char* sharp(unsigned index) noexcept {
-    constexpr const char* values[]{"original","off","low","medium","high"};return index<5?values[index]:"original";
+    constexpr const char* values[]{"original","0","10","20","30","40","50","60","70","80","90","100"};return index<12?values[index]:"original";
 }
 }

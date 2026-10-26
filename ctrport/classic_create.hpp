@@ -47,25 +47,25 @@ void classic_create_controls() {
     g.width_edit = add_edit(ID_WIDTH, rect(312, 314, 88, 28), g.cfg.custom_w, ES_NUMBER | ES_CENTER);
     g.height_edit = add_edit(ID_HEIGHT, rect(412, 314, 88, 28), g.cfg.custom_h, ES_NUMBER | ES_CENTER);
 
-    g.fps_toggle = add_button(ID_FPS60, Kind::Toggle, rect(312, 356, 190, 26), L"60 FPS Unlock", &g.cfg.fps_60, -1, TAB_SETTINGS);
-    add_button(ID_FULLSCREEN, Kind::Toggle, rect(312, 388, 190, 26), L"Fullscreen Mode", &g.cfg.fullscreen, -1, TAB_SETTINGS);
+    // 60 FPS mode, upscaling method and mode: in the GRAPHICS section below (launcher_graphics.hpp)
+    add_button(ID_FULLSCREEN, Kind::Toggle, rect(312, 356, 190, 26), L"Fullscreen Mode", &g.cfg.fullscreen, -1, TAB_SETTINGS);
     g.scene_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(436), px(190), px(220), g.window, reinterpret_cast<HMENU>(ID_SCENE_RES), nullptr, nullptr);
+        px(312), px(488), px(190), px(220), g.window, reinterpret_cast<HMENU>(ID_SCENE_RES), nullptr, nullptr);
     SendMessageW(g.scene_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
-    for (int i=0; i<6; ++i) {
-        SendMessageW(g.scene_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(tr(kSceneLabels[i])));
-        if (g.cfg.scene_height == kSceneHeights[i]) SendMessageW(g.scene_combo, CB_SETCURSEL, i, 0);
+    for (int i = 0; i < static_cast<int>(std::size(kModes)); ++i) {
+        SendMessageW(g.scene_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(tr(kModeLabels[i])));
+        if (g.cfg.upscaling_mode == kModes[i]) SendMessageW(g.scene_combo, CB_SETCURSEL, i, 0);
     }
 
     g.upscaler_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(488), px(190), px(170), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_UPSCALER)), nullptr, nullptr);
+        px(312), px(436), px(190), px(170), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_UPSCALER)), nullptr, nullptr);
     SendMessageW(g.upscaler_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
     for (int i = 0; i < static_cast<int>(std::size(kUpscalers)); ++i) {
-        SendMessageW(g.upscaler_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kUpscalerLabels[i]));
+        SendMessageW(g.upscaler_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(tr(kUpscalerLabels[i])));
         if (g.cfg.upscaler == kUpscalers[i]) SendMessageW(g.upscaler_combo, CB_SETCURSEL, i, 0);
     }
     g.renderer_combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        px(312), px(540), px(190), px(120), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_RENDERER)), nullptr, nullptr);
+        px(312), px(420), px(190), px(120), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_RENDERER)), nullptr, nullptr);
     SendMessageW(g.renderer_combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
     for (int i = 0; i < static_cast<int>(std::size(kRenderers)); ++i) {
         SendMessageW(g.renderer_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(kRendererLabels[i]));
@@ -108,4 +108,5 @@ void classic_create_controls() {
     add_button(ID_OPEN_SAVES, Kind::ActionBtn, rect(520, 304, 210, 36), L"Open saves", nullptr, -1, TAB_ADVANCED);
     add_button(ID_OPEN_LOGS, Kind::ActionBtn, rect(744, 304, 246, 36), L"Open logs folder", nullptr, -1, TAB_ADVANCED);
     add_button(ID_LAUNCHER_SKIN,Kind::ActionBtn,rect(724,78,266,36),L"Aspetto: Classico",nullptr,-1,TAB_ADVANCED);
+    graphics_section_create();
 }

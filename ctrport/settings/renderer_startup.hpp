@@ -21,7 +21,14 @@ inline void prepare_renderer_environment() {
     const auto* document = runtime_snapshot();
     if (!document) return;
     if(const auto* resolution=document->find("window_resolution")) {
-        if(resolution->text!="original") {
+        if(resolution->text=="native") {
+            DEVMODEW display{};
+            display.dmSize=sizeof(display);
+            if(!EnumDisplaySettingsW(nullptr,ENUM_CURRENT_SETTINGS,&display)) win_error("settings display mode");
+            if(!SetEnvironmentVariableA("CTR_GPU_WIDTH",std::to_string(display.dmPelsWidth).c_str()) ||
+               !SetEnvironmentVariableA("CTR_GPU_HEIGHT",std::to_string(display.dmPelsHeight).c_str()))
+                win_error("settings window dimensions");
+        } else if(resolution->text!="original") {
             const auto split=resolution->text.find('x');
             const auto width=resolution->text.substr(0,split), height=resolution->text.substr(split+1);
             if(!SetEnvironmentVariableA("CTR_GPU_WIDTH",width.c_str()) ||
@@ -31,6 +38,13 @@ inline void prepare_renderer_environment() {
     }
     const auto* up=document->find("upscaler");
     if(!SetEnvironmentVariableA("CTR_UPSCALER",up ? up->text.c_str() : "off")) win_error("settings upscaler environment");
+    // the scene height of the upscaling mode, for renderers that read it from the environment
+    if(!SetEnvironmentVariableA("CTR_SCENE_HEIGHT",std::to_string(scene_height(*document)).c_str())) win_error("settings scene environment");
+    // FSR 3 sharpness (0..1) from the shared Sharpness setting; Original keeps its default
+    const auto* sharpness=document->find("upscaling_sharpness");
+    const bool percent=sharpness && sharpness->text!="original";
+    if(!SetEnvironmentVariableA("CTR_FSR3_SHARPNESS",percent ? std::to_string(std::stoi(sharpness->text)/100.0).c_str() : nullptr))
+        win_error("settings FSR 3 sharpness environment");
     const auto* ao=document->find("ambient_occlusion");
     if(!SetEnvironmentVariableA("CTR_GPU_AO",ao && ao->text=="off" ? "off" : nullptr)) win_error("settings AO environment");
     const auto* hero=document->find("hero_shadows");

@@ -31,13 +31,16 @@ inline int environment_anisotropy() {
     return value;
 }
 struct SharpnessPolicy { bool enabled; float attenuation; };
+// Sharpness in percent (0 turns RCAS off, 100 is attenuation 0), or the old named levels.
 inline SharpnessPolicy sharpness_policy(const char* value) {
-    const std::string request=value ? value : "original";
+    const std::string request=value && value[0] ? value : "original";
     if(request=="original") return {true,0.25f};
     if(request=="off") return {false,0.25f};
     if(request=="low") return {true,2.f};
     if(request=="medium") return {true,1.f};
     if(request=="high") return {true,0.f};
+    for(int percent=0;percent<=100;percent+=10)
+        if(request==std::to_string(percent)) return {percent!=0,2.5f*(1.f-percent/100.f)};
     throw std::invalid_argument("invalid FSR1 sharpness");
 }
 inline SharpnessPolicy environment_sharpness() {

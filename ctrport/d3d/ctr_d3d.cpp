@@ -92,7 +92,7 @@ void SyncSettingsEnvironment() {
     for (const char* key : {"CTR_GPU_PRESENT_MODE", "CTR_SETTINGS_ANISOTROPY", "CTR_SETTINGS_FSR1_SHARPEN",
                             "CTR_SETTINGS_HDR", "CTR_SETTINGS_GAMMA", "CTR_SETTINGS_HDR_PEAK", "CTR_SETTINGS_HDR_EXPOSURE",
                             "CTR_SETTINGS_PRESENTATION_LIMIT", "CTR_SETTINGS_WINDOW_MODE", "CTR_SETTINGS_DISPLAY_REFRESH",
-                            "CTR_UPSCALER", "CTR_GPU_AO", "CTR_GPU_HERO_SHADOWS", "CTR_GPU_WIDTH", "CTR_GPU_HEIGHT", "CTR_GPU_FULLSCREEN"}) {
+                            "CTR_UPSCALER", "CTR_SCENE_HEIGHT", "CTR_GPU_AO", "CTR_GPU_HERO_SHADOWS", "CTR_GPU_WIDTH", "CTR_GPU_HEIGHT", "CTR_GPU_FULLSCREEN"}) {
         char value[256];
         const DWORD n = GetEnvironmentVariableA(key, value, sizeof(value));
         _putenv_s(key, n && n < sizeof(value) ? value : "");
