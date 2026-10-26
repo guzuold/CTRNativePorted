@@ -1,3 +1,10 @@
+## v0.7.2 — 2026-10-26
+
+Faster first shader translation for Direct3D 11 on hard disks.
+
+- **First Direct3D 11 start on a hard disk:** to find the shaders of the title update, `ctr_shaders` decompressed every file of its archives (about 8.5 GB) with many readers at once; on a mechanical disk the translation seemed stuck at 0%. It now reads only the shader folder of those archives: the result is the same and the reading takes seconds.
+- Nothing else changes. **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.1 — 2026-10-26
 
 The graphics settings follow the layout of current PC games: display, upscaling method and mode, geometry and textures, effects and lighting.

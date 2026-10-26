@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.7.1](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.1-u2)**
+**Latest release: [v0.7.2](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.2-u2)** (faster first shader translation on hard disks)
 
 v0.7.1 makes the **Direct3D 11 renderer** the default and lays out the graphics settings like current PC games: upscaling method (FSR 1, FSR 3,
 DLSS) with Quality/Balanced/Performance modes and sharpness, a single shadow quality, and the
