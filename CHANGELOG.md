@@ -1,3 +1,12 @@
+## v0.7.4 — 2026-10-26
+
+Direct3D 11 fixes.
+
+- **PlayStation controllers in game:** in v0.7.3 the controller was seen but the game did not read it: the runtime looked for it only in the Vulkan renderer. It now reads it from either renderer.
+- **Leaving the game:** holding Escape for two seconds, or View + Menu (Share/touch pad + Options) and then A, closes the game again with Direct3D 11.
+- **Closing the window:** the launcher no longer reports "The game stopped" with an error code after the game window is closed.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.3 — 2026-10-26
 
 Two fixes for the Direct3D 11 renderer.
