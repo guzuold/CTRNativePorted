@@ -1,3 +1,14 @@
+## v0.7.0 — 2026-10-26
+
+A second renderer, Direct3D 11, that does not use shadPS4; upscaling quality presets; sharper shadow maps.
+
+- **Direct3D 11 renderer:** choose it in launcher **Settings → Renderer**. Vulkan (shadPS4) stays the default. It draws from the game engine's own render state with shaders translated from your own dump; no game file is included. The first time you play with Direct3D 11 the launcher offers to translate the shaders (`ctr_shaders.exe`): about six minutes once on a 20-thread CPU, a few seconds afterwards. Tested on 1.00 and 1.21: title, menus, adventure hub and races, at 60 FPS with PS4 Pro mode.
+- **PC Settings with Direct3D 11:** vertical sync, frame rate limit, window modes, exclusive fullscreen refresh rate, texture filtering, display gamma, ambient occlusion off, hero shadows off, AMD FSR 1 (sharpness changes at once) and native HDR10 with peak and exposure. HDR10 needs a display in Windows HDR mode; it has not been tested on one yet. AMD FSR 3 and DLSS stay Vulkan only: with Direct3D 11 the launcher asks for Off or FSR 1.
+- **Upscaling quality presets** (both renderers): the render resolution choices carry the usual names: Ultra performance 720p, Performance 1080p, Balanced 1260p (new), Quality 1440p, Native 2160p; 900p and 1800p remain. With a window smaller than 4K, Native renders more pixels than the window and acts as supersampling.
+- **Shadow map detail** (Direct3D 11, Shadows and effects page): High creates the shadow maps at twice the PS4 size.
+- **Not yet with Direct3D 11:** PlayStation controllers through SDL (Xbox/XInput controllers work); split screen and the game's compute passes are untested. Use Vulkan for them.
+- **How to update:** from v0.6.1 or older, install v0.6.2 first with **Check updates**, then check again for v0.7.0. The 0.6.1 updater cannot install the new renderer files directly. Saves, settings and mods are preserved.
+
 ## v0.6.2 — 2026-10-26
 
 Step release before v0.7.0: the updater learns the program files of the new Direct3D 11 renderer.
