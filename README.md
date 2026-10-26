@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.6.1](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.6.1)**
+**Latest release: [v0.6.2](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.6.2)** (a step release: install it with **Check updates**, then install v0.7.0 the same way)
 
 The **Nitro Cinema launcher** adds horizontal tabs, antialiased controls and animated
 transitions, with background artwork read directly from your own dump. It is selected

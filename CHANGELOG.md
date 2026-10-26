@@ -1,3 +1,10 @@
+## v0.6.2 — 2026-10-26
+
+Step release before v0.7.0: the updater learns the program files of the new Direct3D 11 renderer.
+
+- **Why this release exists:** an installed launcher installs updates with its own update helper, which accepts only a closed list of program files. The 0.6.1 helper does not know `ctr_d3d.dll` and `ctr_shaders.exe`, so it would refuse the whole v0.7.0 package. v0.6.2 installs the helper that knows them; **Check updates** then offers v0.7.0.
+- Nothing else changes: the runtime, the GPU library and the launcher features are those of v0.6.1. Saves, settings and mods are preserved.
+
 ## v0.6.1 — 2026-10-25
 
 Two launcher skins, with Nitro Cinema selected by default, retain the v0.6.0 runtime and in-game PC Settings.
