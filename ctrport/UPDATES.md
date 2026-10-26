@@ -104,10 +104,16 @@ files therefore goes out in two steps:
 1. A release built with `build_release.ps1 -WithoutDirect3D11` (the files it would add
    are left out) whose `launcher_update.ps1` lists the new paths. Installed launchers
    accept it and install that helper.
-2. The next release, built normally, with the new files.
+2. The next release, built normally, with the new files. Its tag carries the helper
+   generation it needs, `vX.Y.Z-uN` (asset `CTRNativePorted-vX.Y.Z-uN-win64.zip`), and
+   `$UpdaterGeneration` in `launcher_update.ps1` is raised to N in the step release.
+   Helpers offer the highest release they can parse whose generation they reach; helpers of
+   0.6.1 and older parse only `vX.Y.Z`, so they offer the step release instead of a
+   package they would refuse.
 
 The Direct3D 11 renderer (`build/CTRPort-gpu/ctr_d3d.dll`, `ctr_shaders.exe`) is the
-first such case: 0.6.1 and older helpers refuse it. A launcher without `ctr_d3d.dll`
+first such case: 0.6.1 and older helpers refuse it. v0.6.2 is its step release (generation
+2) and v0.7.0 is tagged `v0.7.0-u2`. A launcher without `ctr_d3d.dll`
 next to the runtime keeps the Vulkan renderer and disables the renderer choice.
 
 ## Repeatable checks

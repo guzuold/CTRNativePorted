@@ -7,7 +7,7 @@ A second renderer, Direct3D 11, that does not use shadPS4; upscaling quality pre
 - **Upscaling quality presets** (both renderers): the render resolution choices carry the usual names: Ultra performance 720p, Performance 1080p, Balanced 1260p (new), Quality 1440p, Native 2160p; 900p and 1800p remain. With a window smaller than 4K, Native renders more pixels than the window and acts as supersampling.
 - **Shadow map detail** (Direct3D 11, Shadows and effects page): High creates the shadow maps at twice the PS4 size.
 - **Not yet with Direct3D 11:** PlayStation controllers through SDL (Xbox/XInput controllers work); split screen and the game's compute passes are untested. Use Vulkan for them.
-- **How to update:** from v0.6.1 or older, install v0.6.2 first with **Check updates**, then check again for v0.7.0. The 0.6.1 updater cannot install the new renderer files directly. Saves, settings and mods are preserved.
+- **How to update:** from v0.6.1 or older, install v0.6.2 first with **Check updates**, then check again for v0.7.0. The 0.6.1 updater cannot install the new renderer files directly, so this release is tagged `v0.7.0-u2` and older updaters offer v0.6.2 first. Saves, settings and mods are preserved.
 
 ## v0.6.2 — 2026-10-26
 

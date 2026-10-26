@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.7.0](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.0)**
+**Latest release: [v0.7.0](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.0-u2)**
 
 v0.7.0 adds a **Direct3D 11 renderer** that does not use shadPS4 (launcher Settings → Renderer),
 upscaling quality presets and sharper shadow maps; see the [changelog](CHANGELOG.md). From v0.6.1
