@@ -1,3 +1,10 @@
+## v0.7.8 — 2026-10-27
+
+Trophy names and descriptions without the trophy key.
+
+- **TROPHIES tab without your PS4 trophy key:** trophies were shown only by number. They now have their names, descriptions and grades, plus a tip on how to unlock each one, in English from the [Crash Bandicoot Wiki](https://crashbandicoot.fandom.com/wiki/Crash_Team_Racing_Nitro-Fueled) (CC BY-SA). The texts are downloaded once and kept in `runtime/user/trophies/wiki.json`, so they also work offline. With your trophy key, the game's own texts in the game language are shown as before.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.7 — 2026-10-27
 
 Mods from GameBanana, mods dropped on the launcher, and the PC-port mod format in the runtime.
