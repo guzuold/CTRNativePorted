@@ -44,7 +44,7 @@ void draw_control(const DRAWITEMSTRUCT& item) {
             Pen shine(Color(0xfffff38a),4);gr.DrawLine(&shine,26.f,8.f,lw-30,8.f);gr.Restore(clipped);
             Pen edge(Color(0xffffe97c),1.5f);gr.DrawPath(&edge,&face);
             PointF triangle[]={{84,28},{78,69},{113,49}};gr.FillPolygon(&ink,triangle,3);
-            const wchar_t* label=g.process?L"IN GIOCO":(g.xbox_busy||g.shaders_busy)?L"ATTENDI":L"GIOCA";
+            const wchar_t* label=tr(g.process?L"IN GAME":(g.xbox_busy||g.shaders_busy)?L"WAIT":L"PLAY");
             text(gr,label,0,62,FontStyleBold,rect(128,9,lw-166,lh-25),kArcadeDark,StringAlignmentCenter);
             gr.Restore(saved);
             break;
@@ -71,7 +71,7 @@ void draw_control(const DRAWITEMSTRUCT& item) {
             const ARGB color=friends||close?kArcadePink:mini?kArcadeCyan:hot?0xff2c365c:0xff202742;
             fill_round(gr,box,8,SolidBrush(Color(fade(color,alpha))));
             if(!friends&&!close&&!mini)stroke_round(gr,box,8,0xff3c466c,1);
-            const auto label=id==ID_NITRO_MOTION?(nitro_motion?L"Animazioni: sì":L"Animazioni: no"):tr(c.label);
+            const auto label=id==ID_NITRO_MOTION?tr(nitro_motion?L"Animations: on":L"Animations: off"):tr(c.label);
             if(friends){
                 SolidBrush icon{Color(kArcadeDark)};gr.FillEllipse(&icon,20.f,8.f,9.f,9.f);gr.FillEllipse(&icon,29.f,10.f,7.f,7.f);
                 gr.FillPie(&icon,15.f,18.f,18.f,17.f,180.f,180.f);gr.FillPie(&icon,27.f,19.f,13.f,14.f,180.f,180.f);

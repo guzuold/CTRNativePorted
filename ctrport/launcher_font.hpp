@@ -17,11 +17,13 @@ struct Font {
         if (text.empty()) return true;
         // Unsupported Unicode stays readable through the launcher's system-font path.
         for (wchar_t ch : text) if ((ch >= 0x590 && ch <= 0x8ff) || (ch >= 0xfb1d && ch <= 0xfeff) || (ch != L'\n' && ch != L'\r' && !glyphs.count(ch))) return false;
-        const float scale = size * 1.2f / height;
+        float scale = size * 1.2f / height;
         const auto width = [&](const std::wstring& s) { float n = 0; for (auto ch : s) n += glyphs.at(ch).advance * scale; return n; };
         std::vector<std::wstring> lines;
         std::wstring line;
         const bool wrap = text.find(L'\n') != std::wstring::npos;
+        // a single line too wide (longer words in other languages) is drawn smaller, down to 65%
+        if (!wrap) { const float w = width(text); if (w > box.Width) scale *= std::max(0.65f, box.Width / w); }
         for (wchar_t ch : text) {
             if (ch == L'\r') continue;
             if (ch == L'\n') { lines.push_back(line); line.clear(); continue; }

@@ -20,6 +20,7 @@
 
 #include "../gpu/ctr_gpu.h"
 #include "../gpu/shim/controller_exit_state.h"
+#include "../hle/ui_text.h"
 #include "videoout.h"
 
 static_assert(sizeof(CtrGpuGamepad) == sizeof(XINPUT_GAMEPAD), "CtrGpuGamepad keeps the XINPUT_GAMEPAD layout");
@@ -169,7 +170,7 @@ void show(HWND owner) {
     }
     RECT r{};
     GetWindowRect(owner, &r);
-    dialog = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"CTRPortExitConfirmation", L"Esci dal gioco", WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+    dialog = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"CTRPortExitConfirmation", ctr_ui::ui_text(ctr_ui::Text::ExitTitle), WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
                              r.left + (r.right - r.left - 520) / 2, r.top + (r.bottom - r.top - 220) / 2, 520, 220, owner, nullptr,
                              GetModuleHandleW(nullptr), nullptr);
     if (!dialog) {
@@ -182,10 +183,9 @@ void show(HWND owner) {
         SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
         return h;
     };
-    child(L"STATIC", L"Vuoi chiudere il gioco?\nAttendi la fine di eventuali salvataggi.\nRilascia i pulsanti, poi premi A per uscire o B per annullare.",
-          20, 20, 475, 80, 0);
-    child(L"BUTTON", L"A - Esci", 40, 125, 190, 36, IDOK);
-    HWND cancel = child(L"BUTTON", L"B - Annulla", 270, 125, 190, 36, IDCANCEL);
+    child(L"STATIC", ctr_ui::ui_text(ctr_ui::Text::ExitQuestion), 20, 20, 475, 80, 0);
+    child(L"BUTTON", ctr_ui::ui_text(ctr_ui::Text::ExitConfirm), 40, 125, 190, 36, IDOK);
+    HWND cancel = child(L"BUTTON", ctr_ui::ui_text(ctr_ui::Text::ExitCancel), 270, 125, 190, 36, IDCANCEL);
     SetForegroundWindow(dialog);
     SetFocus(cancel);
     std::fputs("ctrport: controller exit confirmation opened\n", stderr);

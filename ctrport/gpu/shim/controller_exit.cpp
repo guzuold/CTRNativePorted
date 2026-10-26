@@ -9,6 +9,7 @@
 #include <vector>
 #include <SDL3/SDL.h>
 #include "controller_exit_state.h"
+#include "../../hle/ui_text.h"
 #include "ctr_gpu.h"
 static_assert(sizeof(CtrGpuGamepad)==sizeof(XINPUT_GAMEPAD),"CtrGpuGamepad keeps the XINPUT_GAMEPAD layout");
 namespace {
@@ -73,16 +74,16 @@ void show(HWND owner){
     static bool registered=[] {WNDCLASSW c{};c.lpfnWndProc=exit_proc;c.hInstance=GetModuleHandleW(nullptr);c.lpszClassName=L"CTRPortExitConfirmation";c.hbrBackground=reinterpret_cast<HBRUSH>(COLOR_WINDOW+1);c.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));return RegisterClassW(&c)!=0;}();
     if(!registered){gesture.cancel();std::fputs("ctrport: exit dialog registration failed\n",stderr);return;}
     RECT r{};GetWindowRect(owner,&r);
-    dialog=CreateWindowExW(WS_EX_TOPMOST|WS_EX_TOOLWINDOW,L"CTRPortExitConfirmation",L"Esci dal gioco",WS_CAPTION|WS_SYSMENU|WS_VISIBLE,
+    dialog=CreateWindowExW(WS_EX_TOPMOST|WS_EX_TOOLWINDOW,L"CTRPortExitConfirmation",ctr_ui::ui_text(ctr_ui::Text::ExitTitle),WS_CAPTION|WS_SYSMENU|WS_VISIBLE,
         r.left+(r.right-r.left-520)/2,r.top+(r.bottom-r.top-220)/2,520,220,owner,nullptr,GetModuleHandleW(nullptr),nullptr);
     if(!dialog){gesture.cancel();return;}
     auto child=[&](const wchar_t* type,const wchar_t* text,int x,int y,int width,int height,int id){
         HWND h=CreateWindowW(type,text,WS_CHILD|WS_VISIBLE|(id?WS_TABSTOP:0),x,y,width,height,dialog,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),GetModuleHandleW(nullptr),nullptr);
         SendMessageW(h,WM_SETFONT,reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)),TRUE);return h;
     };
-    child(L"STATIC",L"Vuoi chiudere il gioco?\nAttendi la fine di eventuali salvataggi.\nRilascia i pulsanti, poi premi A per uscire o B per annullare.",20,20,475,80,0);
-    child(L"BUTTON",L"A - Esci",40,125,190,36,IDOK);
-    HWND cancel=child(L"BUTTON",L"B - Annulla",270,125,190,36,IDCANCEL);
+    child(L"STATIC",ctr_ui::ui_text(ctr_ui::Text::ExitQuestion),20,20,475,80,0);
+    child(L"BUTTON",ctr_ui::ui_text(ctr_ui::Text::ExitConfirm),40,125,190,36,IDOK);
+    HWND cancel=child(L"BUTTON",ctr_ui::ui_text(ctr_ui::Text::ExitCancel),270,125,190,36,IDCANCEL);
     SetForegroundWindow(dialog);SetFocus(cancel);
     std::fputs("ctrport: controller exit confirmation opened\n",stderr);
 }

@@ -45,7 +45,7 @@ void switch_launcher_skin() {
     SetWindowPos(g.window,nullptr,work.left+(work.right-work.left-px(kWidth))/2,
         work.top+std::max(0L,(work.bottom-work.top-px(kHeight))/2),px(kWidth),px(kHeight),SWP_NOZORDER|SWP_NOACTIVATE);
     SetWindowRgn(g.window,CreateRoundRectRgn(0,0,px(kWidth)+1,px(kHeight)+1,px(24),px(24)),FALSE);
-    SetWindowTextW(g.window,classic_skin?L"CTR Native Ported — Classico":L"CTR Native Ported — Nitro Cinema");
+    SetWindowTextW(g.window,classic_skin?L"CTR Native Ported — Classic":L"CTR Native Ported — Nitro Cinema");
     render_base_layer();create_controls();
     for(HWND child=GetWindow(g.window,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT))
         SetWindowLongPtrW(child,GWL_STYLE,GetWindowLongPtrW(child,GWL_STYLE)|WS_CLIPSIBLINGS);

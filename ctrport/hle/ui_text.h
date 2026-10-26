@@ -8,7 +8,8 @@
 #include <string>
 namespace ctr_ui {
 enum class Text { NoFriends, Send, InvitationFrom, NoInvitations, Accept, JoinQuestion, AcceptFailed,
-                  DeclineFailed, RetryHint, ErrorTitle, SelectRecipients, Cancel, TrophyUnlocked, Trophy, Count };
+                  DeclineFailed, RetryHint, ErrorTitle, SelectRecipients, Cancel, TrophyUnlocked, Trophy,
+                  ExitTitle, ExitQuestion, ExitConfirm, ExitCancel, Count };
 // The picker window is found by this title (invitation_dialog.cpp), so it is not translated.
 inline constexpr const wchar_t* kInvitationTitle = L"CTR - Invitation";
 inline int ui_language() {
@@ -34,6 +35,14 @@ inline const wchar_t* ui_text(Text text) {
         {L"Cancel", L"Annuler", L"Annulla", L"Abbrechen", L"Cancelar"},
         {L"Trophy unlocked", L"Trophée débloqué", L"Trofeo sbloccato", L"Trophäe freigeschaltet", L"Trofeo desbloqueado"},
         {L"Trophy {0}", L"Trophée {0}", L"Trofeo {0}", L"Trophäe {0}", L"Trofeo {0}"},
+        {L"Quit the game", L"Quitter le jeu", L"Esci dal gioco", L"Spiel beenden", L"Salir del juego"},
+        {L"Close the game?\nWait for any saving to finish.\nRelease the buttons, then press A to quit or B to cancel.",
+         L"Fermer le jeu ?\nAttendez la fin des sauvegardes en cours.\nRelâchez les boutons, puis appuyez sur A pour quitter ou B pour annuler.",
+         L"Vuoi chiudere il gioco?\nAttendi la fine di eventuali salvataggi.\nRilascia i pulsanti, poi premi A per uscire o B per annullare.",
+         L"Spiel schließen?\nWarte, bis laufende Speichervorgänge beendet sind.\nLass die Tasten los und drücke dann A zum Beenden oder B zum Abbrechen.",
+         L"¿Cerrar el juego?\nEspera a que terminen los guardados en curso.\nSuelta los botones y pulsa A para salir o B para cancelar."},
+        {L"A - Quit", L"A - Quitter", L"A - Esci", L"A - Beenden", L"A - Salir"},
+        {L"B - Cancel", L"B - Annuler", L"B - Annulla", L"B - Abbrechen", L"B - Cancelar"},
     };
     return table[static_cast<int>(text)][ui_language()];
 }

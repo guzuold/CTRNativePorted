@@ -107,6 +107,6 @@ void classic_create_controls() {
     add_button(ID_SAVE_BACKUP, Kind::ActionBtn, rect(296, 304, 210, 36), L"Back up saves", nullptr, -1, TAB_ADVANCED);
     add_button(ID_OPEN_SAVES, Kind::ActionBtn, rect(520, 304, 210, 36), L"Open saves", nullptr, -1, TAB_ADVANCED);
     add_button(ID_OPEN_LOGS, Kind::ActionBtn, rect(744, 304, 246, 36), L"Open logs folder", nullptr, -1, TAB_ADVANCED);
-    add_button(ID_LAUNCHER_SKIN,Kind::ActionBtn,rect(724,78,266,36),L"Aspetto: Classico",nullptr,-1,TAB_ADVANCED);
+    add_button(ID_LAUNCHER_SKIN,Kind::ActionBtn,rect(724,78,266,36),L"Look: Classic",nullptr,-1,TAB_ADVANCED);
     graphics_section_create();
 }

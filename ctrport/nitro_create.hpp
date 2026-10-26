@@ -6,11 +6,11 @@ void create_controls() {
 
     for(int i=0;i<TAB_COUNT;++i)
         g.tab_buttons.push_back(add_button(ID_TAB_BASE+i,Kind::TabBtn,rect(nitro::nav_left[i],12,nitro::nav_width[i],40),kTabNames[i],nullptr,i,-1));
-    add_button(ID_NITRO_FRIENDS,Kind::ActionBtn,rect(1018,13,116,38),L"AMICI");
+    add_button(ID_NITRO_FRIENDS,Kind::ActionBtn,rect(1018,13,116,38),L"FRIENDS");
     add_button(ID_MINIMIZE,Kind::ActionBtn,rect(1171,13,38,38),L"–");
     add_button(ID_CLOSE,Kind::ActionBtn,rect(1221,13,38,38),L"×");
     update_button=add_button(ID_CHECK_UPDATE,Kind::ActionBtn,rect(865,671,145,31),update_label.c_str());
-    g.launch=add_button(ID_LAUNCH,Kind::Launch,rect(40,520,432,105),L"GIOCA",nullptr,-1,TAB_HOME);
+    g.launch=add_button(ID_LAUNCH,Kind::Launch,rect(40,520,432,105),L"PLAY",nullptr,-1,TAB_HOME);
     // --- TAB 1: MODS ---
     add_button(ID_MODS_REFRESH, Kind::ActionBtn, page_rect(738, 78, 106, 36), L"REFRESH", nullptr, -1, TAB_MODS);
     add_button(ID_OPEN_MODS, Kind::ActionBtn, page_rect(854, 78, 136, 36), L"OPEN FOLDER", nullptr, -1, TAB_MODS);
@@ -90,8 +90,8 @@ void create_controls() {
     for (const auto& language : kGameLanguages) SendMessageW(g.language_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(language.label));
     SendMessageW(g.language_combo, CB_SETCURSEL, game_language_index(g.cfg.game_language), 0);
 
-    add_button(ID_LAUNCHER_SKIN,Kind::ActionBtn,page_rect(580,78,250,36),L"Aspetto: Nitro Cinema",nullptr,-1,TAB_ADVANCED);
-    add_button(ID_NITRO_MOTION,Kind::ActionBtn,page_rect(840,78,150,36),L"Animazioni",nullptr,-1,TAB_ADVANCED);
+    add_button(ID_LAUNCHER_SKIN,Kind::ActionBtn,page_rect(580,78,250,36),L"Look: Nitro Cinema",nullptr,-1,TAB_ADVANCED);
+    add_button(ID_NITRO_MOTION,Kind::ActionBtn,page_rect(840,78,150,36),L"Animations",nullptr,-1,TAB_ADVANCED);
     // --- TAB 3: ADVANCED ---
     g.base_edit = add_edit(ID_BASE_EDIT, page_rect(296, 144, 580, 34), g.cfg.base_dir);
     add_button(ID_BASE_BROWSE, Kind::ActionBtn, page_rect(890, 144, 100, 34), L"BROWSE", nullptr, -1, TAB_ADVANCED);

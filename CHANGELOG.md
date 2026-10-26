@@ -1,3 +1,15 @@
+## v0.7.5 — 2026-10-26
+
+Localization review: the launcher and the game's own windows follow the chosen language.
+
+- **Nitro Cinema launcher:** the play button, the Friends button, the home status, the footer, the look and animation buttons were in Italian in every language. They now follow the language chosen in Settings (English, French, Italian, German, Spanish).
+- **Longer words** in English, French, German and Spanish no longer get cut ("TROP...", "SETTI..."): a label too wide is drawn smaller.
+- **Launcher messages** (lock file, settings recovery, backups, start errors, Xbox icons) are translated too; the Classic window title is in English.
+- **Exit confirmation in game** (View + Menu): in the game language instead of always Italian.
+- **Graphics settings:** the options of 14 settings (frame rate limit, anisotropy, view distance, effects, bloom, fur and others) now have French, German and Spanish labels in the launcher and in the in-game PC Settings menu.
+- **Online service messages** are in English like the others.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.4 — 2026-10-26
 
 Direct3D 11 fixes.

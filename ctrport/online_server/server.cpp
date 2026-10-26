@@ -662,7 +662,7 @@ struct Server::Impl {
             for (auto it = remote_invitations.begin(); it != remote_invitations.end();)
                 it = it->second.expires <= now ? remote_invitations.erase(it) : std::next(it);
             if (remote_invitations.size() >= 64 && !remote_invitations.count(invitation))
-                throw std::runtime_error("Troppi inviti in attesa");
+                throw std::runtime_error("Too many pending invitations");
             // Retrying delivery must not turn an accepted invitation back into a pending one.
             const auto existing = remote_invitations.find(invitation);
             if (existing != remote_invitations.end()) {

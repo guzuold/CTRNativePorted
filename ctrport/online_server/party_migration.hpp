@@ -36,7 +36,7 @@ inline PartyRecovery verify_party_recovery(const Json& ticket, const std::string
         throw std::runtime_error("Checkpoint of a different room");
     PartyRecovery result;result.room=room;result.previous_owner=owner;
     result.generation=payload.at("generation").as_u64();
-    if(result.generation==(std::numeric_limits<std::uint64_t>::max)())throw std::runtime_error("Generazione lobby esaurita");
+    if(result.generation==(std::numeric_limits<std::uint64_t>::max)())throw std::runtime_error("Lobby generation exhausted");
     const auto& rows=payload.at("members");
     if(!rows.is_array() || rows.items.size()<2 || rows.items.size()>8)throw std::runtime_error("Invalid checkpoint participants");
     std::set<std::string> codes,names;std::set<std::uint64_t> accounts;
@@ -54,7 +54,7 @@ inline PartyRecovery verify_party_recovery(const Json& ticket, const std::string
     if(!found_owner)throw std::runtime_error("Proprietario assente dal checkpoint");
     std::sort(result.members.begin(),result.members.end(),[](const auto& a,const auto& b){return user_id(a.name)<user_id(b.name);});
     for(const auto& member:result.members)if(!member.endpoint.empty()){result.successor=member.code;break;}
-    if(result.successor.empty())throw std::runtime_error("Nessun successore raggiungibile registrato");
+    if(result.successor.empty())throw std::runtime_error("No reachable successor registered");
     return result;
 }
 } // namespace ctr_online

@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
         const std::uint16_t discovery = config.discovery_port ? config.discovery_port : 3078;
         std::vector<PortRequest> ports;
         if (upnp)
-            ports = {{"TCP", config.http_port, "server HTTP"}, {"TCP", 3074, "lobby"}, {"UDP", 3074, "gioco"},
+            ports = {{"TCP", config.http_port, "server HTTP"}, {"TCP", 3074, "lobby"}, {"UDP", 3074, "game"},
                      {"UDP", discovery, "discovery"}, {"UDP", static_cast<std::uint16_t>(discovery + 1), "discovery"},
                      {"UDP", static_cast<std::uint16_t>(discovery + 2), "discovery"}, {"UDP", static_cast<std::uint16_t>(discovery + 3), "discovery"}};
         if (mapper.open(ports, "CTR Native Port", location) && auto_public && config.public_host.empty()) {

@@ -43,7 +43,7 @@ inline LobbyActionResult lobby_action(const std::filesystem::path& root,const st
                 const auto snapshot=party_request(root,"127.0.0.1",self,req);
                 result.party={"127.0.0.1",self,snapshot.at("room").text,snapshot};
                 try {party_request(root,selection.ip,selection.owner,command("leave"));}catch(...){}
-            } else throw std::runtime_error("Azione lobby sconosciuta");
+            } else throw std::runtime_error("Unknown lobby action");
             result.ok=true;
         } catch(const std::exception& e){result.detail=e.what();}
         return result;

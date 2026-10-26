@@ -330,11 +330,11 @@ struct LaneLock {
                 return true;
             }
             if (GetLastError() != ERROR_FILE_EXISTS) {
-                MessageBoxW(owner, (L"Unable to create lock file " + path.wstring()).c_str(), kTitle, MB_ICONERROR);
+                MessageBoxW(owner, trf(L"Unable to create lock file {0}", path.wstring()).c_str(), kTitle, MB_ICONERROR);
                 return false;
             }
-            const std::wstring text = L"The runtime is currently in use by another process (shared lane lock):\n\n" +
-                widen(read_tail(path, 4096)) + L"\n\nRetry?";
+            const std::wstring text = tr(L"The runtime is currently in use by another process:") + std::wstring(L"\n\n") +
+                widen(read_tail(path, 4096)) + L"\n\n" + tr(L"Retry?");
             if (MessageBoxW(owner, text.c_str(), kTitle, MB_RETRYCANCEL | MB_ICONWARNING) != IDRETRY) return false;
         }
     }
@@ -570,14 +570,14 @@ void load_config() {
     ctr_online::Json document = ctr_online::Json::object();
     try { document = ctrport::settings::Store(config_path()).read(); }
     catch (const std::exception& error) {
-        const std::wstring message = L"Settings could not be loaded. The file has been preserved.\n" + widen(error.what()) +
-            L"\n\nRestore the previous settings? The current file will be preserved separately.";
-        if (MessageBoxW(nullptr, message.c_str(), L"Settings recovery", MB_YESNO | MB_ICONWARNING) == IDYES) {
+        const std::wstring message = tr(L"Settings could not be loaded. The file has been preserved.") + std::wstring(L"\n") + widen(error.what()) +
+            L"\n\n" + tr(L"Restore the previous settings? The current file will be preserved separately.");
+        if (MessageBoxW(nullptr, message.c_str(), tr(L"Settings recovery"), MB_YESNO | MB_ICONWARNING) == IDYES) {
             try {
                 ctrport::settings::Store(config_path()).restore_backup();
                 document = ctrport::settings::Store(config_path()).read();
             } catch (const std::exception& recovery) {
-                MessageBoxW(nullptr, widen(recovery.what()).c_str(), L"Settings recovery failed", MB_ICONERROR);
+                MessageBoxW(nullptr, widen(recovery.what()).c_str(), tr(L"Settings recovery failed"), MB_ICONERROR);
             }
         }
     }
@@ -680,7 +680,7 @@ bool save_config() {
         settings_last_ui_snapshot = std::move(snapshot);
         return true;
     } catch (const std::exception& error) {
-        MessageBoxW(g.window, widen(error.what()).c_str(), L"Settings were not saved", MB_ICONERROR);
+        MessageBoxW(g.window, widen(error.what()).c_str(), tr(L"Settings were not saved"), MB_ICONERROR);
         return false;
     }
 }
@@ -760,12 +760,20 @@ void text(Graphics& gr, const std::wstring& value, int which, float size, int st
     gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
     const auto* retail = which == 0 ? retail_fonts.title.get() : classic_skin ? retail_fonts.body.get() : nullptr;
     if (retail && retail->draw(gr, value, which == 0 ? size : size * 1.25f, r, color, align)) return;
-    Font font(&family(which), size, usable_style(family(which), style), UnitPixel);
+    const int usable = usable_style(family(which), style);
     StringFormat format;
     format.SetAlignment(align);
     format.SetLineAlignment(StringAlignmentCenter);
     format.SetTrimming(StringTrimmingEllipsisCharacter);
-    if (value.find(L'\n') == std::wstring::npos) format.SetFormatFlags(StringFormatFlagsNoWrap);
+    if (value.find(L'\n') == std::wstring::npos) {
+        format.SetFormatFlags(StringFormatFlagsNoWrap);
+        // a line too wide (longer words in other languages) is drawn smaller, down to 65%
+        Font natural(&family(which), size, usable, UnitPixel);
+        RectF needed;
+        gr.MeasureString(value.c_str(), -1, &natural, PointF(0, 0), &format, &needed);
+        if (needed.Width > r.Width && needed.Width > 0) size *= std::max(0.65f, r.Width / needed.Width);
+    }
+    Font font(&family(which), size, usable, UnitPixel);
     SolidBrush brush{Color(color)};
     gr.DrawString(value.c_str(), -1, &font, r, &format, &brush);
 }
@@ -1250,7 +1258,7 @@ void validate() {
     const bool base_modules = base_eboot && fs::exists(base / "sce_module", ec);
     const bool patch_ok = !g.cfg.patch_dir.empty() && fs::exists(patch / "eboot.bin", ec);
     g.base_status = !base_eboot ? Status{tr(L"eboot.bin not found in the base folder"), 2}
-                  : !base_modules ? Status{L"sce_module folder missing from the base game", 2}
+                  : !base_modules ? Status{tr(L"sce_module folder missing from the base game"), 2}
                                   : Status{tr(L"Base game found"), 1};
     if (!g.cfg.use_patch) g.patch_status = {tr(L"Update disabled: v01.00 will be started"), 0};
     else g.patch_status = patch_ok ? Status{tr(L"Title update found"), 1} : Status{tr(L"Update folder or eboot.bin missing"), 2};
@@ -1835,8 +1843,8 @@ void xbox_prompts_ready(std::wstring* raw_error) {
     g.xbox_busy = false;
     InvalidateRect(g.launch, nullptr, FALSE);
     if (!error->empty()) {
-        MessageBoxW(g.window, (L"Xbox button icon preparation failed:\n" + *error +
-                               L"\n\nDisable \"Colored Xbox icons\" in Settings to use PS4 button icons.").c_str(),
+        MessageBoxW(g.window, (tr(L"Xbox button icon preparation failed:") + std::wstring(L"\n") + *error + L"\n\n" +
+                               tr(L"Turn off the Xbox icons in Settings to use the PS4 button icons.")).c_str(),
                     kTitle, MB_ICONERROR);
         return;
     }
@@ -1897,7 +1905,7 @@ void prepare_d3d_shaders() {
                 CloseHandle(pi.hThread);
                 if (code) *error = widen(last_error.empty() ? "exit code " + std::to_string(code) : last_error);
             } else {
-                *error = L"ctr_shaders.exe did not start (error " + std::to_wstring(GetLastError()) + L")";
+                *error = trf(L"ctr_shaders.exe did not start (error {0})", std::to_wstring(GetLastError()));
             }
         } else {
             *error = L"pipe creation failed";
@@ -1988,7 +1996,7 @@ void launch_game() {
     g.log_stem = logs / (L"play_" + stamp);
     try { ctr_online::backup_savedata(g.root, "before_launch"); }
     catch (const std::exception& error) {
-        MessageBoxW(g.window, (L"Save backup failed; launch cancelled:\n" + widen(error.what())).c_str(), kTitle, MB_ICONERROR);
+        MessageBoxW(g.window, (tr(L"Save backup failed; launch cancelled:") + std::wstring(L"\n") + widen(error.what())).c_str(), kTitle, MB_ICONERROR);
         g.lock.release();
         return;
     }
@@ -2043,13 +2051,13 @@ void launch_game() {
             // and the public matchmaking by itself.
             const std::string server_ip="127.0.0.1";
             const auto verified=ctr_online::verify_candidate_endpoint(server_ip+":8780",g.host_status.friend_code);
-            if(verified.status!=ctr_online::VerifyStatus::Verified) throw std::runtime_error("Identita del servizio locale non verificata");
+            if(verified.status!=ctr_online::VerifyStatus::Verified) throw std::runtime_error("Local service identity not verified");
             const auto online_dir=g.root / "runtime/user/online";
             fs::create_directories(online_dir);
             const auto key_path=online_dir / "party_traffic_key.der";
             std::ofstream key(key_path,std::ios::binary|std::ios::trunc);
             key.write(reinterpret_cast<const char*>(verified.traffic_key.data()),static_cast<std::streamsize>(verified.traffic_key.size()));
-            key.close();if(!key) throw std::runtime_error("Impossibile salvare la chiave della lobby");
+            key.close();if(!key) throw std::runtime_error("Could not save the lobby key");
             set[L"CTR_ONLINE"]=L"1";
             set[L"CTR_ONLINE_SERVER"]=widen(server_ip);
             set[L"CTR_ONLINE_TRAFFIC_KEY"]=key_path.wstring();
@@ -2090,7 +2098,7 @@ void launch_game() {
     if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
     if (!started) {
         g.lock.release();
-        MessageBoxW(g.window, (L"Unable to start ctrport.exe (error " + std::to_wstring(error) + L").").c_str(), kTitle, MB_ICONERROR);
+        MessageBoxW(g.window, trf(L"Unable to start ctrport.exe (error {0}).", std::to_wstring(error)).c_str(), kTitle, MB_ICONERROR);
         return;
     }
     CloseHandle(info.hThread);
@@ -2107,7 +2115,7 @@ void launch_game() {
         try {
             ctr_online::backup_savedata(root, "after_exit");
         } catch (const std::exception& error) {
-            MessageBoxW(window, (L"Local backup incomplete:\n" + widen(error.what())).c_str(), kTitle, MB_ICONWARNING);
+            MessageBoxW(window, (tr(L"Local backup incomplete:") + std::wstring(L"\n") + widen(error.what())).c_str(), kTitle, MB_ICONWARNING);
         }
         PostMessageW(window, WM_APP_FINISHED, code, 0);
     }).detach();
@@ -2145,7 +2153,7 @@ void game_finished(DWORD code) {
     const bool closed_by_user = !reasons.empty() && reasons.back().find("window closed") != std::string::npos;
     if (code == 0 && (reasons.empty() || closed_by_user)) return;
     std::wstring message = trf(L"The game stopped (exit code {0}).", std::to_wstring(code)) + L"\n\n";
-    if (reasons.empty()) message += L"No specific error found in the logs.\n";
+    if (reasons.empty()) message += tr(L"No specific error found in the logs.") + std::wstring(L"\n");
     for (std::size_t i = reasons.size() > 5 ? reasons.size() - 5 : 0; i < reasons.size(); ++i) message += widen(reasons[i]) + L"\n";
     message += L"\nLog: " + g.log_stem.wstring() + L".stdout.log";
     MessageBoxW(g.window, message.c_str(), kTitle, MB_ICONWARNING);
@@ -2601,7 +2609,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     DwmSetWindowAttribute(window, 35, &caption, sizeof(caption));
     DwmSetWindowAttribute(window, 36, &caption_text, sizeof(caption_text));
     DwmSetWindowAttribute(window, 34, &border, sizeof(border));
-    SetWindowTextW(window,classic_skin?L"CTR Native Ported — Classico":L"CTR Native Ported — Nitro Cinema");
+    SetWindowTextW(window,classic_skin?L"CTR Native Ported — Classic":L"CTR Native Ported — Nitro Cinema");
     ShowWindow(window, show);
     UpdateWindow(window);
 

@@ -33,7 +33,7 @@ Json verify_party_message(const Json& packet, const std::string& expected_code, 
 PartyLobby::PartyLobby(std::string owner) : owner_(std::move(owner)), room_(hex(random_bytes(32))), destination_(owner_) {}
 Json PartyLobby::recovery_checkpoint(const std::string& caller) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if(destination_!=owner_ || !members_.count(caller))throw std::runtime_error("Checkpoint riservato ai partecipanti");
+    if(destination_!=owner_ || !members_.count(caller))throw std::runtime_error("Checkpoint reserved for members");
     Json result=Json::object(),people=Json::array();
     result.set("format",Json::of("ctr-party-recovery-v1"));result.set("owner",Json::of(owner_));
     result.set("room",Json::of(room_));result.set("generation",Json::of(generation_));
@@ -139,23 +139,23 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
         if (members_.size()>=8) throw std::runtime_error("Lobby piena (8/8)");
         FriendCodeInfo target;
         if (parse_friend_code(request.at("target").text,target)!=CodeParseError::Ok) throw std::runtime_error("Invalid invited code");
-        if (invited_.size()>=64 && !invited_.count(target.code)) throw std::runtime_error("Troppi inviti pendenti");
+        if (invited_.size()>=64 && !invited_.count(target.code)) throw std::runtime_error("Too many pending invitations");
         invited_[target.code]={caller,now};
     } else if (action=="notify" || action=="receive_invite") {
         std::string sender=caller;
         if(action=="receive_invite") {
-            if(!self) throw std::runtime_error("Operazione riservata al launcher locale");
+            if(!self) throw std::runtime_error("Operation reserved for the local launcher");
             FriendCodeInfo from;
             if(parse_friend_code(request.at("from").text,from)!=CodeParseError::Ok) throw std::runtime_error("Invalid sender");
             sender=from.code;
         }
         FriendCodeInfo host;
         if (parse_friend_code(request.at("owner").text,host)!=CodeParseError::Ok) throw std::runtime_error("Invalid invitation host");
-        if (inbox_.size()>=64 && !inbox_.count(sender)) throw std::runtime_error("Troppi inviti ricevuti");
+        if (inbox_.size()>=64 && !inbox_.count(sender)) throw std::runtime_error("Too many invitations received");
         inbox_[sender]=host.code; inbox_seen_[sender]=now;
     } else if (action=="destination" || action=="new") {
-        if (!self) throw std::runtime_error("Operazione riservata al launcher locale");
-        if (members_.size()>1) throw std::runtime_error("La tua lobby contiene altri giocatori");
+        if (!self) throw std::runtime_error("Operation reserved for the local launcher");
+        if (members_.size()>1) throw std::runtime_error("Your lobby has other players");
         const std::string destination=action=="new" ? owner_ : request.at("owner").text;
         FriendCodeInfo target;
         if (parse_friend_code(destination,target)!=CodeParseError::Ok) throw std::runtime_error("Invalid destination");
@@ -168,7 +168,7 @@ Json PartyLobby::apply(const std::string& caller, const Json& request, bool frie
         for(auto it=inbox_.begin();it!=inbox_.end();) {
             if(it->second==destination_) { inbox_seen_.erase(it->first); it=inbox_.erase(it); } else ++it;
         }
-    } else if (action!="status") throw std::runtime_error("Azione lobby sconosciuta");
+    } else if (action!="status") throw std::runtime_error("Unknown lobby action");
     auto result = snapshot(caller);
     // Resolve the backup account from authenticated membership, never a caller
     // supplied account number. Only that member's join/configure/heartbeat gets it.

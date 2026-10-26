@@ -224,7 +224,7 @@ inline bool graphics_section_command(int id, int code) {
         changes.set(key, value);
         ctrport::settings::Store(config_path()).update(changes);
     } catch (const std::exception& error) {
-        MessageBoxW(g.window, widen(error.what()).c_str(), L"Settings were not saved", MB_ICONERROR);
+        MessageBoxW(g.window, widen(error.what()).c_str(), tr(L"Settings were not saved"), MB_ICONERROR);
     }
     if (key == "upscaler") g.cfg.upscaler = widen(value.text);
     if (key == "upscaling_mode") g.cfg.upscaling_mode = widen(value.text);

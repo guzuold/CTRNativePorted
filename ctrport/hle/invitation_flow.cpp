@@ -51,7 +51,7 @@ bool safe_id(const std::string& id, std::size_t maximum) {
 Json exchange(const std::string& method, const std::string& path, const std::string& body, int expected) {
     online::HttpResponse response;
     if (!online::http_exchange(method, path, {{"Content-Type", "application/json"}}, body, &response))
-        throw std::runtime_error(method + " " + path + ": servizio locale non raggiungibile");
+        throw std::runtime_error(method + " " + path + ": local service unreachable");
     if (response.status != expected)
         throw std::runtime_error(method + " " + path + ": HTTP " + std::to_string(response.status));
     return response.body.empty() ? Json::null() : ctr_online::parse_json(response.body);

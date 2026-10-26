@@ -71,18 +71,18 @@ void nitro_paint_chrome(Graphics& gr) {
     const float selected=nitro_nav_from+(nitro_nav_to-nitro_nav_from)*nitro_progress();
     fill_round(gr,rect(nitro::nav_center(selected)-33,53,66,5),2.5f,SolidBrush(Color(kArcadeGold)));
     std::wstring summary=g.cfg.resolution.substr(0,g.cfg.resolution.find(L' '));
-    summary+=g.cfg.fps_60 ? L"  ·  Limite 60 FPS" : L"  ·  Limite 30 FPS";
+    summary+=std::wstring(L"  ·  ")+tr(g.cfg.fps_60 ? L"60 FPS limit" : L"30 FPS limit");
     // Small vector gear; avoids symbol-font substitution at fractional DPI.
     const auto gear=gr.Save();gr.TranslateTransform(38,686);
     Pen teeth(Color(kTextLight),3);for(int i=0;i<8;++i){gr.RotateTransform(45);gr.DrawLine(&teeth,0.f,-6.f,0.f,-10.f);}
     Pen rim(Color(kTextLight),2.8f);gr.DrawEllipse(&rim,-6.f,-6.f,12.f,12.f);gr.Restore(gear);
-    text(gr,L"Configurazione  ·  "+summary,2,15,FontStyleRegular,rect(63,674,770,25),kTextLight);
+    text(gr,tr(L"Configuration")+std::wstring(L"  ·  ")+summary,2,15,FontStyleRegular,rect(63,674,770,25),kTextLight);
     text(gr,L"Launcher "+ctr_update::wide(ctr_update::version),2,14,FontStyleItalic,rect(1033,674,114,25),kTextLight,StringAlignmentCenter);
-    text(gr,L"Gioco 1.21",2,14,FontStyleItalic,rect(1168,674,90,25),kTextLight,StringAlignmentCenter);
+    text(gr,trf(L"Game {0}",L"1.21"),2,14,FontStyleItalic,rect(1168,674,90,25),kTextLight,StringAlignmentCenter);
 }
 void nitro_paint_home(Graphics& gr) {
     const auto color=g.can_launch ? kArcadeCyan : kArcadeOrange;
-    const std::wstring shaders=L"Traduzione shader "+std::to_wstring(g.shaders_percent)+L"%";
-    text(gr,g.process ? L"Gioco in esecuzione" : g.shaders_busy ? shaders.c_str() : g.xbox_busy ? L"Preparazione in corso" : g.can_launch ? L"Pronto a giocare" : L"Configura il percorso del gioco",2,25,FontStyleBold|FontStyleItalic,rect(70,476,560,38),color);
-    if(!g.can_launch) text(gr,L"Apri Avanzate per selezionare il tuo dump.",2,13,FontStyleRegular,rect(48,627,670,24),kTextMuted);
+    const std::wstring shaders=trf(L"Translating shaders {0}%",std::to_wstring(g.shaders_percent));
+    text(gr,g.process ? tr(L"Game running") : g.shaders_busy ? shaders.c_str() : g.xbox_busy ? tr(L"Preparing") : g.can_launch ? tr(L"Ready to play") : tr(L"Set up the game path"),2,25,FontStyleBold|FontStyleItalic,rect(70,476,560,38),color);
+    if(!g.can_launch) text(gr,tr(L"Open Advanced to select your dump."),2,13,FontStyleRegular,rect(48,627,670,24),kTextMuted);
 }
