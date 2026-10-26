@@ -1,3 +1,12 @@
+## v0.7.7 — 2026-10-27
+
+Mods from GameBanana, mods dropped on the launcher, and the PC-port mod format in the runtime.
+
+- **MODS tab:** one scrolling list instead of pages. At the top, a zone where a downloaded mod (`.zip`, `.7z`, `.rar` or a folder) can be dropped to install it; then the installed mods; then the mods for Crash Team Racing Nitro-Fueled (PC) on GameBanana, each with **PAGE** and **INSTALL** / **REMOVE**. Downloads are checked against GameBanana's MD5.
+- **PC-port mods (`mod.json`):** the runtime now applies them. A mod that changes assets inside a game archive (sounds, music, HUD) is applied without copying the archive, and only when the game's asset is exactly the one the mod was made for: mods made for another region or version are refused with a message instead of damaging the game. Patch files listed by a mod are applied while the mod is enabled. Mods that need shaders, settings or variants (the `nitro-mod.json` format) are not supported yet and are refused when installing.
+- **US game (issue #4):** with the US 1.21 dump the game still stopped at start, with Direct3D 11 and with Vulkan: the graphics switches are made for the EU eboot. With another eboot the game now starts with its original graphics settings; the in-game PC Settings menu is available only on EU 1.21 for now. US 1.21 has not been run by us yet: reports are welcome.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.6 — 2026-10-26
 
 Direct3D 11 for the US version of the game.
