@@ -35,4 +35,6 @@ void GfxDrawIndexOffset(u32 index_offset, u32 count);
 // NUM_THREAD_X / Y / Z), group counts. Reported and saved for translation, not run yet.
 void GfxDispatch(u64 program, const u32* regs, u32 x, u32 y, u32 z, u64 caller);
 u64 GfxDrawCount();
+// The display showing the window takes HDR10 (BT.2020 PQ) output.
+bool GfxHdrDisplay();
 u64 GnmSubmitCount();

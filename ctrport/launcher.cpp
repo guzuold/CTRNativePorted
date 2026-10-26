@@ -1237,8 +1237,13 @@ void validate() {
     EnableWindow(g.patch_edit, g.cfg.use_patch);
     EnableWindow(g.patch_browse, g.cfg.use_patch);
     EnableWindow(g.fps_toggle, g.cfg.use_patch);
-    // the Direct3D 11 backend has no scene upscaler yet
-    if (g.upscaler_combo) EnableWindow(g.upscaler_combo, g.cfg.renderer != L"d3d11");
+    // a package without the Direct3D 11 files (the step release that 0.6.1 updaters accept): Vulkan
+    const bool d3d11_installed = fs::exists(g.runtime_exe.parent_path() / "ctr_d3d.dll", ec);
+    if (!d3d11_installed && g.cfg.renderer == L"d3d11") {
+        g.cfg.renderer = L"vulkan";
+        if (g.renderer_combo) SendMessageW(g.renderer_combo, CB_SETCURSEL, 0, 0);
+    }
+    if (g.renderer_combo) EnableWindow(g.renderer_combo, d3d11_installed);
     for (HWND pill : g.pills) EnableWindow(pill, !g.cfg.fullscreen);
     EnableWindow(g.width_edit, !g.cfg.fullscreen && g.resolution == 4);
     EnableWindow(g.height_edit, !g.cfg.fullscreen && g.resolution == 4);
@@ -1921,16 +1926,11 @@ bool d3d11_ready() {
         prepare_d3d_shaders();
         return false;
     }
-    try {
-        const auto document = ctrport::settings::Store(config_path()).read();
-        for (const char* key : {"ambient_occlusion", "hero_shadows", "hdr_output", "hdr_peak_nits", "hdr_exposure"}) {
-            const auto* value = document.find(key);
-            if (value && value->is_string() && value->text != "original" && !(std::string(key) == "hdr_output" && value->text == "off")) {
-                MessageBoxW(g.window, trf(L"With Direct3D 11, set the PC setting {0} to Original.", widen(key)).c_str(), tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
-                return false;
-            }
-        }
-    } catch (const std::exception&) {}
+    // the temporal upscalers need the GPU library's Vulkan integration
+    if (g.cfg.upscaler == L"fsr3" || g.cfg.upscaler == L"dlss") {
+        MessageBoxW(g.window, tr(L"With Direct3D 11, choose Scene upscaling Off or AMD FSR 1."), tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
+        return false;
+    }
     return true;
 }
 
@@ -1990,7 +1990,7 @@ void launch_game() {
     set[L"CTR_NEO_MODE"] = L"1";
     set[L"CTR_SETTINGS_PATH"] = config_path().wstring();
     set[L"CTR_SCENE_HEIGHT"] = g.cfg.scene_height;
-    set[L"CTR_UPSCALER"] = g.cfg.renderer == L"d3d11" ? L"off" : g.cfg.upscaler;
+    set[L"CTR_UPSCALER"] = g.cfg.upscaler;
     if (g.cfg.renderer == L"d3d11") set[L"CTR_GPU_BACKEND"] = L"d3d11";
     set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";

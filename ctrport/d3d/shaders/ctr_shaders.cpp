@@ -33,6 +33,7 @@
 
 #include "../../settings/menu_assets.hpp"
 #include "shader_export.hpp"
+#include "variants.h"
 
 namespace fs = std::filesystem;
 using gcn::Bytes;
@@ -134,6 +135,7 @@ struct Result {
     std::string reason;
     std::vector<std::string> lines;
     Bytes dxbc;
+    std::vector<std::pair<std::string, Bytes>> variants;  // packed name, DXBC
 };
 
 // records read by ctrport/d3d/renderer.cpp LoadShaderIndex
@@ -150,8 +152,49 @@ std::vector<std::string> index_lines(const gcn::ShaderEntry& e, const gcn::Trans
     return out;
 }
 
-std::atomic<uint64_t> g_translate_ms{0}, g_compile_ms{0}, g_cached{0};  // summed over the worker threads
+std::atomic<uint64_t> g_translate_ms{0}, g_compile_ms{0}, g_cached{0}, g_variants{0};  // summed over the worker threads
 fs::path g_cache;  // <user>/dxbc_cache: compiled bytecode by HLSL hash, so a rebuild compiles only new shaders
+
+// HLSL -> DXBC through the cache; an empty result and the first error line when fxc refuses it
+Bytes compile(const std::string& hlsl, const char* target, std::string& error) {
+    const ULONGLONG t1 = GetTickCount64();
+    char leaf[64];
+    snprintf(leaf, sizeof(leaf), "%016llx_%s.dxbc", (unsigned long long)gcn::fnv1a64((const uint8_t*)hlsl.data(), hlsl.size()),
+             target);
+    const fs::path cached = g_cache / leaf;
+    Bytes dxbc;
+    if (std::ifstream f{cached, std::ios::binary}) {
+        dxbc.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+        if (!dxbc.empty()) {
+            g_cached++;
+            return dxbc;
+        }
+    }
+    ID3DBlob *code = nullptr, *err = nullptr;
+    const HRESULT hr = g_compile(hlsl.data(), hlsl.size(), nullptr, nullptr, nullptr, "main", target, 1 << 14 | 1 << 11, 0,
+                                 &code, &err);
+    g_compile_ms += GetTickCount64() - t1;
+    const std::string msg = blob_text(err);
+    if (err) err->Release();
+    if (FAILED(hr) || !code) {
+        if (code) code->Release();
+        error = msg.substr(0, 200);
+        for (const auto& l : gcn::split(msg, '\n'))
+            if (l.find("error") != std::string::npos) {
+                error = l;
+                break;
+            }
+        return {};
+    }
+    dxbc.assign((const uint8_t*)code->GetBufferPointer(), (const uint8_t*)code->GetBufferPointer() + code->GetBufferSize());
+    code->Release();
+    fs::path tmp = cached;
+    tmp += ".tmp" + std::to_string(GetCurrentThreadId());
+    std::ofstream(tmp, std::ios::binary).write((const char*)dxbc.data(), dxbc.size());
+    std::error_code ec;
+    fs::rename(tmp, cached, ec);
+    return dxbc;
+}
 
 Result work(const gcn::ShaderEntry& e, const fs::path& hlsl_dir) {
     const ULONGLONG t0 = GetTickCount64();
@@ -163,51 +206,36 @@ Result work(const gcn::ShaderEntry& e, const fs::path& hlsl_dir) {
         r.reason = ex.what();
         return r;
     }
+    g_translate_ms += GetTickCount64() - t0;
     if (!hlsl_dir.empty()) std::ofstream(hlsl_dir / (e.name + ".hlsl"), std::ios::binary) << t.hlsl;
     const char* target = e.kind == "vs" || e.kind == "es" ? "vs_5_0" : e.kind == "gs" ? "gs_5_0" : "ps_5_0";
-    const ULONGLONG t1 = GetTickCount64();
-    g_translate_ms += t1 - t0;
-    char leaf[64];
-    snprintf(leaf, sizeof(leaf), "%016llx_%s.dxbc", (unsigned long long)gcn::fnv1a64((const uint8_t*)t.hlsl.data(), t.hlsl.size()),
-             target);
-    const fs::path cached = g_cache / leaf;
-    if (std::ifstream f{cached, std::ios::binary}) {
-        r.dxbc.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
-        if (!r.dxbc.empty()) {
-            g_cached++;
-            r.status = Result::Compiled;
-            r.lines = index_lines(e, t);
-            return r;
-        }
-    }
-    ID3DBlob *code = nullptr, *err = nullptr;
-    const HRESULT hr = g_compile(t.hlsl.data(), t.hlsl.size(), nullptr, nullptr, nullptr, "main", target, 1 << 14 | 1 << 11, 0,
-                                 &code, &err);
-    g_compile_ms += GetTickCount64() - t1;
-    const std::string msg = blob_text(err);
-    if (err) err->Release();
-    if (FAILED(hr) || !code) {
-        if (code) code->Release();
+    r.dxbc = compile(t.hlsl, target, r.reason);
+    if (r.dxbc.empty()) {
         r.status = Result::CompileError;
-        r.reason = msg.substr(0, 200);
-        for (const auto& l : gcn::split(msg, '\n'))
-            if (l.find("error") != std::string::npos) {
-                r.reason = l;
-                break;
-            }
         return r;
-    }
-    r.dxbc.assign((const uint8_t*)code->GetBufferPointer(), (const uint8_t*)code->GetBufferPointer() + code->GetBufferSize());
-    code->Release();
-    {
-        fs::path tmp = cached;
-        tmp += ".tmp" + std::to_string(GetCurrentThreadId());
-        std::ofstream(tmp, std::ios::binary).write((const char*)r.dxbc.data(), r.dxbc.size());
-        std::error_code ec;
-        fs::rename(tmp, cached, ec);
     }
     r.status = Result::Compiled;
     r.lines = index_lines(e, t);
+    // PC settings that change this shader's code: "P <setting> <packed name>", same bindings
+    for (auto& v : shader_variants(e.code)) {
+        const std::string name = e.name + "~" + v.setting;
+        std::string error;
+        Bytes dxbc;
+        try {
+            const auto vt = gcn::translate_one(v.code, e.kind, e.gnm);
+            if (!hlsl_dir.empty()) std::ofstream(hlsl_dir / (name + ".hlsl"), std::ios::binary) << vt.hlsl;
+            dxbc = compile(vt.hlsl, target, error);
+        } catch (const std::exception& ex) {
+            error = ex.what();
+        }
+        if (dxbc.empty()) {
+            say("     %s: variant not built: %s", name.c_str(), error.c_str());
+            continue;
+        }
+        r.lines.push_back("P " + v.setting + " " + name);
+        r.variants.push_back({name, std::move(dxbc)});
+        g_variants++;
+    }
     return r;
 }
 
@@ -296,7 +324,7 @@ int run(int argc, wchar_t** argv) {
         });
     for (auto& t : pool) t.join();
 
-    say("     %llu from the bytecode cache; thread time: translation %llu s, compilation %llu s", (unsigned long long)g_cached,
+    say("     %llu setting variants, %llu from the bytecode cache; thread time: translation %llu s, compilation %llu s", (unsigned long long)g_variants, (unsigned long long)g_cached,
         g_translate_ms / 1000, g_compile_ms / 1000);
     say("step 4 4 packing");
     std::map<std::string, int> unsupported, compile_errors;
@@ -309,6 +337,7 @@ int run(int argc, wchar_t** argv) {
             compiled++;
             for (const auto& l : r.lines) text += l + "\n";
             blobs[todo[k]->name] = &r.dxbc;
+            for (const auto& [name, dxbc] : r.variants) blobs[name] = &dxbc;
         } else if (r.status == Result::Unsupported) {
             unsupported[r.reason.substr(0, 60)]++;
         } else {

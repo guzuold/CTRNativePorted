@@ -17,6 +17,11 @@ void VideoOutStartWindow(const char* title, int width, int height);
 const DisplayConfig& VideoOutDisplay();
 // The game's display gamma (sceVideoOutAdjustColor_), 1 until it sets one.
 float VideoOutGamma();
+// The game chose BT.2020 PQ output (sceVideoOutConfigureOutputMode_): its flip buffers hold
+// HDR10 code values.
+bool VideoOutHdr();
+// `addr` is one of the registered flip buffers (the game's display pass renders into it).
+bool VideoOutIsBuffer(u64 addr);
 // A flip of the registered buffer `index` (SubmitFlip, Gnm submit-and-flip, flip requests).
 void VideoOutFlip(int handle, int index, s64 arg);
 bool VideoOutHasFocus();

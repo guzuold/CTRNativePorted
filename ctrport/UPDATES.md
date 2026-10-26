@@ -95,6 +95,21 @@ The first release containing this feature must be installed manually by users
 of older launchers. Subsequent releases can use the in-app update path.
 This updater is included in the refreshed v0.4.0 package (2026-10-20). Even users already on v0.4.0 must download this refreshed package manually once. Future releases must use a higher version number.
 
+### New program files
+
+An installed launcher applies a package with its *installed* helper, so a path that
+helper's closed list lacks makes it refuse the whole ZIP. A release that adds program
+files therefore goes out in two steps:
+
+1. A release built with `build_release.ps1 -WithoutDirect3D11` (the files it would add
+   are left out) whose `launcher_update.ps1` lists the new paths. Installed launchers
+   accept it and install that helper.
+2. The next release, built normally, with the new files.
+
+The Direct3D 11 renderer (`build/CTRPort-gpu/ctr_d3d.dll`, `ctr_shaders.exe`) is the
+first such case: 0.6.1 and older helpers refuse it. A launcher without `ctr_d3d.dll`
+next to the runtime keeps the Vulkan renderer and disables the renderer choice.
+
 ## Repeatable checks
 
 Run with Windows PowerShell 5.1:

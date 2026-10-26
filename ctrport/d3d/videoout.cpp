@@ -17,6 +17,7 @@
 #include <thread>
 #include <vector>
 
+#include "../settings/display_controls/gpu_policy.hpp"
 #include "../settings/pacing_controls/gpu_policy.hpp"
 #include "equeue.h"
 #include "gfx.h"
@@ -217,11 +218,30 @@ SYSV int sceVideoOutSetBufferAttribute(void* attr, u32 fmt, u32 tiling, u32 aspe
     a[5] = pitch;
     return 0;
 }
-// Display capabilities: a plain SDR display (bit 0 would select the BT.2020 PQ output path).
+// HDR10 output is offered to the game when the PC setting asks for native HDR and the display
+// showing the window takes it (as the GPU library: the selection permits negotiation, the
+// display decides). CUSA14876 declares HDR support in its param.sfo.
+bool HdrOffered() {
+    static const bool offered = [] {
+        bool requested = false;
+        try {
+            requested = ctrport::settings::display::native_hdr();
+        } catch (const std::exception& e) {
+            Fatal("HDR setting: %s", e.what());
+        }
+        const bool display = requested && GfxHdrDisplay();
+        LOG("CTR_SETTINGS_HDR requested=%d display_pq10=%d available=%d", int(requested), int(display), int(display));
+        return display;
+    }();
+    return offered;
+}
+std::atomic<bool> g_hdr{false};
+constexpr u64 kCapabilityBt2020Pq = 0x80;
 SYSV int sceVideoOutGetDeviceCapabilityInfo_(int handle, u64* info, u64 size) {
     if (handle != kHandle) return kErrInvalidHandle;
     if (!info) return kErrInvalidAddress;
     memset(info, 0, size && size < 64 ? size : 8);
+    if (HdrOffered()) info[0] |= kCapabilityBt2020Pq;
     return 0;
 }
 struct Mode {
@@ -236,12 +256,17 @@ SYSV void sceVideoOutModeSetAny_(Mode* mode, u32 size) {
     memset(mode, 0xFF, size);
     mode->size = size;
 }
-// SDR output only: "any" colorimetry is accepted, the HDR request (BT.2020 PQ, 0x14) is not
-// offered by the capability query and is refused like a display without HDR.
+// "Any" colorimetry selects SDR output; BT.2020 PQ (12) selects HDR10 when it is offered, and is
+// refused like a display without HDR otherwise.
 SYSV int sceVideoOutConfigureOutputMode_(int handle, u32 reserved, const Mode* mode, const void*, u32, u32) {
     if (handle != kHandle) return kErrInvalidHandle;
     if (reserved || !mode) return kErrInvalidValue;
-    return mode->colorimetry == 0xFF ? 0 : kErrInvalidValue;
+    bool hdr;
+    if (mode->colorimetry == 0xFF) hdr = false;
+    else if (mode->colorimetry == 12 && HdrOffered()) hdr = true;
+    else return kErrInvalidValue;
+    if (g_hdr.exchange(hdr) != hdr) LOG("videoout: output mode %s", hdr ? "HDR10 (BT.2020 PQ)" : "SDR");
+    return 0;
 }
 struct ColorSettings {
     float gamma;
@@ -381,6 +406,12 @@ void VideoOutStartWindow(const char* title, int width, int height) {
 
 const DisplayConfig& VideoOutDisplay() { return g_display; }
 float VideoOutGamma() { return g_gamma; }
+bool VideoOutHdr() { return g_hdr; }
+bool VideoOutIsBuffer(u64 addr) {
+    for (u64 b : g_buffers)
+        if (b && b == addr) return true;
+    return false;
+}
 
 bool VideoOutHasFocus() { return g_hwnd && GetForegroundWindow() == g_hwnd; }
 HWND__* VideoOutHwndRaw() { return g_hwnd; }

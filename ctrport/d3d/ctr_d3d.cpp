@@ -92,7 +92,7 @@ void SyncSettingsEnvironment() {
     for (const char* key : {"CTR_GPU_PRESENT_MODE", "CTR_SETTINGS_ANISOTROPY", "CTR_SETTINGS_FSR1_SHARPEN",
                             "CTR_SETTINGS_HDR", "CTR_SETTINGS_GAMMA", "CTR_SETTINGS_HDR_PEAK", "CTR_SETTINGS_HDR_EXPOSURE",
                             "CTR_SETTINGS_PRESENTATION_LIMIT", "CTR_SETTINGS_WINDOW_MODE", "CTR_SETTINGS_DISPLAY_REFRESH",
-                            "CTR_UPSCALER", "CTR_GPU_WIDTH", "CTR_GPU_HEIGHT", "CTR_GPU_FULLSCREEN"}) {
+                            "CTR_UPSCALER", "CTR_GPU_AO", "CTR_GPU_HERO_SHADOWS", "CTR_GPU_WIDTH", "CTR_GPU_HEIGHT", "CTR_GPU_FULLSCREEN"}) {
         char value[256];
         const DWORD n = GetEnvironmentVariableA(key, value, sizeof(value));
         _putenv_s(key, n && n < sizeof(value) ? value : "");
@@ -108,26 +108,28 @@ extern "C" CTR_GPU_API int ctr_gpu_init(const CtrGpuConfig* config) {
     std::filesystem::create_directories("runtime/user/logs", ec);
     LogInit("runtime/user/logs/ctr_d3d.log");
     LOG("engine-state D3D11 backend, %zu exports, data in %s", Exports().size(), g_user_root.string().c_str());
-    // PC settings this backend does not provide yet are refused here, not ignored. The scene
-    // upscalers are the exception: the game's own Neo scaling then shows the internal resolution.
-    if (ctrport::settings::display::native_hdr()) Fatal("native HDR output is not available on the D3D11 backend");
-    const auto calibration = ctrport::settings::display::calibration();
-    if (calibration.peak != 0 || calibration.exposure != 1)
-        Fatal("HDR peak / exposure calibration is not available on the D3D11 backend");
-    if (const char* up = getenv("CTR_UPSCALER"); up && up[0] && strcmp(up, "off"))
-        LOG("scene upscaler %s is not available on the D3D11 backend: the internal resolution is scaled by the game", up);
+    // Invalid PC settings values are refused here, not ignored. The temporal scene upscalers (FSR 3,
+    // DLSS) are reported by the renderer: the game's own Neo scaling then shows the scene.
+    try {  // HDR selection and calibration values, checked as the GPU library checks them
+        (void)ctrport::settings::display::native_hdr();
+        (void)ctrport::settings::display::calibration();
+    } catch (const std::exception& e) {
+        Fatal("display settings: %s", e.what());
+    }
     VideoOutStartWindow(config->title, config->width, config->height);
     return 0;
 }
 
 // PC settings ABIs (ctrport/settings/renderer_startup.hpp): the controls this backend applies.
-// Renderer: presentation mode and anisotropy (FSR1 sharpness has no FSR1 pass to act on here, as
-// in the GPU library while FSR1 is off). Display: gamma (HDR values refused at start). Pacing:
-// presentation limit, window mode, exclusive refresh. AO and hero-shadow overrides: not yet.
+// Renderer: presentation mode, anisotropy, FSR 1 sharpness (live). Display: gamma, native HDR10 with peak / exposure. Pacing:
+// presentation limit, window mode, exclusive refresh. AO and hero shadows: the "off" versions of
+// the recognised shaders that ctr_shaders translates next to the originals (renderer.cpp).
 extern "C" __declspec(dllexport) unsigned ctr_gpu_settings_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_display_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_pacing_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_live_settings_abi() { return 1; }
+extern "C" __declspec(dllexport) unsigned ctr_gpu_ao_abi() { return 1; }
+extern "C" __declspec(dllexport) unsigned ctr_gpu_hero_abi() { return 1; }
 extern "C" __declspec(dllexport) unsigned ctr_gpu_live_settings_set(unsigned key, unsigned value) {
     return ctrport::settings::live_gpu::set(key, value);
 }

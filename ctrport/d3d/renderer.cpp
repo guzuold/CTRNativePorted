@@ -2,13 +2,14 @@
 // From FrankHUN88453/CTR-NitroFueled-PC 96b4aa5474b1d42b0d9f383349dc091ea9a2d385 port/src/gfx/renderer.cpp
 // (MIT, ctrport/d3d/LICENSE.FrankHUN88453); ctrport glue: guest memory, eboot and version tables, settings from the environment, render scale default 1 and frame size from the device, prologue-checked hooks, no button glyph override, captures under
 // runtime/user/gpu_d3d/capture; PC settings: presentation mode, presentation limit, display
-// gamma, anisotropy policy, window modes with exclusive fullscreen;
+// gamma, anisotropy policy, window modes with exclusive fullscreen, native HDR10 output, FSR 1
+// scene upscaling;
 // offset draws and the dispatch report added at the end.
 // D3D11 renderer driven by the engine's own render state (see gfx.h).
 #include <windows.h>
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
-#include <dxgi1_5.h>
+#include <dxgi1_6.h>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -49,6 +50,7 @@ struct ShaderInfo {
     std::vector<std::pair<int, bool>> samplers;  // slot, compare
     std::vector<int> cbuffers;
     std::vector<std::pair<int, int>> inputs;  // sem, size
+    std::vector<std::pair<std::string, std::string>> variants;  // PC setting, packed name (ctr_shaders)
     std::vector<u8> bytecode;
     ComPtr<ID3D11VertexShader> vs;
     ComPtr<ID3D11PixelShader> ps;
@@ -125,6 +127,7 @@ ComPtr<ID3D11DeviceContext> g_ctx;
 ComPtr<ID3D11DeviceContext1> g_ctx1;  // constant buffer offsets (D3D11.1)
 ComPtr<IDXGISwapChain> g_swap;
 ComPtr<ID3D11RenderTargetView> g_swap_rtv;
+bool g_swap_hdr = false;  // back buffers are R10G10B10A2 in the HDR10 color space
 fs::path g_shader_dir;
 std::atomic<u64> g_video_ms{0};  // last draw with a video shader
 // debugging aid: CTR_TRACE_DEPTH=<hex base>,<first frame> logs, for 12 frames, the draws per viewport
@@ -263,6 +266,8 @@ std::string LoadEmbeddedShaders() {
     return index;
 }
 
+bool ShaderSettingActive(const std::string& setting);
+
 void LoadShaderIndex() {
     char env[MAX_PATH] = {};
     wchar_t exe[MAX_PATH];
@@ -313,9 +318,20 @@ void LoadShaderIndex() {
             int s, n;
             is >> s >> n;
             cur->inputs.push_back({s, n});
+        } else if (cur && tag == 'P') {
+            std::string setting, name;
+            is >> setting >> name;
+            cur->variants.push_back({setting, name});
         }
     }
     LOG("gfx: %zu translated shaders indexed from %s", g_shaders.size(), g_shader_dir.string().c_str());
+    for (const char* setting : {"ao_off", "hero_off"}) {
+        if (!ShaderSettingActive(setting)) continue;
+        size_t n = 0;
+        for (const auto& [key, info] : g_shaders)
+            for (const auto& v : info.variants) n += v.first == setting;
+        LOG("gfx: PC setting %s: %zu shader versions%s", setting, n, n ? "" : " - shaders.bin predates them, rebuild it with ctr_shaders");
+    }
 }
 
 const char* kBlitHlsl = R"(
@@ -341,12 +357,31 @@ float4 psmain(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target {
 }
 // ctrport: display gamma (the game's brightness setting or the PC settings override), as the
 // GPU library's presenter applies it: sRGB decode, then encode with exponent 1 / (3.4 - gamma).
-cbuffer present : register(b1) { float present_gamma; float3 present_pad; };
+// HDR10 frames keep their PQ code values; the PC settings peak (nits, 0 = none) and exposure
+// recalibrate them as ctrport/settings/display_controls/color_math.inc does for the GPU library.
+cbuffer present : register(b1) { float present_gamma; float present_hdr; float present_peak; float present_exposure; };
 float3 srgb_decode(float3 c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
 float3 gamma_encode(float3 l) {
     return l < 0.0031308 ? 12.92 * l / present_gamma : 1.055 * pow(l, 1.0 / (2.4 + 1.0 - present_gamma)) - 0.055;
 }
+float3 pq_decode(float3 v) {
+    float3 p = pow(saturate(v), 1.0 / (2523.0 / 32.0));
+    return 10000.0 * pow(max(p - 3424.0 / 4096.0, 0.0) / max(2413.0 / 128.0 - (2392.0 / 128.0) * p, 0.000001), 1.0 / (2610.0 / 16384.0));
+}
+float3 pq_encode(float3 nits) {
+    float3 y = pow(saturate(nits / 10000.0), 2610.0 / 16384.0);
+    return pow((3424.0 / 4096.0 + (2413.0 / 128.0) * y) / (1.0 + (2392.0 / 128.0) * y), 2523.0 / 32.0);
+}
 float4 presentps(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target {
+    if (present_hdr != 0) {
+        float4 c = t0.Sample(s0, uv);
+        if (present_peak != 0 || present_exposure != 1) {
+            float3 nits = pq_decode(c.rgb) * present_exposure;
+            if (present_peak > 0) nits = min(nits, present_peak);
+            c.rgb = pq_encode(nits);
+        }
+        return c;
+    }
     float4 c = psmain(pos, uv);
     if (present_gamma != 1.0) c.rgb = gamma_encode(srgb_decode(saturate(c.rgb)));
     return c;
@@ -452,6 +487,32 @@ bool CreateSwapChain(HWND hwnd) {
         g_present_mode == PresentMode::Fifo ? "FIFO" : g_present_mode == PresentMode::Immediate ? "Immediate" : "Mailbox",
         g_tearing ? " (tearing supported)" : "");
     return true;
+}
+
+void InitSceneUpscale();
+
+// Switches the back buffers between SDR (RGBA8, sRGB) and HDR10 (R10G10B10A2, BT.2020 PQ) when the
+// game changes its output mode.
+void SetSwapHdr(bool hdr) {
+    if (hdr == g_swap_hdr) return;
+    ComPtr<IDXGISwapChain3> swap3;
+    if (FAILED(g_swap.As(&swap3))) Fatal("HDR output: DXGI 1.4 swap chain unavailable");
+    DXGI_SWAP_CHAIN_DESC sd;
+    g_swap->GetDesc(&sd);
+    g_ctx->OMSetRenderTargets(0, nullptr, nullptr);
+    g_swap_rtv.Reset();
+    const DXGI_FORMAT format = hdr ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;
+    const DXGI_COLOR_SPACE_TYPE space = hdr ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+    UINT support = 0;
+    if (FAILED(g_swap->ResizeBuffers(0, 0, 0, format, sd.Flags)) ||
+        FAILED(swap3->CheckColorSpaceSupport(space, &support)) || !(support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) ||
+        FAILED(swap3->SetColorSpace1(space)))
+        Fatal("HDR output: the swap chain refused %s", hdr ? "HDR10" : "SDR");
+    ComPtr<ID3D11Texture2D> bb;
+    g_swap->GetBuffer(0, IID_PPV_ARGS(&bb));
+    g_dev->CreateRenderTargetView(bb.Get(), nullptr, &g_swap_rtv);
+    g_swap_hdr = hdr;
+    LOG("gfx: swap chain output %s", hdr ? "HDR10 (R10G10B10A2, BT.2020 PQ)" : "SDR (RGBA8)");
 }
 
 bool Init() {
@@ -575,11 +636,22 @@ bool Init() {
         g_dev->CreateBuffer(&bd, nullptr, &g_copy_cb);
     }
     LoadShaderIndex();
+    InitSceneUpscale();
     LOG("gfx: D3D11 device ready");
     return true;
 }
 
 // ------------------------------------------------------------------ shaders
+// PC settings applied as shader versions (restart settings, as in the GPU library)
+bool ShaderSettingActive(const std::string& setting) {
+    const auto off = [](const char* key) {
+        const char* v = getenv(key);
+        return v && !strcmp(v, "off");
+    };
+    static const bool ao_off = off("CTR_GPU_AO"), hero_off = off("CTR_GPU_HERO_SHADOWS");
+    return (setting == "ao_off" && ao_off) || (setting == "hero_off" && hero_off);
+}
+
 // Saves a shader that has no ahead-of-time translation (code + Gnm struct) so that
 // tools/gcn2hlsl.py can translate it: missing_shaders/Rt_<hash>_<vs|ps>.bin/.gnm
 void DumpMissingShader(u64 handle, u64 code, u32 size, u64 hash, bool vertex) {
@@ -637,11 +709,18 @@ ShaderInfo* GetShader(u64 handle, bool vertex) {
             }
         }
         if (info->bytecode.empty()) {
-            auto e = g_embedded.find(info->name);
+            // the version of this shader a PC setting selects (ambient occlusion / hero shadows off)
+            std::string name = info->name;
+            for (const auto& [setting, variant] : info->variants)
+                if (ShaderSettingActive(setting)) {
+                    name = variant;
+                    LOG("gfx: %s uses its %s version", info->name.c_str(), setting.c_str());
+                }
+            auto e = g_embedded.find(name);
             if (e != g_embedded.end()) {
                 info->bytecode.assign(e->second.first, e->second.first + e->second.second);
             } else {
-                std::ifstream in(g_shader_dir / (info->name + ".dxbc"), std::ios::binary);
+                std::ifstream in(g_shader_dir / (name + ".dxbc"), std::ios::binary);
                 info->bytecode.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
             }
         }
@@ -1253,6 +1332,151 @@ ID3D11SamplerState* GetSampler(const u32* ss, bool cmp) {
     return (g_samplers[key] = st).Get();
 }
 
+// ------------------------------------------------------------------ FSR 1 scene upscaling
+// PC setting upscaler = fsr1 with a lower scene resolution: the game renders its 3D scene at that
+// resolution, then its display pass stretches it onto the display canvas and draws the HUD. As in
+// the GPU library, the finished scene is the color target bound before the first draw into a
+// registered flip buffer, in a frame that had a four-target G-buffer pass; the display pass then
+// samples the FSR 1 (EASU + RCAS) upscale instead, before the HUD is drawn over it.
+struct SceneUpscale {
+    bool enabled = false, gbuffer_seen = false, last_display = false, pending = false, done = false;
+    Surface* last_color = nullptr;  // color target 0 of the latest draw
+    Surface* source = nullptr;      // the finished scene of this frame
+    u32 out_w = 0, out_h = 0;       // the display target (physical pixels)
+    ComPtr<ID3D11ComputeShader> easu, rcas;
+    ComPtr<ID3D11Buffer> cb;
+    ComPtr<ID3D11SamplerState> sampler;
+    ComPtr<ID3D11Texture2D> tex[2];
+    ComPtr<ID3D11ShaderResourceView> srv[2];
+    ComPtr<ID3D11UnorderedAccessView> uav[2];
+    u32 w = 0, h = 0;
+    ID3D11ShaderResourceView* result = nullptr;
+    u64 frames = 0;
+} g_up;
+
+// the FSR sources (fsr/fsr1.hlsl and AMD's headers), embedded by CMake
+struct FsrSource {
+    const char* name;
+    const char* text;
+};
+const FsrSource kFsrSources[] = {
+#include "fsr_sources.inc"
+};
+struct FsrInclude : ID3DInclude {
+    HRESULT __stdcall Open(D3D_INCLUDE_TYPE, LPCSTR name, LPCVOID, LPCVOID* data, UINT* bytes) override {
+        for (const auto& s : kFsrSources)
+            if (!strcmp(s.name, name)) {
+                *data = s.text, *bytes = (UINT)strlen(s.text);
+                return S_OK;
+            }
+        return E_FAIL;
+    }
+    HRESULT __stdcall Close(LPCVOID) override { return S_OK; }
+};
+
+void InitSceneUpscale() {
+    const char* up = getenv("CTR_UPSCALER");
+    const std::string mode = up && up[0] ? up : "off";
+    if (mode == "off") return;
+    if (mode != "fsr1") {
+        LOG("gfx: scene upscaler %s is not available with Direct3D 11: the game's own scaling shows the scene",
+            mode.c_str());
+        return;
+    }
+    FsrInclude include;
+    for (int pass = 0; pass < 2; pass++) {
+        const D3D_SHADER_MACRO defines[] = {{pass ? "SAMPLE_RCAS" : "SAMPLE_EASU", "1"}, {nullptr, nullptr}};
+        ComPtr<ID3DBlob> code, err;
+        if (FAILED(D3DCompile(kFsrSources[0].text, strlen(kFsrSources[0].text), "fsr1.hlsl", defines, &include, "main",
+                              "cs_5_0", D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, &code, &err)))
+            Fatal("FSR 1 shader: %s", err ? (const char*)err->GetBufferPointer() : "?");
+        g_dev->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr,
+                                   pass ? &g_up.rcas : &g_up.easu);
+    }
+    D3D11_BUFFER_DESC bd{};
+    bd.ByteWidth = 32;
+    bd.Usage = D3D11_USAGE_DYNAMIC;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    g_dev->CreateBuffer(&bd, nullptr, &g_up.cb);
+    D3D11_SAMPLER_DESC sd{};
+    sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    sd.MaxLOD = D3D11_FLOAT32_MAX;
+    g_dev->CreateSamplerState(&sd, &g_up.sampler);
+    g_up.enabled = true;
+    LOG("gfx: scene upscaler FSR 1 ready");
+}
+
+// Per draw, before its textures are bound: the display-pass transition and G-buffer passes.
+void SceneUpscaleTrack(Surface* color0, u64 color0_base, u32 targets, bool depth) {
+    if (!g_up.enabled) return;
+    const bool display = color0 && VideoOutIsBuffer(color0_base);
+    if (display && !g_up.last_display) {
+        g_up.pending = g_up.gbuffer_seen && g_up.last_color && g_up.last_color != color0;
+        g_up.source = g_up.last_color;
+        g_up.gbuffer_seen = false;
+        g_up.done = false;
+        g_up.result = nullptr;
+        g_up.out_w = Scaled(color0->w, color0->scale), g_up.out_h = Scaled(color0->h, color0->scale);
+    } else if (!display) {
+        g_up.pending = false;
+    }
+    g_up.last_display = display;
+    if (targets == 4 && depth) g_up.gbuffer_seen = true;
+    if (color0) g_up.last_color = color0;
+}
+
+// The upscaled scene for the display pass (made at its first use in the frame), or null when the
+// sizes are not an upscale the GPU library would do.
+ID3D11ShaderResourceView* SceneUpscaled(Surface& src) {
+    if (g_up.done) return g_up.result;
+    g_up.done = true;
+    const u32 iw = Scaled(src.w, src.scale), ih = Scaled(src.h, src.scale), ow = g_up.out_w, oh = g_up.out_h;
+    if (iw >= ow || ih >= oh || iw * 4 < ow || std::fabs(double(iw) / ih - double(ow) / oh) > 0.02) return nullptr;
+    if (g_up.w != ow || g_up.h != oh) {
+        for (int i = 0; i < 2; i++) {
+            D3D11_TEXTURE2D_DESC td{};
+            td.Width = ow, td.Height = oh, td.MipLevels = td.ArraySize = 1;
+            td.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            td.SampleDesc.Count = 1;
+            td.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+            g_up.tex[i].Reset(), g_up.srv[i].Reset(), g_up.uav[i].Reset();
+            if (FAILED(g_dev->CreateTexture2D(&td, nullptr, &g_up.tex[i]))) return nullptr;
+            g_dev->CreateShaderResourceView(g_up.tex[i].Get(), nullptr, &g_up.srv[i]);
+            g_dev->CreateUnorderedAccessView(g_up.tex[i].Get(), nullptr, &g_up.uav[i]);
+        }
+        g_up.w = ow, g_up.h = oh;
+    }
+    const auto sharpness = ctrport::settings::renderer::environment_sharpness();
+    D3D11_MAPPED_SUBRESOURCE m;
+    if (FAILED(g_ctx->Map(g_up.cb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &m))) return nullptr;
+    const float c[8] = {(float)iw, (float)ih, (float)ow, (float)oh, sharpness.attenuation, 0, 0, 0};
+    memcpy(m.pData, c, sizeof(c));
+    g_ctx->Unmap(g_up.cb.Get(), 0);
+    g_ctx->CSSetConstantBuffers(0, 1, g_up.cb.GetAddressOf());
+    g_ctx->CSSetSamplers(0, 1, g_up.sampler.GetAddressOf());
+    const UINT gx = (ow + 15) / 16, gy = (oh + 15) / 16;
+    auto pass = [&](ID3D11ComputeShader* cs, ID3D11ShaderResourceView* in, ID3D11UnorderedAccessView* out) {
+        g_ctx->CSSetShader(cs, nullptr, 0);
+        g_ctx->CSSetShaderResources(0, 1, &in);
+        g_ctx->CSSetUnorderedAccessViews(0, 1, &out, nullptr);
+        g_ctx->Dispatch(gx, gy, 1);
+        ID3D11ShaderResourceView* no_srv = nullptr;
+        ID3D11UnorderedAccessView* no_uav = nullptr;
+        g_ctx->CSSetShaderResources(0, 1, &no_srv);
+        g_ctx->CSSetUnorderedAccessViews(0, 1, &no_uav, nullptr);
+    };
+    pass(g_up.easu.Get(), src.srv.Get(), g_up.uav[0].Get());
+    if (sharpness.enabled) pass(g_up.rcas.Get(), g_up.srv[0].Get(), g_up.uav[1].Get());
+    g_ctx->CSSetShader(nullptr, nullptr, 0);
+    g_up.result = g_up.srv[sharpness.enabled ? 1 : 0].Get();
+    if (++g_up.frames <= 3 || g_up.frames % 600 == 0)
+        LOG("CTR_UPSCALE_DISPATCH mode=fsr1 frame=%llu input=%ux%u output=%ux%u rcas=%d before_hud=1",
+            (unsigned long long)g_up.frames, iw, ih, ow, oh, int(sharpness.enabled));
+    return g_up.result;
+}
+
 void BindTextures(int stage, u64 ctx, u64 dev, const ShaderInfo* si) {
     ID3D11ShaderResourceView* srv[32] = {};
     u32 swz[32] = {};
@@ -1268,7 +1492,16 @@ void BindTextures(int stage, u64 ctx, u64 dev, const ShaderInfo* si) {
         if (ok) {
             swz[slot] = SwizzleCode((const u32*)t);
             auto it = g_surfaces.find(DecodeTSharp((const u32*)t).base);
-            if (it != g_surfaces.end()) g_tscale[stage][slot] = it->second.scale;
+            if (it != g_surfaces.end()) {
+                g_tscale[stage][slot] = it->second.scale;
+                // the display pass samples the finished scene: FSR 1 upscale in its place, with
+                // the scale that maps the game's texel coordinates onto it
+                if (stage == 1 && g_up.pending && &it->second == g_up.source && dims == 2 && !it->second.dsv)
+                    if (ID3D11ShaderResourceView* up = SceneUpscaled(it->second)) {
+                        srv[slot] = up;
+                        g_tscale[stage][slot] = (float)g_up.w / it->second.w;
+                    }
+            }
         }
     }
     if (stage == 0) memcpy(g_vs_swz, swz, sizeof(swz));
@@ -1698,9 +1931,11 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     }
     // render targets + viewport
     ID3D11RenderTargetView* rtv[8] = {};
-    u32 nrt = 0;
+    u32 nrt = 0, targets = 0;
     float rt_scale = 0;
     u32 rt_height = 0;
+    Surface* color0 = nullptr;
+    u64 color0_base = 0;
     for (int i = 0; i < 8; i++) {
         u64 h = Q(ctx + CTX_COLOR_TARGETS + i * 8);
         if (!h) continue;
@@ -1708,7 +1943,9 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
             rtv[i] = s->rtv.Get();
             s->rendered = true;
             nrt = i + 1;
+            targets++;
             if (!rt_scale) rt_scale = s->scale, rt_height = s->h;
+            if (i == 0) color0 = s, color0_base = (u64)R<u32>(h + 0x10) << 8;
         }
     }
     SECTION(1);
@@ -1719,6 +1956,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
         return;
     }
     g_draw_scale = rt_scale ? rt_scale : depth ? depth->scale : 1.0f;
+    SceneUpscaleTrack(color0, color0_base, targets, depth != nullptr);
     u32 dctl = R<u32>(ctx + CTX_DEPTH_STENCIL_CONTROL);
     bool zwrite = (dctl >> 2) & 1;
     // a pass that samples the depth buffer while depth-testing binds it read-only
@@ -2406,6 +2644,7 @@ bool GfxPresent(u64 addr) {
         LOG("cap: capturing frame %llu", (unsigned long long)g_frame);
     }
     auto it = g_surfaces.find(addr);
+    SetSwapHdr(VideoOutHdr());
     float black[4] = {0, 0, 0, 1};
     g_ctx->OMSetRenderTargets(1, g_swap_rtv.GetAddressOf(), nullptr);
     g_ctx->ClearRenderTargetView(g_swap_rtv.Get(), black);
@@ -2425,18 +2664,22 @@ bool GfxPresent(u64 addr) {
         g_ctx->IASetInputLayout(nullptr);
         g_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         g_ctx->VSSetShader(g_blit_vs.Get(), nullptr, 0);
-        // display gamma: the PC settings override, else the game's own setting
-        static const float settings_gamma = ctrport::settings::display::calibration().gamma;
-        const float gamma = settings_gamma != 0 ? settings_gamma : VideoOutGamma();
+        // display gamma: the PC settings override, else the game's own setting; HDR10: the
+        // settings peak and exposure
+        static const auto calibration = ctrport::settings::display::calibration();
+        const float gamma = calibration.gamma != 0 ? calibration.gamma : VideoOutGamma();
         static float last_gamma = -1;
-        if (g_present_ps && g_present_cb && gamma != last_gamma) {
+        static int last_hdr = -1;
+        if (g_present_ps && g_present_cb && (gamma != last_gamma || int(g_swap_hdr) != last_hdr)) {
             D3D11_MAPPED_SUBRESOURCE m;
             if (SUCCEEDED(g_ctx->Map(g_present_cb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &m))) {
-                const float cb[4] = {gamma, 0, 0, 0};
+                const float cb[4] = {gamma, g_swap_hdr ? 1.0f : 0.0f, calibration.peak, calibration.exposure};
                 memcpy(m.pData, cb, sizeof(cb));
                 g_ctx->Unmap(g_present_cb.Get(), 0);
                 last_gamma = gamma;
-                LOG("gfx: display gamma %.3f (%s)", gamma, settings_gamma != 0 ? "PC settings" : "game");
+                last_hdr = g_swap_hdr;
+                if (g_swap_hdr) LOG("gfx: HDR10 calibration peak %.0f nits exposure %.2f", calibration.peak, calibration.exposure);
+                else LOG("gfx: display gamma %.3f (%s)", gamma, calibration.gamma != 0 ? "PC settings" : "game");
             }
         }
         g_ctx->PSSetShader(g_present_ps ? g_present_ps.Get() : g_blit_ps.Get(), nullptr, 0);
@@ -2489,6 +2732,27 @@ bool GfxPresent(u64 addr) {
 }
 
 void GfxRecordFrames(int frames) { g_record_request = frames; }
+
+// The output showing the window advertises the HDR10 color space (Windows HDR on for that display).
+bool GfxHdrDisplay() {
+    ComPtr<IDXGIFactory1> factory;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return false;
+    HWND hwnd = VideoOutHwnd();
+    const HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY);
+    ComPtr<IDXGIAdapter1> adapter;
+    for (UINT a = 0; factory->EnumAdapters1(a, &adapter) != DXGI_ERROR_NOT_FOUND; a++) {
+        ComPtr<IDXGIOutput> output;
+        for (UINT o = 0; adapter->EnumOutputs(o, &output) != DXGI_ERROR_NOT_FOUND; o++) {
+            ComPtr<IDXGIOutput6> output6;
+            DXGI_OUTPUT_DESC1 desc{};
+            if (SUCCEEDED(output.As(&output6)) && SUCCEEDED(output6->GetDesc1(&desc)) && desc.Monitor == monitor) {
+                LOG("gfx: display %ls color space %d, peak %.0f nits", desc.DeviceName, (int)desc.ColorSpace, desc.MaxLuminance);
+                return desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+            }
+        }
+    }
+    return false;
+}
 
 // ------------------------------------------------------------------ ctrport additions
 void GfxDrawIndexOffset(u32 index_offset, u32 count) {

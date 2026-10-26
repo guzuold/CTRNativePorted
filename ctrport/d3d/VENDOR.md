@@ -20,6 +20,21 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
   `import_runtime_shaders.py`. Their output is byte-identical to the Python translator: same HLSL and
   same DXBC for all 3202 shaders it handles. They also read one more shader, the Fur GS of
   `update2.pak`, which the Python IGA reader could not read. `shaders/ctr_shaders.cpp` (GPL-2.0-or-later) is the tool.
+- FSR 1: `fsr/ffx_a.h`, `fsr/ffx_fsr1.h` (AMD FidelityFX, MIT), copied unchanged from shadPS4 v0.18.0
+  `src/video_core/host_shaders/fsr` (SHA256 `94d8d663…`, `4dc2022e…`). `fsr/fsr1.hlsl` is the D3D11 form
+  of shadPS4's `fsr.comp` (32-bit float path); CMake embeds the three into the DLL.
+- `shaders/variants.cpp` (GPL-2.0-only) reuses the GPU library's recognised-shader contracts
+  (`ctrport/gpu/ao_controls`, `ctrport/gpu/shadow_quality`).
+
+## PC settings
+
+| Setting | Direct3D 11 |
+|---|---|
+| present mode, presentation limit, window mode, exclusive refresh, anisotropy, display gamma | as before (first settings group) |
+| ambient occlusion off, hero shadows off | `ctr_shaders` translates the patched versions of the four AO shaders and the HeroShadows pixel shader next to the originals (index records `P <setting> <name>`); the renderer loads them at restart. Hero shadows also keep the runtime's CPU patch. |
+| native HDR, HDR peak, HDR exposure | HDR10 is offered to the game (capability BT.2020 PQ) when the setting asks for it and the window's display uses the HDR10 color space; the swap chain then switches to R10G10B10A2 with `DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020`, and the present shader applies peak / exposure as `color_math.inc` does |
+| scene upscaling FSR 1, FSR 1 sharpness | the finished scene (color target before the first draw into a flip buffer, after a four-target G-buffer pass) is upscaled with EASU + RCAS to the display target and sampled by the display pass in its place, before the HUD; sharpness is read every frame (live) |
+| scene upscaling FSR 3, DLSS | not available: logged, the game's own scaling shows the scene; the launcher asks for Off or FSR 1 |
 
 ## Engine addresses (per eboot SHA256, `engine.h`)
 
@@ -57,5 +72,5 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
   A call stops the process.
 - **2D macro-tiled textures:** only met as render targets sampled before their first draw. They read
   as transparent black.
-- **Not available on this backend:** PlayStation controllers through SDL, the FSR/DLSS presenter and
-  the gamma adjustment; supersampling is available with `CTR_D3D_RenderScale`.
+- **Not available on this backend:** PlayStation controllers through SDL, the temporal upscalers
+  (FSR 3, DLSS); supersampling is available with `CTR_D3D_RenderScale`.

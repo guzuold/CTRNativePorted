@@ -6,7 +6,10 @@
 # ctr_online_server.exe, the launcher, the Visual C++ runtime DLLs, assets and documents.
 # ctr_video.lib is compiled here without the GPU control suite of ctrport/video/build.ps1,
 # which needs local evidence that is not in this repository; its sources are the same.
-param([string]$OutputDirectory = 'build/release-local', [int]$Jobs = 12)
+# -WithoutDirect3D11: leave out ctr_d3d.dll and ctr_shaders.exe. Updaters of 0.6.1 and older refuse
+# a package with paths their closed list lacks; a release built this way carries the newer updater
+# first, and the next release can add the files (ctrport/UPDATES.md, "New program files").
+param([string]$OutputDirectory = 'build/release-local', [int]$Jobs = 12, [switch]$WithoutDirect3D11)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $out = Join-Path $root $OutputDirectory
@@ -58,7 +61,11 @@ foreach ($dll in 'ctr_gpu.dll', 'ctr_hle.dll') { Copy-Item (Join-Path $root "bui
 
 Step 'ctr_d3d.dll and ctr_shaders.exe (build/CTRPort-d3d): the Direct3D 11 renderer and its shader translator'
 & "$PSScriptRoot/d3d/build.ps1" -Jobs $Jobs -DllOnly
-foreach ($file in 'ctr_d3d.dll', 'ctr_shaders.exe') { Copy-Item (Join-Path $root "build/CTRPort-d3d/$file") $runtime -Force }
+if ($WithoutDirect3D11) {
+    foreach ($file in 'ctr_d3d.dll', 'ctr_shaders.exe') { Remove-Item -LiteralPath (Join-Path $runtime $file) -ErrorAction SilentlyContinue }
+} else {
+    foreach ($file in 'ctr_d3d.dll', 'ctr_shaders.exe') { Copy-Item (Join-Path $root "build/CTRPort-d3d/$file") $runtime -Force }
+}
 
 Step 'ctr_online_server.exe'
 & "$PSScriptRoot/online_server/build_online_server.ps1" -OutputDirectory "$OutputDirectory/obj/online_server"
