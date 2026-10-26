@@ -386,6 +386,7 @@ void VideoOutStartWindow(const char* title, int width, int height) {
         HWND h = CreateWindowA(wc.lpszClassName, name.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                                r.right - r.left, r.bottom - r.top, nullptr, nullptr, wc.hInstance, nullptr);
         ShowWindow(h, SW_SHOW);
+        SetForegroundWindow(h);  // exclusive fullscreen holds only while the window is in front
         // borderless covers the monitor; exclusive starts there and the swap chain takes the output
         if (g_display.mode != DisplayConfig::Windowed) SetFullscreen(h, g_fullscreen = true);
         {

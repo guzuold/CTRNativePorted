@@ -127,6 +127,7 @@ ComPtr<ID3D11DeviceContext> g_ctx;
 ComPtr<ID3D11DeviceContext1> g_ctx1;  // constant buffer offsets (D3D11.1)
 ComPtr<IDXGISwapChain> g_swap;
 ComPtr<ID3D11RenderTargetView> g_swap_rtv;
+DXGI_MODE_DESC g_exclusive_mode{};  // the display mode exclusive fullscreen asks for
 bool g_swap_hdr = false;  // back buffers are R10G10B10A2 in the HDR10 color space
 fs::path g_shader_dir;
 std::atomic<u64> g_video_ms{0};  // last draw with a video shader
@@ -465,6 +466,7 @@ bool CreateSwapChain(HWND hwnd) {
             }
         }
         if (!chosen) Fatal("requested resolution/refresh %dx%d@%.3f is unavailable on this display", dc.width, dc.height, hz);
+        g_exclusive_mode = *chosen;
         if (FAILED(g_swap->ResizeTarget(chosen)) || FAILED(g_swap->SetFullscreenState(TRUE, output.Get())) ||
             FAILED(g_swap->ResizeBuffers(0, dc.width, dc.height, DXGI_FORMAT_UNKNOWN, sd.Flags)))
             Fatal("exclusive fullscreen transition failed");
@@ -493,6 +495,43 @@ void InitSceneUpscale();
 
 // Switches the back buffers between SDR (RGBA8, sRGB) and HDR10 (R10G10B10A2, BT.2020 PQ) when the
 // game changes its output mode.
+// The back buffers again, at their size and format (after a fullscreen change).
+void ResizeSwapBuffers() {
+    DXGI_SWAP_CHAIN_DESC sd;
+    g_swap->GetDesc(&sd);
+    g_ctx->OMSetRenderTargets(0, nullptr, nullptr);
+    g_swap_rtv.Reset();
+    const HRESULT hr = g_swap->ResizeBuffers(0, sd.BufferDesc.Width, sd.BufferDesc.Height, DXGI_FORMAT_UNKNOWN, sd.Flags);
+    ComPtr<ID3D11Texture2D> bb;
+    g_swap->GetBuffer(0, IID_PPV_ARGS(&bb));
+    g_dev->CreateRenderTargetView(bb.Get(), nullptr, &g_swap_rtv);
+    if (FAILED(hr)) LOG("gfx: ResizeBuffers 0x%08lx", (unsigned long)hr);
+}
+
+// Exclusive fullscreen ends when the window leaves the foreground (Alt+Tab, another program in
+// front, the launcher at start). A flip-model swap chain then refuses Present
+// (DXGI_ERROR_INVALID_CALL) until its buffers are resized: the game kept running on a black
+// screen. The buffers follow every change, and fullscreen is taken again with the same display
+// mode when the window is back in front.
+void KeepExclusiveFullscreen(HRESULT last_present) {
+    if (VideoOutDisplay().mode != DisplayConfig::Exclusive) return;
+    static BOOL state = TRUE;
+    BOOL fullscreen = FALSE;
+    g_swap->GetFullscreenState(&fullscreen, nullptr);
+    if (!fullscreen && GetForegroundWindow() == VideoOutHwnd()) {
+        ComPtr<IDXGIOutput> output;
+        if (SUCCEEDED(g_swap->GetContainingOutput(&output)) && SUCCEEDED(g_swap->ResizeTarget(&g_exclusive_mode)) &&
+            SUCCEEDED(g_swap->SetFullscreenState(TRUE, output.Get())))
+            g_swap->GetFullscreenState(&fullscreen, nullptr);
+    }
+    if (fullscreen != state || last_present == DXGI_ERROR_INVALID_CALL) {
+        ResizeSwapBuffers();
+        LOG("gfx: exclusive fullscreen %s at frame %llu", fullscreen ? "taken again" : "left (window not in front)",
+            (unsigned long long)g_frame);
+        state = fullscreen;
+    }
+}
+
 void SetSwapHdr(bool hdr) {
     if (hdr == g_swap_hdr) return;
     ComPtr<IDXGISwapChain3> swap3;
@@ -2644,6 +2683,8 @@ bool GfxPresent(u64 addr) {
         LOG("cap: capturing frame %llu", (unsigned long long)g_frame);
     }
     auto it = g_surfaces.find(addr);
+    static HRESULT last_present = S_OK;
+    KeepExclusiveFullscreen(last_present);
     SetSwapHdr(VideoOutHdr());
     float black[4] = {0, 0, 0, 1};
     g_ctx->OMSetRenderTargets(1, g_swap_rtv.GetAddressOf(), nullptr);
@@ -2725,9 +2766,12 @@ bool GfxPresent(u64 addr) {
     // PC settings presentation limit (startup value or live revision), then the presentation mode
     ctrport::settings::pacing::wait_before_present();
     double tp = NowMs();
-    g_swap->Present(g_present_mode == PresentMode::Fifo ? 1 : 0,
+    const HRESULT presented = g_swap->Present(g_present_mode == PresentMode::Fifo ? 1 : 0,
                     g_present_mode == PresentMode::Immediate && g_tearing ? DXGI_PRESENT_ALLOW_TEARING : 0);
     g_present_ms += NowMs() - tp;
+    if (presented != last_present && presented != DXGI_STATUS_OCCLUDED)
+        LOG("gfx: Present 0x%08lx at frame %llu", (unsigned long)presented, (unsigned long long)g_frame);
+    last_present = presented;
     return true;
 }
 
