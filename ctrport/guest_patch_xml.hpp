@@ -389,6 +389,13 @@ inline std::map<std::string, std::string> read_sfo(const fs::path& path) {
     return out;
 }
 
+// The XML patch files of enabled octr-mod mods (mod name, file), set at startup by
+// octr_mods.hpp: every patch in them is applied while its mod is enabled.
+inline std::vector<std::pair<std::wstring, fs::path>>& mod_patch_files() {
+    static std::vector<std::pair<std::wstring, fs::path>> files;
+    return files;
+}
+
 // --- Runtime: apply the selected patches of CTR_PATCHES_DIR to the mapped eboot -----------
 // Returns the number of patches applied. Problems in a selected patch stop the launch.
 inline int apply_selected(unsigned char* image, const Spans& spans, const std::string& title_id, const std::string& app_ver,
@@ -396,6 +403,23 @@ inline int apply_selected(unsigned char* image, const Spans& spans, const std::s
     const auto selection = read_selection(selection_path);
     // Every selected patch is validated before the first byte is written.
     std::vector<std::pair<std::wstring, std::vector<Write>>> chosen_writes;
+    for (const auto& [mod, path] : mod_patch_files()) {
+        std::vector<Patch> patches;
+        const std::wstring file = mod + L"/" + path.filename().wstring();
+        try { patches = parse_patches(mods::read_text(path), file); }
+        catch (const std::exception& e) { throw std::runtime_error("patch file " + utf8(file) + " cannot be read: " + e.what()); }
+        for (const auto& patch : patches) {
+            const auto why = mismatch(patch, title_id, app_ver);
+            if (!why.empty()) {
+                std::fprintf(stderr, "Patches: %s: skipped, %s\n", utf8(patch.key()).c_str(), why.c_str());
+                continue;
+            }
+            std::vector<Write> writes;
+            try { writes = plan(patch, image, spans, patch.app_ver == app_ver); }
+            catch (const std::exception& e) { throw std::runtime_error("patch " + utf8(patch.key()) + ": " + e.what()); }
+            chosen_writes.push_back({patch.key(), std::move(writes)});
+        }
+    }
     for (const auto& file : load_folder(dir)) {
         if (!file.error.empty()) {
             const auto prefix = file.file + L"/";
@@ -435,7 +459,8 @@ inline int apply_selected(unsigned char* image, const Spans& spans, const std::s
 inline int apply_from_environment(unsigned char* image, const Spans& spans, const std::string& title_id, unsigned version) {
     wchar_t dir[32768]{}, config[32768]{};
     const DWORD dir_len = GetEnvironmentVariableW(L"CTR_PATCHES_DIR", dir, 32768);
-    if (!dir_len || dir_len >= 32768) return 0;
+    if ((!dir_len || dir_len >= 32768) && mod_patch_files().empty()) return 0;
+    if (dir_len >= 32768) dir[0] = 0;
     const DWORD config_len = GetEnvironmentVariableW(L"CTR_PATCHES_CONFIG", config, 32768);
     const fs::path selection = config_len && config_len < 32768 ? fs::path(config) : fs::path(dir) / L"patches.json";
     char app_ver[8];

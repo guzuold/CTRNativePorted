@@ -38,6 +38,7 @@
 #include "bank_dispatch.hpp"
 #include <algorithm>
 #include "entry_boundary.hpp"
+#include "octr_mods.hpp"
 #include "single_r32_draw_control.hpp"
 #include "gnm_flip_tail.hpp"
 #include "gnm_write_data.hpp"
@@ -1755,7 +1756,8 @@ int main(int argc, char** argv) {
                 ctrport::kernel_files.configure(base_path, patch_path);
                 ctrport::kernel_files.configure_user("runtime/user/data");
                 // CTR_MODS_DIR: enabled loose-file mods override /app0 files (mod_overlay.hpp).
-                try { ctrport::mods::overlay.configure_from_environment({patch_path, base_path}); }
+                // octr-mod mods (mod.json): asset changes inside archives and their patch files (octr_mods.hpp).
+                try { ctrport::mods::overlay.configure_from_environment({patch_path, base_path}); ctrport::octr::configure(base_path, patch_path); }
                 catch (const std::exception& error) { throw std::runtime_error(std::string("Mods: ") + error.what()); }
             }
             std::vector<ctrport::MappedImage> images;

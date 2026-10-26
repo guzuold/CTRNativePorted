@@ -31,6 +31,48 @@ Changes apply at the next launch. "Use mods and patches" turns both off at once.
   - each file overridden between mods (`Mods: path: A -> B`);
   - a total in the form `Mods: N game files replaced, M added`.
 
+## octr-mod mods (`mod.json`)
+
+Most mods for the PC ports on GameBanana are folders with a `mod.json` manifest (schemaVersion 2).
+A folder in `runtime/mods` with `mod.json` at its top is applied by the runtime
+(`octr_mods.hpp`) while the mod is enabled, in the load order of the other mods:
+
+- `archive_asset` operations change one entry inside a game archive (`archives/<archive>`):
+  the entry becomes the mod's `payload` file, or the original entry with the `runs` byte
+  changes applied. The entry the game would read must have the manifest's `original_sha256`,
+  and the result its `patched_sha256`; otherwise the launch stops and the log names the mod and
+  the asset. Mods made for another region or version of the game stop here instead of
+  damaging it (for example, assets that differ between CUSA14876 and CUSA13795).
+- The archive is not copied: the runtime serves the original file with the replaced entries
+  appended after its end, stored uncompressed, and only their 16-byte descriptors redirected
+  (the same view the PC Settings menu uses for `update.pak` and `update2.pak`, which it continues).
+- The `patches` listed in the manifest are applied while the mod is enabled (all patches in
+  those files, with the TitleID and AppVer rules of patch files below).
+- The `files` hashes are checked at startup.
+- Game folders inside the mod (`archives/`, ...) are loose files as in any other mod; its
+  payloads and manifest are not.
+- Any other capability (shaders, settings, variants of the `nitro-mod.json` format) or
+  operation kind is refused by name, by the launcher when installing and by the runtime.
+
+`ctrport/octr_mods_control.cpp` applies the mods of a folder to the user's own game folders,
+read-only, and reads every replaced entry back through the view.
+
+## Installing mods from the launcher
+
+The FILE MODS view is one scrolling list:
+
+- a drop zone: `.zip`, `.7z` and `.rar` archives (extracted with the Windows `tar.exe`) and
+  folders dropped anywhere on the launcher are installed;
+- the installed mods;
+- the GameBanana catalog of the PC ports (game 26138; `gamebanana.hpp`), with a page button and
+  INSTALL / REMOVE. Downloads are checked against their MD5 on GameBanana.
+
+What a download or a dropped item installs: a `mod.json` folder whole; otherwise its game
+folders, or loose `.pak` files into `archives/`, as one mod; patch XML files into
+`runtime/patches` (`gb<id>-` prefix for downloads). Links, `eboot.bin`, `sce_module`, `sce_sys`
+and manifests the runtime cannot apply are refused before anything is written. What each
+download installed is kept in `runtime/user/gamebanana.json`, so REMOVE deletes only that.
+
 ## Patch files: `runtime/patches`
 
 - These are XML files in the shadPS4 / GoldHEN format (`<Patch>`, `<TitleID><ID>`,
@@ -63,4 +105,5 @@ Changes apply at the next launch. "Use mods and patches" turns both off at once.
 ## Checks
 
 `powershell -File ctrport/test_mods.ps1` builds `mods_test.cpp` as C++17 (runtime) and C++20
-(launcher) and runs 49 checks on synthetic files. No game files are used.
+(launcher) and runs 52 checks on synthetic files, then builds `gamebanana_test.cpp` (launcher) and runs
+23 checks of the catalog parsing and the installer. No game files and no network are used.

@@ -26,50 +26,7 @@ void paint_window(HDC target) {
             // 3a/3b/3c share the uninterrupted purple Pit Lane shell.
 
             if (g.current_tab == TAB_MODS) {
-                text(gr, L"MODS", 0, 36.0f, FontStyleBold, page_rect(296, 76, 300, 40), kArcadeGold);
-                int active = 0;
-                for (const auto& mod : g.mod_list) active += mod.enabled;
-                for (std::size_t i = 0; i < g.patch_list.size(); ++i)
-                    active += !g.patch_warn[i] && ctrport::guest_patches::selected(g.patch_list[i], g.patch_selection);
-                draw_slanted_box(gr, page_rect(410, 84, 120, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
-                text(gr, g.cfg.mods_enabled ? trf(L"{0} ENABLED", std::to_wstring(active)) : std::wstring(tr(L"ALL OFF")), 1, 11.0f, FontStyleBold,
-                     page_rect(410, 84, 120, 26), g.cfg.mods_enabled && active ? kArcadeLime : kTextMuted, StringAlignmentCenter);
-
-                const bool files = g.mods_view == 0;
-                const int count = files ? static_cast<int>(g.mod_list.size()) : static_cast<int>(g.patch_list.size());
-                const float alpha = g.cfg.mods_enabled ? 1.f : 0.5f;
-                if (count == 0) {
-                    const RectF empty_card = page_rect(296, 176, 694, 100);
-                    fill_round(gr, empty_card, 16, SolidBrush(Color(kArcadeCard)));
-                    stroke_round(gr, empty_card, 16, kArcadeDark, 3.0f);
-                    text(gr, tr(files ? L"No mods yet" : L"No patch files yet"), 0, 22.0f, FontStyleBold, page_rect(320, 196, 640, 30), kTextLight);
-                    text(gr, trf(L"Folder: {0}", files ? L"runtime/mods" : L"runtime/patches"), 1, 12.0f, FontStyleRegular, page_rect(320, 236, 640, 20), kArcadeCyan);
-                }
-                for (int row = 0; row < kModRows; ++row) {
-                    const int i = g.mods_page * kModRows + row;
-                    if (i >= count) break;
-                    const float y = 176.f + row * 52.f;
-                    const bool on = g.mod_row_on[row];
-                    const bool warn = files ? g.mod_bad[i] : g.patch_warn[i];
-                    fill_round(gr, page_rect(296, y, 694, 44), 14, SolidBrush(Color(kArcadeCard)));
-                    stroke_round(gr, page_rect(296, y, 694, 44), 14, kArcadeDark, 3.0f);
-                    PointF badge_pts[] = {PointF(nitro::page_x(296), nitro::page_y(y)), PointF(nitro::page_x(344), nitro::page_y(y)), PointF(nitro::page_x(335), nitro::page_y(y+44)), PointF(nitro::page_x(296), nitro::page_y(y+44))};
-                    SolidBrush badge_br(Color(fade(on && g.cfg.mods_enabled ? (warn ? kArcadeOrange : files ? kArcadeLime : kArcadeCyan) : kTextOff, alpha)));
-                    gr.FillPolygon(&badge_br, badge_pts, 4);
-                    Pen badge_pen(Color(kArcadeDark), 3.0f);
-                    gr.DrawPolygon(&badge_pen, badge_pts, 4);
-                    text(gr, std::to_wstring(i + 1), 0, 18.0f, FontStyleBold, page_rect(296, y + 8, 42, 28), kArcadeDark, StringAlignmentCenter);
-                    const std::wstring name = files ? g.mod_list[i].name : widen(g.patch_list[i].name);
-                    const std::wstring& detail = files ? g.mod_details[i] : g.patch_details[i];
-                    text(gr, name, 1, 13.5f, FontStyleBold, page_rect(354, y + 4, files ? 470.f : 560.f, 20), fade(kTextLight, alpha));
-                    text(gr, detail, 1, 10.5f, FontStyleRegular, page_rect(354, y + 24, files ? 470.f : 560.f, 18), fade(warn ? kArcadeOrange : kTextMuted, alpha));
-                }
-                const int pages = std::max(1, (count + kModRows - 1) / kModRows);
-                const std::wstring footer = trf(L"Page {0} / {1}", std::to_wstring(g.mods_page + 1), std::to_wstring(pages));
-                text(gr, footer, 1, 11.5f, FontStyleBold, page_rect(396, 544, 494, 30), kTextMuted, StringAlignmentCenter);
-                const std::wstring notice = !g.mods_notice.empty() ? g.mods_notice
-                    : g.mods_game.empty() ? std::wstring(tr(L"Game version unknown")) : trf(L"Game: {0}", g.mods_game);
-                text(gr, notice, 1, 11.0f, FontStyleRegular, page_rect(296, 582, 694, 22), g.mods_notice_error ? kArcadePink : kTextMuted, StringAlignmentCenter);
+                mods_list_paint(gr);  // launcher_mods.hpp
             } else if (g.current_tab == TAB_TROPHIES) {
                 text(gr, tr(L"TROPHIES"), 0, 36.0f, FontStyleBold, page_rect(296, 76, 300, 40), kArcadeGold);
                 const auto total = g.trophy_set.trophies.size();

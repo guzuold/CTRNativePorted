@@ -213,10 +213,17 @@ inline bool readme_file(const fs::path& path) {
     const auto ext = fold(path.extension().wstring());
     return ext == L".txt" || ext == L".md" || ext == L".jpg" || ext == L".jpeg" || ext == L".png" || ext == L".ini" || ext == L".json";
 }
+// An octr-mod mod (mod.json at the top of its folder, octr_mods.hpp): only its game folders
+// are loose files; its payloads, patches and manifest are applied by octr_mods.hpp.
+inline bool octr_mod(const fs::path& folder) {
+    std::error_code ec;
+    return fs::is_regular_file(folder / L"mod.json", ec);
+}
 // The folder of a mod that corresponds to the game's /app0.
 inline fs::path content_root(const fs::path& mod) {
     fs::path root = mod;
     for (int depth = 0; depth < 2; ++depth) {
+        if (octr_mod(root)) return root;
         std::vector<fs::path> folders;
         bool other_files = false;
         for (const auto& entry : fs::directory_iterator(root)) {
@@ -262,6 +269,7 @@ inline Index build_index(const std::vector<Mod>& mods, const std::vector<fs::pat
         if (!mod.enabled) continue;
         if (is_reparse(mod.folder)) throw std::runtime_error("mod " + utf8(mod.name) + ": links are not supported");
         const auto root = content_root(mod.folder);
+        const bool octr = octr_mod(root);
         std::size_t count = 0;
         for (auto it = fs::recursive_directory_iterator(root); it != fs::recursive_directory_iterator(); ++it) {
             const auto relative = it->path().lexically_relative(root);
@@ -272,6 +280,10 @@ inline Index build_index(const std::vector<Mod>& mods, const std::vector<fs::pat
                 if (top == L"eboot.bin" || top == L"sce_module" || top == L"sce_sys")
                     throw std::runtime_error("mod " + utf8(mod.name) + ": replacing " + utf8(relative.wstring()) +
                                              " is not supported; code changes belong in patch XML files");
+            }
+            if (octr && it.depth() == 0 && !(it->is_directory() && game_folder(relative.wstring()))) {
+                it.disable_recursion_pending();
+                continue;
             }
             if (!it->is_regular_file()) continue;
             if (it.depth() == 0 && readme_file(relative) && !game_folder(relative.wstring())) {
@@ -304,12 +316,17 @@ class Overlay {
     std::mutex mutex_;
     bool active_ = false;
     Index index_;
+    std::vector<Mod> octr_;
 public:
     bool active() { std::lock_guard<std::mutex> lock(mutex_); return active_; }
     void configure(const fs::path& mods_dir, const fs::path& config, const std::vector<fs::path>& game_roots) {
-        auto index = build_index(list_mods(mods_dir, read_config(config)), game_roots);
+        const auto mods = list_mods(mods_dir, read_config(config));
+        auto index = build_index(mods, game_roots);
         std::lock_guard<std::mutex> lock(mutex_);
         index_ = std::move(index);
+        octr_.clear();
+        for (const auto& mod : mods)
+            if (mod.enabled && octr_mod(content_root(mod.folder))) octr_.push_back({mod.name, content_root(mod.folder), true});
         active_ = true;
         for (const auto& line : index_.log) std::fprintf(stderr, "%s\n", line.c_str());
         std::fflush(stderr);
@@ -330,6 +347,8 @@ public:
         return it == index_.files.end() ? fs::path{} : it->second;
     }
     std::size_t files() { std::lock_guard<std::mutex> lock(mutex_); return index_.files.size(); }
+    // Enabled octr-mod mods in load order, each with the folder holding its mod.json.
+    std::vector<Mod> octr_mods() { std::lock_guard<std::mutex> lock(mutex_); return octr_; }
 };
 inline Overlay overlay;
 }

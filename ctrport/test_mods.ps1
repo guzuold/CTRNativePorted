@@ -19,3 +19,9 @@ foreach ($std in 'c++17', 'c++20') {
     & $exe
     if ($LASTEXITCODE -ne 0) { throw "mods test failed ($std)" }
 }
+# GameBanana downloads (launcher only, C++20): synthetic API answers and extracted folders.
+$exe = Join-Path $out 'gamebanana_test.exe'
+& $cl /nologo /O2 /W4 /WX /EHsc /utf-8 /std:c++20 "$PSScriptRoot/gamebanana_test.cpp" "$PSScriptRoot/online_server/json.cpp" "/Fo$out/" "/Fe$exe" *> "$out/build_gamebanana.log"
+if ($LASTEXITCODE -ne 0) { Get-Content "$out/build_gamebanana.log" -Tail 30; throw 'gamebanana test build failed' }
+& $exe
+if ($LASTEXITCODE -ne 0) { throw 'gamebanana test failed' }

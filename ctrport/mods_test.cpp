@@ -57,6 +57,25 @@ int main() {
     check(mods::content_root(dir / "Gamma") == dir / "Gamma/Gamma v1/CUSA14876", "layout: wrapper and CUSA14876 folder");
     check(mods::content_root(dir / "Delta") == dir / "Delta/Delta", "layout: one wrapper folder");
 
+    // octr-mod (mod.json): the folder is the root even with one subfolder; only its game
+    // folders are loose files, its payloads and manifest are not.
+    {
+        const auto octr = root / "octr";
+        put(octr / "Voice/mod.json", "{}");
+        put(octr / "Voice/assets/entry1.bin", "payload");
+        put(octr / "Gauge/mod.json", "{}");
+        put(octr / "Gauge/payloads/x.igz", "payload");
+        put(octr / "Gauge/archives/extra.pak", "extra");
+        put(octr / "Gauge/octr-mod.required", "");
+        check(mods::content_root(octr / "Voice") == octr / "Voice" && mods::octr_mod(octr / "Voice"), "octr-mod: mod.json folder is the root");
+        const auto octr_index = mods::build_index(mods::list_mods(octr, {}), {patch, base});
+        check(octr_index.files.size() == 1 && octr_index.files.count(L"archives/extra.pak") == 1, "octr-mod: only game folders are loose files");
+        mods::Overlay overlay;
+        overlay.configure(octr, root / "none.json", {patch, base});
+        const auto enabled = overlay.octr_mods();
+        check(enabled.size() == 2 && enabled[0].name == L"Gauge" && enabled[1].folder == octr / "Voice", "octr-mod: enabled mods listed in load order");
+    }
+
     auto list = mods::list_mods(dir, {});
     check(list.size() == 4 && list[0].name == L"Alpha" && list[1].name == L"beta" && list[3].name == L"Gamma",
           "new mods appended alphabetically, case-insensitive, hidden skipped");

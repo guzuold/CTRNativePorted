@@ -44,6 +44,7 @@ namespace Gdiplus { using std::min; using std::max; }
 #include "settings/store.hpp"
 #include "settings/menu_catalog.hpp"
 #include "guest_patch_xml.hpp"
+#include "gamebanana.hpp"
 #include "launcher_text.hpp"
 #include "trophy_data.hpp"
 #include <shlwapi.h>
@@ -78,6 +79,9 @@ constexpr UINT WM_APP_HOST_READY = WM_APP + 2;
 constexpr UINT WM_APP_XBOX_READY = WM_APP + 3;
 constexpr UINT WM_APP_SHADERS_PROGRESS = WM_APP + 4;
 constexpr UINT WM_APP_SHADERS_READY = WM_APP + 5;
+constexpr UINT WM_APP_GB_CATALOG = WM_APP + 6;
+constexpr UINT WM_APP_GB_PROGRESS = WM_APP + 7;
+constexpr UINT WM_APP_GB_DONE = WM_APP + 8;
 
 // Design 2a Pit Lane Palette (from Claude Design token specification)
 ARGB kArcadeBg      = 0xFF10152C;  // Deep arcade purple/indigo
@@ -148,13 +152,15 @@ enum : int {
     ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT, ID_ONLINE_HOST, ID_ONLINE_FRIENDS, ID_WUMPA_X100
 };
 
-// MODS tab: a page of kModRows rows, each with a toggle and (file mods) move buttons.
-constexpr int kModRows = 7;
+// MODS tab: a scrolling list (launcher_mods.hpp) drawn with a pool of kModRows row slots, each
+// with a toggle and move buttons (installed mods, patches) or page and install buttons (GameBanana).
+constexpr int kModRows = 9;
 enum : int {
-    ID_MODS_FILES = 200, ID_MODS_PATCHES, ID_MODS_MASTER, ID_MODS_REFRESH, ID_MODS_PREV, ID_MODS_NEXT,
+    ID_MODS_FILES = 200, ID_MODS_PATCHES, ID_MODS_MASTER, ID_MODS_REFRESH,
     ID_MOD_ROW_TOGGLE = 210, ID_MOD_ROW_UP = 220, ID_MOD_ROW_DOWN = 230,
     ID_TROPHY_KEY_EDIT = 240, ID_TROPHY_IMPORT,
-    ID_PLAYER_PAD = 250  // 250..253: the controller of players 1..4
+    ID_PLAYER_PAD = 250,  // 250..253: the controller of players 1..4
+    ID_GB_ROW_PAGE = 260, ID_GB_ROW_GET = 270  // GameBanana rows: open the mod's page, install or remove
 };
 // TROPHIES tab: a grid of the game's trophy icons.
 constexpr int kTrophyColumns = 12;
@@ -392,10 +398,22 @@ struct App {
     ctrport::guest_patches::Selection patch_selection;
     std::wstring mods_notice, mods_game;
     bool mods_notice_error = false;
-    int mods_view = 0, mods_page = 0;  // view 0: file mods, 1: patches
+    int mods_view = 0;  // view 0: file mods (installed, then GameBanana), 1: patches
+    float mods_scroll = 0;  // list scroll position (page coordinates)
+    int mod_slot_item[kModRows]{};  // the list item each row slot shows, -1 when unused
     bool mod_row_on[kModRows]{};
     HWND mod_row_toggle[kModRows]{}, mod_row_up[kModRows]{}, mod_row_down[kModRows]{};
-    HWND mods_prev = nullptr, mods_next = nullptr;
+    // GameBanana rows (gamebanana.hpp): the online catalog and what was installed from it.
+    std::vector<ctrport::gamebanana::Entry> gb_list;
+    std::map<std::uint64_t, ctrport::gamebanana::Installed> gb_installed;
+    std::wstring gb_error;
+    bool gb_loading = false, gb_loaded = false;
+    HWND gb_row_page[kModRows]{}, gb_row_get[kModRows]{};
+    // The install in progress (a download or a dropped file): one at a time.
+    bool mods_busy = false;
+    std::uint64_t mods_busy_id = 0;  // GameBanana id, 0 for a dropped file
+    int mods_busy_percent = -1;      // download progress, -1 while extracting and installing
+    std::wstring mods_busy_name;
     // TROPHIES tab (trophy_data.hpp)
     ctr_trophy::Set trophy_set;
     std::map<int, std::int64_t> trophy_unlocked;
@@ -1128,6 +1146,7 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
 inline float settings_scroll = 0;
 void validate();
 #include "launcher_graphics.hpp"
+#include "launcher_mods.hpp"
 #include "classic_pages.hpp"
 #include "nitro_pages.hpp"
 #include "classic_controls.hpp"
@@ -1509,6 +1528,9 @@ fs::path mods_dir() { return g.root / "runtime/mods"; }
 fs::path mods_config_path() { return g.root / "runtime/user/mods.json"; }
 fs::path patches_dir() { return g.root / "runtime/patches"; }
 fs::path patches_config_path() { return g.root / "runtime/user/patches.json"; }
+// What was installed from GameBanana, and the folder for downloads and extraction.
+fs::path gamebanana_registry() { return g.root / "runtime/user/gamebanana.json"; }
+fs::path gamebanana_work() { return g.root / "runtime/user/gamebanana"; }
 
 void reload_mods() {
     namespace mods = ctrport::mods;
@@ -1528,12 +1550,23 @@ void reload_mods() {
             const auto inner = mods::content_root(mod.folder).lexically_relative(mod.folder).generic_wstring();
             g.mod_details.push_back(trf(L"{0} game files", std::to_wstring(index.files.size())) + (inner.empty() || inner == L"." ? L"" : L" \u00b7 " + inner + L"/"));
             g.mod_bad.push_back(index.files.empty());
-            if (index.files.empty()) g.mod_details.back() = tr(L"No game files found");
+            if (const auto root = mods::content_root(mod.folder); mods::octr_mod(root)) {
+                // octr-mod: the runtime applies its manifest (octr_mods.hpp)
+                const auto manifest = ctrport::gamebanana::read_manifest(root / L"mod.json");
+                g.mod_details.back() = !manifest.problem.empty() ? widen(manifest.problem)
+                    : trf(L"{0} asset changes", std::to_wstring(manifest.operations)) + L" \u00b7 " + trf(L"{0} patch files", std::to_wstring(manifest.patches)) +
+                      (index.files.empty() ? L"" : L" \u00b7 " + trf(L"{0} game files", std::to_wstring(index.files.size())));
+                g.mod_bad.back() = !manifest.problem.empty();
+            } else if (index.files.empty()) {
+                g.mod_details.back() = tr(L"No game files found");
+            }
         } catch (const std::exception& e) {
             g.mod_details.push_back(widen(e.what()));
             g.mod_bad.push_back(true);
         }
     }
+    try { g.gb_installed = ctrport::gamebanana::read_installed(gamebanana_registry()); }
+    catch (const std::exception& e) { if (g.mods_notice.empty()) { g.mods_notice = widen(e.what()); g.mods_notice_error = true; } }
     // The game the patches are checked against: TITLE_ID and APP_VER of the eboot that will run.
     std::string title, version;
     g.mods_game.clear();
@@ -1718,33 +1751,6 @@ void import_trophy_key() {
     SetWindowTextW(g.trophy_key_edit, widen(key).c_str());  // EN_CHANGE saves and reloads
 }
 
-void sync_mod_rows() {
-    if (!g.mods_prev) return;
-    const bool files = g.mods_view == 0;
-    const int count = files ? static_cast<int>(g.mod_list.size()) : static_cast<int>(g.patch_list.size());
-    const int pages = std::max(1, (count + kModRows - 1) / kModRows);
-    g.mods_page = std::clamp(g.mods_page, 0, pages - 1);
-    const bool shown = g.current_tab == TAB_MODS;
-    for (int row = 0; row < kModRows; ++row) {
-        const int i = g.mods_page * kModRows + row;
-        const bool used = i < count;
-        if (used) g.mod_row_on[row] = files ? g.mod_list[i].enabled : ctrport::guest_patches::selected(g.patch_list[i], g.patch_selection);
-        ShowWindow(g.mod_row_toggle[row], shown && used ? SW_SHOW : SW_HIDE);
-        ShowWindow(g.mod_row_up[row], shown && used && files ? SW_SHOW : SW_HIDE);
-        ShowWindow(g.mod_row_down[row], shown && used && files ? SW_SHOW : SW_HIDE);
-        EnableWindow(g.mod_row_up[row], used && i > 0);
-        EnableWindow(g.mod_row_down[row], used && i + 1 < count);
-        for (HWND control : {g.mod_row_toggle[row], g.mod_row_up[row], g.mod_row_down[row]}) InvalidateRect(control, nullptr, FALSE);
-    }
-    ShowWindow(g.mods_prev, shown && pages > 1 ? SW_SHOW : SW_HIDE);
-    ShowWindow(g.mods_next, shown && pages > 1 ? SW_SHOW : SW_HIDE);
-    EnableWindow(g.mods_prev, g.mods_page > 0);
-    EnableWindow(g.mods_next, g.mods_page + 1 < pages);
-    for (const auto& entry : g.controls)
-        if (entry.second.kind == Kind::Segment) InvalidateRect(entry.first, nullptr, FALSE);
-    InvalidateRect(g.window, nullptr, FALSE);
-}
-
 // Saves the order and switches of the file mods, or the patch choices.
 void save_mods_choice(int index, bool toggle, int move) {
     try {
@@ -1758,8 +1764,6 @@ void save_mods_choice(int index, bool toggle, int move) {
                 const bool bad = g.mod_bad[index];
                 g.mod_bad[index] = g.mod_bad[other];
                 g.mod_bad[other] = bad;
-                // Keep the moved mod on screen.
-                g.mods_page = other / kModRows;
             }
             ctrport::mods::write_config(mods_config_path(), ctrport::mods::config_of(g.mod_list));
         } else {
@@ -1773,6 +1777,189 @@ void save_mods_choice(int index, bool toggle, int move) {
         g.mods_notice_error = true;
     }
     sync_mod_rows();
+}
+
+// The list index (mod, patch or GameBanana entry) of the item a row slot shows, -1 for none.
+int slot_index(int slot) {
+    if (slot < 0 || slot >= kModRows || g.mod_slot_item[slot] < 0) return -1;
+    const auto list = mods_list::items();
+    return g.mod_slot_item[slot] < static_cast<int>(list.size()) ? list[g.mod_slot_item[slot]].index : -1;
+}
+
+// --- GameBanana and dropped mods (gamebanana.hpp) -----------------------------------------------
+// Work for a background thread: the catalog, or one install (a GameBanana file or a dropped
+// archive or folder). The result comes back to the window with WM_APP_GB_CATALOG / _DONE.
+struct ModsJob {
+    std::vector<ctrport::gamebanana::Entry> catalog;
+    std::uint64_t id = 0;               // GameBanana id, 0 for a dropped file
+    ctrport::gamebanana::File file;     // the GameBanana file
+    fs::path source;                    // the dropped archive or folder
+    std::wstring title;
+    bool has_previous = false;
+    ctrport::gamebanana::Installed previous, installed;
+    std::wstring error;
+};
+
+void load_gamebanana(bool force) {
+    if (g.gb_loading || (g.gb_loaded && !force)) return;
+    g.gb_loading = true;
+    g.gb_error.clear();
+    const HWND window = g.window;
+    std::thread([window] {
+        auto* job = new ModsJob;
+        try { job->catalog = ctrport::gamebanana::fetch_catalog(); }
+        catch (const std::exception& e) { job->error = widen(e.what()); }
+        if (!PostMessageW(window, WM_APP_GB_CATALOG, 0, reinterpret_cast<LPARAM>(job))) delete job;
+    }).detach();
+    sync_mod_rows();
+}
+
+void gamebanana_catalog_ready(ModsJob* job) {
+    std::unique_ptr<ModsJob> owned(job);
+    g.gb_loading = false;
+    g.gb_loaded = job->error.empty();
+    g.gb_error = job->error;
+    if (job->error.empty()) g.gb_list = std::move(job->catalog);
+    sync_mod_rows();
+}
+
+// Runs one install on a background thread: download (GameBanana), extraction, installation.
+void start_mods_job(std::unique_ptr<ModsJob> job) {
+    namespace gb = ctrport::gamebanana;
+    g.mods_busy = true;
+    g.mods_busy_id = job->id;
+    g.mods_busy_percent = job->id ? 0 : -1;
+    g.mods_busy_name = job->title;
+    g.mods_notice.clear();
+    g.mods_notice_error = false;
+    const HWND window = g.window;
+    const fs::path work = gamebanana_work(), mods = mods_dir(), patches = patches_dir();
+    std::thread([window, work, mods, patches, job = job.release()] {
+        const fs::path staging = work / (L"staging-" + std::to_wstring(GetCurrentThreadId()));
+        fs::path archive;
+        try {
+            std::error_code ec;
+            fs::remove_all(staging, ec);
+            fs::create_directories(work);
+            fs::path from = job->source;
+            if (job->id) {
+                archive = work / (std::to_wstring(job->file.id) + L"-" + gb::safe_name(gb::wide(job->file.name)));
+                int shown = -1;
+                gb::http_get(widen(job->file.url), &archive, [&](std::uint64_t received, std::uint64_t total) {
+                    const int percent = total ? static_cast<int>(received * 100 / total) : 0;
+                    if (percent != shown) PostMessageW(window, WM_APP_GB_PROGRESS, static_cast<WPARAM>(shown = percent), 0);
+                });
+                PostMessageW(window, WM_APP_GB_PROGRESS, static_cast<WPARAM>(-1), 0);
+                if (!job->file.md5.empty() && gb::md5_hex(archive) != job->file.md5)
+                    throw std::runtime_error("the downloaded file does not match its MD5 on GameBanana");
+                from = archive;
+            }
+            if (!fs::is_directory(from)) {
+                gb::extract(from, staging);
+                from = staging;
+            }
+            const std::wstring prefix = job->id ? L"gb" + std::to_wstring(job->id) + L"-" : L"";
+            job->installed = gb::install_extracted(from, mods, patches, prefix, job->title, job->has_previous ? &job->previous : nullptr);
+            job->installed.file = job->id ? job->file.name : narrow(job->source.filename().wstring());
+        } catch (const std::exception& e) {
+            job->error = widen(e.what());
+        }
+        std::error_code ec;
+        fs::remove_all(staging, ec);
+        if (!archive.empty()) fs::remove(archive, ec);
+        if (!PostMessageW(window, WM_APP_GB_DONE, 0, reinterpret_cast<LPARAM>(job))) delete job;
+    }).detach();
+    sync_mod_rows();
+}
+
+std::vector<fs::path> dropped_queue;  // dropped while another install runs
+void install_dropped(const std::vector<fs::path>& paths);
+
+void mods_install_done(ModsJob* job) {
+    std::unique_ptr<ModsJob> owned(job);
+    g.mods_busy = false;
+    g.mods_busy_id = 0;
+    g.mods_busy_percent = -1;
+    std::wstring notice;
+    bool error = !job->error.empty();
+    if (error) {
+        notice = trf(L"{0} was not installed: {1}", job->title, job->error);
+    } else {
+        if (job->id) {
+            g.gb_installed[job->id] = job->installed;
+            try { ctrport::gamebanana::write_installed(gamebanana_registry(), g.gb_installed); }
+            catch (const std::exception& e) { notice = widen(e.what()); error = true; }
+        }
+        if (!error)
+            notice = job->installed.patches.empty() ? trf(L"Installed: {0}", job->title)
+                                                    : trf(L"Installed: {0}. Turn its patches on under PATCHES.", job->title);
+    }
+    reload_mods();
+    g.mods_notice = notice;
+    g.mods_notice_error = error;
+    sync_mod_rows();
+    if (error) dropped_queue.clear();  // the notice shows what failed
+    else if (!dropped_queue.empty()) install_dropped({});
+}
+
+// INSTALL or REMOVE of a GameBanana row.
+void gamebanana_get(int index) {
+    namespace gb = ctrport::gamebanana;
+    if (g.mods_busy || index < 0 || index >= static_cast<int>(g.gb_list.size())) return;
+    const gb::Entry& entry = g.gb_list[index];
+    const auto found = g.gb_installed.find(entry.id);
+    if (found != g.gb_installed.end()) {
+        if (MessageBoxW(g.window, trf(L"Remove {0}?", gb::wide(entry.name)).c_str(), kTitle, MB_YESNO | MB_ICONQUESTION) != IDYES) return;
+        try {
+            gb::remove_installed(found->second, mods_dir(), patches_dir());
+            g.gb_installed.erase(found);
+            gb::write_installed(gamebanana_registry(), g.gb_installed);
+            reload_mods();
+            g.mods_notice = trf(L"Removed: {0}", gb::wide(entry.name));
+        } catch (const std::exception& e) {
+            reload_mods();
+            g.mods_notice = widen(e.what());
+            g.mods_notice_error = true;
+        }
+        sync_mod_rows();
+        return;
+    }
+    // Downloads with several files (variants): the user picks one.
+    std::size_t chosen = 0;
+    if (entry.files.size() > 1) {
+        const HMENU menu = CreatePopupMenu();
+        for (std::size_t i = 0; i < entry.files.size(); ++i)
+            AppendMenuW(menu, MF_STRING, i + 1, (gb::wide(entry.files[i].name) + L"\t" + gb::size_text(entry.files[i].size)).c_str());
+        POINT at{};
+        GetCursorPos(&at);
+        const int picked = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, at.x, at.y, 0, g.window, nullptr);
+        DestroyMenu(menu);
+        if (picked <= 0) return;
+        chosen = static_cast<std::size_t>(picked - 1);
+    }
+    auto job = std::make_unique<ModsJob>();
+    job->id = entry.id;
+    job->file = entry.files[chosen];
+    job->title = gb::wide(entry.name);
+    start_mods_job(std::move(job));
+}
+
+// Archives (.zip, .7z, .rar) and folders dropped on the launcher, installed one after another.
+void install_dropped(const std::vector<fs::path>& paths) {
+    if (g.current_tab != TAB_MODS) { reload_mods(); load_gamebanana(false); select_tab(TAB_MODS); }
+    if (g.mods_view != 0) { g.mods_view = 0; g.mods_scroll = 0; }
+    for (const auto& path : paths) {
+        std::error_code ec;
+        const auto ext = ctrport::mods::fold(path.extension().wstring());
+        if (fs::is_directory(path, ec) || ext == L".zip" || ext == L".7z" || ext == L".rar") dropped_queue.push_back(path);
+        else { g.mods_notice = trf(L"Not a mod archive or folder: {0}", path.filename().wstring()); g.mods_notice_error = true; }
+    }
+    if (g.mods_busy || dropped_queue.empty()) { sync_mod_rows(); return; }
+    auto job = std::make_unique<ModsJob>();
+    job->source = dropped_queue.front();
+    dropped_queue.erase(dropped_queue.begin());
+    job->title = fs::is_directory(job->source) ? job->source.filename().wstring() : job->source.stem().wstring();
+    start_mods_job(std::move(job));
 }
 
 // Checked again at launch: the runtime refuses the same problems, but here they get a dialog.
@@ -1976,6 +2163,10 @@ void launch_game() {
     if (update_preparing || update_handoff) return;
     validate();
     if (!g.can_launch || g.process || g.xbox_busy || g.shaders_busy) return;
+    if (g.mods_busy) {
+        MessageBoxW(g.window, tr(L"Wait until the mod is installed."), kTitle, MB_ICONINFORMATION);
+        return;
+    }
     if (g.cfg.upscaler == L"dlss" &&
         (!fs::exists(g.runtime_exe.parent_path() / "ctr_dlss.dll") ||
          !fs::exists(g.runtime_exe.parent_path() / "nvngx_dlss.dll"))) {
@@ -2220,7 +2411,21 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     switch (message) {
     case WM_MOUSEWHEEL:
         if (graphics_section_wheel(GET_WHEEL_DELTA_WPARAM(wparam))) return 0;
+        if (mods_list_wheel(GET_WHEEL_DELTA_WPARAM(wparam))) return 0;
         break;
+    case WM_DROPFILES: {
+        // Archives and folders dropped anywhere on the launcher are installed as mods.
+        const HDROP drop = reinterpret_cast<HDROP>(wparam);
+        std::vector<fs::path> paths;
+        for (UINT i = 0, n = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0); i < n; ++i) {
+            std::wstring path(DragQueryFileW(drop, i, nullptr, 0) + 1, L'\0');
+            path.resize(DragQueryFileW(drop, i, path.data(), static_cast<UINT>(path.size())));
+            paths.push_back(path);
+        }
+        DragFinish(drop);
+        install_dropped(paths);
+        return 0;
+    }
     case WM_CREATE: {
         g.window = window;
         g.field_brush = CreateSolidBrush(RGB(16, 21, 44));
@@ -2228,6 +2433,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         render_base_layer();
         g.updating = true;
         create_controls();
+        DragAcceptFiles(window, TRUE);  // mods dropped on the launcher (WM_DROPFILES)
         for(HWND child=GetWindow(window,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT))
             SetWindowLongPtrW(child,GWL_STYLE,GetWindowLongPtrW(child,GWL_STYLE)|WS_CLIPSIBLINGS);
         g.updating = false;
@@ -2394,38 +2600,43 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         // Tab selection
         if (id >= ID_TAB_BASE && id < ID_TAB_BASE + static_cast<int>(TAB_COUNT)) {
             const int tab = id - ID_TAB_BASE;
-            if (tab == TAB_MODS) reload_mods();  // folders may have changed outside the launcher
+            if (tab == TAB_MODS) { reload_mods(); load_gamebanana(false); }  // folders may have changed outside the launcher
             if (tab == TAB_TROPHIES) reload_trophies();  // the game may have unlocked trophies
             if (tab == TAB_SETTINGS) refresh_pads();
             select_tab(tab);
             return 0;
         }
 
-        // MODS tab
+        // MODS tab: row buttons act on the list item their slot shows
         if (id >= ID_MOD_ROW_TOGGLE && id < ID_MOD_ROW_TOGGLE + kModRows) {
-            save_mods_choice(g.mods_page * kModRows + id - ID_MOD_ROW_TOGGLE, true, 0);
+            save_mods_choice(slot_index(id - ID_MOD_ROW_TOGGLE), true, 0);
             return 0;
         }
         if (id >= ID_MOD_ROW_UP && id < ID_MOD_ROW_UP + kModRows) {
-            save_mods_choice(g.mods_page * kModRows + id - ID_MOD_ROW_UP, false, -1);
+            save_mods_choice(slot_index(id - ID_MOD_ROW_UP), false, -1);
             return 0;
         }
         if (id >= ID_MOD_ROW_DOWN && id < ID_MOD_ROW_DOWN + kModRows) {
-            save_mods_choice(g.mods_page * kModRows + id - ID_MOD_ROW_DOWN, false, 1);
+            save_mods_choice(slot_index(id - ID_MOD_ROW_DOWN), false, 1);
+            return 0;
+        }
+        if (id >= ID_GB_ROW_PAGE && id < ID_GB_ROW_PAGE + kModRows) {
+            const int index = slot_index(id - ID_GB_ROW_PAGE);
+            if (index >= 0 && index < static_cast<int>(g.gb_list.size()) && g.gb_list[index].profile.rfind("https://gamebanana.com/", 0) == 0)
+                ShellExecuteW(nullptr, L"open", widen(g.gb_list[index].profile).c_str(), nullptr, nullptr, SW_SHOW);
+            return 0;
+        }
+        if (id >= ID_GB_ROW_GET && id < ID_GB_ROW_GET + kModRows) {
+            gamebanana_get(slot_index(id - ID_GB_ROW_GET));
             return 0;
         }
         if (id == ID_MODS_FILES || id == ID_MODS_PATCHES) {
             g.mods_view = id == ID_MODS_PATCHES;
-            g.mods_page = 0;
+            g.mods_scroll = 0;
             sync_mod_rows();
             return 0;
         }
-        if (id == ID_MODS_PREV || id == ID_MODS_NEXT) {
-            g.mods_page += id == ID_MODS_NEXT ? 1 : -1;
-            sync_mod_rows();
-            return 0;
-        }
-        if (id == ID_MODS_REFRESH) { reload_mods(); sync_mod_rows(); return 0; }
+        if (id == ID_MODS_REFRESH) { reload_mods(); load_gamebanana(true); sync_mod_rows(); return 0; }
         if (id == ID_TROPHY_IMPORT) { import_trophy_key(); return 0; }
         if (id == ID_MODS_MASTER) {
             g.cfg.mods_enabled = !g.cfg.mods_enabled;
@@ -2436,7 +2647,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         }
 
         if (id == ID_OPEN_MODS) {
-            const fs::path folder = g.mods_view ? patches_dir() : mods_dir();
+            const fs::path folder = g.mods_view == 1 ? patches_dir() : mods_dir();
             std::error_code ec;
             fs::create_directories(folder, ec);
             ShellExecuteW(nullptr, L"open", folder.c_str(), nullptr, nullptr, SW_SHOW);
@@ -2507,8 +2718,18 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_APP_SHADERS_READY:
         d3d_shaders_ready(static_cast<DWORD>(wparam), reinterpret_cast<std::wstring*>(lparam));
         return 0;
+    case WM_APP_GB_CATALOG:
+        gamebanana_catalog_ready(reinterpret_cast<ModsJob*>(lparam));
+        return 0;
+    case WM_APP_GB_PROGRESS:
+        g.mods_busy_percent = static_cast<int>(wparam);
+        InvalidateRect(g.window, nullptr, FALSE);
+        return 0;
+    case WM_APP_GB_DONE:
+        mods_install_done(reinterpret_cast<ModsJob*>(lparam));
+        return 0;
     case WM_CLOSE:
-        if (g.process || g.host_busy || g.xbox_busy || g.shaders_busy || update_preparing) return 0;
+        if (g.process || g.host_busy || g.xbox_busy || g.shaders_busy || g.mods_busy || update_preparing) return 0;
         nitro_finish();
         save_config();
         KillTimer(window,20);

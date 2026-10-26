@@ -24,14 +24,14 @@ void classic_create_controls() {
     add_button(ID_MODS_FILES, Kind::Segment, rect(296, 128, 140, 32), L"FILE MODS", nullptr, 0, TAB_MODS);
     add_button(ID_MODS_PATCHES, Kind::Segment, rect(442, 128, 140, 32), L"PATCHES", nullptr, 1, TAB_MODS);
     add_button(ID_MODS_MASTER, Kind::Toggle, rect(770, 130, 220, 28), L"Use mods and patches", &g.cfg.mods_enabled, -1, TAB_MODS);
+    // Row slots of the MODS list, placed on the visible rows by sync_mod_rows (launcher_mods.hpp).
     for (int row = 0; row < kModRows; ++row) {
-        const float y = 176.f + row * 52.f;
-        g.mod_row_up[row] = add_button(ID_MOD_ROW_UP + row, Kind::ActionBtn, rect(836, y + 8, 36, 28), L"▲", nullptr, -1, TAB_MODS);
-        g.mod_row_down[row] = add_button(ID_MOD_ROW_DOWN + row, Kind::ActionBtn, rect(878, y + 8, 36, 28), L"▼", nullptr, -1, TAB_MODS);
-        g.mod_row_toggle[row] = add_button(ID_MOD_ROW_TOGGLE + row, Kind::Toggle, rect(930, y + 6, 54, 32), L"", &g.mod_row_on[row], -1, TAB_MODS);
+        g.mod_row_up[row] = add_button(ID_MOD_ROW_UP + row, Kind::ActionBtn, rect(836, 176, 36, 28), L"▲", nullptr, -1, TAB_MODS);
+        g.mod_row_down[row] = add_button(ID_MOD_ROW_DOWN + row, Kind::ActionBtn, rect(878, 176, 36, 28), L"▼", nullptr, -1, TAB_MODS);
+        g.mod_row_toggle[row] = add_button(ID_MOD_ROW_TOGGLE + row, Kind::Toggle, rect(930, 176, 54, 32), L"", &g.mod_row_on[row], -1, TAB_MODS);
+        g.gb_row_page[row] = add_button(ID_GB_ROW_PAGE + row, Kind::ActionBtn, rect(790, 176, 84, 28), L"PAGE", nullptr, -1, TAB_MODS);
+        g.gb_row_get[row] = add_button(ID_GB_ROW_GET + row, Kind::ActionBtn, rect(882, 176, 102, 28), L"INSTALL", nullptr, -1, TAB_MODS);
     }
-    g.mods_prev = add_button(ID_MODS_PREV, Kind::ActionBtn, rect(296, 544, 90, 30), L"◀", nullptr, -1, TAB_MODS);
-    g.mods_next = add_button(ID_MODS_NEXT, Kind::ActionBtn, rect(900, 544, 90, 30), L"▶", nullptr, -1, TAB_MODS);
     reload_mods();
 
     // --- TROPHIES ---
