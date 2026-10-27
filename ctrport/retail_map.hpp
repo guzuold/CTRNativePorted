@@ -8,6 +8,10 @@
 // holding the functions found for its slots. A binding that is not found stays unavailable and
 // the feature using it is switched off; nothing is guessed. Reference offsets map to themselves.
 #pragma once
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #include "retail_anchors.hpp"
 #include "retail_profiles.hpp"
 #include <algorithm>
@@ -74,8 +78,31 @@ inline std::vector<std::size_t> occurrences(const unsigned char* image, const st
     return hits;
 }
 
+// Committed, readable ranges of the image (offsets). The load segments leave reserved,
+// uncommitted gaps between them, which must never be read.
+using Ranges = std::vector<std::pair<std::size_t, std::size_t>>;
+inline Ranges readable_ranges(const unsigned char* image, std::size_t extent) {
+    Ranges ranges;
+    for (std::size_t at = 0; at < extent;) {
+        MEMORY_BASIC_INFORMATION info{};
+        if (!VirtualQuery(image + at, &info, sizeof(info))) break;
+        const auto region_end = static_cast<std::size_t>(static_cast<const unsigned char*>(info.BaseAddress) - image) + info.RegionSize;
+        const DWORD readable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+        if (info.State == MEM_COMMIT && (info.Protect & readable) && !(info.Protect & (PAGE_GUARD | PAGE_NOACCESS)))
+            ranges.emplace_back(at, (std::min)(region_end, extent));
+        if (region_end <= at) break;
+        at = region_end;
+    }
+    return ranges;
+}
+inline bool inside(const Ranges& ranges, std::size_t at, std::size_t size) {
+    for (const auto& [begin, end] : ranges)
+        if (at >= begin && at <= end && size <= end - at) return true;
+    return false;
+}
+
 inline std::size_t resolve(const unsigned char* image, std::size_t extent, const std::vector<std::pair<std::uint64_t, std::uint64_t>>& spans,
-                           const Point& p) {
+                           const Ranges& ranges, const Point& p) {
     std::size_t result = missing;
     for (std::uint32_t n = 0; n < p.count; ++n) {
         const auto& w = windows[p.first + n];
@@ -87,7 +114,7 @@ inline std::size_t resolve(const unsigned char* image, std::size_t extent, const
             std::memcpy(&displacement, image + at + w.displacement, 4);
             std::size_t reached = at + w.end + static_cast<std::ptrdiff_t>(displacement);
             if (w.indirect) {
-                if (reached + 8 > extent) continue;
+                if (!inside(ranges, reached, 8)) continue;
                 std::uint64_t pointer = 0;
                 std::memcpy(&pointer, image + reached, 8);
                 const auto base = reinterpret_cast<std::uintptr_t>(image);
@@ -96,7 +123,7 @@ inline std::size_t resolve(const unsigned char* image, std::size_t extent, const
             }
             at = reached + w.delta;
         }
-        if (at >= extent) continue;
+        if (!inside(ranges, at, 1)) continue;
         if (result != missing && result != at) return missing;  // windows disagree
         result = at;
     }
@@ -104,7 +131,7 @@ inline std::size_t resolve(const unsigned char* image, std::size_t extent, const
 }
 
 // The table (8-byte aligned, outside code) whose listed slots hold the listed points.
-inline std::size_t resolve_vtable(const unsigned char* image, std::size_t extent, const Point& p) {
+inline std::size_t resolve_vtable(const unsigned char* image, const Ranges& ranges, const Point& p) {
     std::vector<std::pair<std::size_t, std::uint64_t>> slots;
     const auto base = reinterpret_cast<std::uintptr_t>(image);
     std::string spec = p.slots;
@@ -121,21 +148,22 @@ inline std::size_t resolve_vtable(const unsigned char* image, std::size_t extent
         from = comma + 1;
     }
     std::size_t result = missing;
-    for (std::size_t s = 0; s + 8 <= extent; s += 8) {
-        std::uint64_t value = 0;
-        std::memcpy(&value, image + s, 8);
-        if (value != slots.front().second || s < slots.front().first * 8) continue;
-        const std::size_t table = s - slots.front().first * 8;
-        bool all = true;
-        for (const auto& [slot, expected] : slots) {
-            if (table + slot * 8 + 8 > extent) { all = false; break; }
-            std::memcpy(&value, image + table + slot * 8, 8);
-            all = all && value == expected;
+    for (const auto& [begin, end] : ranges)
+        for (std::size_t s = (begin + 7) & ~std::size_t(7); s + 8 <= end; s += 8) {
+            std::uint64_t value = 0;
+            std::memcpy(&value, image + s, 8);
+            if (value != slots.front().second || s < slots.front().first * 8) continue;
+            const std::size_t table = s - slots.front().first * 8;
+            bool all = true;
+            for (const auto& [slot, expected] : slots) {
+                if (!inside(ranges, table + slot * 8, 8)) { all = false; break; }
+                std::memcpy(&value, image + table + slot * 8, 8);
+                all = all && value == expected;
+            }
+            if (!all) continue;
+            if (result != missing) return missing;
+            result = table;
         }
-        if (!all) continue;
-        if (result != missing) return missing;
-        result = table;
-    }
     return result;
 }
 
@@ -144,23 +172,39 @@ inline std::size_t resolve_vtable(const unsigned char* image, std::size_t extent
 // whether they agree with the offsets recorded for this eboot (retail_profiles.hpp).
 inline void prepare(const unsigned char* image, std::size_t extent, const std::string& sha,
                     const std::vector<std::pair<std::uint64_t, std::uint64_t>>& executable_spans) {
-    state = State{image, extent, sha, sha == reference_sha256, std::vector<std::size_t>(std::size(points), missing)};
+    // CTR_RETAIL_MAP_SEARCH=1 searches the reference eboot too: every binding must then be found
+    // at its own offset (a check of the search itself).
+    char forced[2]{};
+    const bool search_reference = GetEnvironmentVariableA("CTR_RETAIL_MAP_SEARCH", forced, sizeof(forced)) == 1 && forced[0] == '1';
+    state = State{image, extent, sha, sha == reference_sha256 && !search_reference, std::vector<std::size_t>(std::size(points), missing)};
     if (state.reference) {
         for (std::size_t i = 0; i < std::size(points); ++i) state.found[i] = points[i].reference;
         return;
     }
     const auto start = std::chrono::steady_clock::now();
+    const auto ranges = readable_ranges(image, extent);
     std::size_t resolved = 0;
     for (int pass = 0; pass < 2; ++pass)  // vtables need the functions their slots hold
         for (std::size_t i = 0; i < std::size(points); ++i) {
             if ((points[i].kind == 2) != (pass == 1)) continue;
-            state.found[i] = points[i].kind == 2 ? resolve_vtable(image, extent, points[i]) : resolve(image, extent, executable_spans, points[i]);
+            state.found[i] = points[i].kind == 2 ? resolve_vtable(image, ranges, points[i]) : resolve(image, extent, executable_spans, ranges, points[i]);
             if (state.found[i] != missing) ++resolved;
             else std::fprintf(stderr, "retail_map: %s (EU 1.21 %#x) not found in this eboot; the features using it are off\n",
                               points[i].name, static_cast<unsigned>(points[i].reference));
         }
     std::fprintf(stderr, "retail_map: %zu of %zu EU 1.21 bindings found in eboot %.16s (%lld ms)\n", resolved, std::size(points), sha.c_str(),
                  static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count()));
+    if (sha == reference_sha256) {
+        std::size_t wrong = 0;
+        for (std::size_t i = 0; i < std::size(points); ++i)
+            if (state.found[i] != points[i].reference) {
+                ++wrong;
+                std::fprintf(stderr, "retail_map: self-check %s found %#zx, expected %#x\n", points[i].name, state.found[i],
+                             static_cast<unsigned>(points[i].reference));
+            }
+        std::fprintf(stderr, "retail_map: self-check on the reference eboot: %zu of %zu at their own offset\n", std::size(points) - wrong,
+                     std::size(points));
+    }
     // Offsets recorded for this eboot by other means (retail_profiles.hpp) check the search.
     if (const auto* profile = retail_profile(sha)) {
         const std::pair<const char*, std::uint64_t> recorded[] = {
