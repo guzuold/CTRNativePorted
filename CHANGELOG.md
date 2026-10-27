@@ -1,3 +1,12 @@
+## v0.7.12 — 2026-10-27
+
+Fix for the US version, which closed right at start with v0.7.11.
+
+- **US game closing at start (issue #4):** with v0.7.11 the US game closed without a message right after loading. When the runtime looked for the PC Settings menu code in the US game, it also read parts of memory that are not in use, and that ended the program. It now reads only the memory the game actually uses. The EU game was not affected.
+- **Checked** on the EU v01.21 game by forcing the same search the US game goes through: all 32 places were found at their known addresses, and the menu and the settings worked. The US game itself still has not been run by us.
+- **Repository:** the project's published history no longer contains files and notes from the research phase, and the source zips of all releases were rebuilt to match. Program and game behaviour are unchanged.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.11 — 2026-10-27
 
 The US version gets the same settings and saves as the EU version, and the keyboard keys can be changed in the launcher.
