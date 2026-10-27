@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
-# development build of ctrport.exe: same sources and flags as build.ps1 plus debug
+# Development build of ctrport.exe: same sources and flags as build.ps1 plus debug
 # information (/Zi, /DEBUG) so a sampler can resolve host functions. The assembly
 # bridges are assembled from source; the pinned video library and the audio/font
-# backends come from the last infra build. Output goes to build/CTRPort-dev and
+# backends come from the last build. Output goes to build/CTRPort-dev and
 # never replaces build/CTRPort-infra/ctrport.exe.
 param([string]$OutputDirectory = 'build/CTRPort-dev')
 $ErrorActionPreference='Stop'

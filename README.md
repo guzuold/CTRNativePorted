@@ -331,9 +331,8 @@ Single parts can be rebuilt on their own:
 - `ctrport/online_server/build_online_server.ps1`: the online service, which also runs
   standalone.
 
-The development scripts `ctrport/build.ps1`, `ctrport/build_profile.ps1` and
-`ctrport/video/build.ps1` depend on earlier local builds and on evidence that is not in
-this repository. On a fresh clone, use `build_release.ps1`.
+The development scripts `ctrport/build.ps1` and `ctrport/build_profile.ps1` reuse the
+libraries of an earlier `build_release.ps1` run. On a fresh clone, use `build_release.ps1`.
 
 Tests:
 - `ctrport/test_mods.ps1`: mods and patch formats;

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // New callback registration/query implementation, ABI observed in retail libc.
-// Evidence: (development notes)
 #pragma once
 #include "thread_destructor.hpp"
 namespace ctrport {

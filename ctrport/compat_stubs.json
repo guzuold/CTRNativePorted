@@ -83,7 +83,7 @@
       "returned_value": 0,
       "justification": "Offline-only compatibility: network initialization has no functional network backend. Baseline net.cpp sceNetInit explicitly DUMMY returns ORBIS_OK. R8 requires real networking.",
       "tag": "R8",
-      "online_replacement": "With CTR_ONLINE=1 ctr_hle binds the real implementation instead (ctrport/hle/net_socket.cpp, net_ctl_online.cpp; (development notes)); offline this stub stays active."
+      "online_replacement": "With CTR_ONLINE=1 ctr_hle binds the real implementation instead (ctrport/hle/net_socket.cpp, net_ctl_online.cpp); offline this stub stays active."
     },
     {
       "nid": "gky0+oaNM4k",
@@ -93,7 +93,7 @@
       "returned_value": 0,
       "justification": "Declared offline compatibility: network control initialization unused by offline play; no network state query or fabricated outputs.",
       "tag": "R8",
-      "online_replacement": "With CTR_ONLINE=1 ctr_hle binds the real implementation instead (ctrport/hle/net_socket.cpp, net_ctl_online.cpp; (development notes)); offline this stub stays active."
+      "online_replacement": "With CTR_ONLINE=1 ctr_hle binds the real implementation instead (ctrport/hle/net_socket.cpp, net_ctl_online.cpp); offline this stub stays active."
     },
     {
       "nid": "g8cM39EUZ6o",
@@ -198,7 +198,7 @@
       "module": "libSceSharePlay",
       "public_name": "sceSharePlaySetProhibition",
       "returned_value": 0,
-      "justification": "development 2026-10-12: reached by the original intro with the shadPS4 GPU library (run claude_profile_20261012_181930, caller offset 10220847). SharePlay is a social streaming feature not needed offline; pinned shadPS4 v0.18.0 shareplay.cpp79-82 returns ORBIS_OK without effect. Logged on every call; compatibility only, not original PS4 behavior or reconstruction.",
+      "justification": "Reached by the original intro with the shadPS4 GPU library (caller offset 10220847). SharePlay is a social streaming feature not needed offline; pinned shadPS4 v0.18.0 shareplay.cpp79-82 returns ORBIS_OK without effect. Logged on every call; compatibility only, not original PS4 behavior or reconstruction.",
       "tag": "R8"
     },
     {
@@ -207,7 +207,7 @@
       "module": "libSceNpTrophy",
       "public_name": "sceNpTrophyShowTrophyList",
       "returned_value": 0,
-      "justification": "development 2026-10-12: implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1097-1101), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
+      "justification": "Implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1097-1101), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
       "tag": "R8"
     },
     {
@@ -216,7 +216,7 @@
       "module": "libSceNpTrophy",
       "public_name": "sceNpTrophyAbortHandle",
       "returned_value": 0,
-      "justification": "development 2026-10-12: implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1318-1321), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
+      "justification": "Implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1318-1321), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
       "tag": "R8"
     },
     {
@@ -225,7 +225,7 @@
       "module": "libSceNpTrophy",
       "public_name": "sceNpTrophyCaptureScreenshot",
       "returned_value": 0,
-      "justification": "development 2026-10-12: implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1323-1326), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
+      "justification": "Implemented in ctrport/hle/np_trophy.cpp as a logged call returning ORBIS_OK, the same as pinned shadPS4 v0.18.0 np_trophy.cpp (1323-1326), which also stubs it. Trophy system UI/capture; not needed offline. Compatibility only, not original PS4 behavior or reconstruction.",
       "tag": "R8"
     }
   ]

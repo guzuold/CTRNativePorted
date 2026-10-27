@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Demonware lobby tasks: request parsing and replies of the project server (R8 phase 3).
 
-Client side (retail v01.21, (development notes)): a task is a lobby record of
+Client side (retail v01.21): a task is a lobby record of
 payload type 0x86 holding the service ID (raw byte), the task ID (typed u8) and the task
 parameters as a typed byte buffer. The reply is a record of payload type 1 holding a typed
 byte buffer: transaction ID u64 | error u32 | task ID u8 | results (u32 count, then

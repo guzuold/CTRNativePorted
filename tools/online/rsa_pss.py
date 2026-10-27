@@ -6,7 +6,7 @@
   imports: 0x126 bytes for RSA-2048).
 - sign_pss_sha256(key, message, salt_length=0): RSASSA-PSS with SHA-256 and MGF1-SHA-256
   (RFC 8017 9.1.1). The client verifies auth3 replies with libtomcrypt
-  rsa_verify_hash_ex(..., PSS, sha256, saltlen 0) ((development notes)).
+  rsa_verify_hash_ex(..., PSS, sha256, saltlen 0).
 """
 import hashlib, secrets
 

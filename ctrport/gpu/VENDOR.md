@@ -8,7 +8,7 @@
 - Derived at build time: `vk_presenter.cpp` and `vk_rasterizer.cpp` by `make_patched.py`
   (exact replacements, listed there; the latter adds opt-in attachment-size diagnostics).
 - Copied unchanged from bbport for Windows, revision `4fcdf770e078911cc7f36e409d316ec423b7c81e`
-  ((development notes), GPL-2.0):
+  (`gpu/shim` there, GPL-2.0):
   `shim/core/address_space.h`, `shim/core/signals.h`, `shim/core/libraries/libs.h`,
   `shim/core/devtools/widget/gpu_memory.h`, `shim/common/debug.h`, `shim/common/logging/log.h`,
   `shim/tracy/Tracy.hpp`, `shim/tracy/TracyVulkan.hpp`, `shim/imgui/renderer/texture_manager.h`.

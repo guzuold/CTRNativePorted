@@ -265,7 +265,7 @@ inline int gnm_depth_publication_eop_gpu_control(){
  std::cout<<"{\"scope\":\"gnm_depth_publication_EOP_GPU_control\",\"passed\":true,\"real_queue_fences\":2,\"real_kernel_waiter\":true,\"data32_noIRQ_preserves_high_word\":true,\"data64_verified_before_IRQ\":true,\"two_owned_two_plane_generations\":true,\"later_pending_preserves_label_and_IRQ\":true,\"resume_skips_published_owner\":true,\"CPU_mutation_blocks_completion\":true,\"guest_padding_preserved\":true,\"synthetic_depth_downloads\":true,\"actual_GPU_depth_publication\":false,\"frame_or_flip\":false}\n";return 0;
 }
 
-// Supervision GPU-resident EOP policy control. Authored guest page,
+// GPU-resident EOP policy control. Authored guest page,
 // genuine retained D32/MS2 depth image, real queue fence; no retail span claim.
 inline int gnm_gpu_resident_eop_control(){
  struct State{bool passed=false;}state;

@@ -313,47 +313,6 @@ std::string read_tail(const fs::path& path, std::size_t limit) {
     return data;
 }
 
-// Exclusive lane lock guard
-struct LaneLock {
-    fs::path path;
-    std::string token;
-    bool held = false;
-    bool acquire(const fs::path& root, HWND owner) {
-        std::error_code ec;
-        if (!fs::exists(root / "locks", ec)) return true;
-        path = root / "locks/shared.lock";
-        fs::create_directories(path.parent_path(), ec);
-        std::random_device random;
-        char hex[33];
-        std::snprintf(hex, sizeof(hex), "%08x%08x%08x%08x", random(), random(), random(), random());
-        token = hex;
-        for (;;) {
-            const HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-            if (file != INVALID_HANDLE_VALUE) {
-                const std::string owner_json = "{\"owner\": \"launcher\", \"pid\": " + std::to_string(GetCurrentProcessId()) +
-                    ", \"timestamp\": " + std::to_string(std::time(nullptr)) + ", \"token\": \"" + token + "\"}";
-                DWORD written = 0;
-                WriteFile(file, owner_json.data(), static_cast<DWORD>(owner_json.size()), &written, nullptr);
-                CloseHandle(file);
-                held = true;
-                return true;
-            }
-            if (GetLastError() != ERROR_FILE_EXISTS) {
-                MessageBoxW(owner, trf(L"Unable to create lock file {0}", path.wstring()).c_str(), kTitle, MB_ICONERROR);
-                return false;
-            }
-            const std::wstring text = tr(L"The runtime is currently in use by another process:") + std::wstring(L"\n\n") +
-                widen(read_tail(path, 4096)) + L"\n\n" + tr(L"Retry?");
-            if (MessageBoxW(owner, text.c_str(), kTitle, MB_RETRYCANCEL | MB_ICONWARNING) != IDRETRY) return false;
-        }
-    }
-    void release() {
-        if (!held) return;
-        held = false;
-        if (read_tail(path, 4096).find(token) != std::string::npos) DeleteFileW(path.c_str());
-    }
-};
-
 enum class Kind { Browse, Toggle, Pill, Launch, TabBtn, ActionBtn, Segment };
 struct Control { Kind kind; const wchar_t* label; bool* value; int pill; RectF box; int tab = -1; };
 struct Status { std::wstring text; int kind = 0; };  // 0 neutral, 1 ok, 2 error
@@ -449,7 +408,6 @@ struct App {
     HICON window_icon = nullptr;
     HANDLE process = nullptr;
     fs::path log_stem;
-    LaneLock lock;
 } g;
 
 constexpr int ID_CHECK_UPDATE = 906;
@@ -2238,7 +2196,6 @@ void launch_game() {
     g.xbox_ready = false;
     if (!check_mods_before_launch(resolve(g.cfg.base_dir), g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path())) return;
     if (!save_config()) return;
-    if (!g.lock.acquire(g.root, g.window)) return;
     std::error_code ec;
     const std::wstring stamp = timestamp();
     const fs::path logs = g.root / "runtime/user/logs";
@@ -2248,7 +2205,6 @@ void launch_game() {
     try { ctr_online::backup_savedata(g.root, "before_launch"); }
     catch (const std::exception& error) {
         MessageBoxW(g.window, (tr(L"Save backup failed; launch cancelled:") + std::wstring(L"\n") + widen(error.what())).c_str(), kTitle, MB_ICONERROR);
-        g.lock.release();
         return;
     }
     const fs::path base = resolve(g.cfg.base_dir), patch = resolve(g.cfg.patch_dir);
@@ -2297,7 +2253,7 @@ void launch_game() {
     else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
     if (g.cfg.online) {
         if(g.host_busy || !g.host_status.running) {
-            g.lock.release();g.friends_notice=tr(L"Wait for Online to connect.");
+            g.friends_notice=tr(L"Wait for Online to connect.");
             g.friends_notice_error=true;animate_friends(true);return;
         }
         try {
@@ -2318,7 +2274,7 @@ void launch_game() {
             set[L"CTR_ONLINE_PORT_OFFSET"]=std::to_wstring(ctr_online::kHostGamePortOffset);
             set[L"CTR_ONLINE_ACCOUNT"]=std::to_wstring(ctr_online::player_account(g.host_status.friend_code,narrow(g.cfg.online_id)));
         } catch(const std::exception& e) {
-            g.lock.release();g.friends_notice=widen(e.what());g.friends_notice_error=true;
+            g.friends_notice=widen(e.what());g.friends_notice_error=true;
             animate_friends(true);return;
         }
     }
@@ -2354,7 +2310,6 @@ void launch_game() {
     out_log->close_writer(); err_log->close_writer();
     if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
     if (!started) {
-        g.lock.release();
         MessageBoxW(g.window, trf(L"Unable to start ctrport.exe (error {0}).", std::to_wstring(error)).c_str(), kTitle, MB_ICONERROR);
         return;
     }
@@ -2381,7 +2336,6 @@ void launch_game() {
 void game_finished(DWORD code) {
     CloseHandle(g.process);
     g.process = nullptr;
-    g.lock.release();
     load_config();
     reload_mods();  // mods the runtime did not apply are marked
     sync_mod_rows();
@@ -2742,7 +2696,6 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             MessageBeep(MB_ICONASTERISK);
             return 0;
         }
-
 
         if(id==ID_ONLINE_FRIENDS){animate_friends(true);return 0;}
 

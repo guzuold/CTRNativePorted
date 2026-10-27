@@ -101,9 +101,7 @@ trophy/Crash before HUD; no race verification is claimed by these tests.
 
 Off control on retail 1.21 passed at internal 1080p with no upscaler dispatch.
 Launcher tests exercised all three options, checked saved `upscaler=dlss`, and
-verified that display/internal-resolution selections were preserved. Full report:
-(development notes) (project root), with
-per-run renderer hashes, source/output checks, and compatibility-stub call lists.
+verified that display/internal-resolution selections were preserved.
 
 ## Race check, 2026-10-16 (incomplete temporal validation)
 
@@ -143,10 +141,8 @@ disocclusion and the game's own motion blur; it is not ground-truth flow.
 `tools/profiler/race_upscale_session.py` provides isolated run/pad/shot/measure/stop
 commands. `tools/profiler/upscale_motion_check.py <capture-directory> --frame 1`
 reproduces the diagnostic from consecutive retail GPU captures and logged jitter.
-Full evidence, build hashes, 21 active compatibility stubs and the 10 distinct
-called stubs per run: (development notes).
+Each run had 21 active compatibility stubs, of which 10 distinct ones were called.
 All raw game-derived captures remain under ignored `runtime/user/instances`.
-Runtime race evidence advances; reconstructed replacements remain zero.
 
 ## Frame generation (set aside)
 

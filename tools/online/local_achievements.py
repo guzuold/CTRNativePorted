@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Project-server Wumpa Challenge (achievement engine, service 125) state per account.
 
-Observed retail v01.21 requests ((development notes)), all struct
+Observed retail v01.21 requests, all struct
 buffers in the "octane_psn" context:
 - task 1: event report {1: context, 2: {1: name, 2: UTC, 3: {1: key, 2: value}, 4: 0}, 3: {}},
   sent after login with the event "login";

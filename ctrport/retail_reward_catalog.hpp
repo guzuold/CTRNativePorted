@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Read-only observation of the user's retail reward table. No retail
-// catalogue is shipped. Layout evidence: (development notes)
+// catalogue is shipped; the layout was read from a running retail v01.21 game.
 #pragma once
 #include <windows.h>
 #include "retail_map.hpp"

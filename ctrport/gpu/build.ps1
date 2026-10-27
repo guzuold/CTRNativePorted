@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Builds build/CTRPort-gpu/ctr_gpu.dll with clang-cl (tools/toolchains/llvm-19.1.1),
-# Visual Studio's CMake and Ninja. Run under the build-claude lock:
-#   powershell -File ctrport/gpu/build.ps1
+# Visual Studio's CMake and Ninja:  powershell -File ctrport/gpu/build.ps1
 param([int]$Jobs = 12, [switch]$Reconfigure)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)

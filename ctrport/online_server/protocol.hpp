@@ -3,8 +3,7 @@
 // typed byte buffers and lobby tasks (demonware_tasks.py), the HTTP proxy task
 // (demonware_rest.py), auth3 tickets (demonware_auth3.py), the lobby protocol 210
 // (demonware_lobby.py), discovery replies (discovery.py), room selectors (room.py) and the
-// session multipart (local_sessions.py). The contracts are documented in those modules and in
-// (development notes)
+// session multipart (local_sessions.py). The contracts are documented in those modules.
 #pragma once
 #include "crypto.hpp"
 #include "json.hpp"

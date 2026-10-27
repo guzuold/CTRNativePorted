@@ -2,7 +2,7 @@
 // Layout of the Alchemy PS4 render objects of CTR Nitro-Fueled (EU CUSA14876 and US CUSA13795,
 // 1.00 and 1.21): field offsets read from
 // the retail field registration of igPS4GraphicsDevice / igPS4GraphicsDeviceContext /
-// igPS4ShaderHeader and checked on live objects during draws ((development notes)), the
+// igPS4ShaderHeader and checked on live objects during draws by an engine-state probe, the
 // same as FrankHUN88453's engine.h for CUSA13795 (MIT). Addresses are per eboot SHA256.
 #pragma once
 #include <cstring>

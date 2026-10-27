@@ -8,5 +8,7 @@ $root=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $out=Join-Path $root 'build/CTRPort-dev'
 & (Join-Path $env:VCToolsInstallDir 'bin/HostX64/x64/cl.exe') /nologo /EHsc /std:c++17 /W4 /WX "$PSScriptRoot/control_test.cpp" "/Fo$out/prompt_control.obj" "/Fe$out/prompt_control.exe"
 if($LASTEXITCODE){throw 'Prompt controls compilation failed'}
-& "$out/prompt_control.exe" "$root/dump/CUSA14876"
+# the base game folder: CTR_BASE_DIR, or dump/CUSA14876
+$base=if($env:CTR_BASE_DIR){$env:CTR_BASE_DIR}else{Join-Path $root "dump/CUSA14876"}
+& "$out/prompt_control.exe" $base
 if($LASTEXITCODE){throw 'Prompt controls failed'}

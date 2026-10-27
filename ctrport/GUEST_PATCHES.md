@@ -49,8 +49,7 @@ slot (`tls_storage.hpp`), so later executions no longer fault. Same length, same
 - Measured with `tools/profiler/speed_probe.py`, without input: 60.0 flips/s, and the
   intro and title sequence changes scene at the same wall-clock times as at 30 FPS
   (same draws per frame, twice the frames), so the game runs in real time. Race
-  physics at 60 FPS were not measured. Details in
-  (development notes).
+  physics at 60 FPS were not measured.
 
 ## CTR_NATIVE_4K
 
@@ -157,7 +156,7 @@ because the game keeps saving during the run.
 
 ## CTR_ONLINE (auth3 traffic key)
 
-Written for ctrport (R8, (development notes)). The game's Demonware client
+Written for ctrport. The game's Demonware client
 accepts an auth3 login reply only if its `X-Signature` header verifies (RSA-PSS, SHA-256,
 salt length 0) against an RSA-2048 public key stored in the eboot, the only
 SubjectPublicKeyInfo in the image. The project server cannot sign with that key. With

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// New owned attribute implementation. Public pinned shadPS4 behavior recorded in
-// (development notes)
+// New owned attribute implementation, after the public behaviour of pinned shadPS4 v0.18.0.
 #pragma once
 #include "settings/hot_trace.hpp"
 #include "kernel_mutex.hpp"

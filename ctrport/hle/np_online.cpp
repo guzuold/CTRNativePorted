@@ -245,8 +245,8 @@ std::string base64(const std::string& data) {
 }
 
 // ID token in the shape the game's Demonware client reads (retail v01.21, decoded payload of
-// a "header.payload.signature" token: "env_iss_id", "duid" of 64 hex digits, "iat", "exp";
-// (development notes)). Issued by the runtime for the project server, which
+// a "header.payload.signature" token: "env_iss_id", "duid" of 64 hex digits, "iat", "exp").
+// Issued by the runtime for the project server, which
 // accepts it; the signature part is a fixed marker, not a Sony signature. Each JSON part is
 // padded with spaces to a multiple of 3 bytes so its base64 has no '=' padding.
 std::string local_id_token() {

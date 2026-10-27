@@ -4,8 +4,6 @@
 #   powershell -File ctrport/build_release.ps1 [-OutputDirectory build/release-local]
 # Steps: audio and font backends, ctr_video.lib, ctrport.exe, ctr_gpu.dll and ctr_hle.dll, ctr_d3d.dll and ctr_shaders.exe,
 # ctr_online_server.exe, the launcher, the Visual C++ runtime DLLs, assets and documents.
-# ctr_video.lib is compiled here without the GPU control suite of ctrport/video/build.ps1,
-# which needs local evidence that is not in this repository; its sources are the same.
 # -WithoutDirect3D11: leave out ctr_d3d.dll and ctr_shaders.exe. Updaters of 0.6.1 and older refuse
 # a package with paths their closed list lacks; a release built this way carries the newer updater
 # first, and the next release can add the files (ctrport/UPDATES.md, "New program files").

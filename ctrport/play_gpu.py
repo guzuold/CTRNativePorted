@@ -7,9 +7,9 @@ stops, logs to runtime/user/logs/play_<time>.{stdout,stderr}.log, and on exit pr
 reason the runtime stopped (missing function, unresolved access or assertion).
 """
 import datetime, json, os, re, shutil, subprocess, sys
+import contextlib
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.lane_lock import lane_lock
 from tools.online.local_backup import backup_savedata
 
 root = Path(__file__).resolve().parents[1]
@@ -185,7 +185,7 @@ command = [str(runtime_executable), '--entry-after-libc-init-images', str(eboot)
           [str(p) for p in sorted((game / 'sce_module').glob('*.prx'))]
 res_info = 'fullscreen' if fullscreen else f'{width or 1280}x{height or 720}'
 print(f'CTRPort (target={"v01.21" if use_121 else "v01.00"}, pro={use_pro}, native_4k={use_native_4k}, scene_height={scene_height or "legacy"}, 60fps={use_60fps}, unlock_all={use_unlock_all}, online={use_online}, split_screen={use_split_screen}, display={res_info}): close window to quit. Logs:', log, flush=True)
-with (instance_lock(workdir) if instance_name else lane_lock('shared', 'claude', timeout=600)), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
+with (instance_lock(workdir) if instance_name else contextlib.nullcontext()), log.with_suffix('.stdout.log').open('wb') as out, log.with_suffix('.stderr.log').open('wb') as err:
     print('CTRPort: pre-run save backup:', backup_savedata(user_root, 'before_launch'), flush=True)
     child = subprocess.Popen(command, cwd=workdir, env=env, stdout=out, stderr=err)
     log.with_suffix('.run.json').write_text(json.dumps({'pid': child.pid, 'cwd': str(workdir),

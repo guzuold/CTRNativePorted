@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Demonware lobby connection, protocol "210" (R8 phase 3), server side.
 
-Contract of the game's client (retail v01.21; (development notes)):
+Contract of the game's client (retail v01.21):
 1. client header, 28 bytes: u32 200, u32 200, u32 0xd2, u32 0xdc (offered protocols),
    u32 max receive size, client nonce [8];
 2. frames, both directions: u32 size (bytes after this field) | u8 0xab | u8 type | ...

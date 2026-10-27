@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """auth3 replies of the project server (R8 phase 3).
 
-Contract read from the retail v01.21 eboot ((development notes)):
+Contract read from the retail v01.21 eboot:
 - the PS4 client posts {"auth_task":"46", "iv_seed", "title_id", "identity", "extra_data"}
   and calls the reply handler expecting task 47 (0x2f) and a 0x80-byte client ticket;
 - the reply must be HTTP 200 with an "X-Signature" header: base64 RSASSA-PSS/SHA-256

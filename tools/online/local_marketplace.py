@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Project-server Pit Stop state: Wumpa currency balances and inventory per account.
 
-Observed retail v01.21 requests ((development notes)):
+Observed retail v01.21 requests:
 - service 80 task 165, typed [STRING context, UINT32 1, UINT32 856]: inventory page; the
   client sizes the request from its local item catalogue (856 items);
 - service 80 task 245, struct buffer {1: context, 2: max results}: currency balances; the

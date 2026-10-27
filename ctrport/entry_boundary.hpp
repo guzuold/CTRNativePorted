@@ -2320,7 +2320,7 @@ inline LONG CALLBACK entry_dependency_exception(EXCEPTION_POINTERS* exception) {
     char line[768];
     const auto length=snprintf(line,sizeof(line),"{\"scope\":\"original_startup_libc_dependency_boundary\",\"nid\":\"%s\",\"library\":\"%s\",\"source_image_sha256\":\"%s\",\"caller_address\":%llu,\"data_access\":%s,\"original_startup_executed\":true,\"original_libc_page_enabled\":true,\"main_reached\":false,\"runtime_replacements\":0}\n",identity.nid.c_str(),identity.library.c_str(),identity.image_sha256.c_str(),static_cast<unsigned long long>(call.caller),call.data_access?"true":"false");
     DWORD written=0;if(length>0) WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),line,static_cast<DWORD>(length),&written,nullptr);
-    //: actual VirtualQuery boundary needs owner/flags/output-size evidence.
+    // VirtualQuery boundary: owner, flags and output size still need evidence.
     // Observe registers only; preserve the existing missing-import failure below.
     if(!call.data_access && identity.nid=="rVjRvHJ0X6c" && identity.library=="libkernel"){
         char query_line[512];const auto n=snprintf(query_line,sizeof(query_line),"{\"scope\":\"missing_virtual_query_arguments\",\"caller_image_sha256\":\"%s\",\"caller_offset\":%llu,\"address\":%llu,\"flags\":%llu,\"output\":%llu,\"info_size\":%llu,\"guest_modified\":false}\n",caller_sha,static_cast<unsigned long long>(caller_offset),static_cast<unsigned long long>(exception->ContextRecord->Rdi),static_cast<unsigned long long>(exception->ContextRecord->Rsi),static_cast<unsigned long long>(exception->ContextRecord->Rdx),static_cast<unsigned long long>(exception->ContextRecord->Rcx));

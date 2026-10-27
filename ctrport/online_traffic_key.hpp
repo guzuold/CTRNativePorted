@@ -4,7 +4,7 @@
 // the only one in the image). The project server cannot sign with that key, so the runtime
 // replaces it in memory with the project server's public key; the original verification
 // code is unchanged. The original bytes are checked by SHA-256, so no game data is stored in
-// the repository. ctrport/GUEST_PATCHES.md, (development notes)
+// the repository. See ctrport/GUEST_PATCHES.md.
 #pragma once
 #include "retail_profiles.hpp"
 #include <windows.h>

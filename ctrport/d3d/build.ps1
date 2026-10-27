@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Builds build/CTRPort-d3d/ctr_d3d.dll and ctr_hle.dll with clang-cl (tools/toolchains/llvm-19.1.1),
-# Visual Studio's CMake and Ninja. Run under the build-claude lock:
-#   powershell -File ctrport/d3d/build.ps1
+# Visual Studio's CMake and Ninja:  powershell -File ctrport/d3d/build.ps1
 # -DllOnly: only ctr_d3d.dll and ctr_shaders.exe (a release build makes ctr_hle.dll with ctrport/gpu/build.ps1).
 param([int]$Jobs = 12, [switch]$Reconfigure, [switch]$DllOnly)
 $ErrorActionPreference = 'Stop'

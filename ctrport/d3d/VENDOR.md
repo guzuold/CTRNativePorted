@@ -47,7 +47,7 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
 | `igPS4GraphicsDeviceContext::clear` | 0x1306ba0 | 0x13c9e40 |
 | `igPS4GraphicsDeviceContext::copyTexture` | 0x1307f20 | 0x13cb1c0 |
 
-- **Device globals:** found by the engine-state probe ((development notes)).
+- **Device globals:** found by an engine-state probe on live objects.
 - **clear / copyTexture:** the callees at the same offsets of `igWorkflowGpuPicking::getPixel` (+0x109)
   and of the command decoder in both versions.
 - **Hooks:** placed only when the first 16 code bytes match the recorded prologue.

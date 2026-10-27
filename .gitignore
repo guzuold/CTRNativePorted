@@ -10,8 +10,6 @@
 /tools/toolchains/*.tar.xz
 /tools/toolchains/*.partial
 
-/Saved/
-
 # Game files must never be committed
 *.bin
 *.prx

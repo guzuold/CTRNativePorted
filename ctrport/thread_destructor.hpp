@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// New scoped registration/lifecycle implementation; public contract and revision
-// recorded in (development notes)
+// New scoped registration/lifecycle implementation, after the public shadPS4 v0.18.0 contract.
 #pragma once
 #include "original_call.hpp"
 #include <mutex>

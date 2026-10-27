@@ -4,8 +4,7 @@
 Scope: this is a fixture written from the public UPnP IGD specification (WANIPConnection:1
 SOAP actions and error codes), not a real router; it checks that ctr_online_server.exe sends
 well-formed requests and handles the documented answers. The real routers seen so far: the
-developer's router answers SSDP only as a ManageableDevice (IGD disabled), see
-(development notes)
+developer's router answers SSDP only as a ManageableDevice (IGD disabled).
 
 The synthetic router:
 - describes a WANPPPConnection without an external address and a WANIPConnection with

@@ -2,7 +2,7 @@
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $root
-$active=Get-Process launcher,ctrport -ErrorAction SilentlyContinue | Where-Object {$_.Path -like '<install folder>\*'}
+$active=Get-Process launcher,ctrport -ErrorAction SilentlyContinue | Where-Object {$_.Path -and -not $_.Path.StartsWith($root)}
 if($active){throw 'User launcher/game is running; no default-port tests started.'}
 # Probe exclusive binds without sending requests: process visibility can be restricted.
 foreach($port in @(3074,8780)){

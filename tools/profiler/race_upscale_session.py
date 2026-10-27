@@ -9,7 +9,6 @@ import argparse, ctypes, datetime, json, os, shutil, subprocess, sys, time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
-from tools.lane_lock import lane_lock
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('command',choices=['run','pad','shot','stop','status','measure']);p.add_argument('--work',type=Path,required=True)
@@ -22,11 +21,11 @@ def main():
         (work/'runtime/user/logs').mkdir(parents=True)
         for name in ['ctr_gpu.dll','ctr_hle.dll']:shutil.copy2(ROOT/'build/CTRPort-gpu'/name,work/name)
         shutil.copytree(ROOT/'runtime/user/savedata',work/'runtime/user/savedata')
-        base=(ROOT/'dump/CUSA14876').resolve();patch=Path('dump/CUSA14876-patch')
+        base=Path(os.environ.get('CTR_BASE_DIR',ROOT/'dump/CUSA14876')).resolve();patch=Path(os.environ.get('CTR_PATCH_DIR',ROOT/'dump/CUSA14876-patch')).resolve()
         env={k:v for k,v in os.environ.items() if not k.startswith('CTR_')}
         env.update(CTR_GPU_LIBRARY='1',CTR_TLS_PATCH='1',CTR_GPU_LOG='error',CTR_NO_FRAME_OBSERVATION='1',CTR_BASE_DIR=str(base),CTR_PATCH_DIR=str(patch),CTR_SCENE_HEIGHT=str(a.height),CTR_UPSCALER=a.mode,CTR_GPU_FSR='0',CTR_GPU_WIDTH='1920',CTR_GPU_HEIGHT='1080',CTR_60FPS_PATCH='1',CTR_PAD_TEST_INPUT='1',CTR_AUDIO_MUTE='1',CTR_FRAME_TIMES=str(work/'frames.csv'),CTR_UPSCALE_CAPTURE_DIR=str(work),CTR_PRESENT_CAPTURE_TRIGGER=str(work/'capture.trigger'),CTR_DLSS_DUMP_TRIGGER=str(work/'motion.trigger'),CTR_DLSS_DUMP_DIR=str(work),CTR_DLSS_DUMP_FRAMES='3')
         cmd=[str(ROOT/'build/CTRPort-dev/ctrport.exe'),'--entry-after-libc-init-images',str(patch/'eboot.bin')]+[str(x) for x in sorted((base/'sce_module').glob('*.prx'))]
-        with lane_lock('shared','claude',timeout=60), (work/'stdout.log').open('wb') as out,(work/'stderr.log').open('wb') as err:
+        with (work/'stdout.log').open('wb') as out,(work/'stderr.log').open('wb') as err:
             child=subprocess.Popen(cmd,cwd=work,env=env,stdout=out,stderr=err)
             (work/'session.json').write_text(json.dumps({'pid':child.pid,'mode':a.mode,'height':a.height,'started':datetime.datetime.now().isoformat(),'monotonic_ns':time.perf_counter_ns()},indent=2))
             print(work,child.pid,flush=True)
