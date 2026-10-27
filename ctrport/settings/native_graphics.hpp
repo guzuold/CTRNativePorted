@@ -7,6 +7,7 @@
 // game keeps its own value; any other value is re-asserted every frame because scene data
 // may rewrite render state on load.
 #include "control_schema.hpp"
+#include "../retail_map.hpp"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -35,6 +36,8 @@ struct State {
 };
 inline State state;
 inline unsigned char* image = nullptr;
+// Where render_static, fxaa_static and smaa_static are in the running eboot (retail_map.hpp).
+inline std::uintptr_t render_at = 0, fxaa_at = 0, smaa_at = 0;
 
 inline bool owns(const std::string& key) {
     return key == "native_antialiasing" || key == "native_bloom" || key == "native_motion_blur" ||
@@ -65,7 +68,8 @@ inline void load(const Json& document) {
 
 // Loader barrier: before guest threads start.
 inline void configure(unsigned char* retail_image, const std::string& sha, const Json& document) {
-    if (sha != pinned_sha) return;
+    if (!retail_map::bound(sha) || !retail_map::has(render_static) || !retail_map::has(fxaa_static) || !retail_map::has(smaa_static)) return;
+    render_at = retail_map::at(render_static); fxaa_at = retail_map::at(fxaa_static); smaa_at = retail_map::at(smaa_static);
     image = retail_image;
     load(document);
 }
@@ -79,12 +83,12 @@ inline std::uint64_t read64(std::uint64_t address) {
 // Game thread, once per pad poll (once per frame for the polling pad).
 inline void apply() {
     if (!image) return;
-    const auto render = read64(reinterpret_cast<std::uint64_t>(image + render_static));
+    const auto render = read64(reinterpret_cast<std::uint64_t>(image + render_at));
     const auto data = render ? read64(render + render_data) : 0;
     if (!data) return;
     auto byte = [&](std::uintptr_t offset) -> unsigned char& { return *reinterpret_cast<unsigned char*>(data + offset); };
-    auto& fxaa = *reinterpret_cast<unsigned char*>(image + fxaa_static);
-    auto& smaa = *reinterpret_cast<unsigned char*>(image + smaa_static);
+    auto& fxaa = *reinterpret_cast<unsigned char*>(image + fxaa_at);
+    auto& smaa = *reinterpret_cast<unsigned char*>(image + smaa_at);
     if (state.restore.exchange(false)) {
         // Switching an option back to original restores the retail value once.
         if (state.antialiasing < 0) { fxaa = 1; smaa = 0; }

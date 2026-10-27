@@ -13,6 +13,7 @@
 #include "quality_controls/world_hook.hpp"
 #include "vfx_controls/override.hpp"
 #include "native_graphics.hpp"
+#include "../retail_map.hpp"
 #include <cstdio>
 #include <memory>
 
@@ -102,7 +103,7 @@ struct StartupAdapter {
         if(distance) distance->uninstall();
         if(shadows) { geometry_controls::rollback_shadow(image,extent,sha); shadows=false; }
         FlushInstructionCache(GetCurrentProcess(),image,extent);
-        menu->uninstall();
+        if(menu) menu->uninstall();
     }
 };
 
@@ -112,33 +113,50 @@ struct StartupAdapter {
 inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image,std::size_t extent,
         const std::string& sha,const fs::path& path,const Json& document,bridge::Hooks hooks) {
     validate(document);
+    // The EU 1.21 eboot (the reference) must take every requested control. On another retail
+    // eboot (retail_map.hpp) a control whose code was not found is reported and left original.
+    const bool strict=retail_map::identity();
+    const auto optional=[&](const char* control,auto&& step) {
+        if(strict) { step(); return true; }
+        try { step(); return true; }
+        catch(const std::exception& e) {
+            std::fprintf(stderr,"settings: %s not available on this eboot, left original: %s\n",control,e.what()); std::fflush(stderr);
+            return false;
+        }
+    };
     const auto* aa=document.find("antialiasing");
-    const bool disable=aa && aa->text=="off";
-    if(disable) graphics::require_gate(image,extent,sha,graphics::aa_gate_original);
-    const auto selected=retail_graphics_selection(document);
-    retail_graphics::verify(image,extent,sha,selected,false);
+    bool disable=aa && aa->text=="off";
+    if(disable) disable=optional("antialiasing",[&]{graphics::require_gate(image,extent,sha,graphics::aa_gate_original);});
+    auto selected=retail_graphics_selection(document);
+    if(strict) retail_graphics::verify(image,extent,sha,selected,false);
+    else for(std::size_t i=0;i<selected.size();++i) {
+        retail_graphics::Options one{}; one[i]=selected[i];
+        if(selected[i]) selected[i]=optional(retail_graphics::descriptors[i].key,[&]{retail_graphics::verify(image,extent,sha,one,false);});
+    }
     const auto* shadow=document.find("cascaded_shadows");
-    const bool shadow_off=shadow && shadow->text=="off";
-    if(shadow_off) geometry_controls::shadow_verify(image,extent,sha,false);
+    bool shadow_off=shadow && shadow->text=="off";
+    if(shadow_off) shadow_off=optional("cascaded_shadows",[&]{geometry_controls::shadow_verify(image,extent,sha,false);});
     const auto* mesh=document.find("racer_mesh_lod");
-    const bool mesh_highest=mesh && mesh->text=="highest";
-    if(mesh_highest) quality_controls::verify_mesh(image,extent,sha,false);
+    bool mesh_highest=mesh && mesh->text=="highest";
+    if(mesh_highest) mesh_highest=optional("racer_mesh_lod",[&]{quality_controls::verify_mesh(image,extent,sha,false);});
     auto adapter=std::make_unique<StartupAdapter>();
     adapter->image=image; adapter->extent=extent; adapter->sha=sha;
     native_graphics::configure(image,sha,document);
-    adapter->menu=std::make_unique<bridge::Adapter>(image,sha,path,hooks,&document);
-    adapter->menu->install();
+    optional("PC Settings menu",[&]{
+        auto menu=std::make_unique<bridge::Adapter>(image,sha,path,hooks,&document);
+        menu->install(); adapter->menu=std::move(menu);
+    });
     bool aa_installed=false, retail_installed=false;
     try {
         const auto* hero=document.find("hero_shadows");
-        if(hero && hero->text=="off") {hero_shadows::apply(image,extent,sha);adapter->hero=true;}
+        if(hero && hero->text=="off") optional("hero_shadows",[&]{hero_shadows::apply(image,extent,sha);adapter->hero=true;});
         std::printf("settings_hero_shadows requested=%s application=restart\n",adapter->hero?"off":"original");
         const auto* world=document.find("static_mesh_lod");
-        adapter->world=quality_controls::install_world(image,extent,sha,world && world->text=="reduced" ? quality_controls::WorldLod::reduced : quality_controls::WorldLod::original);
+        optional("static_mesh_lod",[&]{adapter->world=quality_controls::install_world(image,extent,sha,world && world->text=="reduced" ? quality_controls::WorldLod::reduced : quality_controls::WorldLod::original);});
         const auto* vfx_value=document.find("vfx_quality");
         const auto effects_quality=vfx_value && vfx_value->text=="low" ? vfx::Quality::low :
             vfx_value && vfx_value->text=="high" ? vfx::Quality::high : vfx::Quality::original;
-        vfx::apply(image,extent,sha,effects_quality);adapter->effects_quality=effects_quality;
+        optional("vfx_quality",[&]{vfx::apply(image,extent,sha,effects_quality);adapter->effects_quality=effects_quality;});
         std::printf("settings_geometry_effects static_mesh=%s vfx=%s application=restart\n",world ? world->text.c_str() : "original",vfx_value ? vfx_value->text.c_str() : "original");
         const auto* shadow_resolution=document.find("shadow_resolution");
         const auto* cascade_limit=document.find("shadow_cascade_limit");
@@ -148,13 +166,13 @@ inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image,std:
         shadow_options.resolution=resolution_value=="0.5" ? shadow_quality::Resolution::half :
             resolution_value=="0.75" ? shadow_quality::Resolution::three_quarters : shadow_quality::Resolution::original;
         shadow_options.cascade_limit=limit_value=="original" ? 0u : static_cast<unsigned>(std::stoul(limit_value));
-        adapter->shadow_detail=shadow_quality::install(image,extent,sha,shadow_options);
+        optional("shadow_resolution",[&]{adapter->shadow_detail=shadow_quality::install(image,extent,sha,shadow_options);});
         std::printf("settings_shadow_quality resolution=%s limit=%s application=restart\n",resolution_value.c_str(),limit_value.c_str());
         const auto* texture=document.find("texture_quality");
         const auto texture_value=texture ? texture->text : "original";
-        adapter->texture=quality_controls::install_texture(image,extent,sha,
+        optional("texture_quality",[&]{adapter->texture=quality_controls::install_texture(image,extent,sha,
             texture_value=="half" ? quality_controls::TextureMips::half :
-            texture_value=="quarter" ? quality_controls::TextureMips::quarter : quality_controls::TextureMips::original);
+            texture_value=="quarter" ? quality_controls::TextureMips::quarter : quality_controls::TextureMips::original);});
         if(mesh_highest) { quality_controls::apply_mesh_highest(image,extent,sha);adapter->mesh=true; }
         std::printf("settings_quality texture=%s racer_mesh=%s application=restart\n",texture_value.c_str(),mesh_highest?"highest":"original");
         if(shadow_off) { geometry_controls::apply_shadow_off(image,extent,sha); adapter->shadows=true; }
@@ -163,7 +181,7 @@ inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image,std:
         const auto distance_value=distance ? distance->text : "original";
         const auto scale=distance_value=="0.5" ? geometry_controls::DistanceScale::half :
             distance_value=="0.75" ? geometry_controls::DistanceScale::three_quarters : geometry_controls::DistanceScale::original;
-        adapter->distance=geometry_controls::install(image,extent,sha,scale);
+        optional("distance_scale",[&]{adapter->distance=geometry_controls::install(image,extent,sha,scale);});
         std::printf("settings_distance_applied requested=%s application=restart override_applied=%s\n",distance_value.c_str(),adapter->distance?"true":"false");
         const auto applied=graphics::apply_aa(image,extent,sha,disable);
         aa_installed=applied.override_applied;
@@ -174,7 +192,7 @@ inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image,std:
                 retail_graphics::descriptors[i].key,selected[i]?"off":"original",selected[i]?"true":"false");
         std::printf("{\"scope\":\"settings_antialiasing_applied\",\"requested\":\"%s\",\"application\":\"restart\",\"override_applied\":%s,\"changed_bytes\":%zu,\"reconstructed\":0}\n",
                     disable ? "off" : "original",applied.override_applied ? "true" : "false",applied.changed_bytes);
-        std::printf("{\"scope\":\"settings_original_menu_bridge\",\"installed\":true,\"reconstructed\":0}\n");
+        std::printf("{\"scope\":\"settings_original_menu_bridge\",\"installed\":%s,\"reconstructed\":0}\n",adapter->menu?"true":"false");
         FlushInstructionCache(GetCurrentProcess(),image,extent);
         std::fflush(stdout);
     } catch(...) {

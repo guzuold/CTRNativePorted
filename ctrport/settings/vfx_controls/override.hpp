@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
+#include "../../retail_map.hpp"
 #include <array>
 #include <cstring>
 #include <stdexcept>
@@ -16,17 +17,17 @@ inline const std::array<unsigned char,9>& bytes(Quality q) {
 }
 inline void verify(const unsigned char* p,std::size_t n,const std::string& sha,Quality q) {
  const auto& expected=bytes(q);
- if(sha!="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5" || !p || site>n || expected.size()>n-site)
+ if(!retail_map::bound(sha) || !p || retail_map::at(site)>n || expected.size()>n-retail_map::at(site))
   throw std::invalid_argument("VFX unsupported image");
- if(std::memcmp(p+site,expected.data(),expected.size()))throw std::invalid_argument("VFX producer signature mismatch");
+ if(!retail_map::same(p+retail_map::at(site),site,expected.data(),expected.size()))throw std::invalid_argument("VFX producer signature mismatch");
 }
 // Loader barrier only. Publishes quality and its original dependent enable flags;
 // never changes particle spawn/lifetime, simulation, or scene-owned parameters.
 inline void apply(unsigned char* p,std::size_t n,const std::string& sha,Quality q) {
  const auto& replacement=bytes(q); if(q==Quality::original)return;
- verify(p,n,sha,Quality::original);std::memcpy(p+site,replacement.data(),replacement.size());verify(p,n,sha,q);
+ verify(p,n,sha,Quality::original);std::memcpy(p+retail_map::at(site),replacement.data(),replacement.size());verify(p,n,sha,q);
 }
 inline void rollback(unsigned char* p,std::size_t n,const std::string& sha,Quality q) {
- if(q==Quality::original)return;verify(p,n,sha,q);std::memcpy(p+site,original.data(),original.size());verify(p,n,sha,Quality::original);
+ if(q==Quality::original)return;verify(p,n,sha,q);std::memcpy(p+retail_map::at(site),original.data(),original.size());verify(p,n,sha,Quality::original);
 }
 }

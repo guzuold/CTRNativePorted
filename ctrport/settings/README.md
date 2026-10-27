@@ -51,6 +51,23 @@ reference folder, checks it byte for byte. The per-component READMEs describe ch
 that run in the development repository against private extracts of the user's dump;
 those tools are not part of this repository.
 
+## Other game versions (US CUSA13795, v01.00)
+
+The settings were written against the EU 01.21 eboot (CUSA14876). At start the runtime looks for
+the same code in the eboot that runs (`../retail_map.hpp`, signatures in `../retail_anchors.hpp`,
+made by `tools/retail_anchors.py` from the EU 01.21 eboot): each binding is a window of EU code
+around it, with the bytes that change when code moves left out, and it is found only when that
+window occurs exactly once. Every setting then checks its own instructions there before
+changing them, as on EU 01.21. A setting whose code is not found stays original and the log
+says so (`settings: ... not available on this eboot`); without the menu's selector code the PC
+Settings menu is off. The log also lists the bindings that were not found and compares three of
+them with offsets recorded for the US eboots by other means (`retail_map: check ...`).
+
+Checked on EU 01.00, which differs from 01.21 much more than the US 01.21 eboot does: all 7
+offsets already known there by other means were found at the right place and none at a wrong
+one; 21 of the 32 bindings were found, the others belong to features 01.00 does not have (the
+menu selector, the Wumpa shop).
+
 ## If the game does not start after a change
 
 Close the game and the launcher, open a command prompt in the installation folder and

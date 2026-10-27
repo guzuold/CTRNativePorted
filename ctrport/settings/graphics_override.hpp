@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
+#include "../retail_map.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -27,9 +28,10 @@ struct AAReadback {
 
 inline void require_gate(const unsigned char* base, std::size_t extent, const std::string& sha,
                          const std::array<unsigned char, 9>& expected) {
-    if (sha != retail_121_sha) throw std::invalid_argument("AA override has no binding for this retail executable");
-    if (!base || extent < aa_gate + expected.size()) throw std::invalid_argument("AA gate outside executable image");
-    if (std::memcmp(base + aa_gate, expected.data(), expected.size()) != 0)
+    if (!retail_map::bound(sha)) throw std::invalid_argument("AA override has no binding for this retail executable");
+    const auto gate = retail_map::at(aa_gate);
+    if (!base || extent < gate + expected.size()) throw std::invalid_argument("AA gate outside executable image");
+    if (!retail_map::same(base + gate, aa_gate, expected.data(), expected.size()))
         throw std::invalid_argument("AA gate differs from the pinned retail instructions");
 }
 
@@ -39,14 +41,14 @@ inline AAReadback apply_aa(unsigned char* base, std::size_t extent, const std::s
     // This function deliberately has no page-protection or live-patching path.
     // The loader invokes it while the original image is writable and before
     // original game workers enter the rendering code.
-    base[aa_branch] = 0xeb;
+    base[retail_map::at(aa_gate) + (aa_branch - aa_gate)] = 0xeb;
     require_gate(base, extent, sha, aa_gate_disabled);
     return {true, false, 1};
 }
 
 inline void rollback_aa(unsigned char* base, std::size_t extent, const std::string& sha) {
     require_gate(base, extent, sha, aa_gate_disabled);
-    base[aa_branch] = 0x74;
+    base[retail_map::at(aa_gate) + (aa_branch - aa_gate)] = 0x74;
     require_gate(base, extent, sha, aa_gate_original);
 }
 } // namespace ctrport::settings::graphics

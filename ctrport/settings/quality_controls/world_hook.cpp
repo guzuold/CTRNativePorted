@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #define NOMINMAX
 #include <windows.h>
+#include "../../retail_map.hpp"
 #include "world_hook.hpp"
 #include <array>
 #include <cstdint>
@@ -13,7 +14,6 @@ namespace ctrport::settings::quality_controls {
 namespace {
 constexpr std::size_t site=0x348350, size=17, trampoline=0x100;
 constexpr unsigned char original[size]={0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x55,0x41,0x54,0x53,0x48,0x83,0xec,0x48};
-constexpr auto identity="39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5";
 template<class T>T read(const unsigned char* p,std::size_t at){T v;std::memcpy(&v,p+at,sizeof(v));return v;}
 void absolute_jump(unsigned char* p,const void* target){const unsigned char op[]{0xff,0x25,0,0,0,0};std::memcpy(p,op,6);std::memcpy(p+6,&target,8);}
 extern "C" void world_callback(WorldHook* owner,const unsigned long long* args) noexcept {owner->invoke(args);}
@@ -56,15 +56,15 @@ std::unique_ptr<WorldHook> install_world(unsigned char* base,std::size_t extent,
     if(selected!=WorldLod::original && selected!=WorldLod::reduced)
         throw std::invalid_argument("invalid world mesh setting");
     if(selected==WorldLod::original) return {};
-    if(sha!=identity || !base || site>extent || size>extent-site)
+    if(!retail_map::bound(sha) || !base || !retail_map::has(site) || retail_map::at(site)>extent || size>extent-retail_map::at(site))
         throw std::invalid_argument("unsupported world mesh hook image");
     MEMORY_BASIC_INFORMATION region{};
-    if(!VirtualQuery(base+site,&region,sizeof(region)) || region.State!=MEM_COMMIT ||
+    if(!VirtualQuery(base+retail_map::at(site),&region,sizeof(region)) || region.State!=MEM_COMMIT ||
        (region.Protect & (PAGE_GUARD|PAGE_NOACCESS)) ||
        !(region.Protect & (PAGE_READWRITE|PAGE_EXECUTE_READWRITE|PAGE_WRITECOPY|PAGE_EXECUTE_WRITECOPY)) ||
-       reinterpret_cast<std::uintptr_t>(base+site)+size>reinterpret_cast<std::uintptr_t>(region.BaseAddress)+region.RegionSize)
+       reinterpret_cast<std::uintptr_t>(base+retail_map::at(site))+size>reinterpret_cast<std::uintptr_t>(region.BaseAddress)+region.RegionSize)
         throw std::invalid_argument("world mesh hook requires writable bootstrap image");
-    if(std::memcmp(base+site,original,size))throw std::invalid_argument("world encoder prologue mismatch");
+    if(!retail_map::same(base+retail_map::at(site),site,original,size,true))throw std::invalid_argument("world encoder prologue mismatch");
     auto hook=std::unique_ptr<WorldHook>(new WorldHook());hook->image_=base;
     hook->code_=static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE));
     if(!hook->code_)throw std::runtime_error("world mesh thunk allocation failed");
@@ -78,7 +78,7 @@ std::unique_ptr<WorldHook> install_world(unsigned char* base,std::size_t extent,
     append_pointer(hook.get());stub.insert(stub.end(),{0x48,0xb8});append_pointer(reinterpret_cast<const void*>(&world_callback));
     stub.insert(stub.end(),{0xff,0xd0,0x48,0x83,0xc4,0x58,0xc3});
     std::memcpy(hook->code_,stub.data(),stub.size());
-    std::memcpy(hook->code_+trampoline,original,size);absolute_jump(hook->code_+trampoline+size,base+site+size);
+    std::memcpy(hook->code_+trampoline,original,size);absolute_jump(hook->code_+trampoline+size,base+retail_map::at(site)+size);
     // UNWIND_INFO: v1, prolog4, one UWOP_ALLOC_SMALL(size88).
     const unsigned char unwind[]{1,4,1,0,4,0xa2,0,0};std::memcpy(hook->code_+0x200,unwind,sizeof(unwind));
     auto* function=reinterpret_cast<RUNTIME_FUNCTION*>(hook->code_+0x210);
@@ -88,17 +88,17 @@ std::unique_ptr<WorldHook> install_world(unsigned char* base,std::size_t extent,
     DWORD previous=0;
     if(!VirtualProtect(hook->code_,4096,PAGE_EXECUTE_READ,&previous))throw std::runtime_error("world mesh thunk protection failed");
     FlushInstructionCache(GetCurrentProcess(),hook->code_,4096);
-    absolute_jump(base+site,hook->code_);std::memset(base+site+14,0x90,size-14);hook->installed_=true;
-    FlushInstructionCache(GetCurrentProcess(),base+site,size);
+    absolute_jump(base+retail_map::at(site),hook->code_);std::memset(base+retail_map::at(site)+14,0x90,size-14);hook->installed_=true;
+    FlushInstructionCache(GetCurrentProcess(),base+retail_map::at(site),size);
     return hook;
 }
 void WorldHook::uninstall(){
     if(!installed_)return;
     std::array<unsigned char,size> expected{};absolute_jump(expected.data(),code_);std::memset(expected.data()+14,0x90,size-14);
-    if(std::memcmp(image_+site,expected.data(),size))throw std::runtime_error("world mesh hook altered by another patch");
-    DWORD old=0;if(!VirtualProtect(image_+site,size,PAGE_EXECUTE_READWRITE,&old))throw std::runtime_error("world mesh unhook protection failed");
-    std::memcpy(image_+site,original,size);FlushInstructionCache(GetCurrentProcess(),image_+site,size);
-    DWORD ignored=0;if(!VirtualProtect(image_+site,size,old,&ignored))throw std::runtime_error("world mesh unhook restore protection failed");
+    if(std::memcmp(image_+retail_map::at(site),expected.data(),size))throw std::runtime_error("world mesh hook altered by another patch");
+    DWORD old=0;if(!VirtualProtect(image_+retail_map::at(site),size,PAGE_EXECUTE_READWRITE,&old))throw std::runtime_error("world mesh unhook protection failed");
+    std::memcpy(image_+retail_map::at(site),original,size);FlushInstructionCache(GetCurrentProcess(),image_+retail_map::at(site),size);
+    DWORD ignored=0;if(!VirtualProtect(image_+retail_map::at(site),size,old,&ignored))throw std::runtime_error("world mesh unhook restore protection failed");
     installed_=false;
 }
 WorldHook::~WorldHook(){

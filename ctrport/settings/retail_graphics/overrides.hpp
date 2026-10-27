@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
+#include "../../retail_map.hpp"
 #include <array>
 #include <cstddef>
 #include <cstring>
@@ -38,16 +39,29 @@ inline constexpr std::array<Descriptor, 5> descriptors{{
 using Options = std::array<bool, descriptors.size()>; // true = off; false = original
 struct Readback { std::size_t controls_applied = 0; std::size_t changed_bytes = 0; };
 
+// Offsets are the reference eboot's (retail_map.hpp); another retail eboot uses the same code
+// where retail_map found it. A 'jne rel32' turned into 'jmp rel32' keeps its own target there.
+inline std::array<unsigned char, 8> written(const unsigned char* site, const Descriptor& d, bool disabled) {
+    auto bytes = disabled ? d.disabled : d.original;
+    if (d.original[0] == 0x0f && d.original[1] == 0x85 && d.disabled[0] == 0xe9) {
+        const bool jump = site[0] == 0xe9;
+        std::int32_t rel = 0; std::memcpy(&rel, site + (jump ? 1 : 2), 4);
+        if (disabled) { rel += jump ? 0 : 1; std::memcpy(bytes.data() + 1, &rel, 4); }
+        else { rel -= jump ? 1 : 0; std::memcpy(bytes.data() + 2, &rel, 4); }
+    }
+    return bytes;
+}
 inline void verify(const unsigned char* base, std::size_t extent, const std::string& sha,
                    const Options& selected, bool disabled) {
-    if (sha != retail_sha256) throw std::invalid_argument("retail graphics executable identity is unsupported");
+    if (!retail_map::bound(sha)) throw std::invalid_argument("retail graphics executable identity is unsupported");
     for (std::size_t i = 0; i != descriptors.size(); ++i) {
         if (!selected[i]) continue;
         const auto& d = descriptors[i];
-        if (!base || d.site_rva > extent || d.length > extent - d.site_rva)
+        const auto site = retail_map::at(d.site_rva);
+        if (!base || site > extent || d.length > extent - site)
             throw std::invalid_argument(std::string(d.key) + ": instruction outside image");
         const auto& bytes = disabled ? d.disabled : d.original;
-        if (std::memcmp(base + d.site_rva, bytes.data(), d.length))
+        if (!retail_map::same(base + site, d.site_rva, bytes.data(), d.length))
             throw std::invalid_argument(std::string(d.key) + ": instruction signature mismatch");
     }
 }
@@ -64,7 +78,8 @@ inline Readback apply(unsigned char* base, std::size_t extent, const std::string
         const auto& d = descriptors[i];
         for (std::size_t j = 0; j != d.length; ++j)
             result.changed_bytes += d.original[j] != d.disabled[j];
-        std::memcpy(base + d.site_rva, d.disabled.data(), d.length);
+        const auto site = retail_map::at(d.site_rva);
+        std::memcpy(base + site, written(base + site, d, true).data(), d.length);
         ++result.controls_applied;
     }
     verify(base, extent, sha, selected, true);
@@ -77,7 +92,8 @@ inline void rollback(unsigned char* base, std::size_t extent, const std::string&
     for (std::size_t i = 0; i != descriptors.size(); ++i) {
         if (!selected[i]) continue;
         const auto& d = descriptors[i];
-        std::memcpy(base + d.site_rva, d.original.data(), d.length);
+        const auto site = retail_map::at(d.site_rva);
+        std::memcpy(base + site, written(base + site, d, false).data(), d.length);
     }
     verify(base, extent, sha, selected, false);
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// User-owned retail data only. Bound to the EU v01.21 SHA in reward_catalog::start.
+// User-owned retail data only. EU v01.21 offsets, found in other retail eboots by retail_map.hpp
+// (reward_catalog::start).
 // Constant-price single products and bundle membership read from retail memory.
 // Redirect handles and other price implementations remain unsupported.
 #pragma once
@@ -12,7 +13,7 @@ inline bool shop_object(std::uintptr_t handle, std::uintptr_t& object) {
 inline bool shop_snapshot(std::uintptr_t base, std::string& result) {
     std::uintptr_t market = 0, data = 0, list = 0, array = 0;
     std::uint32_t count = 0;
-    if (!read(base + 0x2ac8348, market) || !market || !read(market + 0x18, data) || !data ||
+    if (!read(base + retail_map::at(0x2ac8348), market) || !market || !read(market + 0x18, data) || !data ||
         !read(data + 0x70, list) || !list || !read(list + 0xc, count) || !count || count > 4096 ||
         !read(list + 0x20, array) || !array) return false;
     std::ostringstream out;
@@ -24,7 +25,7 @@ inline bool shop_snapshot(std::uintptr_t base, std::string& result) {
         std::uint32_t id=0, price=0, currency_id=0, item_count=0, item_id=0, quantity=0;
         if (!read(array+i*8,sku) || !sku || !read(sku,vtable) ||
             !read(vtable+28*8,accessor)) continue;
-        if (accessor == base+0xab21a0) {
+        if (accessor == base+retail_map::at(0xab21a0)) {
             // Original accessor walks +0x90 and sums unowned component prices.
             std::uintptr_t members=0, member_array=0;
             std::uint32_t member_count=0;
@@ -48,7 +49,7 @@ inline bool shop_snapshot(std::uintptr_t base, std::string& result) {
             out << "]}";
             continue;
         }
-        if (accessor != base+0xab1620 ||
+        if (accessor != base+retail_map::at(0xab1620) ||
             !read(sku+0xc,id) || !id || !read(sku+0x28,price) || !price || price > 1000000 ||
             !read(sku+0x18,handle) || !shop_object(handle,product) ||
             !read(sku+0x20,handle) || !shop_object(handle,currency) ||

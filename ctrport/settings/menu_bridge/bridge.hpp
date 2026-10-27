@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
 #include "../menu_protocol.hpp"
+#include "../../retail_map.hpp"
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -19,6 +20,7 @@ using Word = std::uint64_t;
 constexpr char retail_sha[] = "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5";
 constexpr std::size_t selector_vtable = 0x27746c8;
 constexpr std::size_t event_rva = 0x127f500, index_rva = 0x127f5d0, setter_rva = 0x125d880;
+constexpr std::size_t slot0_rva = 0x127f4c0, load_event_type = 0x2a21ee8;  // EU 1.21 offsets (retail_map.hpp)
 constexpr std::size_t object_size = 0x1d0, option_offset = 0x1c8, player_offset = 0x1cc, index_offset = 0x1a0;
 
 inline bool accessible(const void* pointer, std::size_t size, bool write = false) noexcept {
@@ -60,6 +62,8 @@ struct Hooks {
 
 class Adapter {
     unsigned char* image_;
+    // Where the reference bindings are in the running eboot (retail_map.hpp).
+    std::size_t vtable_ = 0, event_rva_ = 0, index_rva_ = 0, setter_ = 0, slot0_ = 0, load_type_ = 0;
     Store store_;
     const Json applied_;
     Hooks hooks_;
@@ -116,7 +120,7 @@ class Adapter {
         return ctr_settings_guest_call4(fn, a, b, c, d);
     }
     bool own(void* object, menu::Option& option) const {
-        if (!accessible(object, object_size) || read<void*>(object) != at(selector_vtable))
+        if (!accessible(object, object_size) || read<void*>(object) != at(vtable_))
             throw std::runtime_error("settings: unexpected selector instance/vtable");
         const auto id = read<std::uint32_t>(object, option_offset);
         if (!menu::owns(id)) return false;
@@ -163,7 +167,7 @@ class Adapter {
             !(info.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)))
             throw std::runtime_error("settings: invalid event metadata getter");
         auto* meta = reinterpret_cast<void*>(original(getter, reinterpret_cast<Word>(event)));
-        const auto* target = read<void*>(at(0x2a21ee8));
+        const auto* target = read<void*>(at(load_type_));
         if (!target) throw std::runtime_error("settings: load event metadata is not initialized");
         // Retail tests the TARGET type's ancestry flag, not each child type's.
         // A derived event with its own zero flag can still descend from target.
@@ -180,14 +184,17 @@ class Adapter {
         }
         return false;
     }
-    static void signature(void* pointer, const std::array<unsigned char, 16>& bytes) {
-        if (!accessible(pointer, bytes.size()) || std::memcmp(pointer, bytes.data(), bytes.size()))
+    static void signature(void* pointer, std::size_t reference, const std::array<unsigned char, 16>& bytes) {
+        if (!accessible(pointer, bytes.size()) ||
+            !retail_map::same(static_cast<const unsigned char*>(pointer), reference, bytes.data(), bytes.size()))
             throw std::runtime_error("settings: retail callback signature mismatch; bridge not installed");
     }
 public:
     Adapter(void* image, const std::string& sha256, fs::path path, Hooks hooks, const Json* startup = nullptr)
         : image_(static_cast<unsigned char*>(image)), store_(std::move(path)), applied_(startup ? *startup : store_.read()), hooks_(hooks) {
-        if (!image_ || sha256 != retail_sha) throw std::runtime_error("settings: unsupported executable SHA256");
+        if (!image_ || !retail_map::bound(sha256)) throw std::runtime_error("settings: unsupported executable SHA256");
+        vtable_ = retail_map::at(selector_vtable); event_rva_ = retail_map::at(event_rva); index_rva_ = retail_map::at(index_rva);
+        setter_ = retail_map::at(setter_rva); slot0_ = retail_map::at(slot0_rva); load_type_ = retail_map::at(load_event_type);
         if (!hooks_.error) throw std::invalid_argument("settings: an error display sink is required");
         validate(applied_);
         requested_ = store_.read();
@@ -206,13 +213,13 @@ public:
     // The original image's vtable page must still be writable (no code patch).
     void install() {
         if (installed_ || active_.load()) throw std::runtime_error("settings: bridge already active");
-        signature(at(0x127f4c0), {0x48,0x8b,0x05,0x51,0x67,0x86,0x01,0xc3,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90});
-        signature(at(event_rva), {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x54,0x53,0x49,0x89,0xd6,0x49,0x89});
-        signature(at(index_rva), {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x55,0x41,0x54,0x53,0x50,0x48,0x89});
-        signature(at(setter_rva), {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x55,0x41,0x54,0x53,0x48,0x83,0xec});
-        auto** table = static_cast<void**>(at(selector_vtable));
-        if (!accessible(table, 34 * sizeof(void*), true) || table[0] != at(0x127f4c0) ||
-            table[25] != at(event_rva) || table[33] != at(index_rva))
+        signature(at(slot0_), slot0_rva, {0x48,0x8b,0x05,0x51,0x67,0x86,0x01,0xc3,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90});
+        signature(at(event_rva_), event_rva, {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x54,0x53,0x49,0x89,0xd6,0x49,0x89});
+        signature(at(index_rva_), index_rva, {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x55,0x41,0x54,0x53,0x50,0x48,0x89});
+        signature(at(setter_), setter_rva, {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x55,0x41,0x54,0x53,0x48,0x83,0xec});
+        auto** table = static_cast<void**>(at(vtable_));
+        if (!accessible(table, 34 * sizeof(void*), true) || table[0] != at(slot0_) ||
+            table[25] != at(event_rva_) || table[33] != at(index_rva_))
             throw std::runtime_error("settings: original selector vtable mismatch; bridge not installed");
         event_ = table[25]; index_ = table[33];
         Adapter* expected = nullptr;
@@ -224,7 +231,7 @@ public:
     }
     void uninstall() {
         if (!installed_) return;
-        auto** table = static_cast<void**>(at(selector_vtable));
+        auto** table = static_cast<void**>(at(vtable_));
         if (!accessible(table, 34 * sizeof(void*), true) ||
             table[25] != reinterpret_cast<void*>(&ctr_settings_event_thunk) ||
             table[33] != reinterpret_cast<void*>(&ctr_settings_index_thunk))
@@ -243,7 +250,7 @@ public:
         void* vtable = nullptr; unsigned char player = 0;
         std::memcpy(&vtable, object, sizeof(vtable));
         std::memcpy(&player, static_cast<const unsigned char*>(object) + player_offset, 1);
-        if (vtable != at(selector_vtable)) throw std::runtime_error("settings: unexpected selector instance/vtable");
+        if (vtable != at(vtable_)) throw std::runtime_error("settings: unexpected selector instance/vtable");
         if (player) throw std::runtime_error("settings: PC selector must not use player-specific storage");
         const auto option = static_cast<menu::Option>(id);
         const bool loading = load_event_cached(reinterpret_cast<void*>(event));
@@ -254,7 +261,7 @@ public:
             try {
                 const unsigned selected = requested(option, requested_);
                 if (!allowed(option, selected)) throw std::runtime_error("settings: saved mode unavailable on this renderer");
-                original(at(setter_rva), self, selected, 0, 0);
+                original(at(setter_), self, selected, 0, 0);
                 if (read<int>(object, index_offset) != static_cast<int>(selected))
                     throw std::runtime_error("settings: original selector rejected saved index");
             } catch (const std::exception& e) { error(e.what()); }
@@ -293,7 +300,7 @@ public:
                         live |= other == option;
             if (!live && hooks_.saved_restart_required) hooks_.saved_restart_required(menu::key(option), value);
         } catch (const std::exception& e) {
-            original(at(setter_rva), self, static_cast<Word>(old), place, reverse);
+            original(at(setter_), self, static_cast<Word>(old), place, reverse);
             if (read<int>(object, index_offset) != old) fatal("settings: failed save and original selector rollback failed");
             error(e.what()); return 0;
         }

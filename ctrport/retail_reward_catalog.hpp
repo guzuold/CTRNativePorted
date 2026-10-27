@@ -3,6 +3,7 @@
 // catalogue is shipped. Layout evidence: (development notes)
 #pragma once
 #include <windows.h>
+#include "retail_map.hpp"
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -15,8 +16,14 @@
 
 namespace ctrport {
 namespace reward_catalog {
+// The catalogue files name the EU v01.21 eboot: their layout is its. The tables are game data;
+// another retail eboot is read where retail_map.hpp found the same globals and accessors.
 inline constexpr char supported_sha[] =
     "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5";
+inline bool bound(const std::string& pin) {
+    return retail_map::bound(pin) && retail_map::has(0x2ad9c38) && retail_map::has(0x2ac8348) &&
+           retail_map::has(0xab21a0) && retail_map::has(0xab1620);
+}
 template<class T> bool read(std::uintptr_t address, T& value) {
     SIZE_T done = 0;
     return address >= 0x10000 && ReadProcessMemory(GetCurrentProcess(),
@@ -25,7 +32,7 @@ template<class T> bool read(std::uintptr_t address, T& value) {
 inline bool snapshot(std::uintptr_t base, std::string& result) {
     std::uintptr_t system = 0, list = 0, data = 0;
     std::uint32_t count = 0;
-    if (!read(base + 0x2ad9c38, system) || !system || !read(system + 0x220, list) || !list ||
+    if (!read(base + retail_map::at(0x2ad9c38), system) || !system || !read(system + 0x220, list) || !list ||
         !read(list + 0xc, count) || !count || count > 256 || !read(list + 0x20, data) || !data) return false;
     std::ostringstream out;
     out << "{\"schema\":1,\"eboot_sha256\":\"" << supported_sha << "\",\"tracks\":[";
@@ -65,8 +72,8 @@ namespace ctrport::reward_catalog {
 template<class Owner> void start(unsigned char* image, const std::string& pin, Owner owner) {
     wchar_t path[32768]{};
     DWORD length = GetEnvironmentVariableW(L"CTR_REWARD_CATALOG", path, 32768);
-    if (!length && pin != supported_sha) return;
-    if (length >= 32768 || pin != supported_sha)
+    if (!length && !bound(pin)) return;
+    if (length >= 32768 || !bound(pin))
         throw std::runtime_error("Reward catalogue observation has no binding for this eboot/path");
     const auto destination = length ? std::filesystem::path(path) :
         std::filesystem::current_path() / "runtime/user/online/retail_reward_catalog.json";
