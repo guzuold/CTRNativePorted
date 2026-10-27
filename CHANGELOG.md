@@ -1,3 +1,16 @@
+## v0.7.9 — 2026-10-27
+
+Mods made for the US game on the EU game, and mods that do not fit no longer stop the game.
+
+- **A mod that does not fit no longer stops the game:** in v0.7.7 and v0.7.8 a PC-port mod made for another version of the game made the game stop right at start. Now that mod is not applied, the game starts without it, and the MODS tab shows the mod in orange with the reason. A mod is applied whole or not at all.
+- **US mods on the EU game (and the other way round), when it can be proven safe:** most PC-port mods are made for the US version (CUSA13795). The runtime now adapts them to the EU version (CUSA14876) of the same update in two cases:
+  - UI files that differ between the regions only in their language tables: the mod's file gets the game's own languages, and is used only if the result is byte for byte what the mod expects.
+  - Code patches that record the original bytes of every change: each change must find those bytes in your game, at the same place or close by. Calls to moved game functions are re-aimed only when this can be checked in your own game.
+
+  Anything that cannot be checked is not applied. Adapted mods are marked in the MODS tab.
+- **Tested:** "Reserves + CNK Drift Gauge" (made for the US version) on the EU game: the drift gauge beside the kart, the speedometer and the reserves bar in a race. Mods that cannot be adapted yet, such as "Smaller Final lap" or "Nina Voice Mod", are skipped with the reason.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.8 — 2026-10-27
 
 Trophy names and descriptions without the trophy key.
