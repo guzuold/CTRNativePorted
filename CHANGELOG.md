@@ -1,3 +1,18 @@
+## v0.7.11 — 2026-10-27
+
+The US version gets the same settings and saves as the EU version.
+
+- **Graphics settings and PC Settings menu on the US version (issue #4):** they were made for the EU v01.21 game, so with a US dump every graphics setting stayed at its console value and the PC Settings menu was missing. The runtime now finds the same game code in the US game by its bytes and applies the settings there, after checking each setting's own instructions as on the EU game. A setting whose code is not found keeps its console value and the log says which; nothing is guessed. The same works on the EU v01.00 game (without the menu, which v01.00 does not have). The Wumpa Coin rewards and shop of online play use the same search.
+- **Saves:** the US game now keeps its saves in its own folder, `runtime/user/savedata/1/CUSA13795`, as on PS4 and in shadPS4. If the game has no save there yet, the runtime copies in your shadPS4 save for the same game once (from `%APPDATA%\shadPS4`). If there is none, on the US game it copies the saves this runtime wrote before under the EU folder. Nothing is moved or deleted. A save folder copied by hand from shadPS4 works too.
+- **Launcher:** it also finds a `dump\CUSA13795` folder and its update folder, and the folder labels name both editions.
+- **Tested** on the EU game with 13 graphics settings changed:
+  - v01.21: same result as before;
+  - v01.00, which had no settings before: every setting whose code was found was applied. The search found the 7 v01.00 addresses we already knew from other sources, all at the right place;
+  - a shadPS4 save was copied in, loaded and saved again by the game.
+
+  **We have not run the US game ourselves:** reports are welcome, with the `play_*.stderr.log` (its lines starting with `retail_map:` and `settings:` show what was found).
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.10 — 2026-10-27
 
 Frame rate above 60 with Direct3D 11.

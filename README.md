@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.7.10](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.10-u2)** (frame rate above 60 with Direct3D 11)
+**Latest release: [v0.7.11](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.11-u2)** (settings, PC Settings menu and saves on the US version)
 
 v0.7.1 makes the **Direct3D 11 renderer** the default and lays out the graphics settings like current PC games: upscaling method (FSR 1, FSR 3,
 DLSS) with Quality/Balanced/Performance modes and sharpness, a single shadow quality, and the
@@ -46,9 +46,14 @@ complete, in private matches and in public matchmaking; see the
 ## Features
 
 ### Game
-- **Supported game:** European edition CUSA14876, v01.00 and the v01.21 update. Each
-  supported executable is identified by its SHA256 and other executables are refused. The
-  American edition (CUSA13795) is recognized, but untested.
+- **Supported game:** European edition CUSA14876 and American edition CUSA13795, v01.00
+  and the v01.21 update. Each supported executable is identified by its SHA256 and other
+  executables are refused. The settings were made for the EU v01.21 game; on the other
+  versions the runtime finds the same game code by its bytes, and a setting whose code is not
+  found keeps its console value. The US v01.21 game runs (reported in issue #4); we have not
+  run it ourselves.
+- **Saves** are kept per edition in `runtime/user/savedata/1/<CUSA...>`. If there is no save
+  yet, your shadPS4 save for the same game is copied in once.
 - **The original game, unmodified:** it can be played from start to finish, and the Pit
   Stop shop works.
 - **Split screen** for 2–4 local players.
