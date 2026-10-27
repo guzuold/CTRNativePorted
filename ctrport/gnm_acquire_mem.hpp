@@ -38,38 +38,4 @@ inline bool acquire_queue_visibility_supported(const GnmAcquireMemRequest& r){
  return r.control==0x82003fc0u || r.control==0x86007fc0u ||
         r.control==0x84c44000u || r.control==0x82c43fc0u;
 }
-inline int gnm_acquire_mem_control(){
- uint32_t packet[]={0xc0055800,0x80000040,0x12345678,0x9abcdef0,0x87654321,0x10203040,0x55};
- GnmAcquireMemRequest request;if(prepare_acquire_mem(packet,7,request) || request.control!=0x80000040 || request.size_low!=0x12345678 || request.size_high!=0x9abcdef0 || request.base_low!=0x87654321 || request.base_high!=0x10203040 || request.poll_interval!=0x55)return 1;
- if(complete_acquire_mem(packet,7,nullptr,nullptr)!=88)return 2;
- struct State {unsigned calls=0;int status=88;};State state;
- auto provider=+[](void* raw,const GnmAcquireMemRequest& r)->int{auto& s=*static_cast<State*>(raw);++s.calls;return r.control==0x80000040 && r.poll_interval==0x55?s.status:112;};
- GnmCommandCursor cursor;if(cursor.capture(1,0,0,packet,7))return 3;
- auto callback=[&](uint64_t,uint32_t,uint32_t,const CtrPm4::Packet& p,const uint32_t* data){return complete_acquire_mem(data,p.words,provider,&state);};
- if(cursor.resume(callback)!=88 || cursor.completed() || state.calls!=1)return 4;
- state.status=90;if(cursor.resume(callback)!=90 || cursor.completed() || state.calls!=2)return 5;
- // Explicitly synthetic provider success tests cursor transport, not a GPU barrier.
- state.status=0;if(cursor.resume(callback) || cursor.completed()!=1 || state.calls!=3)return 6;
- packet[0]|=1;if(complete_acquire_mem(packet,7,provider,&state)!=88 || state.calls!=3)return 7;
- packet[0]&=~1u;if(complete_acquire_mem(packet,6,provider,&state)!=60 || state.calls!=3)return 8;
- auto throwing=+[](void*,const GnmAcquireMemRequest&)->int{throw 1;};if(complete_acquire_mem(packet,7,throwing,nullptr)!=112)return 9;
- for(const auto control:{0x82003fc0u,0x86007fc0u,0x84c44000u,0x82c43fc0u}){
-  GnmAcquireMemRequest r{control,32640,0,285942784,0,10};if(!acquire_queue_visibility_supported(r))return 10;
-  r.size_high=1;if(acquire_queue_visibility_supported(r))return 11;r.size_high=0;
-  r.base_high=1;if(acquire_queue_visibility_supported(r))return 12;r.base_high=0;
-  r.poll_interval=11;if(acquire_queue_visibility_supported(r))return 13;r.poll_interval=10;
-  r.control^=1u<<27;if(acquire_queue_visibility_supported(r))return 14;
- }
- GnmAcquireMemRequest constants{0x88c40000u,1,0,0,0,10};
- if(!acquire_queue_visibility_supported(constants))return 15;
- constants.size_low=2;if(acquire_queue_visibility_supported(constants))return 16;
- constants.size_low=1;constants.base_low=1;if(acquire_queue_visibility_supported(constants))return 17;
- constants.base_low=0;constants.control|=1u<<29;if(acquire_queue_visibility_supported(constants))return 18;
- GnmAcquireMemRequest global{0x2ec47fc0u,UINT32_MAX,0,0,0,10};
- if(!acquire_queue_visibility_supported(global))return 19;
- global.size_low=1;if(acquire_queue_visibility_supported(global))return 20;
- global.size_low=UINT32_MAX;global.base_low=1;if(acquire_queue_visibility_supported(global))return 21;
- global.base_low=0;global.control|=1u<<28;if(acquire_queue_visibility_supported(global))return 22;
- std::cout<<"{\"scope\":\"gnm_acquire_mem_control\",\"passed\":true,\"all_raw_fields_preserved\":true,\"missing_provider_pending\":true,\"pending_error_keeps_cursor\":true,\"synthetic_provider_only\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

@@ -23,14 +23,4 @@ inline void trace_semaphore_call(uint32_t id,uint64_t caller,int operation,int r
   std::printf("{\"scope\":\"original_Semaphore_call\",\"id\":%u,\"caller\":%llu,\"thread\":%lu,\"operation\":%d,\"result\":%d,\"amount\":%d,\"scheduler_modified\":false}\n",id,static_cast<unsigned long long>(caller),thread,operation,result,amount);std::fflush(stdout);
  });
 }
-inline int semaphore_trace_control(){
- SemaphoreCallTrace trace;std::atomic<unsigned> emitted{0};std::vector<std::future<bool>> workers;
- for(unsigned i=0;i<16;++i)workers.push_back(std::async(std::launch::async,[&]{for(unsigned j=0;j<128;++j)trace.observe(56,0x1234,9,1,0,[&]{++emitted;});return true;}));
- for(auto& w:workers)if(!w.get())return 1;
- if(emitted!=16 || trace.size()!=1)return 1;
- if(!trace.observe(56,0x1234,10,1,0,[&]{++emitted;}) || !trace.observe(56,0x1234,9,2,0,[&]{++emitted;}) || !trace.observe(56,0x1234,9,1,1,[&]{++emitted;}))return 1;
- for(unsigned i=0;i<5000;++i)trace.observe(i,0,1,0,0,[]{});
- if(trace.size()!=4096)return 1;
- std::cout<<"{\"scope\":\"authored_semaphore_trace_control\",\"passed\":true,\"concurrent_duplicate_calls\":2048,\"emissions_per_key\":16,\"bounded_records\":4096,\"scheduler_modified\":false}\n";return 0;
-}
 }

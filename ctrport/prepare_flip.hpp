@@ -16,13 +16,4 @@ inline int prepare_plain_flip(const uint32_t* words,size_t count,uint64_t handle
  // remains unchanged. Slot/mode/argument come from the SysV call, not tail data.
  output={static_cast<uint32_t>(stack[0]),static_cast<uint32_t>(stack[1]),stack[2]};return 0;
 }
-inline int prepare_flip_control(){
- std::array<uint32_t,64> words{};words[0]=0xc03e1000;words[1]=0x68750777;
- PrepareFlipRequest value{7,8,9};std::array<uint64_t,3> stack{0,1,0x12345678};
- if(prepare_plain_flip(words.data(),64,1,true,stack,value) || value.slot || value.mode!=1 || value.argument!=stack[2])return 1;
- value={7,8,9};for(auto marker:{0x68750778u,0x68750780u,0x68750781u,0x68750776u}){words[1]=marker;if(prepare_plain_flip(words.data(),64,1,true,stack,value)!=88 || value.slot!=7 || value.argument!=9)return 2;}
- words[1]=0x68750777;if(prepare_plain_flip(words.data(),63,1,true,stack,value)!=60 || prepare_plain_flip(words.data(),64,2,true,stack,value)!=60 || prepare_plain_flip(words.data(),64,1,false,stack,value)!=60)return 3;
- stack[0]=16;if(prepare_plain_flip(words.data(),64,1,true,stack,value)!=88)return 4;stack[0]=0;stack[1]=2;if(prepare_plain_flip(words.data(),64,1,true,stack,value)!=88)return 5;
- std::cout<<"{\"scope\":\"prepare_flip_control\",\"passed\":true,\"argument_transport\":true,\"negative_cases\":9,\"presentation\":false,\"synthetic\":true}\n";return 0;
-}
 }

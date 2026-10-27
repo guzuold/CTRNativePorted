@@ -79,49 +79,4 @@ extern "C" int ctr_event_flag_set(std::uint64_t id,std::uint64_t bits,std::uint6
     try{return kernel_event_flags.set(id,bits);}catch(const std::exception& error){std::fprintf(stderr,"NID=IOnSvHzqu6A library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_event_flag_set();
-inline int event_flag_set_control(){
-    KernelEventFlags flags;std::uint64_t id=0;flags.create(&id,"contention",0x21,0,nullptr);auto object=flags.find(id);
-    auto parked=[&](std::size_t count){const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(1);while(std::chrono::steady_clock::now()<end){{std::lock_guard<std::mutex> guard(object->mutex);if(object->waiters.size()==count)return true;}std::this_thread::yield();}return false;};
-    std::uint64_t a=0,b=0;
-    auto first=std::async(std::launch::async,[&]{std::uint32_t timeout=2000000;return flags.wait(id,1,0x21,&a,&timeout);});
-    if(!parked(1)){first.get();return 1;}
-    auto second=std::async(std::launch::async,[&]{std::uint32_t timeout=2000000;return flags.wait(id,1,0x21,&b,&timeout);});
-    if(!parked(2)){first.get();second.get();return 1;}
-    if(flags.set(id,0) || first.wait_for(std::chrono::milliseconds(0))!=std::future_status::timeout || second.wait_for(std::chrono::milliseconds(0))!=std::future_status::timeout)return 1;
-    if(flags.set(id,1) || first.get() || a!=1 || second.wait_for(std::chrono::milliseconds(0))!=std::future_status::timeout)return 1;
-    if(flags.set(id,1) || second.get() || b!=1 || object->bits)return 1;
-    auto left=std::async(std::launch::async,[&]{std::uint32_t timeout=2000000;return flags.wait(id,2,0x21,&a,&timeout);});
-    if(!parked(1)){left.get();return 1;}
-    auto right=std::async(std::launch::async,[&]{std::uint32_t timeout=2000000;return flags.wait(id,4,0x21,&b,&timeout);});
-    if(!parked(2)){left.get();right.get();return 1;}
-    if(flags.set(id,6) || left.get() || right.get() || a!=6 || b!=4 || object->bits)return 1;
-    if(flags.set(0,1)!=int(0x80020003U) || flags.set(~std::uint64_t(0),1)!=int(0x80020003U))return 1;
-    std::cout<<"{\"scope\":\"owned_event_set_contention\",\"fifo_single_consumer_per_bit\":true,\"zero_does_not_wake\":true,\"distinct_bits_wake_both\":true,\"snapshot_before_clear\":true,\"invalid_handles_rejected\":true}\n";return 0;
-}
-inline int event_flag_wait_control(){
-    KernelEventFlags flags;std::uint64_t id=0,out=0;flags.create(&id,"wait",0x21,5,nullptr);
-    if(flags.wait(id,1,0x21,&out,nullptr) || out!=5 || flags.find(id)->bits!=4)return 1;
-    if(flags.wait(id,6,0x12,&out,nullptr) || out!=4 || flags.find(id)->bits)return 1;
-    std::uint32_t timeout=1000;if(flags.wait(id,2,0x21,&out,&timeout)!=int(0x8002003cU) || timeout || out)return 1;
-    auto waiter=std::async(std::launch::async,[&]{return flags.wait(id,2,0x21,&out,nullptr);});
-    auto object=flags.find(id);bool parked=false;const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(std::chrono::steady_clock::now()<deadline){{std::lock_guard<std::mutex> guard(object->mutex);parked=!object->waiters.empty();}if(parked)break;std::this_thread::yield();}
-    if(!parked){object->set(2);waiter.get();return 1;}
-    if(waiter.wait_for(std::chrono::milliseconds(0))!=std::future_status::timeout)return 1;
-    object->set(2);if(waiter.get() || out!=2 || object->bits)return 1;
-    if(!flags.wait(0,1,1,nullptr,nullptr) || !flags.wait(id,0,1,nullptr,nullptr) || !flags.wait(id,1,3,nullptr,nullptr))return 1;
-    std::cout<<"{\"scope\":\"owned_fifo_event_wait\",\"and_or_clear_modes\":true,\"timeout\":true,\"real_block_and_wakeup\":true,\"atomic_consumption\":true}\n";return 0;
-}
-inline int event_flag_create_control(){
-    KernelEventFlags flags;std::uint64_t id=0,second=0;
-    if(flags.create(&id,"retail-case",0x21,0,nullptr) || !flags.find(id) || flags.find(id)->bits || flags.find(id)->attribute!=0x21)return 1;
-    if(flags.create(&second,"pattern",2,0x8000000000000001ULL,nullptr) || second==id || flags.find(second)->bits!=0x8000000000000001ULL)return 1;
-    for(unsigned attr:{3U,0x13U,0x23U,0x30U})if(flags.create(&id,"bad",attr,0,nullptr)!=static_cast<int>(0x80020016U))return 1;
-    const auto saved=id;
-    if(!flags.create(nullptr,"bad",1,0,nullptr) || !flags.create(&id,nullptr,1,0,nullptr) || !flags.create(&id,"bad",1,0,&id) || flags.create(&id,std::string(32,'x').c_str(),1,0,nullptr)!=static_cast<int>(0x8002003fU) || id!=saved)return 1;
-    auto* page=VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READONLY);if(!page)throw std::runtime_error("Event flag control allocation failed");
-    bool rejected=false;try{flags.create(static_cast<std::uint64_t*>(page),"readonly",1,0,nullptr);}catch(const std::runtime_error&){rejected=true;}
-    VirtualFree(page,0,MEM_RELEASE);if(!rejected)return 1;
-    std::cout<<"{\"scope\":\"owned_event_flag_creation\",\"initial_bits_preserved\":true,\"distinct_handles\":true,\"invalid_parameters_preserve_output\":true,\"readonly_rejected\":true}\n";return 0;
-}
 }

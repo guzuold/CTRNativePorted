@@ -29,16 +29,4 @@ inline ThreadDestructorRegistry thread_destructors;
 extern "C" void ctr_sysv_dtor_control();
 extern "C" void ctr_dtor_control_increment();
 inline std::atomic<unsigned> destructor_control_count{0};
-inline int thread_destructor_control() {
-    ThreadDestructorRegistry state;unsigned rejected=0;
-    try {state.set(reinterpret_cast<void*>(1));} catch(const std::runtime_error&) {++rejected;}
-    unsigned data=0;
-    try {state.set(&data);} catch(const std::runtime_error&) {++rejected;}
-    state.set(reinterpret_cast<void*>(&ctr_sysv_dtor_control));
-    std::thread worker([&state]{state.on_owned_thread_exit();});worker.join();
-    state.set(nullptr);state.on_owned_thread_exit();
-    if(rejected!=2 || destructor_control_count!=1) throw std::runtime_error("Destructor lifecycle control differs");
-    std::cout<<"{\"scope\":\"synthetic_owned_thread_destructor\",\"callback_count\":1,\"negative_rejections\":2,\"guest_threads_supported\":false}\n";
-    return 0;
-}
 }

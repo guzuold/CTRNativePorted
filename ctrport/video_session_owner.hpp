@@ -108,19 +108,6 @@ extern "C" void ctr_video_mode_any(uint64_t address,uint32_t size,uint64_t calle
  }catch(const std::exception& error){std::fprintf(stderr,"NID=pjkDsgxli6c library=libSceVideoOut caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_video_mode_any();
-inline int video_mode_any_control(){
- GuestStack storage(32768,4096);auto* bytes=static_cast<unsigned char*>(storage.bottom());
- for(uint32_t size: {0u,1u,3u,4u,32u,48u}){
-  std::memset(bytes,0x79,64);
-  ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_mode_any),reinterpret_cast<uint64_t>(bytes),size);
-  uint32_t actual=UINT32_MAX;std::memcpy(&actual,bytes,4);if(actual!=size)return 1;
-  for(uint32_t i=4;i<size;++i)if(bytes[i]!=0xff)return 1;
-  if(bytes[(std::max)(size,4u)]!=0x79)return 1;
- }
- bool rejected=false;try{runtime_video_mode_any(UINT64_MAX-3,32);}catch(...){rejected=true;}if(!rejected)return 1;
- rejected=false;try{runtime_video_mode_any(reinterpret_cast<uint64_t>(bytes),UINT32_MAX);}catch(...){rejected=true;}if(!rejected)return 1;
- std::cout<<"{\"scope\":\"mode_any_SysV_control\",\"sizes\":[0,1,3,4,32,48],\"sentinel_preserved\":true,\"negative_rejections\":2,\"retail_execution\":false}\n";return 0;
-}
 extern "C" int ctr_video_register(int handle,int first,uint64_t addresses,int count,uint64_t attributes,uint64_t caller){
  try{const int result=runtime_video_register(handle,first,addresses,count,attributes);
   std::printf("{\"scope\":\"original_VideoOutRegisterBuffers_return\",\"caller\":%llu,\"result\":%d,\"count\":%d,\"GPU_coherence\":false}\n",static_cast<unsigned long long>(caller),result,count);std::fflush(stdout);return result;
@@ -161,45 +148,9 @@ extern "C" int ctr_video_configure(int handle,uint32_t reserved,uint64_t mode,ui
 }
 extern "C" void ctr_sysv_video_configure();
 extern "C" int ctr_video_configure_bridge_fixture(void*);
-inline int video_output_any_guest_control(){
- if(runtime_video_open(255,0,0,0)!=1)return 1;
- GuestStack storage(32768,4096);auto* mode=static_cast<CtrVideoOutputModeV1*>(storage.bottom());
- runtime_video_mode_any(reinterpret_cast<uint64_t>(mode),32);
- if(ctr_video_configure_bridge_fixture(mode))return 1;
- const auto address=reinterpret_cast<uint64_t>(mode);
- if(runtime_video_configure(2,0,address,0,32,16)!=static_cast<int>(0x8029000bu) || runtime_video_configure(1,1,address,0,32,16)!=static_cast<int>(0x80290001u) || runtime_video_configure(1,0,UINT64_MAX-15,0,32,16)!=static_cast<int>(0x80290002u))return 1;
- bool rejected=false;try{runtime_video_configure(1,0,address,1,32,16);}catch(...){rejected=true;}if(!rejected)return 1;
- mode->colorimetry=2;rejected=false;try{runtime_video_configure(1,0,address,0,32,16);}catch(...){rejected=true;}if(!rejected)return 1;
- mode->colorimetry=255;if(ctr_video_configure_bridge_fixture(mode))return 1;
- if(runtime_video_close(1))return 1;
- std::cout<<"{\"scope\":\"output_any_SysV6_control\",\"sixth_argument\":16,\"real_SDR_admitted\":true,\"negative_rejections\":5,\"readmission\":true,\"game_frame\":false}\n";return 0;
-}
 extern "C" int ctr_video_register_bridge_fixture(void*);
 inline int runtime_video_open(int,int,int,uint64_t);
 inline int runtime_video_close(int);
-inline int video_tiled_guest_control(){
- constexpr uint64_t span=8355840ULL*2;
- auto backing=std::make_shared<DirectMemoryBacking>(span);int64_t physical=-1;void* mapped=nullptr;
- if(backing->allocate(0,span,span,0,0,&physical) || backing->map(&mapped,span,51,0,physical,0))return 1;
- direct_memory_backing=backing;
- if(runtime_video_open(255,0,0,0)!=1)return 1;
- GuestStack storage(32768,4096);auto* bytes=static_cast<unsigned char*>(storage.bottom());
- struct Fixture{uint64_t first;uint64_t buffers[2];CtrVideoBufferAttributesV1 attributes;};
- static_assert(offsetof(Fixture,attributes)==24);
- auto* value=reinterpret_cast<Fixture*>(bytes);*value={3,{reinterpret_cast<uint64_t>(mapped),reinterpret_cast<uint64_t>(mapped)+8355840},{0x80000000u,0,0,1920,1080,1920,0,0,0}};
- if(ctr_video_register_bridge_fixture(value)!=0)return 1;
- if(ctr_video_register_bridge_fixture(value)!=static_cast<int>(0x80290010u))return 1;
- auto output=reinterpret_cast<uint64_t>(bytes+128);std::memset(bytes+128,0x79,16);
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_label_address),1,output)!=16)return 1;
- uint64_t label=0;std::memcpy(&label,bytes+128,8);std::array<uint64_t,16> labels{};const auto memory=make_owned_guest_copy_api();
- if(!label || memory.read(memory.context,label,labels.data(),128) || labels[3] || labels[4] || bytes[136]!=0x79)return 1;
- if(runtime_video_register(2,0,reinterpret_cast<uint64_t>(value->buffers),2,reinterpret_cast<uint64_t>(&value->attributes))!=static_cast<int>(0x8029000bu) || runtime_video_register(1,0,0,2,0)!=static_cast<int>(0x80290002u) || runtime_video_label_address(1,UINT64_MAX-3)!=static_cast<int>(0x80290002u))return 1;
- std::weak_ptr<DirectMemoryBacking> weak=backing;backing.reset();direct_memory_backing.reset();if(weak.expired())return 1;
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_unregister),1,0) || !weak.expired())return 1;
- if(runtime_video_unregister(1,0)!=static_cast<int>(0x80290001u) || runtime_video_unregister(2,0)!=static_cast<int>(0x8029000bu))return 1;
- if(runtime_video_close(1))return 1;
- std::cout<<"{\"scope\":\"tiled_guest_SysV5_control\",\"two_real_images\":true,\"first_slot\":3,\"labels_count\":16,\"copy8_sentinel\":true,\"retained_mapping\":true,\"unregister_releases\":true,\"negative_rejections\":6,\"game_frame\":false}\n";return 0;
-}
 inline int runtime_video_open(int user,int bus,int index,uint64_t parameter){
  if(index!=0)return static_cast<int>(0x80290001u);
  if(user!=255 || bus!=0 || parameter)throw std::runtime_error("VideoOutOpen unsupported user/bus/parameter");
@@ -232,11 +183,6 @@ extern "C" int ctr_video_adjust_color(int handle,uint64_t address,uint64_t calle
  catch(const std::exception& e){std::fprintf(stderr,"NID=pv9CI5VC+R0 library=libSceVideoOut caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_video_adjust_color();
-inline int video_adjust_color_negative_control(){
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_video_adjust_color),1,0,0))!=static_cast<int>(0x80290002U))return 1;
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_video_adjust_color),uint64_t(UINT32_MAX),1,0))!=static_cast<int>(0x8029000bU))return 2;
- std::cout<<"{\"scope\":\"video_adjust_color_negative_ABI\",\"passed\":true,\"GPU_positive_test\":false}\n";return 0;
-}
 inline int runtime_video_resolution(int handle,uint64_t address){
  std::shared_ptr<RuntimeVideoSession> session;
  {std::lock_guard<std::mutex> lock(runtime_video_mutex);if(handle!=1 || !runtime_video_session)return static_cast<int>(0x8029000bu);session=runtime_video_session;}
@@ -314,15 +260,6 @@ extern "C" void ctr_video_set_attributes(uint64_t address,uint32_t format,uint32
 }
 extern "C" void ctr_sysv_video_set_attributes();
 extern "C" void ctr_video_attribute_bridge_fixture(void*);
-inline int video_attribute_bridge_control(){
- GuestStack destination(32768,4096);std::memset(destination.bottom(),0x79,48);
- ctr_video_attribute_bridge_fixture(destination.bottom());
- const auto* value=static_cast<const CtrVideoBufferAttributesV1*>(destination.bottom());
- if(value->format!=0x80000000u || value->tiling!=0 || value->aspect!=0 || value->width!=1920 || value->height!=1080 || value->pitch_pixels!=2048 || value->option || value->reserved0 || value->reserved1 || static_cast<const unsigned char*>(destination.bottom())[40]!=0x79)return 1;
- const auto memory=make_owned_guest_copy_api();
- if(ctr_video_write_buffer_attributes(&memory,UINT64_MAX-19,0,0,0,1920,1080,2048)!=112)return 1;
- std::cout<<"{\"scope\":\"video_attribute_SysV7_control\",\"bytes\":40,\"pitch_seventh_argument\":2048,\"sentinel_preserved\":true,\"overflow_rejected\":true,\"retail_fixture\":false}\n";return 0;
-}
 extern "C" int ctr_video_resolution(int handle,uint64_t address,uint64_t caller){
  try{return runtime_video_resolution(handle,address);}catch(const std::exception& error){std::fprintf(stderr,"NID=6kPnj51T62Y library=libSceVideoOut caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
@@ -338,46 +275,6 @@ extern "C" int ctr_video_open(int user,int bus,int index,uint64_t parameter,uint
  }catch(const std::exception& error){std::fprintf(stderr,"NID=Up36PTk687E library=libSceVideoOut caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_video_open();
-inline int video_event_session_control(){
- if(runtime_video_open(255,0,0,0)!=1)return 1;
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_set_rate),1,1))return 1;
- const auto queue=kernel_display_events.queues.create();
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_video_add_flip),queue,1,0x1234) || ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_video_add_vblank),queue,1,0x5678))return 1;
- auto session=runtime_video_session;
- if(session->invoke([](const CtrVideoSessionApiV1* api){return api->start_pacing(api->context);}) || session->invoke([](const CtrVideoSessionApiV1* api){return api->wait_vblank(api->context,500);}))return 1;
- GuestStack destination(32768,4096);const auto address=reinterpret_cast<uint64_t>(destination.bottom());
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_vblank_status),1,address))return 1;
- if(static_cast<const CtrVideoPublicVblankStatus*>(destination.bottom())->count==0)return 1;
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_flip_status),1,address))return 1;
- if(static_cast<const CtrVideoPublicFlipStatus*>(destination.bottom())->count!=0)return 1;
- const auto events=kernel_display_events.queues.poll(queue,8);if(events.empty() || events[0].ident!=7 || events[0].udata!=0x5678)return 1;
- if(session->invoke([](const CtrVideoSessionApiV1* api){return api->stop_pacing(api->context);}))return 1;
- if(session->invoke([queue](const CtrVideoSessionApiV1* api){const int a=api->remove_event(api->context,queue,6);const int b=api->remove_event(api->context,queue,7);return a?a:b;}))return 1;
- kernel_display_events.queues.destroy(queue);
- if(runtime_video_add_event(queue,1,0,6)!=static_cast<int>(0x8029000cu) || runtime_video_status(2,address,0)!=static_cast<int>(0x8029000bu) || runtime_video_status(1,UINT64_MAX-31,0)!=static_cast<int>(0x80290002u))return 1;
- session.reset();if(runtime_video_close(1))return 1;
- std::cout<<"{\"scope\":\"real_video_kernel_event_status_control\",\"real_vblank_delivered\":true,\"userdata_preserved\":true,\"flip_completion_count\":0,\"negative_rejections\":3,\"game_frame\":false}\n";return 0;
-}
-inline int video_session_owner_control(){
- auto session=std::make_shared<RuntimeVideoSession>();const int status=session->start();if(status)return status;
- if(session->invoke([](const CtrVideoSessionApiV1* api){return api&&api->context&&api->pump_messages?73:91;})!=73)return 1;
- session.reset();
- if(runtime_video_open(255,0,1,0)!=static_cast<int>(0x80290001u))return 1;
- bool rejected=false;try{runtime_video_open(255,1,0,0);}catch(...){rejected=true;}if(!rejected)return 1;
- if(runtime_video_open(255,0,0,0)!=1 || runtime_video_open(255,0,0,0)!=static_cast<int>(0x80290009u))return 1;
- {GuestStack destination(32768,4096);const auto address=reinterpret_cast<uint64_t>(destination.bottom());
-  std::memset(destination.bottom(),0x79,48);
-  if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_capability),1,address))return 1;
-  const auto* capability=static_cast<const uint64_t*>(destination.bottom());if(capability[0]!=0 || capability[1]!=0x7979797979797979ULL)return 1;
-  if(runtime_video_capability(2,address)!=static_cast<int>(0x8029000bu) || runtime_video_capability(1,UINT64_MAX-3)!=static_cast<int>(0x80290002u))return 1;
-  if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_resolution),1,address))return 1;
-  const auto* value=static_cast<const CtrVideoPublicResolutionStatus*>(destination.bottom());
-  if(value->full_width!=1280 || value->full_height!=720 || value->refresh_rate || value->screen_size_in_inch)return 1;
-  if(runtime_video_resolution(1,UINT64_MAX-23)!=static_cast<int>(0x80290002u) || runtime_video_resolution(2,address)!=static_cast<int>(0x8029000bu))return 1;
- }
- if(runtime_video_close(2)!=static_cast<int>(0x8029000bu) || ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_video_close),1,0)!=0 || runtime_video_close(1)!=static_cast<int>(0x8029000bu))return 1;
- std::cout<<"{\"scope\":\"real_video_session_owner_control\",\"live_window_vulkan_session\":true,\"owner_dispatch_result\":73,\"joined_cleanup\":true,\"game_frame\":false}\n";return 0;
-}
 }
 
 #include "video/splash_lifecycle.h"

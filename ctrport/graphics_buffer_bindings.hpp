@@ -92,36 +92,4 @@ inline int prepare_graphics_image_writes(const GraphicsPairOwner& pair,const std
  }
  output=std::move(prepared);return 0;
 }
-inline int graphics_buffer_writes_control(){
- auto ps=std::make_shared<GraphicsStageOwner>();ps->resources.version=1;ps->resources.size=sizeof(ps->resources);ps->resources.flattened_userdata_words=16;ps->flattened_userdata.resize(16);
- auto vs=std::make_shared<GraphicsStageOwner>(*ps);vs->resources.buffers=2;vs->resources.binding_count=2;vs->resources.bindings[0]={0,0,0,0,0};vs->resources.bindings[1]={0,0,2,6,0};
- GraphicsBufferCapture bytes;bytes.sharp=0;bytes.bytes=16;bytes.snapshot.resize(16);bytes.requirement_status=bytes.lease_status=bytes.capture_status=bytes.release_status=bytes.lease_end_status=0;vs->buffers.push_back(bytes);
- vs->clip_planes.push_back({0,0,{1,sizeof(CtrGraphicsClipPlanesV1),0,0,{}}});
- GraphicsPairOwner pair;pair.fragment=ps;pair.vertex=vs;pair.fragment_inputs=ps;pair.vertex_inputs=vs;
- pair.fragment_bindings.version=pair.vertex_bindings.version=1;pair.fragment_bindings.size=pair.vertex_bindings.size=sizeof(CtrGraphicsBindingContractV1);
- auto& contract=pair.vertex_bindings;contract.buffer_after=2;contract.unified_after=2;contract.descriptor_count=2;contract.descriptors[0]={0,0,0,1,0,1};contract.descriptors[1]={0,0,1,1,1,1};
- std::vector<LiveGraphicsBuffer> live{{vs.get(),0,0,7,16}};std::vector<GraphicsBufferWrite> output;
- if(prepare_graphics_buffer_writes(pair,live,output) || output.size()!=2 || output[0].token!=7 || !output[1].null_clip_planes || output[1].token)return 1;
- unsigned rejected=0;
- for(unsigned test=0;test<6;++test){auto invalid=live;auto bad=pair;
-  switch(test){case 0:invalid.clear();break;case 1:invalid[0].stage=ps.get();break;case 2:invalid[0].type=1;break;case 3:invalid[0].token=0;break;case 4:invalid.push_back(invalid[0]);break;case 5:invalid[0].bytes=8;break;}
-  const int status=prepare_graphics_buffer_writes(bad,invalid,output);
-  if(status==(test>=4?112:88) && output.size()==2 && output[0].token==7 && output[1].null_clip_planes)++rejected;
- }
- if(rejected!=6)return 2;
- // A missing image must not block real buffer/sampler preparation. Full
- // input completeness still fails; these partial writes never admit a draw.
- vs->resources.images=1;vs->resources.binding_count=3;vs->resources.bindings[2]={1,16,0,0,0};
- if(graphics_input_capture_status(*vs)!=88 || prepare_graphics_buffer_writes(pair,live,output) || output.size()!=2)return 3;
- std::vector<GraphicsImageWrite> images{{99,99,false,99}};
- if(prepare_graphics_image_writes(pair,{},images)!=88 || images.size()!=1 || images[0].token!=99)return 4;
- std::vector<GraphicsSamplerWrite> samplers;
- if(prepare_graphics_sampler_writes(pair,{},samplers) || !samplers.empty())return 5;
- vs->buffers[0].snapshot.pop_back();
- if(prepare_graphics_buffer_writes(pair,live,output)!=112 || output.size()!=2 || output[0].token!=7)return 6;
- vs->buffers[0].snapshot.push_back(0);
- if(graphics_input_capture_status(*vs,16)!=60)return 7;
-
- std::cout<<"{\"scope\":\"graphics_buffer_writes_control\",\"negative_atomic\":6,\"partial_resource_preparation_without_draw_admission\":true,\"sharp_collision_resolved\":true,\"explicit_null_clip_planes\":true,\"synthetic\":true,\"descriptor_writes\":false}\n";return 0;
-}
 }

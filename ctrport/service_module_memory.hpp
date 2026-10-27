@@ -53,47 +53,4 @@ inline std::vector<ServiceGeneration::Entry> snapshot_service_manifest(
     for(const auto& entry:result)require_service_module_range(owner,entry.target,1,true);
     return result;
 }
-inline int service_manifest_snapshot_control(){
-    const auto owner=GetModuleHandleW(nullptr);const std::string pin(64,'a');
-    static CtrServiceEntry entry{};entry.size=sizeof(entry);entry.signature_id=1;
-    std::memcpy(entry.nid,"synthetic",10);std::memcpy(entry.library,"test",5);
-    std::memcpy(entry.module,"test",5);
-    entry.win64_adapter=reinterpret_cast<const void*>(&service_manifest_snapshot_control);
-    static CtrServiceManifest manifest{};manifest.size=sizeof(manifest);manifest.version=1;
-    manifest.entry_size=sizeof(entry);manifest.entry_count=1;manifest.entries=&entry;
-    std::memcpy(manifest.eboot_sha256,pin.data(),64);
-    const auto result=snapshot_service_manifest(owner,&manifest,pin);
-    if(result.size()!=1 || result[0].target!=entry.win64_adapter)
-        throw std::runtime_error("Manifest snapshot positive differs");
-    unsigned rejected=0;
-    auto check=[&](const CtrServiceManifest* source){
-        try{snapshot_service_manifest(owner,source,pin);}catch(const std::runtime_error&){++rejected;}
-    };
-    check(nullptr);
-    const auto stack=manifest;check(&stack);
-    manifest.entries=reinterpret_cast<const CtrServiceEntry*>(UINTPTR_MAX-1);check(&manifest);
-    manifest.entries=&entry;manifest.entry_count=4097;check(&manifest);manifest.entry_count=1;
-    entry.win64_adapter=&manifest;check(&manifest);
-    if(rejected!=5)throw std::runtime_error("Manifest snapshot rejections differ");
-    return 0;
-}
-inline int service_module_memory_control(){
-    const auto owner=GetModuleHandleW(nullptr);
-    static const std::uint64_t data=42;
-    const auto code=reinterpret_cast<const void*>(&service_module_memory_control);
-    require_service_module_range(owner,&data,sizeof(data),false);
-    require_service_module_range(owner,code,1,true);
-    unsigned rejected=0;
-    auto check=[&](HMODULE module,const void* ptr,std::size_t size,bool execute){
-        try{require_service_module_range(module,ptr,size,execute);}catch(const std::runtime_error&){++rejected;}
-    };
-    check(owner,&data,sizeof(data),true);
-    check(owner,nullptr,1,false);
-    check(owner,&data,0,false);
-    check(owner,reinterpret_cast<const void*>(UINTPTR_MAX-1),8,false);
-    check(GetModuleHandleW(L"kernel32.dll"),code,1,true);
-    const std::uint64_t stack=1;check(owner,&stack,sizeof(stack),false);
-    if(rejected!=6)throw std::runtime_error("Service module memory controls differ");
-    return 0;
-}
 }

@@ -39,17 +39,6 @@ extern "C" std::int64_t ctr_posix_write(int fd,const void* buffer,std::uint64_t 
  catch(const std::exception& e){std::fprintf(stderr,"NID=FxVZqBAA7ks library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_posix_write();
-inline int posix_write_control(){
- namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/posix_write");fs::create_directories(root);
- KernelFiles files;files.configure(root);files.configure_user(root);auto fd=files.open("/data/bytes",0x602,0777);int error=123;
- if(fd<3 || posix_write(files,fd,"actual",6,error)!=6 || error!=123)return 1;
- if(posix_write(files,999,"x",1,error)!=-1 || error!=9)return 1;
- if(posix_write(files,fd,reinterpret_cast<void*>(1),1,error)!=-1 || error!=14)return 1;
- if(posix_write(files,fd,nullptr,0,error)!=0 || error!=14 || files.close(fd))return 1;
- std::ifstream in(root/"bytes",std::ios::binary);std::string bytes((std::istreambuf_iterator<char>(in)),{});if(bytes!="actual")return 1;
- if(posix_write(files,1,nullptr,0,error)!=0 || error!=14 || posix_write(files,2,nullptr,0,error)!=0)return 1;
- std::cout<<"{\"scope\":\"posix_write_control\",\"real_file_bytes\":\"actual\",\"ebadf\":9,\"efault\":14,\"success_preserves_errno\":true}\n";return 0;
-}
 extern "C" void ctr_console_debug(void*,const char* text,std::uint64_t caller) {
     try {std::vector<char> bytes;for(std::size_t i=0;i<1024*1024;++i){char c=0;SIZE_T read=0;
         if(!text || !ReadProcessMemory(GetCurrentProcess(),text+i,&c,1,&read) || read!=1)throw std::runtime_error("Debug text unreadable");
@@ -59,12 +48,4 @@ extern "C" void ctr_console_debug(void*,const char* text,std::uint64_t caller) {
 }
 extern "C" void ctr_sysv_console_write();
 extern "C" void ctr_sysv_console_debug();
-inline int console_output_control() {
-    const char bytes[]={'C','T','R','\0','\n'};
-    if(console_write(1,bytes,sizeof(bytes))!=sizeof(bytes) || console_write(2,bytes,sizeof(bytes))!=sizeof(bytes))return 1;
-    ctr_console_debug(nullptr,"CTR kernel debug control\n",0);
-    if(console_write(1,reinterpret_cast<void*>(1),1)!=static_cast<int>(0x8002000eU))return 1;
-    bool rejected=false;try{console_write(3,bytes,1);}catch(const std::runtime_error&){rejected=true;}
-    return rejected?0:1;
-}
 }

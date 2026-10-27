@@ -33,20 +33,4 @@ public:
   locked_=false;return 0;
  }
 };
-inline int flip_surface_lock_control(){
- auto owner=std::make_shared<VideoLabelMemory>();const auto memory=make_owned_guest_copy_api();const auto base=owner->address();
- FlipSurfaceLock lock;uint64_t values[16]{};if(lock.acquire(memory,base,15,77))return 1;
- if(memory.read(memory.context,base,values,128) || values[15]!=1)return 2;for(unsigned i=0;i<15;++i)if(values[i])return 2;
- FlipSurfaceLock duplicate;if(duplicate.acquire(memory,base,15,77)!=91)return 3;
- for(auto entry:std::array<std::array<uint64_t,4>,4>{{{{88,1,1,77}},{{0,0,1,77}},{{0,1,0,77}},{{0,1,1,78}}}}){
-  if(lock.complete(static_cast<int>(entry[0]),entry[1],entry[2],entry[3])!=88 || memory.read(memory.context,base+120,&values[15],8) || values[15]!=1)return 4;
- }
- if(lock.complete(0,1,1,77) || lock.complete(0,1,1,77)!=91 || memory.read(memory.context,base+120,&values[15],8) || values[15]!=1)return 5;
- if(lock.retire_previous(0,1,2)!=88 || lock.retire_previous(0,2,1)!=88 || lock.retire_previous(88,2,2)!=88)return 8;
- FlipSurfaceLock next;if(next.acquire(memory,base,14,78) || next.complete(0,2,2,78) || lock.retire_previous(0,2,2))return 9;
- if(memory.read(memory.context,base,values,128) || values[15] || values[14]!=1)return 10;
- FlipSurfaceLock malformed;if(malformed.acquire(memory,base,16,0)!=60 || malformed.acquire(memory,base+1,0,0)!=60)return 6;
- owner.reset();if(malformed.acquire(memory,base,0,0)!=60)return 7;
- std::cout<<"{\"scope\":\"flip_surface_lock_control\",\"passed\":true,\"actual_owned_memory\":true,\"failed_completion_retains_lock\":true,\"first_completion_keeps_current_locked\":true,\"later_completion_retires_previous\":true,\"neighbors_unchanged\":true,\"revoked_owner_rejected\":true,\"GPU_completion\":false,\"synthetic\":true}\n";return 0;
-}
 }

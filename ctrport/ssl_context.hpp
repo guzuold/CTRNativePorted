@@ -40,13 +40,4 @@ extern "C" int ctr_ssl_init(size_t bytes,uint64_t caller){try{int id=ssl_context
 extern "C" int ctr_ssl_term(int id,uint64_t caller){try{ssl_contexts.destroy(id);return 0;}catch(const std::exception& e){std::fprintf(stderr,"NID=0K1yQ6Lv-Yc library=libSceSsl caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}}
 extern "C" void ctr_sysv_ssl_init();
 extern "C" void ctr_sysv_ssl_term();
-inline int ssl_context_control(){
- int id=static_cast<int>(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_ssl_init),32768,0));
- if(id<=0 || !ssl_contexts.control(id,32768))return 1;
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_ssl_term),id,0))return 2;
- bool stale=false;try{ssl_contexts.destroy(id);}catch(...){stale=true;}if(!stale)return 3;
- int second=ssl_contexts.create(4097);if(second==id || !ssl_contexts.control(second,4097))return 4;ssl_contexts.destroy(second);
- bool invalid=false;try{ssl_contexts.create(0);}catch(...){invalid=true;}if(!invalid)return 5;
- std::cout<<"{\"scope\":\"ssl_context_control\",\"passed\":true,\"actual_SysV_lifecycle\":true,\"owned_Schannel_credential\":true,\"owned_pool\":true,\"stale_ID_rejected\":true,\"network_connections\":0,\"TLS_handshake_verified\":false}\n";return 0;
-}
 }

@@ -254,29 +254,11 @@ extern "C" int ctr_audio_out_open(int32_t user,int32_t type,int32_t index,uint32
 }
 extern "C" void ctr_sysv_audio_out_open();
 extern "C" int ctr_audio_out_open_fixture(int32_t,int32_t,int32_t,uint32_t,uint32_t,uint32_t);
-inline int audio_port_control(){
- AudioOutputBackend backend;if(backend.open(255,0,0,256,48000,5)!=static_cast<int>(0x8026000fU) || backend.initialize())return 1;
- if(backend.open(255,0,0,255,48000,5)!=static_cast<int>(0x80260006U) || backend.open(255,0,0,256,44100,5)!=static_cast<int>(0x80260008U))return 1;
- for(unsigned i=0;i<8;++i)if(backend.open(255,0,0,256,48000,5)!=static_cast<int>(0x20000000U|i))return 1;
- if(backend.open(255,0,0,256,48000,5)!=static_cast<int>(0x80260005U))return 1;
- if(backend.open(255,1,0,256,48000,5)!=0x20010008 || backend.open(255,1,0,256,48000,5)!=static_cast<int>(0x80260005U))return 1;
- if(audio_output_backend.initialize() || ctr_audio_out_open_fixture(255,0,0,256,48000,5)!=0x20000000)return 1;
- std::cout<<"{\"scope\":\"audio_port_control\",\"SysV6\":true,\"real_float8_source_voices\":10,\"owned_buffers\":true,\"exhaustion\":true,\"guest_PCM\":false,\"passed\":true}\n";return 0;
-}
 extern "C" int ctr_audio_out_volume(int32_t handle,uint32_t flags,const int32_t* volume,uint64_t caller){
  try{int rc=audio_output_backend.set_volume(handle,flags,volume);std::printf("{\"scope\":\"original_AudioOutSetVolume_return\",\"caller\":%llu,\"flags\":%u,\"result\":%d,\"native_channel_gains\":true}\n",static_cast<unsigned long long>(caller),flags,rc);std::fflush(stdout);return rc;
  }catch(const std::exception& e){std::fprintf(stderr,"NID=b+uAV89IlxE library=libSceAudioOut caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_audio_out_volume();
-inline int audio_volume_control(){
- if(audio_output_backend.initialize())return 1;const int handle=audio_output_backend.open(255,0,0,256,48000,5);int32_t volume=16384;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_audio_out_volume),handle,0x55,reinterpret_cast<uint64_t>(&volume)))return 1;
- auto gains=audio_output_backend.volume_control_readback(0);for(unsigned c=0;c<8;++c)if(gains[c]!=((0x55&(1U<<c))?0.5f:1.0f))return 1;
- volume=32769;if(audio_output_backend.set_volume(handle,255,&volume)!=static_cast<int>(0x80260009U))return 1;
- if(audio_output_backend.set_volume(handle,255,nullptr)!=static_cast<int>(0x80260004U) || audio_output_backend.set_volume(0,255,&volume)!=static_cast<int>(0x80260003U))return 1;
- if(audio_output_backend.volume_control_readback(0)!=gains)return 1;
- std::cout<<"{\"scope\":\"audio_volume_control\",\"SysV3\":true,\"native_8channel_readback\":true,\"selective_gain\":true,\"negative_cases\":3,\"guest_PCM\":false,\"passed\":true}\n";return 0;
-}
 extern "C" int ctr_audio_out_output(int32_t handle,const void* input,uint64_t caller){
  try{int rc=audio_output_backend.output(handle,input);static std::atomic<uint64_t> calls{0};const auto count=++calls;
  if(count<5 || !(count&(count-1)))std::printf("{\"scope\":\"original_AudioOutOutput_return\",\"caller\":%llu,\"result\":%d,\"native_PCM_submitted\":%s,\"call_count\":%llu}\n",static_cast<unsigned long long>(caller),rc,rc>0?"true":"false",static_cast<unsigned long long>(count));std::fflush(stdout);return rc;
@@ -288,36 +270,5 @@ extern "C" int ctr_audio_out_close(int32_t handle,uint64_t caller){
  }catch(const std::exception& e){std::fprintf(stderr,"NID=s1--uE9mBFw library=libSceAudioOut caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_audio_out_close();
-inline int audio_pcm_control(){
- if(audio_output_backend.initialize())return 1;const int handle=audio_output_backend.open(255,0,0,256,48000,5);std::array<float,2048> pcm{};
- const auto call=[&](const void* data){return static_cast<int>(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_audio_out_output),handle,reinterpret_cast<uint64_t>(data)));};
- if(call(pcm.data())!=2048 || call(nullptr) || audio_output_backend.played_samples_control(0)!=256)return 1;
- if(call(pcm.data())!=2048 || call(nullptr) || audio_output_backend.played_samples_control(0)!=512)return 1;
- if(call(reinterpret_cast<void*>(1))!=static_cast<int>(0x80260004U) || audio_output_backend.output(0,nullptr)!=static_cast<int>(0x80260003U))return 1;
- std::cout<<"{\"scope\":\"audio_pcm_control\",\"SysV2\":true,\"native_XAudio2_consumed_frames\":512,\"channels\":8,\"synthetic_silence\":true,\"retained_buffer\":true,\"invalid_pointer_handle\":true,\"passed\":true}\n";return 0;
-}
-// S16_8CH public audioout.cpp55-56: signed16, 8 channels, identity channel order.
-inline int audio_s16_control(){
- if(audio_output_backend.initialize())return 1;
- const int handle=ctr_audio_out_open_fixture(255,0,0,256,48000,2);if(handle!=0x20000000)return 1;
- auto* pcm=static_cast<unsigned char*>(VirtualAlloc(nullptr,8192,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!pcm)return 1;
- DWORD old=0;if(!VirtualProtect(pcm+4096,4096,PAGE_NOACCESS,&old))return 1;
- const auto call=[&](const void* data){return static_cast<int>(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_audio_out_output),handle,reinterpret_cast<uint64_t>(data)));};
- // Exactly4096 accessible bytes. Float-sized8192 read would cross the guard.
- bool passed=call(pcm)==2048 && call(nullptr)==0 && audio_output_backend.played_samples_control(0)==256;
- passed=passed && call(pcm)==2048 && call(nullptr)==0 && audio_output_backend.played_samples_control(0)==512;
- passed=passed && call(pcm+1)==static_cast<int>(0x80260004U);
- pcm[0]=1;passed=passed && call(pcm)==2048 && call(nullptr)==0 && audio_output_backend.played_samples_control(0)==768;
- VirtualFree(pcm,0,MEM_RELEASE);
- if(!passed)return 1;
- std::cout<<"{\"scope\":\"audio_s16_control\",\"SysV6_open_SysV2_output\":true,\"PCM_signed16_channels8\":true,\"guarded_input_bytes4096\":true,\"native_consumed_frames768\":true,\"synthetic_silence_then_nonzero_LSB\":true,\"audibility_not_claimed\":true}\n";return 0;
-}
 extern "C" void ctr_sysv_audio_out_init();
-inline int audio_output_control(){
- AudioOutputBackend backend;bool rejected=false;try{backend.format();}catch(...){rejected=true;}
- if(!rejected || backend.initialize() || backend.initialize()!=static_cast<int>(0x8026000eU))return 1;
- auto format=backend.format();if(!format.first || !format.second)return 1;
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_audio_out_init),0,0))return 1;
- std::cout<<"{\"scope\":\"audio_output_control\",\"real_XAudio2_endpoint\":true,\"duplicate_rejected\":true,\"uninitialized_rejected\":true,\"guest_PCM\":false,\"passed\":true}\n";return 0;
-}
 }

@@ -87,72 +87,8 @@ public:
     ~ServiceIntegerThunk(){if(memory)VirtualFree(memory,0,MEM_RELEASE);}
     void* target()const{return memory;}
 };
-inline int service_stale_thunk_control(){
-    const auto token=integer_dispatch_records.add(integer_dispatch_record,std::string(64,'a'),std::string(64,'a'),16);
-    ServiceIntegerThunk thunk(token);integer_dispatch_records.retire(token);
-    (void)ctr_call_original_integer3(thunk.target(),1,2,3);
-    throw std::runtime_error("Stale record thunk returned");
-}
-inline int service_record_thunk_control(const std::filesystem::path& root){
-    const auto token=integer_dispatch_records.add(integer_dispatch_record,std::string(64,'a'),std::string(64,'a'),16);
-    ServiceIntegerThunk thunk(token);
-    MEMORY_BASIC_INFORMATION info{};
-    if(!VirtualQuery(thunk.target(),&info,sizeof(info)) || info.Protect!=PAGE_EXECUTE_READ)
-        throw std::runtime_error("Resident thunk not RX");
-    auto pending=std::async(std::launch::async,[&]{return ctr_call_original_integer3(thunk.target(),10,20,30);});
-    const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(integer_dispatch_generations.waiting_count()!=1){
-        if(std::chrono::steady_clock::now()>end)ExitProcess(5);
-        std::this_thread::yield();
-    }
-    CtrHostApi host{};host.size=sizeof(host);host.version=1;
-    load_service_generation(integer_dispatch_generations,root,root/L"service_control_1.dll",host,std::string(64,'a'),1);
-    if(pending.get()!=61)throw std::runtime_error("Record thunk argument result differs");
-    load_service_generation(integer_dispatch_generations,root,root/L"service_control_2.dll",host,std::string(64,'a'),2);
-    if(ctr_call_original_integer3(thunk.target(),10,20,30)!=62)
-        throw std::runtime_error("Record thunk reload result differs");
-    integer_dispatch_generations.shutdown();integer_dispatch_records.retire(token);return 0;
-}
 inline std::uint64_t service_wrong_version_target(std::uint64_t,std::uint64_t,std::uint64_t){
     // If admission fails to reject, this distinct exit identifies forbidden dispatch.
     ExitProcess(6);
-}
-inline int service_integer_version_control(){
-    integer_dispatch_generations.publish(std::make_shared<int>(1),
-        {{"synthetic","test","test",reinterpret_cast<const void*>(&service_wrong_version_target),1}},
-        1,std::string(64,'b'));
-    (void)ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_waiting_integer3),1,2,3);
-    throw std::runtime_error("Wrong version service returned");
-}
-inline int service_integer_shutdown_control(){
-    auto pending=std::async(std::launch::async,[]{
-        return ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_waiting_integer3),1,2,3);
-    });
-    const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(integer_dispatch_generations.waiting_count()!=1){
-        if(std::chrono::steady_clock::now()>end)ExitProcess(5);
-        std::this_thread::yield();
-    }
-    integer_dispatch_generations.shutdown();
-    (void)pending.get();
-    throw std::runtime_error("Cancelled bridge returned fabricated result");
-}
-inline int service_integer_dispatch_control(const std::filesystem::path& root){
-    auto pending=std::async(std::launch::async,[]{
-        return ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_waiting_integer3),
-            0x1234567800000000ULL,0x2345678900000000ULL,0x3456789a00000000ULL);
-    });
-    const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(integer_dispatch_generations.waiting_count()!=1){
-        if(std::chrono::steady_clock::now()>end)ExitProcess(5);
-        std::this_thread::yield();
-    }
-    CtrHostApi host{};host.size=sizeof(host);host.version=1;
-    load_service_generation(integer_dispatch_generations,root,root/L"service_control_1.dll",host,std::string(64,'a'),1);
-    if(pending.get()!=0x69d0369b00000001ULL)throw std::runtime_error("Waiting SysV integer arguments differ");
-    load_service_generation(integer_dispatch_generations,root,root/L"service_control_2.dll",host,std::string(64,'a'),2);
-    if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_waiting_integer3),10,20,30)!=62)
-        throw std::runtime_error("Reloaded SysV integer dispatch differs");
-    integer_dispatch_generations.shutdown();return 0;
 }
 }

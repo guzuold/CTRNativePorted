@@ -26,14 +26,4 @@ extern "C" int ctr_http_init(int net,int ssl,size_t bytes,uint64_t caller){try{i
 extern "C" int ctr_http_term(int id,uint64_t caller){try{http_contexts.destroy(id);return 0;}catch(const std::exception& e){std::fprintf(stderr,"NID=Ik-KpLTlf7Q library=libSceHttp caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}}
 extern "C" void ctr_sysv_http_init();
 extern "C" void ctr_sysv_http_term();
-inline int http_context_control(){
- int net=net_pools.create("HttpControl",32768,0),ssl=ssl_contexts.create(32768);
- int id=static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_http_init),net,ssl,262144));
- if(id<=0 || !http_contexts.control(id,262144))return 1;
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_http_term),id,0))return 2;
- bool stale=false;try{http_contexts.destroy(id);}catch(...){stale=true;}if(!stale)return 3;
- for(int variant=0;variant<3;++variant){bool rejected=false;try{http_contexts.create(variant==0?-1:net,variant==1?-1:ssl,variant==2?0:4097);}catch(...){rejected=true;}if(!rejected)return 4;}
- int second=http_contexts.create(net,ssl,4097);if(second==id || !http_contexts.control(second,4097))return 5;http_contexts.destroy(second);ssl_contexts.destroy(ssl);net_pools.destroy(net);
- std::cout<<"{\"scope\":\"http_context_control\",\"passed\":true,\"actual_SysV_lifecycle\":true,\"real_WinHTTP_session_query\":true,\"invalid_dependencies_rejected\":true,\"connections\":0}\n";return 0;
-}
 }

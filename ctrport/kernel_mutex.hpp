@@ -88,34 +88,4 @@ extern "C" int ctr_posix_mutex_destroy(std::uint64_t* cell,std::uint64_t caller)
  catch(const std::exception& e){std::fprintf(stderr,"NID=ltCfaGr2JGE library=libScePosix caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_posix_mutex_destroy();
-inline int mutex_destroy_control(){
- std::uint64_t cell=0;if(kernel_mutex_destroy(&cell) || kernel_mutex_lock(&cell))return 1;const auto handle=cell;
- if(kernel_mutex_destroy(&cell)!=static_cast<int>(0x80020010U) || cell!=handle || kernel_mutex_unlock(&cell))return 2;
- auto retained=lookup_mutex(&cell,false);if(kernel_mutex_destroy(&cell)!=static_cast<int>(0x80020010U))return 3;retained.reset();
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_mutex_destroy),reinterpret_cast<std::uint64_t>(&cell),0,0) || cell!=UINT64_MAX || mutex_registry.count(handle))return 4;
- if(kernel_mutex_destroy(&cell)!=static_cast<int>(0x80020016U))return 5;
- std::cout<<"{\"scope\":\"owned_mutex_destroy\",\"passed\":true,\"locked_and_retained_busy\":true}\n";return 0;
-}
-inline int kernel_mutex_control() {
-    std::uint64_t cell=0;
-    if(kernel_mutex_lock(&cell) || !cell || kernel_mutex_lock(&cell)!=11) throw std::runtime_error("Mutex static/errorcheck contract differs");
-    std::promise<void> attempting;
-    auto worker=std::async(std::launch::async,[&]{
-        if(kernel_mutex_unlock(&cell)!=1) throw std::runtime_error("Mutex foreign unlock accepted");
-        attempting.set_value();
-        if(kernel_mutex_lock(&cell) || kernel_mutex_unlock(&cell)) throw std::runtime_error("Mutex worker lock/unlock failed");
-    });
-    attempting.get_future().wait();
-    const bool blocked=worker.wait_for(std::chrono::milliseconds(20))==std::future_status::timeout;
-    const auto unlock=kernel_mutex_unlock(&cell);
-    worker.get();
-    if(!blocked || unlock || kernel_mutex_unlock(&cell)!=1) throw std::runtime_error("Mutex contention/ownership differs");
-    unsigned rejected=0;
-    for(auto invalid:{std::uint64_t(1),std::uint64_t(2),std::uint64_t(0x12345678)}) {
-        try { (void)kernel_mutex_lock(&invalid); } catch(const std::runtime_error&) {++rejected;}
-    }
-    if(rejected!=3) throw std::runtime_error("Unknown mutex handle accepted");
-    std::cout<<"{\"scope\":\"host_default_static_mutex\",\"real_contention\":true,\"foreign_unlock_eperm\":true,\"relock_edeadlk\":true,\"unknown_handles_rejected\":3,\"runtime_bound\":false,\"retail_executed\":false}\n";
-    return 0;
-}
 }

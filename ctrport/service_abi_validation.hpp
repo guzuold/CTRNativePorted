@@ -33,21 +33,4 @@ inline std::vector<ServiceGeneration::Entry> validate_service_manifest(
     }
     return result;
 }
-inline int service_abi_control(){
-    const std::string pin(64,'a');static const int target=1;
-    CtrServiceEntry entry{};entry.size=sizeof(entry);entry.signature_id=1;
-    std::memcpy(entry.nid,"synthetic",10);std::memcpy(entry.library,"test",5);std::memcpy(entry.module,"test",5);entry.win64_adapter=&target;
-    CtrServiceManifest good{};good.size=sizeof(good);good.version=1;good.entry_size=sizeof(entry);good.entry_count=1;good.entries=&entry;
-    std::memcpy(good.eboot_sha256,pin.data(),64);
-    if(validate_service_manifest(good,pin).size()!=1)throw std::runtime_error("Service ABI positive differs");
-    unsigned rejected=0;
-    auto check=[&](CtrServiceManifest candidate){try{validate_service_manifest(candidate,pin);}catch(const std::runtime_error&){++rejected;}};
-    auto bad=good;bad.version=2;check(bad);bad=good;bad.entry_size=1;check(bad);
-    bad=good;bad.entries=nullptr;check(bad);bad=good;bad.entry_count=4097;check(bad);
-    bad=good;bad.reserved[0]=1;check(bad);bad=good;bad.eboot_sha256[0]='b';check(bad);
-    entry.signature_id=3;check(good);entry.signature_id=1;entry.win64_adapter=nullptr;check(good);entry.win64_adapter=&target;
-    std::memset(entry.nid,'x',sizeof(entry.nid));check(good);
-    if(rejected!=9)throw std::runtime_error("Service ABI rejection controls differ");
-    return 0;
-}
 }

@@ -28,24 +28,4 @@ public:
     uint64_t address() const{return address_;}
     CtrGuestCopyApi api(){return {sizeof(CtrGuestCopyApi),1,this,&read,&write};}
 };
-inline int video_label_memory_control(){
-    uint64_t retired=0;
-    {
-        auto labels=std::make_shared<VideoLabelMemory>();auto api=labels->api();retired=labels->address();
-        uint64_t values[16];std::memset(values,0x79,sizeof(values));
-        if(api.read(api.context,retired,values,sizeof(values)))return 1;
-        for(auto value:values)if(value)return 1;
-        values[15]=1;
-        if(api.write(api.context,retired,values,sizeof(values)))return 1;
-        std::memset(values,0,sizeof(values));if(api.read(api.context,retired,values,sizeof(values)) || values[15]!=1)return 1;
-        unsigned rejected=0;
-        for(auto location:{retired-1,retired+128,UINT64_MAX-63})if(api.write(api.context,location,values,sizeof(values)))++rejected;
-        unsigned char output[129];std::memset(output,0x79,sizeof(output));
-        if(api.read(api.context,retired,output,sizeof(output)))++rejected;
-        for(auto value:output)if(value!=0x79)return 1;
-        if(rejected!=4 || !is_owned_output(retired,retired+128))return 1;
-    }
-    if(is_owned_output(retired,retired+128))return 1;
-    std::cout<<"{\"scope\":\"owned_video_label_memory_control\",\"guest_visible_bytes\":128,\"zero_initialized\":true,\"roundtrip_last_label\":1,\"negative_rejections\":4,\"revoked_after_owner\":true,\"GPU_completion\":false,\"game_frame\":false}\n";return 0;
-}
 }

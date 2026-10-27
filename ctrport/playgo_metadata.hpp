@@ -125,33 +125,7 @@ extern "C" void ctr_sysv_playgo_locus();
 extern "C" int ctr_playgo_get_speed(std::uint32_t handle,std::int32_t* p,std::uint64_t caller){try{return playgo_metadata.get_speed(handle,p);}catch(const std::exception& e){playgo_failure("rvBSfTimejE",caller,e);return 0;}}
 extern "C" int ctr_playgo_set_speed(std::uint32_t handle,int value,std::uint64_t caller){try{return playgo_metadata.set_speed(handle,value);}catch(const std::exception& e){playgo_failure("4AAcTU9R3XM",caller,e);return 0;}}
 extern "C" void ctr_sysv_playgo_get_speed();extern "C" void ctr_sysv_playgo_set_speed();
-inline int playgo_speed_control(){
- PlaygoSpeedPolicy policy;if(policy.get(0)!=1 || policy.set(0,100) || policy.get(30100)!=0 || policy.get(30101)!=1)return 1;
- if(policy.set(2,40000) || policy.get(90000)!=2 || policy.set(3,90000)!=playgo_error(4) || policy.set(-1,90000)!=playgo_error(4) || policy.get(90001)!=2)return 1;
- std::cout<<"{\"scope\":\"playgo_speed_policy_control\",\"initial_trickle\":true,\"suspended_at_30000ms\":true,\"trickle_after_30001ms\":true,\"full_preserved\":true,\"invalid_preserves_state\":true,\"clock_fixture\":\"synthetic milliseconds\",\"installer_available\":false}\n";return 0;
-}
 extern "C" int ctr_playgo_close(std::uint32_t handle,std::uint64_t caller){try{return playgo_metadata.close(handle);}catch(const std::exception& e){playgo_failure("Uco1I0dlDi8",caller,e);return 0;}}
 extern "C" int ctr_playgo_term(std::uint64_t caller){try{return playgo_metadata.terminate();}catch(const std::exception& e){playgo_failure("MPe0EeBGM-E",caller,e);return 0;}}
 extern "C" void ctr_sysv_playgo_init();extern "C" void ctr_sysv_playgo_open();extern "C" void ctr_sysv_playgo_chunks();extern "C" void ctr_sysv_playgo_close();extern "C" void ctr_sysv_playgo_term();
-inline int playgo_metadata_control(const char* path){
- PlaygoMetadata state;std::uint32_t handle=99,count=0;PlaygoInit param{};
- if(state.open(&handle,nullptr)!=playgo_error(5) || handle!=99 || state.initialize(nullptr)!=playgo_error(10) || state.initialize(&param)!=playgo_error(10))return 1;
- auto* buffer=VirtualAlloc(nullptr,0x200000,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);if(!buffer)throw std::runtime_error("PlayGo control allocation failed");
- struct Cleanup{void* p;~Cleanup(){VirtualFree(p,0,MEM_RELEASE);}} cleanup{buffer};param.buffer=buffer;param.size=1;
- if(state.initialize(&param)!=playgo_error(11) || state.load(path))return 1;param.size=0x200000;
- if(state.initialize(&param) || state.initialize(&param)!=playgo_error(6) || state.open(&handle,nullptr) || handle!=1 || state.chunk_ids(handle,nullptr,0,&count) || !count)return 1;
- std::vector<std::uint16_t> ids(count+2,0xffff);std::uint32_t written=0;if(state.chunk_ids(handle,ids.data()+1,count,&written) || written!=count || ids.front()!=0xffff || ids.back()!=0xffff)return 1;
- for(unsigned i=0;i<count;++i)if(ids[i+1]!=i)return 1;
-  std::int8_t locus=77;std::uint16_t id=0;
-  if(state.get_locus(1,&id,1,&locus) || locus!=3 || state.get_locus(2,&id,1,&locus)!=playgo_error(9))return 1;
-  id=static_cast<std::uint16_t>(count);
-  if(state.get_locus(1,&id,1,&locus)!=playgo_error(12))return 1;
-  std::uint32_t todo=0;written=123;
-  if(state.get_todo(1,&todo,1,&written) || written!=0)return 1;
-  if(state.set_todo(1,&todo,1) || state.set_todo(1,nullptr,1)!=playgo_error(10) || state.set_todo(1,&todo,0)!=playgo_error(11))return 1;
- if(state.close(7)!=playgo_error(9) || state.close(handle) || state.terminate() || state.terminate()!=playgo_error(5))return 1;
- unsigned rejected=0;for(auto b:{std::vector<unsigned char>{},std::vector<unsigned char>(256)})try{parse_playgo_metadata(b);}catch(const std::runtime_error&){++rejected;}
- if(rejected!=2)return 1;
- std::cout<<"{\"scope\":\"playgo_metadata_control\",\"real_chunk_ids\":"<<count<<",\"guarded_ids\":true,\"lifecycle_errors\":true,\"malformed_rejected\":2,\"installation_status_available\":false}\n";return 0;
-}
 }

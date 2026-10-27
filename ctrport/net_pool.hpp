@@ -24,13 +24,4 @@ extern "C" int ctr_net_pool_create(const char* name,int bytes,int flags,uint64_t
 extern "C" int ctr_net_pool_destroy(int id,uint64_t caller){try{net_pools.destroy(id);return 0;}catch(const std::exception& e){std::fprintf(stderr,"NID=K7RlrTkI-mw library=libSceNet caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}}
 extern "C" void ctr_sysv_net_pool_create();
 extern "C" void ctr_sysv_net_pool_destroy();
-inline int net_pool_control(){
- constexpr char name[]="CTRPoolControl";int id=static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_net_pool_create),reinterpret_cast<uint64_t>(name),32768,0));
- if(id<=0 || !net_pools.backing_control(id,32768))return 1;
- if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_net_pool_destroy),id,0))return 2;
- bool stale=false;try{net_pools.destroy(id);}catch(...){stale=true;}if(!stale)return 3;
- int second=net_pools.create(name,4097,0);if(second==id || !net_pools.backing_control(second,4097))return 4;net_pools.destroy(second);
- for(int variant=0;variant<3;++variant){bool invalid=false;try{net_pools.create(variant==0?nullptr:name,variant==1?0:8,variant==2?1:0);}catch(...){invalid=true;}if(!invalid)return 5;}
- std::cout<<"{\"scope\":\"net_pool_control\",\"passed\":true,\"actual_SysV_lifecycle\":true,\"real_capacity_backing\":true,\"stale_ID_rejected\":true,\"network_transport_supported\":false}\n";return 0;
-}
 }

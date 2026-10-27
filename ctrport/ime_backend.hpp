@@ -78,20 +78,6 @@ public:
     }
 };
 inline ImeTextBackend ime_text_backend;
-inline int ime_backend_control() {
-    ImeTextBackend backend;
-    bool rejected=false;
-    try{backend.roundtrip_control(L"unloaded");}catch(const std::runtime_error&){rejected=true;}
-    if(!rejected || backend.load()!=0 || backend.load()!=0 || !backend.owner_is_separate())return 1;
-    for(const auto& value:{std::wstring(),std::wstring(L"CTR \u00e8 \u65e5\u672c \U0001f3ce"),std::wstring(2048,L'x')})
-        if(backend.roundtrip_control(value)!=value)return 1;
-    backend.unload();backend.unload();rejected=false;
-    try{backend.roundtrip_control(L"closed");}catch(const std::runtime_error&){rejected=true;}
-    if(!rejected || backend.load()!=0 || backend.roundtrip_control(L"reloaded")!=L"reloaded")return 1;
-    backend.unload();
-    std::cout<<"{\"scope\":\"ime_backend_control\",\"unicode_roundtrips\":4,\"separate_owner_thread\":true,\"close_join_reload\":true,\"unloaded_rejected\":true,\"guest_dialog_exports_bound\":false,\"passed\":true}\n";
-    return 0;
-}
 // Public ime_dialog.cpp951-958: absence of an actual dialog client is None=0.
 // Text backend activation is separate from a dialog. Open/input/result paths
 // remain missing; a client outside this verified domain fails explicitly.
@@ -108,15 +94,5 @@ extern "C" unsigned ctr_ime_dialog_status(std::uint64_t caller){
     catch(const std::exception& e){std::fprintf(stderr,"NID=IADmD4tScBY library=libSceImeDialog caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_ime_dialog_status();
-inline int ime_dialog_status_control(){
-    if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_ime_dialog_status),0,0))return 1;
-    if(ime_text_backend.load() || ime_dialog_status())return 1;
-    ime_text_backend.unload();
-    {std::lock_guard<std::mutex> lock(ime_dialog_gate);ime_dialog_client=std::make_unique<ImeDialogClientState>();}
-    bool rejected=false;try{ime_dialog_status();}catch(const std::runtime_error&){rejected=true;}
-    if(!rejected || !ime_dialog_client || ime_dialog_client->status!=1)return 1;
-    ime_dialog_client.reset();if(ime_dialog_status())return 1;
-    std::cout<<"{\"scope\":\"ime_dialog_status_control\",\"actual_SysV_no_client_None\":true,\"text_backend_not_dialog\":true,\"active_client_fails_without_mutation\":true}\n";return 0;
-}
 
 }

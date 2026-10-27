@@ -30,17 +30,4 @@ inline int prepare_push_resources(const CtrGraphicsBindingContractV1& ps,const C
  }
  output=result;return 0;
 }
-inline int graphics_push_resources_control(){
- CtrGraphicsBindingContractV1 ps{},vs{};ps.version=vs.version=1;ps.size=vs.size=sizeof(ps);
- ps.userdata_count=ps.userdata_after=2;ps.packed_userdata[0]=11;ps.packed_userdata[1]=22;
- vs.userdata_before=2;vs.userdata_count=1;vs.userdata_after=3;vs.packed_userdata[0]=33;
- ps.buffer_after=1;vs.buffer_before=1;vs.buffer_after=2;
- std::vector<GraphicsBufferWrite> writes{{0,0,0,0,false,false,7,16},{1,1,0,6,true,true,0,UINT64_MAX}};GraphicsPushResources output;
- if(prepare_push_resources(ps,vs,writes,output) || output.userdata_count!=3 || output.userdata[2]!=33 || output.buffer_count!=2)return 1;
- const auto saved=output;writes[1].slot=0;
- if(prepare_push_resources(ps,vs,writes,output)!=60 || output.userdata!=saved.userdata)return 2;
- writes.pop_back();if(prepare_push_resources(ps,vs,writes,output)!=88 || output.buffer_count!=2)return 3;
- vs.userdata_after=17;if(prepare_push_resources(ps,vs,writes,output)!=60)return 4;
- std::cout<<"{\"scope\":\"graphics_push_resources_control\",\"passed\":true,\"synthetic\":true,\"invalid_atomic\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

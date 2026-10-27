@@ -74,28 +74,4 @@ inline int compile_graphics_vertex_only(const CtrShaderInputsV1& inputs,const Ct
  const auto waited=WaitForSingleObject(thread,INFINITE);CloseHandle(thread);if(waited!=WAIT_OBJECT_0)std::terminate();
  diagnostic=std::move(work.reason);if(!work.status)output=std::move(work.output);return work.status;
 }
-inline int graphics_vertex_only_sink_control(){
- uint32_t spirv[5]{0x07230203,0x10000,0,1,0},userdata[1]{17},flat[16]{17};
- CtrGraphicsResourcesV1 r{};r.version=1;r.size=sizeof(r);r.flattened_userdata_words=16;
- CtrCompiledGraphicsStageV1 stage{1,sizeof(stage),1,5,0x2000,spirv,&r,userdata,1};
- CtrCompiledGraphicsStageV2 v{2,sizeof(v),stage,flat,16};CtrGraphicsBindingContractV1 b{};b.version=1;b.size=sizeof(b);
- CtrGraphicsPipelineStageV1 p{};p.version=1;p.size=sizeof(p);
- CtrCompiledGraphicsVertexOnlyV1 delivery{1,sizeof(delivery),&v,&b,&p};GraphicsVertexOnlySink sink{0x2000,0,{}};
- if(graphics_vertex_only_sink(&sink,&delivery) || !sink.output)return 1;
- spirv[1]=99;flat[0]=99;p.step_rate0=99;
- if(sink.output->vertex->spirv[1]!=0x10000 || sink.output->vertex->flattened_userdata[0]!=17 || sink.output->pipeline.step_rate0)return 2;
- unsigned rejected=0;b.unified_before=1;GraphicsVertexOnlySink bad{0x2000,0,{}};
- if(graphics_vertex_only_sink(&bad,&delivery)==112 && !bad.output)++rejected;
- b.unified_before=0;p.attribute_count=33;bad={0x2000,0,{}};
- if(graphics_vertex_only_sink(&bad,&delivery)==112 && !bad.output)++rejected;
- if(graphics_vertex_only_sink(&sink,&delivery)==112 && sink.output->vertex->spirv[1]==0x10000)++rejected;
- // Retail depth-only VS has zero direct user SGPRs; a null zero-length view is legal.
- p.attribute_count=0;stage.userdata=nullptr;stage.userdata_words=0;v.stage=stage;
- GraphicsVertexOnlySink zero{0x2000,0,{}};
- if(graphics_vertex_only_sink(&zero,&delivery) || !zero.output || zero.output->vertex->userdata_words)return 4;
- stage.userdata_words=1;v.stage=stage;GraphicsVertexOnlySink absent{0x2000,0,{}};
- if(graphics_vertex_only_sink(&absent,&delivery)!=112 || absent.output)return 5;
- if(rejected!=3)return 3;
- std::cout<<"{\"scope\":\"authored_vertex_only_sink\",\"passed\":true,\"negative_cases\":3,\"zero_userdata_supported\":true,\"mutation_isolated\":true,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

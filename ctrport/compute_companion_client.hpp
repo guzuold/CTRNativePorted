@@ -22,28 +22,6 @@ inline int compute_stage_sink(void* raw,const CtrCompiledComputeV1* view){
  if(entries!=1)return 112;
  try{auto owner=std::make_shared<ComputeStageOwner>();owner->stage=std::move(temporary.output);owner->bindings=b;std::copy_n(view->compute_registers,80,owner->registers.begin());sink.output=std::move(owner);++sink.calls;return 0;}catch(...){return 112;}
 }
-inline int compute_stage_transport_control(){
- // Authored structural transport, not executable SPIR-V or a compute oracle.
- uint32_t spirv[]={0x07230203,0x10500,0,2,0,(4u<<16)|15,5,1,0};uint32_t flat[16]{};uint32_t bank[80]{};bank[7]=123;
- CtrGraphicsResourcesV1 resources{};resources.version=1;resources.size=sizeof(resources);resources.flattened_userdata_words=16;
- CtrCompiledGraphicsStageV2 stage{2,sizeof(stage),{1,sizeof(CtrCompiledGraphicsStageV1),0,9,4096,spirv,&resources,flat,0},flat,16};
- CtrGraphicsBindingContractV1 bindings{};bindings.version=1;bindings.size=sizeof(bindings);
- CtrCompiledComputeV1 view{1,sizeof(view),&stage,&bindings,bank,80};ComputeStageSink sink{4096,bank,0,{}};
- if(compute_stage_sink(&sink,&view) || sink.calls!=1 || !sink.output || sink.output->registers[7]!=123)return 1;
- bank[7]=456;flat[9]=789;spirv[7]=99;
- if(sink.output->registers[7]!=123 || sink.output->stage->flattened_userdata[9] || sink.output->stage->spirv[7]!=1)return 2;
- if(compute_stage_sink(&sink,&view)!=112)return 3;
- ComputeStageSink wrong{4096,bank,0,{}};spirv[6]=4;
- if(compute_stage_sink(&wrong,&view)!=112 || wrong.calls || wrong.output)return 4;
- spirv[6]=5;spirv[5]=15;
- if(compute_stage_sink(&wrong,&view)!=112 || wrong.calls || wrong.output)return 5;
- spirv[5]=(4u<<16)|15;view.compute_words=79;
- if(compute_stage_sink(&wrong,&view)!=112 || wrong.calls || wrong.output)return 6;
- view.compute_words=80;uint32_t other[80]{};wrong.expected=other;
- if(compute_stage_sink(&wrong,&view)!=112 || wrong.calls || wrong.output)return 7;
- if(compute_stage_sink(nullptr,&view)!=60)return 8;
- std::cout<<"{\"scope\":\"compute_stage_transport_control\",\"passed\":true,\"deepcopy_isolation\":true,\"wrong_bank_model_length_rejected\":true,\"synthetic_transport_only\":true,\"GPU_execution\":false}\n";return 0;
-}
 inline int compile_owned_compute(const CtrShaderInputsV1& inputs,const CtrShaderOwnedRangesV1& ranges,const GraphicsSubmissionOwner::Compute& compute,const CtrGraphicsProfileV1& profile,std::shared_ptr<ComputeStageOwner>& output,std::string& diagnostic){
  return graphics_metadata_host_call([&](){
   if(!compute.registers || compute.binary.words.empty() || compute.binary.guestAddress!=compute.state.codeAddress)return 60;

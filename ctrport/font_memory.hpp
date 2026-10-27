@@ -37,22 +37,4 @@ inline int font_memory_term(FontMem* mem) {
  std::memset(mem,0,sizeof(*mem));return 0;
 }
 extern "C" void ctr_font_memory_callback_control();
-inline int font_memory_control() {
- FontMem mem{};FontMemInterface iface{};std::uint64_t counter=0;unsigned checks=0;
- if(font_memory_init(nullptr,nullptr,0,nullptr,nullptr,nullptr,nullptr)==font_invalid_parameter)++checks;
- mem.mem_kind=9;mem.attr_bits=7;
- if(font_memory_init(&mem,nullptr,0,nullptr,nullptr,nullptr,nullptr)==font_invalid_parameter && mem.mem_kind==0 && mem.attr_bits==7)++checks;
- if(font_memory_init(&mem,&counter,8,nullptr,&counter,nullptr,nullptr)==0 && mem.mem_kind==0xf00 && mem.region_size==8 && mem.some_ctx2==&counter && !mem.attr_bits)++checks;
- if(font_memory_term(&mem)==0 && !mem.mem_kind && !mem.region_base)++checks;
- if(font_memory_term(&mem)==font_invalid_memory)++checks;
- if(font_memory_term(nullptr)==font_invalid_parameter)++checks;
- auto* callback=reinterpret_cast<void*>(&ctr_font_memory_callback_control);
- if(font_memory_init(&mem,nullptr,0,&iface,&counter,callback,&counter)==0 && mem.iface==&iface)++checks;
- if(font_memory_term(&mem)==0 && counter==1 && mem.mem_kind==0 && mem.on_destroy==callback)++checks;
- iface.mspace_destroy=callback;
- (void)font_memory_init(&mem,nullptr,0,&iface,&counter,nullptr,nullptr);mem.attr_bits=0x80;
- if(font_memory_term(&mem)==0 && counter==2 && !mem.iface)++checks;
- if(checks!=9)throw std::runtime_error("Font memory control mismatch");
- std::cout<<"{\"scope\":\"font_memory_host_control\",\"checks\":9,\"sysv_callback_calls\":2,\"guest_binding\":false}\n";return 0;
-}
 }

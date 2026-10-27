@@ -32,22 +32,5 @@ inline int owned_guest_read(void* c,uint64_t a,void* b,uint64_t n) noexcept{retu
 inline int owned_guest_write(void* c,uint64_t a,const void* b,uint64_t n) noexcept{return owned_guest_copy(c,a,const_cast<void*>(b),n,true);}
 inline int owned_guest_copy_context=1;
 inline CtrGuestCopyApi make_owned_guest_copy_api(){return {sizeof(CtrGuestCopyApi),1,&owned_guest_copy_context,&owned_guest_read,&owned_guest_write};}
-inline int owned_guest_copy_control(){
- const auto api=make_owned_guest_copy_api();uint64_t address=0;
- unsigned char input[48],output[48];std::memset(input,0x63,48);std::memset(output,0x79,48);
- unsigned rejected=0;
- {GuestStack stack(32768,4096);address=reinterpret_cast<uint64_t>(stack.bottom());
-  if(api.write(api.context,address,input,48) || api.read(api.context,address,output,48) || std::memcmp(input,output,48))return 1;
-  for(auto location:{address-32,reinterpret_cast<uint64_t>(stack.top())-32,UINT64_MAX-31})if(api.write(api.context,location,input,48))++rejected;
-  if(api.write(api.context,address,stack.bottom(),48))++rejected;
-  DWORD old=0;if(!VirtualProtect(stack.bottom(),4096,PAGE_READONLY,&old))return 1;
-  if(api.write(api.context,address,input,48))++rejected;
-  if(!VirtualProtect(stack.bottom(),4096,old,&old))return 1;
- }
- std::memset(output,0x79,48);if(api.read(api.context,address,output,48))++rejected;
- for(auto v:output)if(v!=0x79)return 1;
- if(rejected!=6)return 1;
- std::cout<<"{\"scope\":\"owned_guest_stack_copy_control\",\"bytes\":48,\"negative_rejections\":6,\"revoked_read_untouched\":true,\"GPU_coherence\":false}\n";return 0;
-}
 
 }

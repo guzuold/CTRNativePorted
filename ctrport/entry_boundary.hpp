@@ -2031,26 +2031,6 @@ inline int execute_native_ordered_submission(uint32_t count,uint64_t da,uint64_t
  return 0;
 }
 
-inline int gnm_submit_ordered_control(){
- if(runtime_video_open(255,0,0,0)!=1)return 1;
- auto previous=direct_memory_backing;auto backing=std::make_shared<DirectMemoryBacking>(16384);direct_memory_backing=backing;
- int64_t physical=-1;void* target=nullptr;
- if(backing->allocate(0,16384,16384,0,0,&physical) || backing->map(&target,16384,51,0,physical,0))return 2;
- const auto address=reinterpret_cast<uint64_t>(target);GuestStack storage(32768,4096);const auto base=reinterpret_cast<uint64_t>(storage.bottom());
- *reinterpret_cast<uint64_t*>(base)=base+256;*reinterpret_cast<uint32_t*>(base+128)=32;
- const uint32_t commands[]={0xc0002a00,0,0xc0044700,0x504,static_cast<uint32_t>(address),0x40000000U|static_cast<uint32_t>(address>>32),0x76543210,0xfedcba98};
- std::memcpy(reinterpret_cast<void*>(base+256),commands,sizeof(commands));
- const auto before=original_gnm_frame_end.snapshot();auto prior=ordered_gnm_submit;ordered_gnm_submit=&execute_native_ordered_submission;
- const uint64_t arguments[]={1,base,base+128,0,0};
- if(ctr_gnm_submit_bridge_fixture(arguments) || *static_cast<const uint64_t*>(target)!=0xfedcba9876543210ULL)return 3;
- const auto after=original_gnm_frame_end.snapshot();if(after.count!=before.count || after.pending!=before.pending || after.frames!=before.frames)return 4;
- // Unknown packet must remain pending and must not write the authored sentinel.
- *static_cast<uint64_t*>(target)=0;*reinterpret_cast<uint32_t*>(base+256)=0xc000ff00;
- bool rejected=false;try{runtime_gnm_submit(1,base,base+128,0,0);}catch(...){rejected=true;}
- if(!rejected || *static_cast<uint64_t*>(target))return 5;
- ordered_gnm_submit=prior;direct_memory_backing=previous;if(runtime_video_close(1))return 6;
- std::cout<<"{\"scope\":\"gnm_submit_ordered_control\",\"passed\":true,\"SysV5\":true,\"INDEX_TYPE_and_real_EOP64\":true,\"unknown_packet_rejected_before_EOP\":true,\"no_presentation_receipt\":true,\"synthetic\":true}\n";return 0;
-}
 inline LONG CALLBACK entry_dependency_exception(EXCEPTION_POINTERS* exception) {
     if(race_migration::handle(exception))return EXCEPTION_CONTINUE_EXECUTION;
     if(gpu_fault_hook && exception->ExceptionRecord->ExceptionCode==EXCEPTION_ACCESS_VIOLATION && gpu_fault_hook(exception))return EXCEPTION_CONTINUE_EXECUTION;
@@ -2376,34 +2356,6 @@ inline LONG CALLBACK entry_boundary_exception(EXCEPTION_POINTERS* exception) {
     ExitProcess(caller==boundary_source+0x99?4:5);
 }
 extern "C" void ctr_jump_startup(void*,const void*,void*);
-inline int execute_original_init_env(const std::vector<MappedImage>& images,const std::vector<ImageMetadata>& metadata) {
-    const auto libc_sha="1936f5700cc590877d9bf493c6a6bb7714e84003dfd6d74a7d77b1869f71d816";
-    for(std::size_t i=0;i<metadata.size();++i) {
-        if(metadata[i].sha256!=libc_sha) continue;
-        for(const auto& symbol:metadata[i].exports) {
-            if(symbol.nid!="bzQExy189ZI" || symbol.library!="libc" || symbol.module!="libc" || symbol.type!=2) continue;
-            if(symbol.address!=0xad7b0 || images[i].get()[symbol.address]!=0xc3)
-                throw std::runtime_error("Pinned original init_env RET differs");
-            bool executable=false;
-            for(const auto& span:metadata[i].executable_spans)
-                if(symbol.address>=span.first && symbol.address<span.second) executable=true;
-            if(!executable) throw std::runtime_error("Original init_env outside code");
-            const auto page=symbol.address&~std::uint64_t(4095);DWORD previous=0;
-            if(!VirtualProtect(images[i].get()+page,4096,PAGE_EXECUTE_READ,&previous) ||
-               !FlushInstructionCache(GetCurrentProcess(),images[i].get()+symbol.address,1))
-                throw std::runtime_error("Original init_env permission failed");
-            auto* target=resolve_original_call(images,metadata,metadata.front().sha256,libc_sha,symbol.address);
-            (void)ctr_call_original_integer2(target,0,0);
-            DWORD ignored=0;
-            if(!VirtualProtect(images[i].get()+page,4096,previous,&ignored))
-                throw std::runtime_error("Original init_env permission restoration failed");
-            std::cout << "{\"scope\":\"whole_original_libc_init_env_export\",\"image_sha256\":" << std::quoted(metadata[i].sha256)
-                      << ",\"address\":710576,\"nid\":\"bzQExy189ZI\",\"library\":\"libc\",\"original_instruction\":\"RET\",\"original_returned\":true,\"reconstructed_function_executed\":false,\"main_reached\":false}\n";
-            return 0;
-        }
-    }
-    throw std::runtime_error("Pinned original init_env export missing");
-}
 inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::vector<ImageMetadata>& metadata,bool enable_init_page=false,bool bind_guard=false,bool bind_time=false,bool bind_mutex=false,bool bind_condition=false,bool bind_attributes=false,bool bind_settype=false,bool bind_recursive=false,bool bind_attribute_destroy=false,bool bind_random=false,bool bind_sysmodule=false,bool bind_memory=false,bool bind_query=false,bool initialize_libc_only=false,bool continue_after_libc_init=false) {
     // A startup worker must retain mappings after its creator returns. Move only
     // the non-returning startup path; initializer-only controls keep caller ownership.

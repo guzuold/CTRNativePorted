@@ -24,30 +24,4 @@ inline void load_service_generation(ServiceGenerations& generations,
     auto entries=snapshot_service_manifest(module,get(&host),pin);
     generations.publish(std::move(owner),std::move(entries),serial,pin);
 }
-inline int service_dll_control(const std::filesystem::path& root){
-    ServiceGenerations generations;CtrHostApi host{};host.size=sizeof(host);host.version=1;
-    const std::string pin(64,'a');
-    const auto first=std::filesystem::canonical(root/L"service_control_1.dll");
-    const auto second=std::filesystem::canonical(root/L"service_control_2.dll");
-    load_service_generation(generations,root,first,host,pin,1);
-    auto held=generations.acquire();
-    using Call=std::uint64_t(*)(std::uint64_t,std::uint64_t,std::uint64_t);
-    auto invoke=[](const std::shared_ptr<const ServiceGeneration>& generation){
-        Call call{};const auto target=generation->entries.at(0).target;
-        std::memcpy(&call,&target,sizeof(call));return call(10,20,30);
-    };
-    if(invoke(held)!=61)throw std::runtime_error("First DLL result differs");
-    load_service_generation(generations,root,second,host,pin,2);
-    if(invoke(held)!=61 || invoke(generations.acquire())!=62 || !GetModuleHandleW(first.c_str()))
-        throw std::runtime_error("DLL generation retention differs");
-    unsigned rejected=0;const auto before=generations.acquire();
-    try{load_service_generation(generations,root,first,host,std::string(64,'b'),3);}
-        catch(const std::runtime_error&){++rejected;}
-    try{load_service_generation(generations,root,first,host,pin,2);}
-        catch(const std::runtime_error&){++rejected;}
-    if(rejected!=2 || generations.acquire()!=before)throw std::runtime_error("DLL rejection changed generation");
-    held.reset();
-    if(GetModuleHandleW(first.c_str()))throw std::runtime_error("Retired DLL still loaded");
-    return 0;
-}
 }

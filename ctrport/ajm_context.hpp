@@ -68,27 +68,5 @@ extern "C" int ctr_ajm_register(uint32_t context,uint32_t codec,int64_t reserved
  }catch(const std::exception& e){std::fprintf(stderr,"NID=Q3dyFuwGn64 library=libSceAjm caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_ajm_register();
-inline int ajm_codec_control(){
- void* handle=Atrac9GetHandle();if(!handle)return 1;
- unsigned char bad[4]={0,0,0,0},good[4]={0xfe,0x74,0x07,0xe0};
- if(Atrac9InitDecoder(handle,bad)==0 || Atrac9InitDecoder(handle,good)!=0){Atrac9ReleaseHandle(handle);return 1;}
- Atrac9CodecInfo info{};if(Atrac9GetCodecInfo(handle,&info) || info.channels!=2 || info.samplingRate!=48000){Atrac9ReleaseHandle(handle);return 1;}Atrac9ReleaseHandle(handle);
- AudioJobContext context;if(context.register_codec(1) || context.register_codec(1)!=static_cast<int>(0x80930009U) || context.register_codec(23)!=static_cast<int>(0x80930005U))return 1;
- uint32_t id=0;if(audio_job_contexts.initialize(0,&id) || ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_ajm_register),id,1,0))return 1;
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_ajm_register),0,1,0))!=static_cast<int>(0x80930002U))return 1;
- std::cout<<"{\"scope\":\"ajm_codec_control\",\"SysV3\":true,\"native_valid_invalid_ATRAC9_configuration\":true,\"stereo_48000\":true,\"duplicate_invalid_context_invalid_codec\":true,\"guest_decode\":false,\"passed\":true}\n";return 0;
-}
 extern "C" void ctr_sysv_ajm_initialize();
-inline int ajm_context_control(){
- AudioJobContexts registry;struct Output{uint32_t before,id,after;};Output out{123,0,456};
- if(registry.initialize(1,&out.id)!=static_cast<int>(0x80930005U) || out.id || registry.initialize(0,nullptr)!=static_cast<int>(0x80930005U))return 1;
- if(registry.initialize(0,&out.id) || out.id!=1 || out.before!=123 || out.after!=456)return 1;
- auto context=registry.get(out.id);if(!context || registry.get(0) || registry.get(99))return 1;
- std::atomic<unsigned> count{0};DWORD host=GetCurrentThreadId(),owner=host;
- auto first=context->enqueue_host_control([&]{owner=GetCurrentThreadId();++count;});
- auto second=context->enqueue_host_control([&]{if(count!=1)throw std::runtime_error("AJM FIFO violated");++count;});
- first.get();second.get();if(count!=2 || host==owner)return 1;
- uint32_t other=0;if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_ajm_initialize),0,reinterpret_cast<uint64_t>(&other)) || !other || !audio_job_contexts.get(other))return 1;
- std::cout<<"{\"scope\":\"ajm_context_control\",\"SysV2\":true,\"real_worker_FIFO\":true,\"invalid_parameters\":2,\"sentinels\":true,\"codec_support\":false,\"passed\":true}\n";return 0;
-}
 }

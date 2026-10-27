@@ -37,24 +37,4 @@ inline int poll_wait_reg_mem(const uint32_t* packet,size_t words,const CtrPm4::R
  }
  return passed?0:88;
 }
-inline int gnm_wait_reg_mem_control(){
- auto bank=std::make_unique<CtrPm4::Registers>();GuestStack stack(32768,4096);
- auto* value=reinterpret_cast<uint32_t*>(stack.bottom());*value=2;const auto address=reinterpret_cast<uint64_t>(value);const auto memory=make_owned_guest_copy_api();
- uint32_t packet[]={0xc0053c00,0x13,uint32_t(address),uint32_t(address>>32),3,0xff,10};
- if(poll_wait_reg_mem(packet,7,*bank,memory)!=88 || *value!=2)return 1;
- GnmCommandCursor cursor;if(cursor.capture(1,0,0,packet,7))return 2;
- auto poll=[&](uint64_t,uint32_t,uint32_t,const CtrPm4::Packet& p,const uint32_t* data){return poll_wait_reg_mem(data,p.words,*bank,memory);};
- if(cursor.resume(poll)!=88 || cursor.completed())return 3;
- *value=3;if(cursor.resume(poll) || cursor.completed()!=1)return 4;
- // All seven original comparison branches, including unmasked reference.
- const bool expected[]={true,true,true,false,true,false,false};*value=0x102;
- for(uint32_t f=0;f<7;++f){packet[1]=16|f;if(poll_wait_reg_mem(packet,7,*bank,memory)!=(expected[f]?0:88))return 5;}
- packet[1]=0x17;if(poll_wait_reg_mem(packet,7,*bank,memory)!=88)return 6;
- packet[1]=0x113;if(poll_wait_reg_mem(packet,7,*bank,memory)!=88)return 7;
- packet[1]=3;packet[2]=0xA100;packet[3]=0;bank->words[0xA100]=3;
- if(poll_wait_reg_mem(packet,7,*bank,memory))return 8;
- packet[2]=0xA101;bank->words[0xA101]=3;if(poll_wait_reg_mem(packet,7,*bank,memory))return 10;
- packet[2]=0xD000;if(poll_wait_reg_mem(packet,7,*bank,memory)!=60)return 9;
- std::cout<<"{\"scope\":\"gnm_wait_reg_mem_control\",\"passed\":true,\"pending_cursor_preserved\":true,\"real_owned_memory_read\":true,\"comparison_branches\":7,\"synthetic_CPU_writer\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

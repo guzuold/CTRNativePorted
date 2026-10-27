@@ -53,18 +53,5 @@ extern "C" int ctr_system_status(void* output,std::uint64_t caller){
     catch(const std::exception& e){std::fprintf(stderr,"NID=rPo6tV8D9bM library=libSceSystemService caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_system_status();
-inline int system_status_control(){
-    std::array<unsigned char,16> output;output.fill(0xa5);
-    if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_system_status),reinterpret_cast<std::uint64_t>(output.data()),0))return 1;
-    std::int32_t count=-1;std::memcpy(&count,output.data(),4);
-    if(count || output[4] || output[5] || output[6]!=1 || output[7] || output[8])return 1;
-    for(unsigned i=9;i<16;++i)if(output[i]!=0xa5)return 1;
-    {std::lock_guard<std::mutex> guard(system_event_lock);system_pending_events={7,9};}
-    if(system_status(output.data()))return 1;
-    std::memcpy(&count,output.data(),4);
-    if(count!=2 || system_pending_events.size()!=2 || system_status(nullptr)!=static_cast<int>(0x80a10003U))return 1;
-    system_pending_events.clear();
-    std::cout<<"{\"scope\":\"system_status_control\",\"SysV_output_prefix\":true,\"reserved_preserved\":true,\"authored_pending_events\":2,\"query_does_not_consume\":true,\"runtime_events_fabricated\":false}\n";return 0;
-}
 
 }

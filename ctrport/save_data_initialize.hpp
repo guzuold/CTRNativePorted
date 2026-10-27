@@ -43,15 +43,4 @@ extern "C" int ctr_save_data_initialize3(const void* parameters,std::uint64_t ca
     }catch(const std::exception& error){std::fprintf(stderr,"NID=TywrFKCoLGY library=libSceSaveData caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_save_data_initialize3();
-inline int save_data_initialize_control() {
-    SaveDataInitialization state;
-    if(state.ready() || state.initialize(nullptr,"CUSA14876",0x06008000,"runtime/user/savedata/CUSA14876") || !state.ready())return 1;
-    if(state.initialize(nullptr,"CUSA14876",0x06008000,"runtime/user/savedata/CUSA14876") || !state.ready())return 1;
-    unsigned rejected=0;
-    try{state.initialize(reinterpret_cast<void*>(1),"CUSA14876",0x06008000,"runtime/user/savedata/CUSA14876");}catch(const std::runtime_error&){++rejected;}
-    try{SaveDataInitialization other;other.initialize(nullptr,"CUSA14876",0x06008000,"runtime/forbidden");}catch(const std::runtime_error&){++rejected;}
-    try{SaveDataInitialization other;other.initialize(nullptr,"CUSA00000",0,"runtime/user/savedata/CUSA14876");}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=3)return 1;
-    std::cout<<"{\"scope\":\"save_data_initialize_control\",\"real_worker_waiting\":true,\"repeat_idempotent\":true,\"unsupported_rejected\":3,\"save_mount_or_backup_supported\":false}\n";return 0;
-}
 }

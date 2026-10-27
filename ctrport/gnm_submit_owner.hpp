@@ -59,24 +59,4 @@ extern "C" int ctr_gnm_submit(uint32_t count,uint64_t da,uint64_t ds,uint64_t ca
 }
 extern "C" void ctr_sysv_gnm_submit();
 extern "C" int ctr_gnm_submit_bridge_fixture(const uint64_t*);
-inline int gnm_submit_guest_control(){
- if(runtime_video_open(255,0,0,0)!=1)return 1;
- auto previous=direct_memory_backing;auto backing=std::make_shared<DirectMemoryBacking>(16384);
- direct_memory_backing=backing;std::int64_t physical=-1;void* target=nullptr;
- if(backing->allocate(0,16384,16384,0,0,&physical) || backing->map(&target,16384,51,0,physical,0))return 1;
- const auto address=reinterpret_cast<uint64_t>(target);
- GuestStack storage(32768,4096);const auto base=reinterpret_cast<uint64_t>(storage.bottom());
- *reinterpret_cast<uint64_t*>(base)=base+256;*reinterpret_cast<uint32_t*>(base+128)=24;
- uint32_t commands[]={0xc0044700,0x504,static_cast<uint32_t>(address),0x40000000U|static_cast<uint32_t>(address>>32),0x76543210,0xfedcba98};
- std::memcpy(reinterpret_cast<void*>(base+256),commands,sizeof(commands));
- const uint64_t arguments[]={1,base,base+128,0,0};
- if(ctr_gnm_submit_bridge_fixture(arguments) || *static_cast<const uint64_t*>(target)!=0xfedcba9876543210ULL)return 1;
- unsigned rejected=0;
- for(const auto& invalid:std::array<std::array<uint64_t,5>,3>{{{{2,base,base+128,0,0}},{{1,UINT64_MAX-3,base+128,0,0}},{{1,base,base+128,base,0}}}}){
-  try{runtime_gnm_submit(static_cast<uint32_t>(invalid[0]),invalid[1],invalid[2],invalid[3],invalid[4]);}catch(...){++rejected;}
- }
- if(*static_cast<const uint64_t*>(target)!=0xfedcba9876543210ULL || rejected!=3)return 1;
- direct_memory_backing=previous;if(runtime_video_close(1))return 1;
- std::cout<<"{\"scope\":\"gnm_submit_guest_control\",\"SysV5\":true,\"actual_EOP64\":true,\"negative_rejections\":3,\"synthetic\":true,\"game_frame\":false}\n";return 0;
-}
 }

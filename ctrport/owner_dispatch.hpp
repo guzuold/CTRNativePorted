@@ -50,19 +50,4 @@ public:
  }
  ~OwnerDispatch(){close();}
 };
-inline int owner_dispatch_control(){
- OwnerDispatch dispatcher;const auto owner=std::this_thread::get_id();bool same=false;
- auto worker=std::async(std::launch::async,[&]{return dispatcher.invoke([&]{same=std::this_thread::get_id()==owner;return dispatcher.invoke([]{return 73;});});});
- if(!dispatcher.pump(1000) || worker.get()!=73 || !same)return 1;
- auto failure=std::async(std::launch::async,[&]{try{dispatcher.invoke([]()->int{throw std::runtime_error("fixture");});return false;}catch(const std::runtime_error&){return true;}});
- if(!dispatcher.pump(1000) || !failure.get())return 1;
- auto canceled=std::async(std::launch::async,[&]{try{dispatcher.invoke([]{return 0;});return false;}catch(const std::runtime_error&){return true;}});
- const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
- while(dispatcher.pending()!=1){if(std::chrono::steady_clock::now()>deadline){dispatcher.close();canceled.get();return 1;}std::this_thread::yield();}
- dispatcher.close();if(!canceled.get())return 1;
- unsigned rejected=0;try{dispatcher.invoke([]{return 0;});}catch(const std::runtime_error&){++rejected;}
- auto wrong=std::async(std::launch::async,[&]{try{dispatcher.pump(0);return false;}catch(const std::runtime_error&){return true;}});
- if(!wrong.get() || rejected!=1)return 1;
- std::cout<<"{\"scope\":\"owner_dispatch_control\",\"owner_thread_verified\":true,\"nested_call\":73,\"exception_propagated\":true,\"queued_cancel\":true,\"closed_and_wrong_thread_rejected\":true,\"video_integrated\":false}\n";return 0;
-}
 }

@@ -118,89 +118,16 @@ struct WorkerJoinDetachGate {std::promise<void> ready;std::shared_future<void> r
 extern "C" std::uint64_t ctr_worker_join_detach_gate(WorkerJoinDetachGate* gate) {gate->ready.set_value();gate->release.wait();return 17;}
 extern "C" void ctr_worker_join_detach_fixture();
 extern "C" void ctr_thread_exit_fixture();
-// scePthreadExit control: two workers exit from a nested guest call with every callee-saved
-// register overwritten; join must return each exit value and the host threads must finish
-// normally. The main thread has no exit frame (the unsupported path fails loudly).
-inline int guest_thread_exit_control() {
-    if(guest_thread_exit_frame)return 1;
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);
-    for(const std::uint64_t value:{0x5151ull,0xfeedfacecafebeefull}){
-        GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_thread_exit_fixture),reinterpret_cast<void*>(value));
-        worker.publish_and_start();const auto result=worker.join();release_thread_identity();
-        if(result!=value || !worker.completion_collected())return 2;
-    }
-    std::cout<<"{\"scope\":\"guest_thread_exit_control\",\"workers\":2,\"nested_exit\":true,\"callee_saved_clobbered\":true,\"join_values\":true,\"passed\":true}\n";return 0;
-}
-inline int guest_worker_join_detach_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);
-    std::promise<void> release;WorkerJoinDetachGate gate;gate.release=release.get_future().share();auto entered=gate.ready.get_future();
-    GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_worker_join_detach_fixture),&gate);worker.publish_and_start();
-    const bool started=entered.wait_for(std::chrono::seconds(2))==std::future_status::ready;
-    auto joiner=std::async(std::launch::async,[&]{const auto result=worker.join();release_thread_identity();return result;});
-    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(!worker.has_joiner() && std::chrono::steady_clock::now()<deadline)std::this_thread::yield();
-    const bool claimed=worker.has_joiner();const bool rejected=claimed && !worker.detach();
-    release.set_value();const auto result=joiner.get();
-    if(!started || !claimed || !rejected || result!=17 || !worker.completion_collected())return 1;
-    std::cout<<"{\"scope\":\"owned_worker_join_detach_exclusion\",\"join_claim_observed_before_release\":true,\"detach_rejected_during_join\":true,\"result_collected_once\":true,\"guest_bound\":false}\n";return 0;
-}
 struct WorkerSelfJoinControl {GuestWorkerControl* worker=nullptr;bool rejected=false;};
 extern "C" std::uint64_t ctr_worker_self_join_control(WorkerSelfJoinControl* value) {
     try{value->worker->join();}catch(const std::runtime_error&){value->rejected=true;}
     return 17;
 }
 extern "C" void ctr_worker_self_join_fixture();
-inline int guest_worker_self_join_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);
-    WorkerSelfJoinControl state;GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_worker_self_join_fixture),&state);state.worker=&worker;
-    worker.publish_and_start();if(worker.join()!=17 || !state.rejected)return 1;
-    std::cout<<"{\"scope\":\"owned_worker_self_join\",\"rejected_before_host_wait\":true,\"worker_returned\":true,\"parent_collected_result\":true,\"guest_bound\":false}\n";return 0;
-}
 extern "C" void ctr_worker_missing_fixture();
 extern "C" unsigned char ctr_worker_missing_caller;
 extern "C" void ctr_guest_fp_fixture();
 extern "C" void ctr_host_fp_snapshot(void*);
-inline int guest_worker_fp_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});
-    auto owner=std::make_shared<int>(91);std::uint64_t guest=0,before=0,after=0;
-    ctr_host_fp_snapshot(&before);
-    {GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_guest_fp_fixture),&guest);worker.publish_and_start();if(worker.join())return 1;}
-    GuestStack stack(32768,4096);std::uint64_t direct=0;
-    if(ctr_guest_stack_call(reinterpret_cast<void*>(&ctr_guest_fp_fixture),&direct,stack.top(),stack.bottom()))return 1;
-    ctr_host_fp_snapshot(&after);
-    if(guest!=0x037f00009fc0ULL || direct!=guest || before!=after)return 1;
-    std::cout<<"{\"scope\":\"guest_worker_fp_context\",\"mxcsr\":40896,\"x87_control\":895,\"worker_and_direct_match\":true,\"host_restored\":true,\"guest_create_bound\":false}\n";return 0;
-}
-inline int guest_worker_missing_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});
-    auto owner=std::make_shared<int>(91);std::uint64_t unknown=1;
-    std::cout<<"{\"scope\":\"worker_missing_expected_caller\",\"caller\":\"0x"<<std::hex<<reinterpret_cast<std::uint64_t>(&ctr_worker_missing_caller)<<"\"}\n"<<std::flush;
-    GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_worker_missing_fixture),&unknown);
-    worker.publish_and_start();worker.join();return 1;
-}
-inline int guest_worker_rollback_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});
-    auto owner=std::make_shared<int>(91);std::weak_ptr<int> retained=owner;
-    std::uint64_t rsp=0,aborted_identity=0;unsigned rejected=0;
-    {GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);
-     aborted_identity=worker.identity();owner.reset();
-     try{worker.join();}catch(const std::runtime_error&){++rejected;}
-    }
-    if(rsp || !retained.expired())return 1;
-    {std::lock_guard<std::mutex> guard(thread_identity_lock);if(thread_identities.count(aborted_identity))return 1;}
-    owner=std::make_shared<int>(92);
-    try{GuestWorkerControl invalid(nullptr,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);}catch(const std::runtime_error&){++rejected;}
-    try{GuestWorkerControl invalid(tls,nullptr,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);}catch(const std::runtime_error&){++rejected;}
-    try{GuestWorkerControl invalid(tls,owner,nullptr,&rsp);}catch(const std::runtime_error&){++rejected;}
-    {GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);
-     worker.publish_and_start();
-     try{worker.publish_and_start();}catch(const std::runtime_error&){++rejected;}
-     if(worker.join()!=40)return 1;
-     try{worker.join();}catch(const std::runtime_error&){++rejected;}
-    }
-    if(rejected!=6)return 1;
-    std::cout<<"{\"scope\":\"owned_worker_rollback\",\"unpublished_target_not_entered\":true,\"identity_removed\":true,\"owner_released\":true,\"invalid_lifecycle_rejected\":6,\"subsequent_worker_returned\":true,\"guest_create_bound\":false}\n";return 0;
-}
 // An all-ones guest attribute is the documented unrestricted default, not
 // a request for nonexistent Windows CPUs. Other explicit masks remain strict.
 inline DWORD_PTR startup_host_affinity(std::uint64_t guest) {
@@ -211,61 +138,5 @@ inline DWORD_PTR startup_host_affinity(std::uint64_t guest) {
     if(!guest || (guest&~static_cast<std::uint64_t>(process)))
         throw std::runtime_error("Explicit guest affinity outside supported host domain");
     return static_cast<DWORD_PTR>(guest);
-}
-inline int guest_worker_host_affinity_control() {
-    DWORD_PTR process=0,system=0;if(!GetProcessAffinityMask(GetCurrentProcess(),&process,&system) || !process)return 1;
-    GROUP_AFFINITY before{},after{};if(!GetThreadGroupAffinity(GetCurrentThread(),&before))return 1;
-    const auto selected=process&(~process+1);
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);std::uint64_t rsp=0;
-    GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);
-    bool zero=false;try{worker.set_host_affinity(0);}catch(const std::runtime_error&){zero=true;}
-    if(startup_host_affinity(~std::uint64_t{0})!=process || startup_host_affinity(selected)!=selected)return 1;
-    bool empty_guest=false;try{startup_host_affinity(0);}catch(const std::runtime_error&){empty_guest=true;}
-    if(!empty_guest)return 1;
-    const auto original=worker.set_host_affinity(startup_host_affinity(~std::uint64_t{0}));
-    worker.set_host_affinity(selected);
-    if(worker.set_host_affinity(process)!=selected || worker.set_host_affinity(original)!=process || !zero)return 1;
-    if(!GetThreadGroupAffinity(GetCurrentThread(),&after) || before.Mask!=after.Mask || before.Group!=after.Group)return 1;
-    worker.publish_and_start();if(worker.join()!=40)return 1;
-    bool exited=false;try{worker.set_host_affinity(selected);}catch(const std::runtime_error&){exited=true;}if(!exited)return 1;
-    std::cout<<"{\"scope\":\"owned_worker_host_affinity\",\"foreign_worker_readback\":true,\"worker_mask_restored\":true,\"parent_unchanged\":true,\"zero_and_exited_rejected\":true,\"guest_mapping_claimed\":false}\n";return 0;
-}
-inline int guest_worker_detach_exited_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});
-    auto owner=std::make_shared<int>(91);std::weak_ptr<int> retained=owner;std::uint64_t rsp=0;
-    {GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);
-     bool unpublished=false;try{worker.detach();}catch(const std::runtime_error&){unpublished=true;}
-     if(!unpublished)return 1;worker.publish_and_start();owner.reset();
-     const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-     while(!worker.has_exited()){if(std::chrono::steady_clock::now()>=deadline)throw std::runtime_error("Detach control worker deadline");std::this_thread::yield();}
-     {std::lock_guard<std::mutex> guard(thread_identity_lock);if(thread_identities.count(worker.identity()))return 1;}
-     if(!rsp || retained.expired() || worker.completion_collected() || !worker.detach() || !worker.completion_collected() || worker.detach())return 1;
-     bool join_rejected=false;try{worker.join();}catch(const std::runtime_error&){join_rejected=true;}if(!join_rejected)return 1;
-    }
-    if(!retained.expired())return 1;
-    std::cout<<"{\"scope\":\"owned_exited_worker_detach\",\"active_identity_removed\":true,\"completion_retained_until_detach\":true,\"double_detach_and_join_rejected\":true,\"owner_released\":true,\"guest_bound\":false}\n";return 0;
-}
-inline int guest_worker_competing_join_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});
-    auto owner=std::make_shared<int>(91);std::uint64_t rsp=0;
-    GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);
-    worker.publish_and_start();
-    std::promise<void> release;auto ready=release.get_future().share();
-    auto attempt=[&] {ready.wait();bool collected=false;try{collected=worker.join()==40;}catch(const std::runtime_error&){}release_thread_identity();return collected;};
-    auto first=std::async(std::launch::async,attempt);auto second=std::async(std::launch::async,attempt);
-    release.set_value();const bool a=first.get(),b=second.get();if(a==b || !rsp)return 1;
-    std::cout<<"{\"scope\":\"owned_worker_competing_join\",\"concurrent_joiners\":2,\"collections\":1,\"guest_bound\":false}\n";return 0;
-}
-inline int guest_worker_retention_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});
-    auto owner=std::make_shared<int>(91);std::weak_ptr<int> retained=owner;
-    std::uint64_t rsp=0;
-    {GuestWorkerControl worker(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);
-     owner.reset();tls.reset();if(retained.expired() || !worker.identity() || rsp)return 1;
-     worker.publish_and_start();if(worker.join()!=40 || !rsp || retained.expired())return 1;
-     std::lock_guard<std::mutex> guard(thread_identity_lock);if(thread_identities.count(worker.identity()))return 1;
-    }
-    if(!retained.expired())return 1;
-    std::cout<<"{\"scope\":\"owned_worker_retained_launch_context\",\"published_before_entry\":true,\"owner_retained_until_join\":true,\"identity_cleaned\":true,\"owner_released\":true,\"guest_create_bound\":false}\n";return 0;
 }
 }

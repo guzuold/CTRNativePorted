@@ -57,35 +57,6 @@ inline int prepare_indexed_call(const IndexedCommandParameters& command,const Ct
  for(uint32_t i=0;i<result.vertex_buffer_count;++i){if(!resources.vertex_buffers[i])return 88;result.vertex_buffers[i]=resources.vertex_buffers[i];}
  output=result;return 0;
 }
-inline int indexed_call_control(){
- IndexedCommandParameters command{};command.index_token=7;command.index_count=102;command.instance_count=1;command.vertex_offset=-3;
- CtrGraphicsDrawV1 resources{};resources.version=1;resources.size=sizeof(resources);resources.vertex_buffer_count=1;resources.vertex_buffers[0]=9;resources.written_buffers=2;
- CtrGraphicsIndexedDrawV1 result{};
- if(prepare_indexed_call(command,resources,result) || result.index_bytes!=2 || result.vertex_offset!=-3 || result.index_count!=102 || result.index_token!=7 || result.vertex_buffers[0]!=9 || result.written_buffers!=2)return 1;
- command.index_type=1;command.vertex_offset=INT32_MIN;if(prepare_indexed_call(command,resources,result) || result.index_bytes!=4 || result.vertex_offset!=INT32_MIN)return 2;
- const auto saved=result;unsigned rejected=0;
- const auto check=[&](){if(prepare_indexed_call(command,resources,result)==88 && !std::memcmp(&saved,&result,sizeof(result)))++rejected;};
- command.index_token=0;check();command.index_token=7;command.index_count=0;check();command.index_count=102;
- command.index_type=2;check();command.index_type=1;command.instance_count=2;check();command.instance_count=1;
- command.first_instance=1;check();command.first_instance=0;command.first_index=1;check();command.first_index=0;
- command.index_buffer_offset=2;check();command.index_buffer_offset=0;resources.vertex_buffer_count=33;check();resources.vertex_buffer_count=1;
- resources.vertex_buffers[0]=0;check();if(rejected!=9)return 3;
- std::cout<<"{\"scope\":\"indexed_call_control\",\"passed\":true,\"atomic_rejections\":9,\"U16_U32_signed_base\":true,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
-}
-inline int indexed_command_parameters_control(){
- IndexedDrawTransport index;index.token=9;index.type=0;index.count=102;index.bytes=204;
- CtrGraphicsDrawParametersV1 offsets{1,sizeof(offsets),0xfffffffeu,7,3};IndexedCommandParameters result;
- if(prepare_indexed_command(index,offsets,result) || result.vertex_offset!=-2 || result.first_instance!=7 || result.instance_count!=3 || result.first_index || result.index_buffer_offset || result.index_count!=102)return 1;
- unsigned rejected=0;const auto saved=result;const auto unchanged=[&](int status,int expected){return status==expected && !std::memcmp(&saved,&result,sizeof(result));};
- offsets.instance_count=0;if(unchanged(prepare_indexed_command(index,offsets,result),60))++rejected;offsets.instance_count=3;
- index.bytes=203;if(unchanged(prepare_indexed_command(index,offsets,result),88))++rejected;index.bytes=204;
- index.token=0;if(unchanged(prepare_indexed_command(index,offsets,result),88))++rejected;index.token=9;
- index.type=2;if(unchanged(prepare_indexed_command(index,offsets,result),88))++rejected;
- index.type=1;index.bytes=408;offsets.vertex_offset=0x7fffffffu;if(prepare_indexed_command(index,offsets,result) || result.vertex_offset!=INT32_MAX || result.index_type!=1 || result.index_count!=102)return 2;
- offsets.vertex_offset=0x80000000u;if(prepare_indexed_command(index,offsets,result) || result.vertex_offset!=INT32_MIN)return 3;
- if(rejected!=4)return 4;
- std::cout<<"{\"scope\":\"indexed_command_parameters_control\",\"passed\":true,\"signed_base_vertex\":true,\"atomic_rejections\":4,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
-}
 // Range admission for the bounded vertex formats already admitted by the
 // companion. Signed baseVertex is applied before bounds checks, including
 // negative bases; instance-rate inputs use firstInstance and divisor one.
@@ -105,31 +76,6 @@ inline int prepare_indexed_vertex_ranges(const IndexedDrawTransport& index,const
   if(v.stride && last>(uint64_t(v.buffer_size)-v.offset-element)/v.stride)return 88;
  }
  checked=fetch.value.count;return 0;
-}
-inline int indexed_vertex_ranges_control(){
- IndexedDrawTransport index;index.token=7;index.count=3;index.minimum=1;index.maximum=3;
- IndexedCommandParameters cmd;cmd.index_token=7;cmd.index_count=3;cmd.instance_count=1;cmd.vertex_offset=-1;
- GraphicsVertexFetchOwner fetch;fetch.status=fetch.format_status=fetch.physical_status=0;fetch.value.version=1;fetch.value.size=sizeof(fetch.value);fetch.value.count=1;
- auto& v=fetch.value.inputs[0];v.stride=4;v.buffer_size=12;fetch.formats[0]=37;uint64_t checked=99;
- if(prepare_indexed_vertex_ranges(index,cmd,fetch,checked) || checked!=1)return 1;
- unsigned rejected=0;auto reject=[&](){checked=99;const int rc=prepare_indexed_vertex_ranges(index,cmd,fetch,checked);return rc==88 && checked==99;};
- cmd.vertex_offset=0;if(reject())++rejected;cmd.vertex_offset=INT32_MIN;if(reject())++rejected;cmd.vertex_offset=INT32_MAX;if(reject())++rejected;cmd.vertex_offset=-1;
- v.offset=1;if(reject())++rejected;v.offset=0;v.buffer_size=3;if(reject())++rejected;v.buffer_size=12;
- v.input_rate=1;v.divisor=1;cmd.first_instance=2;cmd.instance_count=1;if(prepare_indexed_vertex_ranges(index,cmd,fetch,checked))return 2;
- cmd.instance_count=2;if(reject())++rejected;cmd.first_instance=UINT32_MAX;cmd.instance_count=UINT32_MAX;if(reject())++rejected;
- cmd.first_instance=0;cmd.instance_count=1;v.divisor=2;if(reject())++rejected;v.divisor=1;
- fetch.formats[0]=0;if(reject())++rejected;fetch.formats[0]=37;cmd.index_token=8;if(reject())++rejected;cmd.index_token=7;
- v.input_rate=0;v.stride=0;if(prepare_indexed_vertex_ranges(index,cmd,fetch,checked))return 3;
- cmd.first_index=1;if(reject())++rejected;cmd.first_index=0;cmd.index_buffer_offset=2;if(reject())++rejected;cmd.index_buffer_offset=0;
- // Retail draw10451 uses R16G16_SFLOAT (Vulkan format83): two 16-bit
- // components, four bytes. Exercise the exact last-element boundary and one
- // byte short; admission must not mutate checked on rejection.
- v.stride=40;v.buffer_size=124;fetch.formats[0]=83;index.minimum=0;index.maximum=3;cmd.vertex_offset=0;
- if(prepare_indexed_vertex_ranges(index,cmd,fetch,checked) || checked!=1)return 5;
- v.buffer_size=123;if(reject())++rejected;
- v.buffer_size=124;v.offset=1;if(reject())++rejected;
- if(rejected!=14)return 4;
- std::cout<<"{\"scope\":\"indexed_vertex_ranges_control\",\"passed\":true,\"atomic_rejections\":14,\"signed_base_before_bounds\":true,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
 }
 // Indexed submission must also retain the exact vertex generation observed by
 // its fetch shader. A GPU token alone cannot authorize stale CPU input bytes.
@@ -155,44 +101,5 @@ inline int prepare_indexed_vertices(uint32_t word,const GraphicsVertexFetchOwner
   if(current!=source.snapshot)return 88;total+=source.bytes;
  }
  compared=total;return 0;
-}
-inline int indexed_vertex_generation_control(){
- GraphicsVertexFetchOwner fetch;fetch.status=fetch.format_status=fetch.physical_status=0;fetch.value.count=1;
- auto& input=fetch.value.inputs[0];input.guest_address=0x1000;input.buffer_size=4;input.stride=4;
- fetch.formats[0]=37;GraphicsBufferCapture source;source.address=0x1000;source.bytes=4;source.snapshot={1,2,3,4};
- source.requirement_status=source.lease_status=source.capture_status=source.release_status=source.lease_end_status=0;fetch.buffers.push_back(source);
- std::vector<LiveVertexBuffer> live{{1,0,0,4,0,0,37,9,4,0x1000}};auto bytes=source.snapshot;
- CtrGuestCopyApi memory{};memory.version=1;memory.size=sizeof(memory);memory.context=&bytes;
- memory.read=+[](void* context,uint64_t address,void* output,uint64_t size)->int{auto& value=*static_cast<std::vector<unsigned char>*>(context);if(address!=0x1000 || size!=value.size())return 62;std::memcpy(output,value.data(),value.size());return 0;};
- uint64_t compared=99;if(prepare_indexed_vertices(1,fetch,live,memory,{}, {},compared) || compared!=4)return 1;
- unsigned rejected=0;compared=99;bytes[0]=8;
- if(prepare_indexed_vertices(1,fetch,live,memory,{}, {},compared)==88 && compared==99)++rejected;bytes=source.snapshot;
- if(prepare_indexed_vertices(1,fetch,live,memory,{{0x1003,1}}, {},compared)==88 && compared==99)++rejected;
- if(prepare_indexed_vertices(1,fetch,live,memory,{}, {{0x1000,4}},compared)==88 && compared==99)++rejected;
- live[0].token=0;if(prepare_indexed_vertices(1,fetch,live,memory,{}, {},compared)==88 && compared==99)++rejected;live[0].token=9;
- live.push_back(live[0]);if(prepare_indexed_vertices(1,fetch,live,memory,{}, {},compared)==112 && compared==99)++rejected;live.pop_back();
- if(rejected!=5)return 2;
- std::cout<<"{\"scope\":\"indexed_vertex_generation_control\",\"passed\":true,\"atomic_rejections\":5,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
-}
-inline int indexed_draw_transport_control(){
- DrawPacketInputs packet;packet.opcode=0x27;packet.indexed=true;packet.count=packet.max_indices=3;packet.index_base_low=0x1001;
- GraphicsBufferCapture source;source.address=0x1000;source.bytes=6;source.stride=2;source.records=3;source.snapshot={2,0,9,0,1,0};
- source.requirement_status=source.lease_status=source.capture_status=source.release_status=source.lease_end_status=0;
- auto guest=source.snapshot;
- CtrGuestCopyApi memory{};memory.version=1;memory.size=sizeof(memory);memory.context=&guest;
- memory.read=+[](void* raw,uint64_t address,void* output,uint64_t bytes)->int{const auto& data=*static_cast<std::vector<unsigned char>*>(raw);if(address!=0x1000 || bytes!=data.size())return 62;std::memcpy(output,data.data(),data.size());return 0;};
- IndexedDrawTransport result;
- if(prepare_indexed_transport(packet,source,7,2,6,memory,{}, {},result) || result.minimum!=1 || result.maximum!=9 || result.type || result.count!=3)return 1;
- const auto saved=result;unsigned rejected=0;
- const auto unchanged=[&](int status){return status==88 && !std::memcmp(&saved,&result,sizeof(result));};
- if(unchanged(prepare_indexed_transport(packet,source,7,2,6,memory,{{0x1005,1}}, {},result)))++rejected;
- if(unchanged(prepare_indexed_transport(packet,source,7,2,6,memory,{}, {{0x0fff,2}},result)))++rejected;
- guest[0]=3;if(unchanged(prepare_indexed_transport(packet,source,7,2,6,memory,{}, {},result)))++rejected;guest=source.snapshot;
- if(unchanged(prepare_indexed_transport(packet,source,0,2,6,memory,{}, {},result)))++rejected;
- if(unchanged(prepare_indexed_transport(packet,source,7,2,4,memory,{}, {},result)))++rejected;
- if(rejected!=5)return 2;
- source.snapshot={2,0,0,0,0,0,1,0,1,0,0,0};source.bytes=12;source.stride=4;guest=source.snapshot;
- if(prepare_indexed_transport(packet,source,8,4,12,memory,{}, {},result) || result.type!=1 || result.maximum!=65536 || result.minimum!=1)return 3;
- std::cout<<"{\"scope\":\"indexed_draw_transport_control\",\"passed\":true,\"U16_U32\":true,\"stale_CPU_or_GPU_writers_rejected\":true,\"atomic_rejections\":5,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
 }
 }

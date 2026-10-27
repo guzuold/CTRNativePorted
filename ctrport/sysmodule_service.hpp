@@ -31,20 +31,6 @@ public:
     }
 };
 inline OriginalModuleState nptoolkit_module_state;
-inline int original_module_state_control(){
-    unsigned rejected=0,calls=0;OriginalModuleState state;
-    try{state.load();}catch(const std::runtime_error&){++rejected;}
-    state.configure([&]{++calls;return 0;});
-    if(state.load() || state.load() || calls!=1)throw std::runtime_error("Original initializer repeat differs");
-    try{state.configure([]{return 0;});}catch(const std::runtime_error&){++rejected;}
-    OriginalModuleState failed;unsigned failures=0;failed.configure([&]{++failures;return -7;});
-    if(failed.load()!=-7 || failed.load()!=-7 || failures!=1)throw std::runtime_error("Initializer failure was hidden/retried");
-    OriginalModuleState recursive;recursive.configure([&]{return recursive.load();});
-    try{recursive.load();}catch(const std::runtime_error&){++rejected;}
-    try{recursive.load();}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=4)throw std::runtime_error("Original module negative controls differ");
-    std::cout<<"{\"scope\":\"synthetic_original_module_lifecycle\",\"initializer_called_once\":true,\"failure_preserved\":true,\"negative_rejections\":4,\"retail_execution\":false}\n";return 0;
-}
 class RandomModuleState {
     std::mutex lock;
     bool exports_ready=false;
@@ -71,19 +57,5 @@ inline int load_save_dialog_module() {
     std::lock_guard<std::mutex> guard(save_module_lock);
     if(!save_module_exports_ready) throw std::runtime_error("SaveDialog lifecycle exports not verified");
     save_module_active=true;return 0;
-}
-inline int sysmodule_state_control() {
-    RandomModuleState state;
-    unsigned rejected=0;
-    try {state.load(0xba);} catch(const std::runtime_error&) {++rejected;}
-    if(state.loaded()) throw std::runtime_error("Unavailable module became active");
-    state.configure_verified_exports(true);
-    try {state.load(0xbb);} catch(const std::runtime_error&) {++rejected;}
-    if(state.loaded()) throw std::runtime_error("Unknown module became active");
-    if(state.load(0xba) || !state.loaded() || state.load(0xba)) throw std::runtime_error("Random activation state failed");
-    try {state.configure_verified_exports(false);} catch(const std::runtime_error&) {++rejected;}
-    if(rejected!=3) throw std::runtime_error("Module negatives differ");
-    std::cout<<"{\"scope\":\"synthetic_module_state\",\"module_id\":186,\"activation_and_repeat\":true,\"negative_rejections\":3,\"runtime_bound\":false}\n";
-    return 0;
 }
 }

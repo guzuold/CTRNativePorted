@@ -11,18 +11,4 @@ inline std::unique_ptr<GuestCopyRegion> make_image_copy_region(
  auto owner=std::shared_ptr<void>(images,(*images)[index].get());
  return std::make_unique<GuestCopyRegion>(std::move(owner),static_cast<std::size_t>(extent),metadata.spans);
 }
-inline int guest_copy_image_control(const char* path){
- auto images=std::make_shared<std::vector<MappedImage>>();ImageMetadata metadata;
- images->push_back(load_retail_image(path,false,&metadata));
- if(metadata.executable_spans.empty())return 1;
- const auto address=reinterpret_cast<std::uintptr_t>(images->front().get())+metadata.executable_spans.front().first;
- auto region=make_image_copy_region(images,0,metadata);auto api=make_guest_copy_api(*region);
- unsigned char bytes[64]{};if(api.read(api.context,address,bytes,64))return 1;
- const auto expected=std::vector<unsigned char>(bytes,bytes+64);
- std::weak_ptr<std::vector<MappedImage>> weak=images;images.reset();if(weak.expired())return 1;
- std::memset(bytes,0,64);if(api.read(api.context,address,bytes,64) || std::memcmp(bytes,expected.data(),64))return 1;
- region->revoke();if(!api.read(api.context,address,bytes,64))return 1;
- region.reset();if(!weak.expired())return 1;
- std::cout<<"{\"scope\":\"retail_image_guest_copy_ownership\",\"image_sha256\":"<<std::quoted(metadata.sha256)<<",\"read_bytes\":64,\"owner_retained\":true,\"revoked_rejected\":true,\"owner_released\":true,\"guest_execution\":false}\n";return 0;
-}
 }

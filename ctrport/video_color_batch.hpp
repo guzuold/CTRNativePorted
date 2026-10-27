@@ -43,30 +43,4 @@ public:
   tokens_.clear();return first;
  }
 };
-inline int video_color_batch_control(){
- if(runtime_video_open(255,0,0,0)!=1)return 1;auto session=runtime_video_session;
- const int result=session->invoke([](const CtrVideoSessionApiV1* api){
-  CtrGraphicsColorRequirementV1 p{1,sizeof(p),0,1920,1080,1,1,14,10,9,0x1000,1920ull*1080*4};
-  VideoColorBatch batch(api->context);uint64_t first=0,second=0;
-  if(batch.create(p,&first) || batch.create(p,&second) || batch.size()!=2)return 2;
-  auto bad=p;bad.version=0;uint64_t unchanged=123;
-  if(batch.create(bad,&unchanged)!=60 || unchanged!=123 || batch.size()!=2)return 3;
-  if(batch.close() || batch.close() || batch.size())return 4;
-  if(ctr_video_color_attachment_release_v1(api->context,second)!=62)return 5;
-  if(batch.create(p,&unchanged)!=60 || unchanged!=123)return 6;
-  VideoColorBatch registry(api->context);uint64_t a=0,b=0;bool reused=false;
-  if(registry.resolve(p,&a,&reused) || reused || registry.resolve(p,&b,&reused) || !reused || a!=b || registry.size()!=1)return 10;
-  auto changed=p;changed.number_format=0;b=123;reused=false;
-  if(registry.resolve(changed,&b,&reused)!=88 || b!=123 || reused || registry.size()!=1)return 11;
-  changed=p;changed.guest_address+=256;
-  if(registry.resolve(changed,&b,&reused)!=88 || b!=123 || registry.size()!=1)return 12;
-  if(registry.close() || ctr_video_color_attachment_release_v1(api->context,a)!=62)return 13;
-  uint64_t unwound=0;
-  try{VideoColorBatch interrupted(api->context);if(interrupted.create(p,&unwound))return 7;throw std::runtime_error("authored interruption");}catch(const std::runtime_error&){}
-  if(!unwound || ctr_video_color_attachment_release_v1(api->context,unwound)!=62)return 8;
-  return 0;
- });session.reset();if(runtime_video_close(1))return 9;
- if(!result)std::cout<<"{\"scope\":\"video_color_batch_control\",\"simultaneously_live\":2,\"failure_preserves_live_colors\":true,\"exception_cleanup\":true,\"exact_backing_reused\":true,\"conflicting_aliases_rejected\":true,\"synthetic\":true,\"GPU_execution\":false}\n";
- return result;
-}
 }

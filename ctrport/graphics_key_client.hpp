@@ -34,12 +34,6 @@ inline uint64_t vertex_capture_budget(uint64_t retained){
  constexpr uint64_t total=256ull*1024*1024,per_buffer=16ull*1024*1024;
  return retained>=total?0:(std::min)(per_buffer,total-retained);
 }
-inline int vertex_capture_budget_control(){
- constexpr uint64_t total=256ull*1024*1024;
- if(vertex_capture_budget(0)!=16ull*1024*1024 || vertex_capture_budget(32ull*1024*1024)!=16ull*1024*1024 ||
-    vertex_capture_budget(total-1)!=1 || vertex_capture_budget(total) || vertex_capture_budget(UINT64_MAX))return 1;
- std::cout<<"{\"scope\":\"vertex_capture_budget_control\",\"passed\":true,\"budget_bytes\":268435456,\"underflow_rejected\":true,\"synthetic\":true}\n";return 0;
-}
 struct GraphicsVertexFetchOwner {
  CtrGraphicsVertexInputsV1 value{};int status=88;std::array<uint32_t,32> formats{};int format_status=88;int physical_status=88;std::vector<GraphicsBufferCapture> buffers;
 };
@@ -120,23 +114,6 @@ inline int decode_owned_push_data(const CtrPm4::Registers& bank,const CtrGraphic
   output=result;return 0;
  });
 }
-inline int graphics_viewport_transport_control(){
- auto bank=std::make_unique<CtrPm4::Registers>();CtrGraphicsProfileV1 profile{};CtrGraphicsViewportStateV1 output{};output.version=99;
- if(decode_owned_viewports(*bank,profile,output)!=60 || output.version!=99)return 1;
- profile.version=1;profile.size=sizeof(profile);profile.max_viewport_width=8192;profile.max_viewport_height=4096;
- if(decode_owned_viewports(*bank,profile,output) || output.version!=1 || output.size!=sizeof(output) || output.count!=1)return 2;
- const auto saved=output;profile.max_viewport_width=0;
- if(decode_owned_viewports(*bank,profile,output)!=60 || std::memcmp(&saved,&output,sizeof(output)))return 3;
- std::cout<<"{\"scope\":\"graphics_viewport_transport_control\",\"passed\":true,\"synthetic\":true,\"actual_device_authority\":false,\"invalid_atomic\":true,\"GPU_execution\":false}\n";return 0;
-}
-inline int graphics_metadata_host_control(){
- const auto caller=GetCurrentThreadId();DWORD worker=caller;
- if(graphics_metadata_host_call([&](){worker=GetCurrentThreadId();return 73;})!=73 || worker==caller)return 1;
- auto bank=std::make_unique<CtrPm4::Registers>();CtrGraphicsKeyV1 output{};output.version=99;
- if(decode_owned_graphics_key(*bank,256,output)!=60 || output.version!=99)return 2;
- if(decode_owned_graphics_key(*bank,0,output) || output.version!=1 || output.mrt_mask || output.num_color_attachments)return 3;
- std::cout<<"{\"scope\":\"graphics_metadata_host_control\",\"passed\":true,\"separate_host_stack\":true,\"invalid_atomic\":true,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
-}
 
 }
 
@@ -157,15 +134,4 @@ inline int decode_owned_draw_parameters(const CtrPm4::Registers& bank,const CtrG
 }
 
 namespace ctrport {
-inline int graphics_draw_parameter_transport_control(){
- auto bank=std::make_unique<CtrPm4::Registers>();GraphicsStageOwner stage{};stage.userdata_words=16;stage.userdata[2]=17;stage.userdata[3]=23;stage.flattened_userdata.assign(stage.userdata.begin(),stage.userdata.end());
- CtrGraphicsPipelineStageV1 vertex{};vertex.version=1;vertex.size=sizeof(vertex);vertex.has_fetch=1;vertex.vertex_offset_sgpr=2;vertex.instance_offset_sgpr=3;
- CtrGraphicsDrawParametersV1 output{};
- if(decode_owned_draw_parameters(*bank,vertex,stage,output) || output.vertex_offset!=17 || output.instance_offset!=23 || output.instance_count!=1)return 1;
- bank->words[0xA102]=41;bank->words[0xC24D]=7;
- if(decode_owned_draw_parameters(*bank,vertex,stage,output) || output.vertex_offset!=41 || output.instance_count!=7)return 2;
- const auto saved=output;vertex.instance_offset_sgpr=16;
- if(decode_owned_draw_parameters(*bank,vertex,stage,output)!=60 || std::memcmp(&saved,&output,sizeof(output)))return 3;
- std::cout<<"{\"scope\":\"graphics_draw_parameter_transport_control\",\"passed\":true,\"invalid_atomic\":true,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

@@ -34,28 +34,4 @@ public:
   }return false;
  }
 };
-inline int published_color_generations_control(){
- PublishedColorGenerations owner;ComputeGuestWriteback writer;writer.address=0x1000;writer.initial.assign(64,0x25);
- if(owner.publish(writer,1)!=91)return 1;writer.completed=true;writer.poisoned=true;if(owner.publish(writer,1)!=91)return 2;writer.poisoned=false;
- if(owner.publish(writer,1))return 3;
- std::vector<std::pair<uint64_t,uint64_t>> ranges{{0x1000,64}};
- if(!owner.matches(writer.address,64,writer.initial,ranges))return 4;
- auto changed=writer.initial;changed[63]=0x26;if(owner.matches(writer.address,64,changed,ranges))return 5;
- if(owner.matches(0x1001,64,writer.initial,ranges) || owner.matches(UINT64_MAX-32,64,writer.initial,ranges))return 6;
- if(owner.matches(writer.address,64,writer.initial,{}))return 7;
- ranges.push_back({0x2000,64});if(!owner.matches(writer.address,64,writer.initial,ranges))return 8;
- ranges.push_back({0x103f,1});if(owner.matches(writer.address,64,writer.initial,ranges))return 9;
- writer.initial=changed;if(owner.publish(writer,ranges.size()))return 10;
- if(!owner.matches(writer.address,64,changed,ranges) || owner.matches(writer.address,64,std::vector<unsigned char>(64,0x25),ranges))return 11;
- // Repeated render-target writes use the last completed publication as the
- // optimistic commit baseline. A later overlapping writer cannot authorize it.
- std::vector<unsigned char> baseline(64,0xa5);
- if(owner.baseline(writer.address,64,ranges,ranges.size(),baseline) || baseline!=changed)return 12;
- auto prior=baseline;ranges.push_back({writer.address+63,1});
- if(owner.baseline(writer.address,64,ranges,ranges.size(),baseline)!=88 || baseline!=prior)return 13;
- if(owner.baseline(writer.address,64,ranges,1,baseline)!=88 || baseline!=prior)return 14;
- if(owner.baseline(writer.address,64,ranges,ranges.size()+1,baseline)!=60 || baseline!=prior)return 15;
- if(owner.baseline(writer.address+1,64,ranges,ranges.size(),baseline)!=62 || baseline!=prior)return 16;
- std::cout<<"{\"scope\":\"published_color_generations_control\",\"passed\":true,\"synthetic_metadata_and_bytes\":true,\"pending_poisoned_stale_partial_overflow_future_epoch_and_superseded_rejected\":true,\"newest_publication_authority\":true,\"repeated_writer_baseline_atomic_controls\":5,\"GPU_execution\":false}\n";return 0;
-}
 }

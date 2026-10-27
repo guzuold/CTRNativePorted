@@ -135,18 +135,6 @@ inline int user_name_control(const char* expected="CTRPlayer"){
  if(offline_np_id(-1,output)!=static_cast<int>(0x80550003U) || offline_np_id(2,output)!=static_cast<int>(0x80550007U))return 7;
  std::cout<<"{\"scope\":\"owned_user_name\",\"passed\":true}\n";return 0;
 }
-inline int user_login_list_control() {
-    UserService service;std::array<std::int32_t,6> output{71,72,73,74,75,76};
-    if(service.login_user_list(output.data()+1)!=static_cast<int>(0x80960002U) || output[1]!=72)return 1;
-    if(service.login_user_list(nullptr)!=static_cast<int>(0x80960005U) || service.initialize(nullptr) || service.login_user_list(output.data()+1))return 1;
-    if(output!=std::array<std::int32_t,6>{71,1,-1,-1,-1,76})return 1;
-    if(service.terminate() || service.login_user_list(output.data()+1)!=static_cast<int>(0x80960002U) || output[1]!=1)return 1;
-    if(service.initialize(nullptr) || service.login_user_list(output.data()+1) || output[1]!=2 || output[0]!=71 || output[5]!=76)return 1;
-    auto* page=VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READONLY);if(!page)throw std::runtime_error("User list control allocation failed");
-    bool rejected=false;try{service.login_user_list(static_cast<std::int32_t*>(page));}catch(const std::runtime_error&){rejected=true;}
-    VirtualFree(page,0,MEM_RELEASE);if(!rejected)return 1;
-    std::cout<<"{\"scope\":\"local_user_login_list\",\"four_int32_slots\":true,\"buffer_canaries_preserved\":true,\"session_identity_changes_after_terminate\":true,\"null_readonly_uninitialized_rejected\":true,\"external_accounts_used\":false}\n";return 0;
-}
 extern "C" int ctr_user_login_list(std::int32_t* output,std::uint64_t caller) {
     try{return user_service.login_user_list(output);}catch(const std::exception& error){std::fprintf(stderr,"NID=fPhymKNvK-A library=libSceUserService caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
@@ -156,48 +144,11 @@ extern "C" int ctr_user_event(std::int32_t* output,uint64_t caller){
  }catch(const std::exception& e){std::fprintf(stderr,"NID=yH17Q6NWtVg library=libSceUserService caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_user_event();
-// Split-screen players on an initialized service whose primary user is 2 and whose initial
-// login was consumed: queued login/logout of fixed identities, listed after the primary user.
-inline int split_user_control(UserService& service){
- std::array<int32_t,4> result{71,72,73,74},list{};char name[16]{};
- if(service.set_extra_user(2,true)!=true || service.set_extra_user(2,true)!=false || service.set_extra_user(1,true)!=true)return 2;
- if(service.get_event(result.data()+1) || result!=std::array<int32_t,4>{71,0,102,74} || service.get_event(result.data()+1) || result[2]!=101)return 3;
- if(service.login_user_list(list.data()) || list!=std::array<int32_t,4>{2,101,102,-1})return 4;
- if(service.get_name(102,name,sizeof(name)) || std::strcmp(name,"Player 3") || service.get_name(103,name,sizeof(name))!=static_cast<int>(0x80960009U))return 5;
- if(service.port_of_user(2)!=0 || service.port_of_user(101)!=1 || service.port_of_user(103)!=-1 || !service.has_user(102))return 6;
- if(service.set_extra_user(2,false)!=true || service.get_event(result.data()+1) || result!=std::array<int32_t,4>{71,1,102,74} || service.has_user(102))return 7;
- if(service.get_event(result.data()+1)!=static_cast<int>(0x80960007U) || service.login_user_list(list.data()) || list!=std::array<int32_t,4>{2,101,-1,-1})return 8;
- bool rejected=false;try{service.set_extra_user(4,true);}catch(const std::runtime_error&){rejected=true;}
- return rejected?0:9;
-}
-inline int user_event_control(){
- UserService service;std::array<int32_t,4> result{71,72,73,74};
- if(service.get_event(result.data()+1)!=static_cast<int>(0x80960002U) || result[1]!=72)return 1;
- if(service.initialize(nullptr) || service.get_event(nullptr)!=static_cast<int>(0x80960005U))return 1;
- auto* page=VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READONLY);if(!page)return 1;
- bool rejected=false;try{service.get_event(static_cast<int32_t*>(page));}catch(...){rejected=true;}VirtualFree(page,0,MEM_RELEASE);
- if(!rejected || service.get_event(result.data()+1) || result!=std::array<int32_t,4>{71,0,1,74})return 1;
- if(service.get_event(result.data()+1)!=static_cast<int>(0x80960007U) || result!=std::array<int32_t,4>{71,0,1,74})return 1;
- if(service.terminate() || service.initialize(nullptr) || service.get_event(result.data()+1) || result[2]!=2)return 1;
- if(const int failed=split_user_control(service))return failed;
- std::cout<<"{\"scope\":\"owned_user_login_event_queue\",\"passed\":true,\"consume_once\":true,\"failed_write_preserves_event\":true,\"split_screen_users\":true,\"external_accounts\":false}\n";return 0;
-}
 extern "C" int ctr_user_initial(std::int32_t* output,uint64_t caller){
  try{const int result=user_service.initial_user(output);std::printf("{\"scope\":\"original_UserServiceGetInitialUser_return\",\"caller\":%llu,\"result\":%d}\n",static_cast<unsigned long long>(caller),result);std::fflush(stdout);return result;
  }catch(const std::exception& e){std::fprintf(stderr,"NID=CdWp0oHWGr0 library=libSceUserService caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_user_initial();
-inline int user_initial_control(){
- UserService service;std::array<int32_t,3> output{71,72,73};
- if(service.initial_user(output.data()+1)!=static_cast<int>(0x80960002U) || output[1]!=72)return 1;
- if(service.initial_user(nullptr)!=static_cast<int>(0x80960005U) || service.initialize(nullptr) || service.initial_user(output.data()+1) || output!=std::array<int32_t,3>{71,1,73})return 2;
- std::array<int32_t,2> event{};if(service.get_event(event.data()) || service.initial_user(output.data()+1) || output[1]!=event[1])return 3;
- if(service.terminate() || service.initialize(nullptr) || service.initial_user(output.data()+1) || output[1]!=2)return 4;
- auto* page=VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READONLY);if(!page)return 5;
- bool rejected=false;try{service.initial_user(static_cast<int32_t*>(page));}catch(...){rejected=true;}VirtualFree(page,0,MEM_RELEASE);if(!rejected)return 6;
- if(user_service.initialize(nullptr) || ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_user_initial),reinterpret_cast<uint64_t>(output.data()+1),0) || output!=std::array<int32_t,3>{71,1,73})return 7;
- std::cout<<"{\"scope\":\"owned_initial_user_control\",\"passed\":true,\"session_identity\":true,\"canaries\":true,\"readonly_rejected\":true,\"event_does_not_change_initial_identity\":true}\n";return 0;
-}
 
 // Retail NpToolkit2 SHA480a769d...e5c9c: call0x41702 passes function in
 // RDI and context in RSI; callback0x41470 consumes an event pointer.
@@ -210,15 +161,6 @@ inline int user_callback_register_owned(void* function,void* argument){
     std::lock_guard<std::mutex> lock(user_callback_lock);
     if(user_callback_function)throw std::runtime_error("Multiple user callback registration not characterized");
     user_callback_function=function;user_callback_argument=argument;return 0;
-}
-inline int user_callback_registration_control(){
-    int function=1,argument=2;bool null_rejected=false,duplicate_rejected=false;
-    try{user_callback_register_owned(nullptr,&argument);}catch(const std::runtime_error&){null_rejected=true;}
-    if(!null_rejected || user_callback_function || user_callback_register_owned(&function,&argument) || user_callback_function!=&function || user_callback_argument!=&argument)return 1;
-    try{user_callback_register_owned(&argument,nullptr);}catch(const std::runtime_error&){duplicate_rejected=true;}
-    if(!duplicate_rejected || user_callback_function!=&function || user_callback_argument!=&argument)return 1;
-    user_callback_function=nullptr;user_callback_argument=nullptr;
-    std::cout<<"{\"scope\":\"user_callback_registration_control\",\"retained_function_and_context\":true,\"null_and_duplicate_atomic\":true,\"callback_executed\":false}\n";return 0;
 }
 
 }

@@ -12,12 +12,6 @@ inline std::string stencil_face_metadata(uint32_t operations,uint32_t reference,
  <<",\"reference\":"<<(reference&255)<<",\"compare_mask\":"<<((reference>>8)&255)<<",\"write_mask\":"<<((reference>>16)&255)
  <<",\"operation_value\":"<<(reference>>24)<<",\"compare\":"<<comparison<<'}';return out.str();
 }
-inline int stencil_metadata_control(){
- if(stencil_face_metadata(0x321,0x88776655,7)!="{\"fail\":1,\"zpass\":2,\"zfail\":3,\"reference\":85,\"compare_mask\":102,\"write_mask\":119,\"operation_value\":136,\"compare\":7}")return 1;
- if(stencil_face_metadata(0x654321>>12,0x44332211,2)!="{\"fail\":4,\"zpass\":5,\"zfail\":6,\"reference\":17,\"compare_mask\":34,\"write_mask\":51,\"operation_value\":68,\"compare\":2}")return 2;
- if(stencil_face_metadata(0xffffffff,0xffffffff,0)!="{\"fail\":15,\"zpass\":15,\"zfail\":15,\"reference\":255,\"compare_mask\":255,\"write_mask\":255,\"operation_value\":255,\"compare\":0}")return 3;
- std::cout<<"{\"scope\":\"stencil_metadata_control\",\"passed\":true,\"authored_cases\":3,\"synthetic\":true,\"gpu_execution\":false}\n";return 0;
-}
 inline std::string depth_attachment_metadata(const CtrPm4::Registers& registers,bool hint_observed,uint32_t hint) {
  const auto& r=registers.words;const uint32_t z=r[0xa010],s=r[0xa011],view=r[0xa002],ctl=r[0xa200],size=r[0xa016];
  std::ostringstream out;

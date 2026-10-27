@@ -50,7 +50,6 @@ inline bool gpu_backend_d3d11(){
 inline bool gpu_library_requested(){
     char value[4]{};return gpu_backend_d3d11() || (GetEnvironmentVariableA("CTR_GPU_LIBRARY",value,sizeof(value))==1 && value[0]=='1');
 }
-inline bool gpu_library_active(){return gpu_library.module!=nullptr;}
 // CPU writes to guest memory done by ctrport services (file reads) must reach the
 // GPU caches and lift page tracking before the write, as shadPS4's ReadFile does.
 inline void gpu_invalidate_guest(const void* address,std::uint64_t bytes){

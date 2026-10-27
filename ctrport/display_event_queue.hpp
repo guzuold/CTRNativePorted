@@ -142,29 +142,5 @@ public:
     }
 
 };
-inline int display_event_queue_control(){
-    DisplayEventQueues queues;auto token=queues.create();queues.add(token,6,0x1234);
-    const std::uint64_t hint=0xabcdef1234560006ULL;
-    for(unsigned i=0;i<20;++i)queues.trigger(token,6,hint,0x6789);
-    auto rows=queues.poll(token,1);
-    if(rows.size()!=1 || rows[0].data!=0xabcdef123456f789ULL || rows[0].udata!=0x1234 ||
-       rows[0].flags!=0x21 || rows[0].filter!=-13 || !queues.poll(token,1).empty())
-        throw std::runtime_error("Display coalescing/clear differs");
-    queues.trigger(token,6,0,0);
-    rows=queues.poll(token,1);if(rows.size()!=1 || rows[0].data)throw std::runtime_error("Display null hint differs");
-    queues.add(token,7,0x5678);queues.trigger(token,7,0x0107,0xabc);
-    rows=queues.poll(token,2);if(rows.size()!=1 || rows[0].data!=0x1abc || rows[0].udata!=0x5678)
-        throw std::runtime_error("Display vblank differs");
-    queues.remove(token,6);unsigned rejected=0;
-    try{queues.trigger(token,6,hint,1);}catch(const std::runtime_error&){++rejected;}
-    try{queues.add(token,8,0);}catch(const std::runtime_error&){++rejected;}
-    try{queues.poll(token,0);}catch(const std::runtime_error&){++rejected;}
-    queues.destroy(token);
-    try{queues.trigger(token,7,7,1);}catch(const std::runtime_error&){++rejected;}
-    try{queues.add(token,7,0);}catch(const std::runtime_error&){++rejected;}
-    try{queues.destroy(token);}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=6 || queues.create()==token)throw std::runtime_error("Display stale token controls differ");
-    return 0;
-}
 }
 

@@ -107,8 +107,3 @@ inline int TransferSampledLinear(VkDevice device,PFN_vkGetDeviceProcAddr get,uin
  return result;
 }
 
-inline int UploadSampledLinear(VkDevice device,PFN_vkGetDeviceProcAddr get,uint32_t family,
- const VkPhysicalDeviceMemoryProperties& memory,VkImage image,VkExtent3D extent,
- VkImageLayout oldLayout,const void* source,uint64_t bytes,uint64_t pitch,bool& completed) {
- return TransferSampledLinear(device,get,family,memory,image,extent,oldLayout,source,nullptr,bytes,pitch,completed);
-}

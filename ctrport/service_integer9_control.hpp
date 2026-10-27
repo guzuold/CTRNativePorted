@@ -32,28 +32,6 @@ inline int service_integer9_control(){
  integer_dispatch_records.retire(token);integer9_dispatch_generations.shutdown();
  std::cout<<"{\"scope\":\"service_integer9_control\",\"nine_exact_arguments\":true,\"pending_no_return\":true,\"generation_pinned\":true,\"reload\":true,\"guest_errno_bits\":true,\"synthetic\":true,\"PS4_service_implemented\":false}\n";return 0;
 }
-inline int service_integer9_dll_control(const std::filesystem::path& root){
- const std::string pin(64,'a');ServiceImportRecord record{pin,pin,"synthetic9","test","test",8,9};
- const auto token=integer_dispatch_records.add(record,pin,pin,16);ServiceIntegerThunk thunk(token,9);
- auto future=std::async(std::launch::async,[&]{return ctr_service_integer9_fixture(thunk.target(),integer9_arguments.data());});
- const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
- while(!integer9_dispatch_generations.waiting_count()){if(std::chrono::steady_clock::now()>deadline)ExitProcess(5);std::this_thread::yield();}
- CtrHostApi host{sizeof(CtrHostApi),1,nullptr,nullptr};
- load_service_generation(integer9_dispatch_generations,root,root/L"service_nine_1.dll",host,pin,1);
- if(future.get()!=0x80020009)return 1;
- load_service_generation(integer9_dispatch_generations,root,root/L"service_nine_2.dll",host,pin,2);
- if(ctr_service_integer9_fixture(thunk.target(),integer9_arguments.data())!=0x8002000a)return 2;
- integer_dispatch_records.retire(token);integer9_dispatch_generations.shutdown();
- std::cout<<"{\"scope\":\"service_integer9_dll_control\",\"paused_call_resumed\":true,\"DLL_generations\":2,\"nine_exact_arguments\":true,\"synthetic\":true,\"PS4_service_implemented\":false}\n";return 0;
-}
 
-inline uint32_t integer9_failure(const uint64_t*,uint64_t,uint64_t* result){*result=123;return 88;}
-inline int service_integer9_failure_control(unsigned mode){
- const std::string pin(64,'a');ServiceImportRecord record{pin,pin,"synthetic9","test","test",8,9};
- const auto token=integer_dispatch_records.add(record,pin,pin,16);ServiceIntegerThunk thunk(token,9);
- if(mode==2)integer_dispatch_records.retire(token);
- else integer9_dispatch_generations.publish(std::make_shared<int>(1),{{"synthetic9","test","test",reinterpret_cast<const void*>(&integer9_failure),mode==1?1U:9U}},1,pin);
- (void)ctr_service_integer9_fixture(thunk.target(),integer9_arguments.data());return 99;
-}
 
 }

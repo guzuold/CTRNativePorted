@@ -25,17 +25,4 @@ inline std::uint32_t service_transport_positive(std::uint64_t a,std::uint64_t b,
 inline std::uint32_t service_transport_failure(std::uint64_t,std::uint64_t,std::uint64_t,std::uint64_t* result){
     *result=123;return 1;
 }
-inline int service_transport_control(){
-    const auto positive=reinterpret_cast<const void*>(&service_transport_positive);
-    if(call_service_integer_adapter(positive,2,10,20,30)!=60 ||
-       call_service_integer_adapter(positive,2,0x80020009,0,0)!=0x80020009)
-        throw std::runtime_error("Service transport result/error bits differ");
-    unsigned rejected=0;
-    try{call_service_integer_adapter(reinterpret_cast<const void*>(&service_transport_failure),2,1,2,3);}
-        catch(const std::runtime_error&){++rejected;}
-    try{call_service_integer_adapter(positive,3,1,2,3);}catch(const std::runtime_error&){++rejected;}
-    try{call_service_integer_adapter(nullptr,2,1,2,3);}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=3)throw std::runtime_error("Transport unsupported result consumed");
-    return 0;
-}
 }

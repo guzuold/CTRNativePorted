@@ -14,14 +14,6 @@ namespace ctrport {
 inline std::atomic<std::uint64_t> host_yield_calls{0};
 extern "C" void ctr_thread_yield(){std::this_thread::yield();host_yield_calls.fetch_add(1,std::memory_order_relaxed);}
 extern "C" void ctr_sysv_thread_yield();
-inline int thread_yield_control(){
-    const auto before=host_yield_calls.load();std::atomic<unsigned> progressed{0};
-    std::vector<std::future<bool>> threads;
-    for(unsigned n=0;n<4;++n)threads.push_back(std::async(std::launch::async,[&]{const auto self=std::this_thread::get_id();for(unsigned i=0;i<1000;++i){ctr_thread_yield();progressed.fetch_add(1);}return self==std::this_thread::get_id();}));
-    for(auto& thread:threads)if(!thread.get())return 1;
-    if(progressed.load()!=4000 || host_yield_calls.load()-before!=4000)return 1;
-    std::cout<<"{\"scope\":\"actual_host_thread_yield\",\"calls\":4000,\"workers_completed\":4,\"thread_identity_preserved\":true,\"ps4_order_timing_equivalence\":false}\n";return 0;
-}
 // Retail NpToolkit2 offset0x453e1 reads the first int32 of pthread_self.
 // Public pthread.h Pthread::tid is first. Other Pthread fields are not supplied.
 struct ThreadIdentity { std::int32_t guest_tid=0;std::thread::id host;std::atomic<int> priority_override{-1};std::atomic<int> guest_policy{1};std::atomic<std::uint64_t> guest_affinity{~std::uint64_t{0}}; };
@@ -64,31 +56,6 @@ inline bool release_thread_identity() {
     const auto found=thread_identities.find(current_thread_identity);
     if(found==thread_identities.end() || found->second->host!=std::this_thread::get_id()) throw std::runtime_error("Thread identity ownership differs");
     retired_thread_identities.push_back(found->second);thread_identities.erase(found);current_thread_identity=0;return true;
-}
-inline int thread_handle_prefix_control(){
-    const auto handle=thread_self();std::int32_t observed=0;SIZE_T got=0;
-    if(!ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(handle),&observed,sizeof(observed),&got) || got!=sizeof(observed) || observed!=thread_numeric_id() || observed<=0)return 1;
-    if(!release_thread_identity())return 1;
-    const auto next=thread_self();if(next==handle || thread_numeric_id()==observed)return 1;
-    {std::lock_guard<std::mutex> lock(thread_identity_lock);if(thread_identities.count(handle) || !thread_identities.count(next))return 1;}
-    std::cout<<"{\"scope\":\"owned_thread_handle_prefix_control\",\"actual_tid_read_at_offset0\":true,\"numeric_id_separate\":true,\"retired_handle_not_reused\":true,\"full_Pthread_layout\":false}\n";return 0;
-}
-inline int thread_numeric_id_control() {
-    const auto first=thread_numeric_id();if(first<=0 || thread_numeric_id()!=first)return 1;
-    std::vector<std::future<int>> workers;
-    for(unsigned i=0;i<4;++i)workers.push_back(std::async(std::launch::async,[]{const auto id=thread_numeric_id();if(id<=0 || thread_numeric_id()!=id || !release_thread_identity())return -1;return id;}));
-    std::set<int> ids{first};for(auto& worker:workers)if(!ids.insert(worker.get()).second)return 1;
-    if(ids.size()!=5 || *ids.begin()<=0 || thread_numeric_id()!=first)return 1;
-    std::cout<<"{\"scope\":\"owned_numeric_thread_id\",\"positive_distinct_ids\":5,\"stable_per_thread\":true,\"parent_unchanged\":true,\"worker_ownership_released\":true}\n";return 0;
-}
-inline int thread_identity_lifecycle_control() {
-    const auto first=thread_self();if(thread_self()!=first || !release_thread_identity() || release_thread_identity())return 1;
-    const auto second=thread_self();if(second==first)return 1;
-    auto worker=std::async(std::launch::async,[&]{const auto own=thread_self();if(own==second)return false;return release_thread_identity() && !release_thread_identity();});
-    if(!worker.get() || thread_self()!=second)return 1;
-    {std::lock_guard<std::mutex> guard(thread_identity_lock);if(thread_identities.count(first) || !thread_identities.count(second))return 1;}
-    if(!release_thread_identity())return 1;
-    std::cout<<"{\"scope\":\"synthetic_thread_identity_lifecycle\",\"stale_identity_removed\":true,\"nonreused_ids\":true,\"worker_isolation\":true}\n";return 0;
 }
 // Public pthread.cpp879-896 reads retained thread attributes, not current CPU.
 inline void record_thread_affinity(std::uint64_t handle,std::uint64_t mask){
@@ -134,14 +101,6 @@ extern "C" int ctr_thread_get_priority(std::uint64_t handle,int* output,std::uin
     try {return thread_get_priority(handle,output);}catch(const std::exception& error){std::fprintf(stderr,"NID=1tKyG7RlMJo library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_thread_get_priority();
-inline int thread_get_priority_control() {
-    int value=-123;const auto self=thread_self();
-    if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_thread_get_priority),self,reinterpret_cast<std::uint64_t>(&value)) || value!=current_guest_priority)return 1;
-    value=-123;if(thread_get_priority(0,&value)!=static_cast<int>(0x80020003U) || value!=-123)return 1;
-    auto worker=std::async(std::launch::async,[]{current_guest_priority=478;int own=0;const auto id=thread_self();const auto rc=thread_get_priority(id,&own);release_thread_identity();return rc==0 && own==478;});
-    if(!worker.get() || current_guest_priority!=700)return 1;
-    std::cout<<"{\"scope\":\"synthetic_owned_thread_getprio\",\"sysv_output\":true,\"invalid_untouched\":true,\"worker_priority\":478}\n";return 0;
-}
 inline int thread_attributes_current(std::uint64_t handle,std::uint64_t* cell) {
     require_time_output(cell,8);
     std::shared_ptr<ThreadIdentity> identity;

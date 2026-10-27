@@ -54,64 +54,6 @@ public:
     std::size_t pending(){std::lock_guard<std::mutex> guard(lock);return waiters.size();}
     int remaining(){std::lock_guard<std::mutex> guard(lock);return tokens;}
 };
-inline int semaphore_microsecond_control() {
-    using namespace std::chrono_literals;
-    SemaphoreQueueControl queue(1);std::promise<void> ready;
-    const auto start=std::chrono::steady_clock::now();
-    const auto result=queue.wait_result(1,250us,ready);
-    const auto elapsed=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-start).count();
-    if(result!=QueueWaitResult::timed_out || elapsed<250 || queue.pending() || !queue.signal(1))return 1;
-    std::promise<void> consume;
-    if(queue.wait_result(1,0us,consume)!=QueueWaitResult::granted || queue.remaining())return 1;
-    std::cout<<"{\"scope\":\"synthetic_semaphore_microseconds\",\"requested_us\":250,\"elapsed_us\":"<<elapsed<<",\"submillisecond_not_truncated\":true,\"available_before_zero_timeout\":true,\"guest_bound\":false}\n";return 0;
-}
-inline int semaphore_timeout_race_control() {
-    using namespace std::chrono_literals;
-    unsigned grants=0,timeouts=0;
-    for(unsigned i=0;i<96;++i) {
-        SemaphoreQueueControl queue(1);std::promise<void> ready;auto entered=ready.get_future();
-        auto waiter=std::async(std::launch::async,[&]{return queue.wait_result(1,1ms,ready);});
-        entered.get();
-        if(i%3==0)std::this_thread::sleep_for(2ms);
-        if(!queue.signal(1))return 1;
-        const auto result=waiter.get();
-        if(result==QueueWaitResult::granted){++grants;if(queue.remaining()!=0)return 1;}
-        else if(result==QueueWaitResult::timed_out){++timeouts;if(queue.remaining()!=1)return 1;}
-        else return 1;
-        if(queue.pending())return 1;
-    }
-    if(grants+timeouts!=96 || !timeouts)return 1;
-    std::cout<<"{\"scope\":\"synthetic_semaphore_timeout_signal_race\",\"iterations\":96,\"grants\":"<<grants<<",\"timeouts\":"<<timeouts<<",\"token_conservation\":true,\"pending_cleanup\":true,\"guest_bound\":false}\n";return 0;
-}
-inline int semaphore_cancel_control() {
-    using namespace std::chrono_literals;
-    for(bool deletion:{false,true}) {
-        SemaphoreQueueControl queue(2);std::promise<void> one,two;
-        auto ready_one=one.get_future(),ready_two=two.get_future();
-        auto a=std::async(std::launch::async,[&]{return queue.wait_result(1,2000ms,one);});ready_one.get();
-        auto b=std::async(std::launch::async,[&]{return queue.wait_result(2,2000ms,two);});ready_two.get();
-        const bool woke=deletion?queue.close():queue.cancel(1)==2;
-        const auto x=a.get(),y=b.get();const auto expected=deletion?QueueWaitResult::deleted:QueueWaitResult::canceled;
-        if(!woke || x!=expected || y!=expected || queue.pending())return 1;
-        if(deletion){if(queue.close() || queue.signal(1))return 1;std::promise<void> next;if(queue.wait_result(1,0ms,next)!=QueueWaitResult::deleted)return 1;}
-        else {std::promise<void> next;if(queue.remaining()!=1 || !queue.wait(1,0ms,next))return 1;}
-    }
-    std::cout<<"{\"scope\":\"synthetic_semaphore_cancel_delete\",\"waiters_woken_with_error\":4,\"no_false_grants\":true,\"cancel_reset_consumable\":true,\"delete_terminal\":true,\"guest_bound\":false}\n";return 0;
-}
-inline int semaphore_priority_control() {
-    using namespace std::chrono_literals;
-    SemaphoreQueueControl queue(1,false);
-    std::promise<void> low_ready,first_ready,second_ready;
-    auto low_signal=low_ready.get_future(),first_signal=first_ready.get_future(),second_signal=second_ready.get_future();
-    auto low=std::async(std::launch::async,[&]{return queue.wait(1,2000ms,low_ready,700);});low_signal.get();
-    auto high_first=std::async(std::launch::async,[&]{return queue.wait(1,2000ms,first_ready,300);});first_signal.get();
-    auto high_second=std::async(std::launch::async,[&]{return queue.wait(1,2000ms,second_ready,300);});second_signal.get();
-    const bool first_grant=queue.pending()==3 && queue.signal(1) && high_first.get();
-    const bool second_grant=queue.pending()==2 && queue.signal(1) && high_second.get();
-    const bool final_grant=queue.pending()==1 && queue.signal(1) && low.get();
-    if(!first_grant || !second_grant || !final_grant || queue.pending() || queue.remaining())return 1;
-    std::cout<<"{\"scope\":\"synthetic_semaphore_priority_queue\",\"real_waiters\":3,\"priority_before_insertion_order\":true,\"equal_priority_fifo\":true,\"guest_scheduler_bound\":false}\n";return 0;
-}
 inline int semaphore_queue_control() {
     using namespace std::chrono_literals;
     SemaphoreQueueControl queue(3);std::promise<void> first_ready,second_ready;

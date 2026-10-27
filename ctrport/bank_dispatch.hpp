@@ -28,40 +28,4 @@ inline int capture_bank_call(EXCEPTION_POINTERS* exception,BankCall* call) noexc
     } else return EXCEPTION_CONTINUE_SEARCH;
     call->captured=true;return EXCEPTION_EXECUTE_HANDLER;
 }
-inline bool invoke_bank_control(BankCall* call,const unsigned char* address,bool data) {
-    __try {
-        if(data) { const volatile unsigned char byte=*address; (void)byte; }
-        else reinterpret_cast<void(*)()>(const_cast<unsigned char*>(address))();
-    } __except(capture_bank_call(GetExceptionInformation(),call)) { return false; }
-    return true;
-}
-inline int check_all_bank_slots(const MissingTrapBank& functions,const MissingTrapBank& data,
-                                const std::vector<MappedImage>& images) {
-    std::uint64_t checked=0;
-    for(bool objects:{false,true}) {
-        const auto& bank=objects?data:functions;
-        for(std::size_t i=0;i<bank.records.size();++i) {
-            const auto& record=bank.records[i];std::uint64_t address=0;
-            std::memcpy(&address,images[record.image].get()+record.slot,8);
-            BankCall call;call.functions=&functions;call.data=&data;
-            if(invoke_bank_control(&call,reinterpret_cast<const unsigned char*>(address),objects) ||
-               !call.captured || !call.caller || call.index!=i || call.data_access!=objects)
-                throw std::runtime_error("Missing bank dispatcher slot/identity/caller differs");
-            ++checked;
-        }
-    }
-    // Synthetic exception records prove that unrelated faults are never swallowed.
-    EXCEPTION_RECORD record{};CONTEXT context{};EXCEPTION_POINTERS exception{&record,&context};
-    BankCall call;call.functions=&functions;call.data=&data;
-    record.ExceptionCode=EXCEPTION_ILLEGAL_INSTRUCTION;context.Rip=1;
-    if(capture_bank_call(&exception,&call)!=EXCEPTION_CONTINUE_SEARCH) throw std::runtime_error("Unrelated UD2 swallowed");
-    context.Rip=reinterpret_cast<std::uint64_t>(functions.memory.get())+1;
-    if(capture_bank_call(&exception,&call)!=EXCEPTION_CONTINUE_SEARCH) throw std::runtime_error("Interior trap RIP swallowed");
-    record.ExceptionCode=EXCEPTION_ACCESS_VIOLATION;record.NumberParameters=2;record.ExceptionInformation[0]=0;record.ExceptionInformation[1]=1;
-    if(capture_bank_call(&exception,&call)!=EXCEPTION_CONTINUE_SEARCH) throw std::runtime_error("Unrelated data fault swallowed");
-    std::cout << "{\"scope\":\"synthetic_host_all_retail_slot_controls\",\"slots_checked\":" << checked
-              << ",\"function_traps\":" << functions.records.size() << ",\"data_guards\":" << data.records.size()
-              << ",\"unrelated_faults_rejected\":3,\"retail_executed\":false,\"returned_success_from_missing_import\":false}\n";
-    return 4;
-}
 }

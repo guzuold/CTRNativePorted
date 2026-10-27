@@ -30,21 +30,4 @@ public:
  uint64_t frames(){std::lock_guard<std::mutex> lock(mutex_);return frames_;}
 };
 inline GnmFrameEnd original_gnm_frame_end;
-inline int gnm_frame_end_control(){
- GnmFrameEnd state;unsigned calls=0,rejected=0;
- auto success=[&](uint64_t count,uint64_t token){++calls;return count==1 && token==7?0:88;};
- if(state.finish(4,success)==62)++rejected;
- if(state.publish(1,7,4,false,true,true)==60)++rejected;
- if(state.publish(1,7,4,true,true,true))return 1;
- if(state.publish(2,8,4,true,true,true)==91)++rejected;
- if(state.finish(5,success)==116)++rejected;
- if(state.finish(4,[&](uint64_t,uint64_t){++calls;return 88;})!=88 || state.frames())return 1;
- if(state.finish(4,[&](uint64_t,uint64_t){if(state.finish(4,success)!=91)return 112;return 116;})!=116 || state.frames())return 1;
- try{state.finish(4,[](uint64_t,uint64_t)->int{throw 1;});return 1;}catch(int){}
- if(state.finish(4,success) || state.frames()!=1 || calls!=2)return 1;
- if(state.finish(4,success)==62)++rejected;
- if(state.publish(1,9,4,true,true,true)==88)++rejected;
- if(state.publish(2,8,4,true,true,true) || state.finish(4,[](uint64_t count,uint64_t token){return count==2 && token==8?0:88;}) || state.frames()!=2 || rejected!=6)return 1;
- std::cout<<"{\"scope\":\"authored_Gnm_frame_end_transaction\",\"passed\":true,\"negative_rejections\":6,\"provider_failure_atomic\":true,\"reentrant_rejected\":true,\"exception_atomic\":true,\"frames\":2,\"real_GPU_idle\":false,\"guest_success_bound\":false}\n";return 0;
-}
 }

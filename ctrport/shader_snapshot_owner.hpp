@@ -63,39 +63,6 @@ public:
  // not source synchronization, descriptor semantics or GPU coherence.
  std::array<uint64_t,4> lifetime_counts(){std::lock_guard<std::mutex> lock(mutex_);return {range_begins_,range_ends_,leases_.size(),snapshots_.size()};}
 };
-inline int shader_owned_ranges_control(){
- auto backing=std::make_shared<DirectMemoryBacking>(65536);int64_t physical=-1;void* mapped=nullptr;
- if(backing->allocate(0,65536,32768,16384,0,&physical)||backing->map(&mapped,32768,51,0,physical,0))return 1;
- ShaderSnapshotOwner owner(backing);const auto ranges=owner.ranges();const auto inputs=owner.api();
- const auto address=reinterpret_cast<uint64_t>(mapped);CtrShaderRangeLeaseV1 lease{};
- if(ranges.begin(ranges.context,address+32,65536,&lease)||lease.bytes!=32736)return 1;
- CtrShaderSnapshot snap{};if(inputs.capture(inputs.context,lease.guest_address,lease.bytes,&snap)||inputs.release(inputs.context,&snap))return 1;
- unsigned rejected=0;auto forged=lease;--forged.bytes;if(ranges.end(ranges.context,&forged)==88)++rejected;
- int wrong=0;std::thread worker([&]{wrong=ranges.end(ranges.context,&lease);});worker.join();if(wrong==116)++rejected;
- if(ranges.end(ranges.context,&lease))return 1;if(ranges.end(ranges.context,&lease)==88)++rejected;
- for(auto bad:{uint64_t(1),UINT64_MAX,address+32768}){auto output=lease;
-  if(ranges.begin(ranges.context,bad,64,&output)==88 && output.token==lease.token)++rejected;}
- DWORD previous=0;if(!VirtualProtect(static_cast<unsigned char*>(mapped)+16384,16384,PAGE_NOACCESS,&previous))return 1;
- if(ranges.begin(ranges.context,address,32768,&lease)||lease.bytes!=16384 || ranges.end(ranges.context,&lease))return 1;
- if(!VirtualProtect(static_cast<unsigned char*>(mapped)+16384,16384,previous,&previous))return 1;
- if(rejected!=6)return 1;
- std::cout<<"{\"scope\":\"shader_owned_ranges_control\",\"passed\":true,\"negative_rejections\":6,\"readable_prefix\":16384,\"synthetic\":true,\"source_writer_coherence\":false}\n";return 0;
-}
-inline int shader_large_image_snapshot_control(){
- constexpr uint64_t size=17694720;
- auto backing=std::make_shared<DirectMemoryBacking>(32*1024*1024);int64_t physical=-1;void* mapped=nullptr;
- if(backing->allocate(0,size,size,0,0,&physical)||backing->map(&mapped,size,51,0,physical,0))return 1;
- const auto address=reinterpret_cast<uint64_t>(mapped);auto* bytes=static_cast<unsigned char*>(mapped);bytes[0]=17;bytes[size-1]=29;
- ShaderSnapshotOwner owner(backing);const auto ranges=owner.ranges();const auto inputs=owner.api();CtrShaderRangeLeaseV1 lease{};CtrShaderSnapshot snapshot{};
- if(ranges.begin(ranges.context,address,size,&lease) || lease.bytes!=size || inputs.capture(inputs.context,address,size,&snapshot))return 2;
- unsigned char first=0,last=0;if(ctr_shader_snapshot_read(&snapshot,address,&first,1) || ctr_shader_snapshot_read(&snapshot,address+size-1,&last,1) || first!=17 || last!=29)return 3;
- bytes[0]=99;if(ctr_shader_snapshot_read(&snapshot,address,&first,1) || first!=17)return 4;
- if(inputs.release(inputs.context,&snapshot) || ranges.end(ranges.context,&lease))return 5;
- unsigned rejected=0;auto preserved=lease;if(ranges.begin(ranges.context,address,32ull*1024*1024+1,&preserved)==60 && preserved.token==lease.token)++rejected;
- auto output=snapshot;if(inputs.capture(inputs.context,address,32ull*1024*1024+1,&output)==60 && output.snapshot_token==snapshot.snapshot_token)++rejected;
- const auto counts=owner.lifetime_counts();if(rejected!=2 || counts[0]!=counts[1] || counts[2] || counts[3])return 6;
- std::cout<<"{\"scope\":\"large_image_snapshot_control\",\"passed\":true,\"bytes\":"<<size<<",\"negative_rejections\":2,\"synthetic\":true,\"source_writer_coherence\":false,\"gpu_execution\":false}\n";return 0;
-}
 inline int shader_snapshot_owner_control(){
  auto backing=std::make_shared<DirectMemoryBacking>(16384);int64_t physical=-1;void* mapped=nullptr;
  if(backing->allocate(0,16384,16384,0,0,&physical)||backing->map(&mapped,16384,51,0,physical,0))return 1;

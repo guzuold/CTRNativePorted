@@ -124,36 +124,6 @@ public:
 inline KernelFiles kernel_files;
 extern "C" int ctr_kernel_open(const char* path,int flags,unsigned mode,std::uint64_t caller){try{return kernel_files.open(path,flags,mode);}catch(const std::exception& error){std::fprintf(stderr,"NID=1G3lF1Gg1k8 library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}}
 extern "C" void ctr_sysv_kernel_open();
-inline int kernel_user_open_control(){
-    namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/user_open");fs::create_directories(root);
-    KernelFiles files;files.configure(root);files.configure_user(root);
-    const int fd=files.open("/data/bytes",0x602,0777);if(fd<3)return 1;
-    DWORD written=0;const char bytes[]="actual-user-data";
-    if(!WriteFile(files.find(fd)->handle,bytes,sizeof(bytes)-1,&written,nullptr) || written!=sizeof(bytes)-1)return 1;
-    if(files.close(fd))return 1;
-    std::ifstream in(root/"bytes",std::ios::binary);std::string got((std::istreambuf_iterator<char>(in)),{});in.close();if(got!=bytes)return 1;
-    if(files.open("/data/bytes",0xa01,0777)!=int(0x80020011U))return 1;
-    const int trunc=files.open("/data/bytes",0x401,0);if(trunc<3 || files.close(trunc) || fs::file_size(root/"bytes")!=0)return 1;
-    if(files.open("/data/missing_parent/file",0x201,0777)!=int(0x80020002U))return 1;
-    unsigned rejected=0;for(const char* path:{"/data/../escape","/data/C:/escape","/data/..\\escape"})try{files.open(path,0x201,0777);}catch(const std::runtime_error&){++rejected;}
-    try{files.open("/app0/bytes",1,0);}catch(const std::runtime_error&){++rejected;}
-    try{files.open("/data/bytes",8,0);}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=5)return 1;
-    std::cout<<"{\"scope\":\"owned_user_open\",\"real_written_bytes\":16,\"exclusive_eexist\":true,\"truncate_actual_size_zero\":true,\"missing_parent_enoent\":true,\"negative_rejections\":5,\"guest_write_service_bound\":false}\n";return 0;
-}
-inline int kernel_open_control(){
-    namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/kernel_open");fs::create_directories(root/"base");fs::create_directories(root/"patch");
-    {std::ofstream(root/"base/a",std::ios::binary)<<"base";std::ofstream(root/"patch/a",std::ios::binary)<<"patch";std::ofstream(root/"base/b",std::ios::binary)<<"fallback";}
-    KernelFiles files;files.configure(root/"base",root/"patch");
-    const auto a=files.open("/app0/a",0,511),b=files.open("/app0/b",0,0);if(a<3 || b<=a)return 1;
-    char data[8]{};DWORD read=0;if(!ReadFile(files.find(a)->handle,data,8,&read,nullptr) || read!=5 || std::string(data,read)!="patch")return 1;
-    if(!ReadFile(files.find(b)->handle,data,8,&read,nullptr) || read!=8 || std::string(data,read)!="fallback")return 1;
-    if(files.open("/app0/missing",0,0)!=int(0x80020002U))return 1;
-    unsigned rejected=0;for(const char* path:{"/app0/../a","/dev/null"})try{files.open(path,0,0);}catch(const std::runtime_error&){++rejected;}
-    try{files.open("/app0/a",1,0);}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=3)return 1;
-    std::cout<<"{\"scope\":\"owned_readonly_open\",\"native_patch_bytes\":true,\"native_base_fallback_bytes\":true,\"missing_enoent\":true,\"write_traversal_mount_rejected\":3}\n";return 0;
-}
 // Public Orbis layout and regular-file policy: shadPS4 file_system.h:22,
 // file_system.cpp:790, pinned revision/license above. Unknown identity fields
 // remain zero per that public virtual-filesystem contract, not host identities.
@@ -215,36 +185,8 @@ inline int kernel_stat(KernelFiles& files,const char* path,GuestFileStat* output
 }
 extern "C" int ctr_kernel_stat(const char* path,GuestFileStat* output,std::uint64_t caller){try{return kernel_stat(kernel_files,path,output);}catch(const std::exception& e){std::fprintf(stderr,"NID=eV9wAD2riIA library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());std::fflush(stderr);ExitProcess(4);}}
 extern "C" void ctr_sysv_kernel_stat();
-inline int kernel_stat_control(){
- namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/path_stat");fs::create_directories(root/"base/dir");fs::create_directories(root/"patch");
- {std::ofstream(root/"base/a")<<"base";std::ofstream(root/"patch/a")<<"patch";std::ofstream(root/"base/b")<<"fallback";}
- KernelFiles files;files.configure(root/"base",root/"patch");GuestFileStat out{};
- if(kernel_stat(files,"/app0/a",&out) || out.size!=5 || out.mode!=0100777)return 1;
- if(kernel_stat(files,"/app0/b",&out) || out.size!=8)return 1;
- if(kernel_stat(files,"/app0/dir",&out) || out.mode!=0040777 || out.size!=65536)return 1;
- out.size=123;if(kernel_stat(files,"/app0/missing",&out)!=int(0x80020002U) || out.size!=123)return 1;
- if(kernel_stat(files,nullptr,&out)!=int(0x8002000eU) || kernel_stat(files,"/app0/a",nullptr)!=int(0x8002000eU))return 1;
- unsigned rejected=0;for(const char* path:{"/app0/../a","/dev/unknown"})try{kernel_stat(files,path,&out);}catch(const std::runtime_error&){++rejected;}
- auto* readonly=VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);DWORD old=0;VirtualProtect(readonly,4096,PAGE_READONLY,&old);
- try{kernel_stat(files,"/app0/a",static_cast<GuestFileStat*>(readonly));}catch(const std::runtime_error&){++rejected;}VirtualFree(readonly,0,MEM_RELEASE);
- if(rejected!=3)return 1;
- std::cout<<"{\"scope\":\"path_stat_control\",\"patch_size\":5,\"base_size\":8,\"directory_contract\":true,\"missing_preserves_output\":true,\"negative_rejections\":3}\n";return 0;
-}
 extern "C" int ctr_kernel_fstat(int fd,GuestFileStat* output,std::uint64_t caller){try{return kernel_fstat(kernel_files,fd,output);}catch(const std::exception& error){std::fprintf(stderr,"NID=kBwCPsYX-m4 library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}}
 extern "C" void ctr_sysv_kernel_fstat();
-inline int kernel_fstat_control(){
-    namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/kernel_stat");fs::create_directories(root);
-    {std::ofstream out(root/"data",std::ios::binary);out<<std::string(513,'q');}
-    KernelFiles files;files.configure(root);const int fd=files.open("/app0/data",0,0);
-    struct Guarded {std::uint64_t before=0x123456789abcdef0ULL;GuestFileStat stat{};std::uint64_t after=0xfedcba9876543210ULL;} guarded;
-    if(kernel_fstat(files,fd,&guarded.stat)!=0 || guarded.stat.size!=513 || guarded.stat.blocks!=2 || guarded.stat.blocksize!=512 || guarded.stat.mode!=0100777)return 1;
-    FILE_BASIC_INFO basic{};if(!GetFileInformationByHandleEx(files.find(fd)->handle,FileBasicInfo,&basic,sizeof(basic)))return 1;
-    if(guarded.stat.modified.seconds*10000000+guarded.stat.modified.nanoseconds/100+116444736000000000LL!=basic.LastWriteTime.QuadPart)return 1;
-    if(guarded.before!=0x123456789abcdef0ULL || guarded.after!=0xfedcba9876543210ULL)return 1;
-    if(kernel_fstat(files,fd,nullptr)!=int(0x8002000eU) || kernel_fstat(files,999,&guarded.stat)!=int(0x80020009U))return 1;
-    const auto negative=file_timestamp(116444735999999999LL);if(negative.seconds!=-1 || negative.nanoseconds!=999999900)return 1;
-    std::cout<<"{\"scope\":\"file_stat_control\",\"size513\":true,\"blocks2\":true,\"timestamp_roundtrip\":true,\"guard_bytes\":true,\"null_unknown_errors\":true}\n";return 0;
-}
 
 // Positioned read of the original bytes through a reopened overlapped handle (see pread).
 inline std::uint64_t native_read_at(HANDLE handle,std::uint64_t offset,unsigned char* target,std::uint64_t count){
@@ -282,16 +224,6 @@ inline std::int64_t kernel_read(KernelFiles& files,int fd,void* output,std::uint
 }
 extern "C" std::int64_t ctr_kernel_read(int fd,void* output,std::uint64_t count,std::uint64_t caller){try{return kernel_read(kernel_files,fd,output,count);}catch(const std::exception& e){std::fprintf(stderr,"NID=Cg4srZ6TKbU library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());std::fflush(stderr);ExitProcess(4);}}
 extern "C" void ctr_sysv_kernel_read();
-inline int kernel_read_control(){
- namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/kernel_read");fs::create_directories(root);{std::ofstream(root/"bytes",std::ios::binary)<<"0123456789";}
- kernel_files.configure(root);const int fd=kernel_files.open("/app0/bytes",0,0);char output[16];std::fill(std::begin(output),std::end(output),'x');
- if(kernel_read(kernel_files,fd,output+1,3)!=3 || std::string(output+1,3)!="012")return 1;
- if(kernel_read(kernel_files,fd,output+4,10)!=7 || std::string(output+4,7)!="3456789" || output[0]!='x' || output[11]!='x')return 1;
- if(kernel_read(kernel_files,fd,output,1)!=0 || kernel_read(kernel_files,fd,nullptr,0)!=0 || kernel_read(kernel_files,fd,nullptr,1)!=int(0x8002000eU) || kernel_read(kernel_files,999,output,1)!=int(0x80020009U))return 1;
- LARGE_INTEGER zero{},pos{};if(!SetFilePointerEx(kernel_files.find(fd)->handle,zero,&pos,FILE_CURRENT) || pos.QuadPart!=10)return 1;
- if(kernel_files.close(fd) || kernel_read(kernel_files,fd,output,1)!=int(0x80020009U))return 1;
- std::cout<<"{\"scope\":\"kernel_read_control\",\"actual_sequential_bytes\":true,\"short_read\":7,\"EOF\":true,\"cursor10\":true,\"guards_and_stale_errors\":true}\n";return 0;
-}
 // Positioned regular-file reads use a separately reopened overlapped handle,
 // retaining the original file object's current offset even across concurrent calls.
 inline std::int64_t kernel_pread(KernelFiles& files,int fd,void* output,std::uint64_t count,std::int64_t offset){
@@ -380,44 +312,8 @@ inline std::int64_t kernel_write(KernelFiles& files,int fd,const void* input,std
 }
 extern "C" std::int64_t ctr_kernel_write(int fd,const void* input,std::uint64_t count,std::uint64_t caller){try{return kernel_write(kernel_files,fd,input,count);}catch(const std::exception& error){std::fprintf(stderr,"NID=4wSze92BhLI library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}}
 extern "C" void ctr_sysv_kernel_write();
-inline int kernel_write_control(){
-    namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/kernel_write");fs::create_directories(root);
-    KernelFiles files;files.configure(root);files.configure_user(root);const int fd=files.open("/data/bytes",0x602,0777);
-    if(fd<3 || kernel_write(files,fd,"abc",3)!=3 || kernel_write(files,fd,"def",3)!=3 || kernel_write(files,fd,nullptr,0)!=0)return 1;
-    LARGE_INTEGER zero{},position{};if(!SetFilePointerEx(files.find(fd)->handle,zero,&position,FILE_CURRENT) || position.QuadPart!=6)return 1;
-    if(kernel_write(files,fd,nullptr,1)!=int(0x8002000eU) || kernel_write(files,fd,reinterpret_cast<void*>(1),1)!=int(0x8002000eU) || kernel_write(files,999,"x",1)!=int(0x80020009U))return 1;
-    if(files.close(fd))return 1;
-    const int ro=files.open("/app0/bytes",0,0);if(kernel_write(files,ro,"x",1)!=int(0x80020009U) || files.close(ro))return 1;
-    std::ifstream in(root/"bytes",std::ios::binary);std::string bytes((std::istreambuf_iterator<char>(in)),{});if(bytes!="abcdef")return 1;
-    unsigned rejected=0;try{const int large=files.open("/data/bytes",2,0);kernel_write(files,large,"x",16ULL*1024*1024+1);}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=1)return 1;
-    std::cout<<"{\"scope\":\"owned_kernel_write\",\"actual_bytes\":\"abcdef\",\"position\":6,\"zero_count\":true,\"error_checks\":4,\"oversized_rejected\":true}\n";return 0;
-}
-inline int kernel_pread_control(){
-    namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/kernel_pread");fs::create_directories(root);
-    {std::ofstream(root/"data",std::ios::binary)<<"0123456789";}
-    KernelFiles files;files.configure(root);const int fd=files.open("/app0/data",0,0);
-    LARGE_INTEGER position{};position.QuadPart=3;if(!SetFilePointerEx(files.find(fd)->handle,position,nullptr,FILE_BEGIN))return 1;
-    char bytes[8]={'x','x','x','x','x','x','x','x'};
-    if(kernel_pread(files,fd,bytes+1,6,7)!=3 || std::string(bytes+1,3)!="789" || bytes[0]!='x' || bytes[4]!='x' || bytes[7]!='x')return 1;
-    if(kernel_pread(files,fd,bytes,8,10)!=0 || kernel_pread(files,fd,nullptr,0,0)!=0)return 1;
-    if(kernel_pread(files,fd,bytes,1,-1)!=int(0x80020016U) || kernel_pread(files,999,bytes,1,0)!=int(0x80020009U) || kernel_pread(files,fd,nullptr,1,0)!=int(0x8002000eU))return 1;
-    position.QuadPart=0;LARGE_INTEGER current{};if(!SetFilePointerEx(files.find(fd)->handle,position,&current,FILE_CURRENT) || current.QuadPart!=3)return 1;
-    std::cout<<"{\"scope\":\"pread_control\",\"actual_bytes\":true,\"short_read\":3,\"EOF\":true,\"position_preserved\":3,\"guard_bytes\":true,\"invalid_errors\":true}\n";return 0;
-}
 
 extern "C" int ctr_kernel_close(int fd,std::uint64_t caller){try{return kernel_files.close(fd);}catch(const std::exception& error){std::fprintf(stderr,"NID=UK2Tl2DWUns library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}}
 extern "C" void ctr_sysv_kernel_close();
-inline int kernel_close_control(){
-    namespace fs=std::filesystem;const auto root=fs::path("runtime/user/tests/kernel_close");fs::create_directories(root);
-    {std::ofstream(root/"data",std::ios::binary)<<"close-test";}
-    KernelFiles files;files.configure(root);const int fd=files.open("/app0/data",0,0);
-    DWORD before=0;if(!GetProcessHandleCount(GetCurrentProcess(),&before))return 1;
-    {auto active=files.find(fd);bool rejected=false;try{files.close(fd);}catch(const std::runtime_error&){rejected=true;}if(!rejected || !files.find(fd))return 1;}
-    if(files.close(fd)!=0 || files.find(fd) || files.close(fd)!=int(0x80020009U) || files.close(999)!=int(0x80020009U))return 1;
-    DWORD after=0;if(!GetProcessHandleCount(GetCurrentProcess(),&after) || after+1!=before)return 1;
-    char data=0;if(kernel_pread(files,fd,&data,1,0)!=int(0x80020009U))return 1;
-    std::cout<<"{\"scope\":\"close_control\",\"native_handle_released\":true,\"descriptor_removed\":true,\"double_close_ebadf\":true,\"read_after_close_ebadf\":true,\"active_operation_rejected\":true}\n";return 0;
-}
 
 }

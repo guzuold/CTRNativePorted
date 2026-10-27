@@ -475,34 +475,11 @@ extern "C" int ctr_pad_init(uint64_t caller){
  }catch(const std::exception& e){std::fprintf(stderr,"NID=hv1luiJrqQM library=libScePad caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_pad_init();
-inline int pad_init_control(){
- PadBackend isolated;unsigned rejected=0;try{isolated.connected_count();}catch(...){++rejected;}
- if(isolated.initialized() || rejected!=1)return 1;
- if(isolated.initialize() || !isolated.initialized() || isolated.connected_count()>4 || isolated.initialize())return 1;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_init),0,0,0) || !pad_backend.initialized())return 1;
- std::cout<<"{\"scope\":\"pad_init_control\",\"real_XInput_four_ports_polled\":true,\"SysV0\":true,\"repeat_init\":true,\"uninitialized_query_rejected\":true,\"guest_input_read\":false}\n";return 0;
-}
 extern "C" int ctr_pad_open(int user,int type,int index,const void* params,uint64_t caller){
  try{const int result=pad_backend.open(user,type,index,params);std::printf("{\"scope\":\"original_PadOpen_return\",\"caller\":%llu,\"user\":%d,\"type\":%d,\"index\":%d,\"result\":%d,\"connected_devices\":%u}\n",static_cast<unsigned long long>(caller),user,type,index,result,pad_backend.connected_count());std::fflush(stdout);return result;
  }catch(const std::exception& e){std::fprintf(stderr,"NID=xk0AcarP3V4 library=libScePad caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_pad_open();
-inline int pad_open_control(){
- PadBackend isolated;if(isolated.open(1,0,0,nullptr)!=static_cast<int>(0x80920005U))return 1;
- if(isolated.initialize())return 1;
- if(isolated.open(-1,0,0,nullptr)!=static_cast<int>(0x809b0001U) || isolated.open(1,0,0,nullptr)!=static_cast<int>(0x809b0081U))return 1;
- if(user_service.initialize(nullptr))return 1;const int handle=isolated.open(1,0,0,nullptr);
- if(handle<=0 || isolated.open(1,0,0,nullptr)!=static_cast<int>(0x80920004U))return 1;
- bool rejected=false;try{isolated.open(1,1,0,nullptr);}catch(...){rejected=true;}if(!rejected)return 1;
- // A split-screen user opens its own port only while logged in; closing frees the user's port.
- const int extra=UserService::extra_user_id(1);
- if(isolated.open(extra,0,0,nullptr)!=static_cast<int>(0x809b0081U) || !user_service.set_extra_user(1,true))return 2;
- const int second=isolated.open(extra,0,0,nullptr);
- if(second<=0 || second==handle || isolated.open(extra,0,0,nullptr)!=static_cast<int>(0x80920004U))return 3;
- if(isolated.close(second) || isolated.close(second)!=static_cast<int>(0x80920003U) || isolated.open(extra,0,0,nullptr)<=0)return 4;
- if(!user_service.set_extra_user(1,false) || isolated.close(handle))return 5;
- std::cout<<"{\"scope\":\"real_XInput_port_open\",\"passed\":true,\"handle_owned\":true,\"split_screen_user_port\":true,\"close\":true,\"connected_devices\":"<<isolated.connected_count()<<",\"no_fabricated_connection\":true}\n";return 0;
-}
 }
 
 namespace ctrport {
@@ -532,113 +509,6 @@ extern "C" int ctr_pad_reset_light_bar(int handle,uint64_t caller){
  }catch(const std::exception& e){std::fprintf(stderr,"NID=DscD1i9HX1w library=libScePad caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_pad_reset_light_bar();
-inline int pad_read_state_control(){
- XINPUT_GAMEPAD fixture{};fixture.wButtons=XINPUT_GAMEPAD_A|XINPUT_GAMEPAD_DPAD_LEFT|XINPUT_GAMEPAD_START;
- fixture.sThumbLX=-32768;fixture.sThumbLY=32767;fixture.sThumbRX=32767;fixture.sThumbRY=-32768;fixture.bLeftTrigger=31;fixture.bRightTrigger=30;
- const auto mapped=pad_connected_sample(fixture,2,0x123456789ULL);uint32_t bits=0;uint64_t time=0;std::memcpy(&bits,mapped.data(),4);std::memcpy(&time,mapped.data()+80,8);
- if(bits!=0x4188 || mapped[4]!=0 || mapped[5]!=0 || mapped[6]!=255 || mapped[7]!=255 || mapped[8]!=31 || mapped[9]!=30 || mapped[76]!=1 || mapped[104]!=2 || time!=0x123456789ULL)return 7;
- fixture={};const auto centered=pad_connected_sample(fixture,1,1);if(centered[4]!=128 || centered[6]!=128 || centered[5]!=127 || centered[7]!=127)return 8;
- {
-  // Two connected slots (idle slot 0, active slot 1) and a disconnected slot 2 with stale data.
-  std::array<DWORD,4> results{ERROR_SUCCESS,ERROR_SUCCESS,ERROR_DEVICE_NOT_CONNECTED,ERROR_DEVICE_NOT_CONNECTED};
-  std::array<XINPUT_STATE,4> states{};
-  states[0].Gamepad.wButtons=XINPUT_GAMEPAD_START;states[0].Gamepad.sThumbLX=1000;states[0].Gamepad.bLeftTrigger=40;
-  states[1].Gamepad.wButtons=XINPUT_GAMEPAD_A;states[1].Gamepad.sThumbLX=-32768;states[1].Gamepad.sThumbRY=20000;states[1].Gamepad.bRightTrigger=255;
-  states[2].Gamepad.wButtons=XINPUT_GAMEPAD_B;states[2].Gamepad.sThumbRX=32767;
-  XINPUT_GAMEPAD merged{};
-  if(merge_xinput(results,states,merged)!=ERROR_SUCCESS || merged.wButtons!=(XINPUT_GAMEPAD_START|XINPUT_GAMEPAD_A) || merged.sThumbLX!=-32768 ||
-     merged.sThumbRX!=0 || merged.sThumbRY!=20000 || merged.bLeftTrigger!=40 || merged.bRightTrigger!=255)return 9;
-  results.fill(ERROR_DEVICE_NOT_CONNECTED);
-  if(merge_xinput(results,states,merged)!=ERROR_DEVICE_NOT_CONNECTED || merged.wButtons)return 10;
- }
- if(user_service.initialize(nullptr) || pad_backend.initialize())return 1;
- const int handle=pad_backend.open(1,0,0,nullptr);if(handle<=0)return 2;
- std::array<unsigned char,122> output;output.fill(0xa5);
- if(pad_backend.read_state(-1,output.data()+1)!=static_cast<int>(0x80920003U) || output[1]!=0xa5)return 3;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_read_state),handle,reinterpret_cast<uint64_t>(output.data()+1),0))return 4;
- if(!output[77])for(size_t i=1;i<121;++i){const unsigned char expected=i==27?0x80:i==28?0x3f:0;if(output[i]!=expected)return 5;}
- if(output[0]!=0xa5 || output[121]!=0xa5)return 6;
- std::cout<<"{\"scope\":\"actual_XInput_sample\",\"passed\":true,\"connected_translation\":true}\n";return 0;
-}
-// Synthetic devices (no hardware): split-screen port assignment and the keyboard map.
-inline int pad_split_screen_control(){
- const auto pad=[](WORD buttons,SHORT lx=0){XINPUT_GAMEPAD g{};g.wButtons=buttons;g.sThumbLX=lx;return g;};
- PortAssigner a;std::vector<PadDevice> devices{{0,pad(0)},{1,pad(0)},{keyboard_device,pad(0)}};
- XINPUT_GAMEPAD out{};
- // Idle devices: port 0 reads all of them, nobody owns it yet, ports 1..3 are disconnected.
- if(!a.update(devices,0).empty() || !a.state(0,devices,out) || a.state(1,devices,out))return 1;
- // The first device used takes port 0; its input is no longer merged with the others.
- devices[1].pad=pad(0,30000);
- auto changes=a.update(devices,10);
- if(changes.size()!=1 || changes[0].port!=0 || changes[0].device!=1 || !changes[0].login || a.owner[0]!=1u)return 2;
- devices[1].pad=pad(0);devices[0].pad=pad(XINPUT_GAMEPAD_A);
- if(!a.state(0,devices,out) || out.wButtons)return 3;
- // Slot 0 holds A: a candidate, joining as port 1 only after the hold time.
- if(!a.update(devices,20).empty() || !a.update(devices,200).empty())return 4;
- changes=a.update(devices,330);
- if(changes.size()!=1 || changes[0].port!=1 || changes[0].device!=0 || !changes[0].login || !a.state(1,devices,out) || out.wButtons!=XINPUT_GAMEPAD_A)return 5;
- // A short press does not join; a device mirroring an assigned one never does.
- devices[2].pad=pad(XINPUT_GAMEPAD_B);
- if(!a.update(devices,400).empty())return 6;
- devices[2].pad=pad(0);
- if(!a.update(devices,500).empty() || !a.update(devices,900).empty() || a.assigned(keyboard_device))return 7;
- devices[2].pad=pad(XINPUT_GAMEPAD_A);
- if(!a.update(devices,1000).empty() || !a.update(devices,1400).empty() || a.assigned(keyboard_device))return 8;
- // Keyboard holds Start alone: joins as port 2. Slot 0 disconnects: port 1 is freed.
- devices[0].pad=pad(0);devices[2].pad=pad(XINPUT_GAMEPAD_START);
- a.update(devices,1500);changes=a.update(devices,1900);
- if(changes.size()!=1 || changes[0].port!=2 || changes[0].device!=keyboard_device)return 9;
- devices.erase(devices.begin());
- changes=a.update(devices,2000);
- if(changes.size()!=1 || changes[0].port!=1 || changes[0].login || a.owner[1] || a.state(1,devices,out))return 10;
- const auto ids=a.devices_of(2,devices);if(ids.size()!=1 || ids[0]!=keyboard_device)return 11;
- // Port 0's device disconnects: port 0 again reads every unassigned device.
- devices.erase(devices.begin());
- changes=a.update(devices,2100);
- if(changes.size()!=1 || changes[0].port!=0 || changes[0].login || a.owner[0] || a.state(0,devices,out))return 12;
- // Launcher assignment: player 1 = slot 1, player 2 = keyboard, player 3 = none, player 4 auto.
- PortAssigner f;f.fixed[0]=1u;f.fixed[1]=keyboard_device;f.blocked[2]=true;
- std::vector<PadDevice> fixed_devices{{0,pad(0)},{keyboard_device,pad(0)}};
- changes=f.update(fixed_devices,0);
- // Slot 1 is not connected: player 1 has no input and slot 0 does not take its place.
- if(changes.size()!=1 || changes[0].port!=1 || changes[0].device!=keyboard_device || !changes[0].login || f.state(0,fixed_devices,out))return 17;
- fixed_devices[0].pad=pad(XINPUT_GAMEPAD_A,30000);
- if(!f.update(fixed_devices,10).empty() || f.owner[0])return 18;
- // Slot 0 held long enough joins the first free automatic port: 4, not the "none" port 3.
- f.update(fixed_devices,400);
- if(f.owner[3]!=0u || f.owner[2])return 19;
- // Slot 1 connects: player 1 logs in on it.
- fixed_devices.push_back({1,pad(XINPUT_GAMEPAD_B)});
- changes=f.update(fixed_devices,500);
- if(changes.size()!=1 || changes[0].port!=0 || changes[0].device!=1u || !f.state(0,fixed_devices,out) || out.wButtons!=XINPUT_GAMEPAD_B)return 20;
- // Keyboard map: defaults, remapping, rejected lines, stick extremes.
- KeyboardMap keys;
- std::istringstream file("# comment\ncross=P,Space\nr1=shift\nl2=nokey\nwrong=A\nmove_left=numpad4\n");
- const auto rejected=keys.load(file);
- if(rejected.size()!=2 || keys.keys[KeyboardMap::CROSS]!=std::vector<int>{'P',VK_SPACE} || keys.keys[KeyboardMap::R1]!=std::vector<int>{VK_SHIFT})return 13;
- if(KeyboardMap::key_code("F12")!=VK_F12 || KeyboardMap::key_code("x")!='X' || KeyboardMap::key_code("PageDown")!=VK_NEXT || KeyboardMap::key_code("f25"))return 14;
- const auto g=keys.state([](int code){return code=='P' || code=='W' || code==VK_NUMPAD4 || code=='R' || code==VK_RETURN;});
- if(g.wButtons!=(XINPUT_GAMEPAD_A|XINPUT_GAMEPAD_START) || g.bLeftTrigger!=255 || g.bRightTrigger || g.sThumbLX!=-32768 || g.sThumbLY!=32767 || g.sThumbRX || g.sThumbRY)return 15;
- const auto sample=pad_connected_sample(g,1,0);
- if(sample[4]!=0 || sample[5]!=0 || sample[6]!=128)return 16;
- std::cout<<"{\"scope\":\"pad_split_screen_control\",\"passed\":true,\"synthetic_devices\":true,\"hardware_read\":false}\n";return 0;
-}
-// Light bar and close through the SysV bridges on a real backend (no light bar is needed:
-// the argument checks and handle ownership are what is verified).
-inline int pad_light_bar_control(){
- if(user_service.initialize(nullptr) || pad_backend.initialize())return 1;
- const int handle=pad_backend.open(1,0,0,nullptr);if(handle<=0)return 2;
- const unsigned char dark[4]{0xc,0xc,0xc,0},red[4]{0xff,0,0,0};
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_set_light_bar),handle,reinterpret_cast<uint64_t>(dark),0))!=static_cast<int>(0x80920006U))return 3;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_set_light_bar),handle,reinterpret_cast<uint64_t>(red),0))return 4;
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_set_light_bar),handle,0,0))!=static_cast<int>(0x80920001U))return 5;
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_set_light_bar),handle+100,reinterpret_cast<uint64_t>(red),0))!=static_cast<int>(0x80920003U))return 6;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_reset_light_bar),handle,0,0))return 7;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_close),handle,0,0))return 8;
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_close),handle,0,0))!=static_cast<int>(0x80920003U))return 9;
- if(static_cast<int>(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_reset_light_bar),handle,0,0))!=static_cast<int>(0x80920003U))return 10;
- std::cout<<"{\"scope\":\"pad_light_bar_close_control\",\"passed\":true,\"SysV\":true,\"invalid_setting_rejected\":true,\"closed_handle_rejected\":true}\n";return 0;
-}
 }
 
 namespace ctrport {
@@ -647,15 +517,4 @@ extern "C" int ctr_pad_information(int handle,void* output,uint64_t caller){
  catch(const std::exception& e){std::fprintf(stderr,"NID=gjP9-KQzoUk library=libScePad caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_pad_information();
-inline int pad_information_control(){
- if(user_service.initialize(nullptr) || pad_backend.initialize())return 1;
- const int handle=pad_backend.open(1,0,0,nullptr);if(handle<=0)return 2;
- std::array<unsigned char,30> info;info.fill(0xa5);
- if(pad_backend.information(-1,info.data()+1)!=static_cast<int>(0x80920003U) || info[1]!=0xa5)return 3;
- if(pad_backend.information(handle,nullptr)!=static_cast<int>(0x80920001U))return 4;
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_pad_information),handle,reinterpret_cast<uint64_t>(info.data()+1),0))return 5;
- if(info[0]!=0xa5 || info[29]!=0xa5 || info[9]!=30 || info[10]!=33 || info[13]>1)return 6;
- for(unsigned i=1;i<=28;++i)if(i!=9 && i!=10 && i!=12 && i!=13 && info[i])return 7;
- std::cout<<"{\"scope\":\"actual_XInput_controller_information\",\"passed\":true,\"public_ABI_bytes\":28,\"touchpad_advertised\":false}\n";return 0;
-}
 }

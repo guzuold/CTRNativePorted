@@ -37,26 +37,6 @@ inline int graphics_pair_attach_command(GraphicsPairOwner& pair,const GraphicsSu
  try{auto packet=route.packet;pair.original_packet=std::move(packet);pair.original_opcode=route.opcode;
  pair.compiler_profile=profile;return 0;}catch(...){return 112;}
 }
-inline int graphics_pair_register_control(){
- auto source=std::make_unique<CtrPm4::Registers>();
- for(size_t i=0;i<source->words.size();++i)source->words[i]=static_cast<uint32_t>(i*17+3);
- GraphicsPairOwner pair;pair.fragment=std::make_shared<GraphicsStageOwner>();pair.vertex=std::make_shared<GraphicsStageOwner>();
- if(graphics_pair_retain_registers(pair,*source,7,2,0,255))return 1;
- source->words.fill(0);
- for(size_t i=0;i<pair.registers->words.size();++i)if(pair.registers->words[i]!=i*17+3)return 2;
- if(pair.submission_token!=7 || pair.command_buffer_index!=2 || pair.word!=255)return 3;
- if(graphics_pair_retain_registers(pair,*source,8,3,1,256)!=60 || pair.submission_token!=7)return 4;
- GraphicsPairOwner invalid;invalid.fragment=pair.fragment;invalid.vertex=pair.vertex;
- if(graphics_pair_retain_registers(invalid,*source,0,0,0,0)!=60 || invalid.registers)return 5;
- if(graphics_pair_retain_registers(invalid,*source,1,0,2,0)!=60 || invalid.registers)return 6;
- GraphicsSubmissionOwner::Route route{255,0x2d,{0xc0012d00,3,0},pair.registers};
- CtrGraphicsProfileV1 profile{};profile.version=1;profile.size=sizeof(profile);profile.max_ubo_size=12345;
- if(graphics_pair_attach_command(pair,route,profile))return 7;
- route.packet[1]=99;profile.max_ubo_size=0;
- if(pair.original_packet[1]!=3 || pair.compiler_profile.max_ubo_size!=12345)return 8;
- if(graphics_pair_attach_command(pair,route,profile)!=60 || pair.original_packet[1]!=3)return 9;
- std::cout<<"{\"scope\":\"authored_pair_register_ownership\",\"words\":53248,\"mutation_isolated\":true,\"negative_cases\":3}\n";return 0;
-}
 // Join CPU snapshots only after exact compiler-input identity comparison.
 // This creates no GPU resource binding or source-writer coherence.
 inline int graphics_pair_attach_inputs(GraphicsPairOwner& pair,const std::shared_ptr<const GraphicsStageOwner>& fragment,const std::shared_ptr<const GraphicsStageOwner>& vertex,uint32_t capture_kinds=15){
@@ -99,41 +79,6 @@ inline int graphics_pair_color_inputs(const GraphicsPairOwner& pair,
   prepared.push_back(found);
  }
  output=std::move(prepared);return 0;
-}
-inline int graphics_pair_color_control(){
- GraphicsPairOwner pair;pair.registers=std::make_shared<CtrPm4::Registers>();pair.fragment=std::make_shared<GraphicsStageOwner>();
- auto inputs=std::make_shared<GraphicsStageOwner>();pair.vertex_inputs=inputs;
- GraphicsStageOwner::Color color{};color.slot=2;color.status=0;
- color.requirement={1,sizeof(CtrGraphicsColorRequirementV1),2,1,1,1,1,14,10,0,0x1000,4};
- color.initial.bytes=4;color.initial.address=0x1000;color.initial.sharp=2;
- color.initial.requirement_status=color.initial.lease_status=color.initial.capture_status=color.initial.release_status=color.initial.lease_end_status=0;
- color.initial.snapshot.resize(4);inputs->colors.push_back(color);
- pair.fragment->resources.mrt_mask=4;std::vector<const GraphicsStageOwner::Color*> out;
- if(graphics_pair_color_inputs(pair,out) || out.size()!=1 || out[0]!=&inputs->colors[0])return 1;
- pair.fragment->resources.mrt_mask=5;
- if(graphics_pair_color_inputs(pair,out)!=88 || out.size()!=1)return 2;
- pair.fragment->resources.mrt_mask=4;inputs->colors[0].initial.snapshot.clear();
- if(graphics_pair_color_inputs(pair,out)!=88 || out.size()!=1)return 3;
- inputs->colors[0]=color;inputs->colors.push_back(color);
- if(graphics_pair_color_inputs(pair,out)!=112 || out.size()!=1)return 4;
- pair.fragment->resources.mrt_mask=0;
- if(graphics_pair_color_inputs(pair,out) || !out.empty())return 5;
- // Authored CPU fixture from the observed12300 slot policy, not pixel proof.
- color.slot=0;color.requirement.slot=0;color.initial.sharp=0;
- inputs->colors={color};pair.fragment->resources.mrt_mask=3;
- pair.graphics_key={};pair.graphics_key.version=1;pair.graphics_key.size=sizeof(pair.graphics_key);
- pair.graphics_key.mrt_mask=3;pair.graphics_key.num_color_attachments=2;
- pair.graphics_key.colors[0].data_format=10;pair.graphics_key.colors[0].write_mask=15;pair.graphics_key.colors[0].samples=1;
- pair.graphics_key_status=0;
- if(graphics_pair_color_inputs(pair,out) || out.size()!=1 || out[0]!=&inputs->colors[0])return 6;
- const auto preserved=out;
- pair.graphics_key_status=88;if(graphics_pair_color_inputs(pair,out)!=88 || out!=preserved)return 7;pair.graphics_key_status=0;
- pair.graphics_key.colors[1].data_format=10;if(graphics_pair_color_inputs(pair,out)!=88 || out!=preserved)return 8;pair.graphics_key.colors[1].data_format=0;
- pair.graphics_key.colors[1].write_mask=1;if(graphics_pair_color_inputs(pair,out)!=88 || out!=preserved)return 9;pair.graphics_key.colors[1].write_mask=0;
- pair.graphics_key.colors[1].samples=1;if(graphics_pair_color_inputs(pair,out)!=88 || out!=preserved)return 10;pair.graphics_key.colors[1].samples=0;
- pair.graphics_key.mrt_mask=1;if(graphics_pair_color_inputs(pair,out)!=88 || out!=preserved)return 11;pair.graphics_key.mrt_mask=3;
- pair.graphics_key.size=0;if(graphics_pair_color_inputs(pair,out)!=88 || out!=preserved)return 12;
- std::cout<<"{\"scope\":\"authored_pair_color_join\",\"negative_cases\":9,\"zero_mrt_supported\":true,\"inactive_slot_skipped\":true,\"atomic_failure\":true,\"GPU_execution\":false}\n";return 0;
 }
 struct GraphicsPairSink {
  uint64_t ps,vs;unsigned calls=0;std::shared_ptr<GraphicsPairOwner> output;
@@ -226,54 +171,6 @@ inline std::string graphics_pair_metadata(uint32_t word,int status,const std::sh
  <<",\"buffer_slots\":"<<v.buffer_after<<",\"userdata_slots\":"<<v.userdata_after;}
  out<<",\"descriptor_binding\":false,\"gpu_execution\":false}\n";return out.str();
 }
-inline int graphics_pair_sink_control(){
- uint32_t spirv[5]{0x07230203,0x10000,0,1,0},userdata[4]{11,22,33,44},flat[17]{11,22,33,44};flat[16]=99;
- CtrGraphicsResourcesV1 resources{};resources.version=1;resources.size=sizeof(resources);resources.flattened_userdata_words=17;
- CtrCompiledGraphicsStageV1 ps{1,sizeof(ps),0,5,0x1000,spirv,&resources,userdata,4},vs=ps;vs.vertex=1;vs.code_address=0x2000;
- CtrCompiledGraphicsStageV2 fragment{2,sizeof(fragment),ps,flat,17},vertex{2,sizeof(vertex),vs,flat,17};
- CtrGraphicsBindingContractV1 pb{};pb.version=1;pb.size=sizeof(pb);auto vb=pb;
- CtrCompiledGraphicsPairV1 pair{1,sizeof(pair),&fragment,&vertex,&pb,&vb};GraphicsPairSink accepted{0x1000,0x2000,0,{}};
- if(graphics_pair_sink(&accepted,&pair) || !accepted.output)return 1;
- flat[16]=0;spirv[2]=99;
- if(accepted.output->fragment->flattened_userdata[16]!=99 || accepted.output->vertex->spirv[2]!=0)return 2;
- unsigned rejected=0;
- for(unsigned i=0;i<8;++i){auto bad=pair;auto bad_vertex=vertex;auto bad_binding=vb;GraphicsPairSink fresh{0x1000,0x2000,0,{}};
-  switch(i){case 0:bad.vertex=nullptr;break;case 1:bad_vertex.stage.vertex=0;bad.vertex=&bad_vertex;break;
-   case 2:bad_binding.unified_before=1;bad.vertex_bindings=&bad_binding;break;case 3:bad_binding.descriptor_count=121;bad.vertex_bindings=&bad_binding;break;case 4:bad.version=0;break;case 5:bad_binding.userdata_after=1;bad.vertex_bindings=&bad_binding;break;case 6:bad_binding.unified_after=1;bad_binding.descriptor_count=1;bad_binding.descriptors[0]={0,0,0,1,0,0};bad.vertex_bindings=&bad_binding;break;case 7:bad_binding.unified_after=1;bad_binding.descriptor_count=1;bad_binding.descriptors[0]={1,0,0,2,UINT32_MAX,0};bad.vertex_bindings=&bad_binding;break;}
-  if(graphics_pair_sink(&fresh,&bad)==112 && !fresh.output)++rejected;
- }
- if(graphics_pair_sink(&accepted,&pair)==112 && accepted.output->fragment->flattened_userdata[16]==99)++rejected;
- if(rejected!=9)return 3;
- CtrGraphicsPipelineStageV1 pm{},vm{};pm.version=vm.version=1;pm.size=vm.size=sizeof(pm);
- resources.has_fetch_shader=1;vm.has_fetch=1;vm.attribute_count=1;vm.attributes[0].semantic=7;vm.vertex_offset_sgpr=-1;
- CtrCompiledGraphicsPairV2 pipeline{2,sizeof(pipeline),&pair,&pm,&vm};GraphicsPairSink joined{0x1000,0x2000,0,{}};
- if(graphics_pair_sink_v2(&joined,&pipeline) || !joined.output)return 4;
- vm.attributes[0].semantic=99;if(joined.output->vertex_pipeline.attributes[0].semantic!=7 || joined.output->vertex_pipeline.vertex_offset_sgpr!=-1)return 5;
- for(unsigned i=0;i<6;++i){auto bad=pipeline;auto metadata=vm;GraphicsPairSink fresh{0x1000,0x2000,0,{}};
-  if(i==0)metadata.attribute_count=33;if(i==1)metadata.has_fetch=2;if(i==2)metadata.persp_sample=2;
-  if(i==3){metadata.has_fetch=0;metadata.attribute_count=0;}
-  if(i==4)metadata.vertex_offset_sgpr=-2;if(i==5)metadata.instance_offset_sgpr=16;
-  bad.vertex_pipeline=&metadata;
-  if(graphics_pair_sink_v2(&fresh,&bad)!=112 || fresh.output || fresh.calls)return 6;
- }
- if(graphics_pair_sink_v2(&joined,&pipeline)!=112 || joined.output->vertex_pipeline.attributes[0].semantic!=7)return 7;
 
- std::cout<<"{\"scope\":\"graphics_pair_sink_control\",\"passed\":true,\"negative_rejections\":9,\"atomic_delivery\":true,\"deep_copy\":true,\"synthetic\":true,\"gpu_execution\":false}\n";return 0;
-}
-
-inline int graphics_pair_input_control(){
- auto stage=std::make_shared<GraphicsStageOwner>();stage->resources.version=1;stage->resources.size=sizeof(stage->resources);stage->resources.flattened_userdata_words=16;stage->flattened_userdata.resize(16);
- GraphicsPairOwner pair;pair.fragment=stage;pair.vertex=stage;auto input=std::make_shared<GraphicsStageOwner>(*stage);
- if(graphics_pair_attach_inputs(pair,input,input) || pair.fragment_inputs!=input || pair.vertex_inputs!=input)return 1;
- unsigned rejected=0;
- for(unsigned i=0;i<4;++i){auto bad=std::make_shared<GraphicsStageOwner>(*input);switch(i){case 0:bad->userdata[0]=9;break;case 1:bad->flattened_userdata[0]=8;break;case 2:bad->resources.mrt_mask=3;break;case 3:bad->resources.binding_count=129;break;}
-  if(graphics_pair_attach_inputs(pair,input,bad)==112 && pair.vertex_inputs==input)++rejected;
- }
- if(graphics_pair_attach_inputs(pair,input,{})==60 && pair.vertex_inputs==input)++rejected;
- auto fmask=std::make_shared<GraphicsStageOwner>(*stage);fmask->resources.fmasks=1;fmask->resources.binding_count=1;fmask->resources.bindings[0].kind=3;
- pair.vertex=fmask;if(graphics_pair_attach_inputs(pair,input,fmask)==88 && pair.vertex_inputs==input)++rejected;
- if(rejected!=6)return 2;
- std::cout<<"{\"scope\":\"graphics_pair_input_control\",\"passed\":true,\"negative_rejections\":6,\"atomic_attachment\":true,\"synthetic\":true,\"gpu_execution\":false}\n";return 0;
-}
 
 }

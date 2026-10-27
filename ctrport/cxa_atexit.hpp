@@ -31,14 +31,4 @@ extern "C" void ctr_sysv_cxa_finalize();
 extern "C" void ctr_sysv_cxa_destructor_control();
 inline std::vector<uint64_t> cxa_destructor_observations;
 extern "C" void ctr_cxa_destructor_observe(uint64_t argument){cxa_destructor_observations.push_back(argument);}
-inline int cxa_atexit_control(){
- auto* callback=reinterpret_cast<void*>(&ctr_sysv_cxa_destructor_control);auto* dsoA=reinterpret_cast<void*>(1);auto* dsoB=reinterpret_cast<void*>(2);
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_cxa_atexit),reinterpret_cast<uint64_t>(callback),11,1) || cxa_destructors.add(callback,22,dsoB) || cxa_destructors.add(callback,33,dsoA))return 1;
- ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_cxa_finalize),1,0);
- if(cxa_destructor_observations!=std::vector<uint64_t>{33,11})return 2;
- cxa_destructors.finalize(dsoA);if(cxa_destructor_observations.size()!=2)return 3;
- cxa_destructors.finalize(nullptr);if(cxa_destructor_observations!=std::vector<uint64_t>{33,11,22})return 4;
- cxa_destructors.finalize(nullptr);bool invalid=false;try{cxa_destructors.add(nullptr,0,nullptr);}catch(...){invalid=true;}if(!invalid || cxa_destructor_observations.size()!=3)return 5;
- std::cout<<"{\"scope\":\"cxa_atexit_control\",\"passed\":true,\"actual_SysV_callback\":true,\"reverse_DSO_order\":true,\"exactly_once\":true,\"null_finalizes_all\":true,\"invalid_callback_rejected\":true}\n";return 0;
-}
 }

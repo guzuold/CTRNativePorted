@@ -16,27 +16,4 @@ inline int prepare_dma(const uint32_t* packet,size_t words,GnmDmaRequest& output
  output=prepared;return 0;
 }
 using GnmDmaProvider=int(*)(void*,const GnmDmaRequest&);
-inline int complete_dma(const uint32_t* packet,size_t words,GnmDmaProvider provider,void* context){
- GnmDmaRequest request;const int status=prepare_dma(packet,words,request);if(status)return status;
- if(!provider)return 88;
- try{return provider(context,request);}catch(...){return 112;}
-}
-inline int gnm_dma_request_control(){
- uint32_t packet[]={0xc0055000,0xc0100000,0x11223344,0x10,0x80,0,64};GnmDmaRequest request;
- if(prepare_dma(packet,7,request) || request.control!=0xc0100000 || request.source_kind!=2 || request.destination_kind!=1 || request.bytes!=64 || request.data!=0x11223344 || request.source!=0x1011223344ull || request.destination!=128)return 1;
- if(complete_dma(packet,7,nullptr,nullptr)!=88)return 2;
- struct State{unsigned calls=0;int result=88;};State state;
- auto provider=+[](void* raw,const GnmDmaRequest& r)->int{auto& s=*static_cast<State*>(raw);++s.calls;return r.data==0x11223344 && r.bytes==64?s.result:112;};
- GnmCommandCursor cursor;if(cursor.capture(1,0,0,packet,7))return 3;
- auto execute=[&](uint64_t,uint32_t,uint32_t,const CtrPm4::Packet& p,const uint32_t* data){return complete_dma(data,p.words,provider,&state);};
- if(cursor.resume(execute)!=88 || cursor.completed() || state.calls!=1)return 4;
- state.result=90;if(cursor.resume(execute)!=90 || cursor.completed() || state.calls!=2)return 5;
- state.result=0;if(cursor.resume(execute) || cursor.completed()!=1 || state.calls!=3)return 6;
- packet[0]|=1;if(complete_dma(packet,7,provider,&state)!=88 || state.calls!=3)return 7;packet[0]&=~1u;
- if(complete_dma(packet,6,provider,&state)!=60 || state.calls!=3)return 8;
- packet[1]=(packet[1]&~0x300000u)|0x200000u;if(complete_dma(packet,7,provider,&state)!=88 || state.calls!=3)return 9;
- auto throwing=+[](void*,const GnmDmaRequest&)->int{throw 1;};packet[1]=0xc0100000;
- if(complete_dma(packet,7,throwing,nullptr)!=112)return 10;
- std::cout<<"{\"scope\":\"gnm_dma_request_control\",\"passed\":true,\"all_raw_fields_preserved\":true,\"pending_error_keeps_cursor\":true,\"GDS_not_stubbed\":true,\"synthetic_provider_only\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

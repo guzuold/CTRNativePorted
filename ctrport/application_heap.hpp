@@ -28,18 +28,4 @@ public:
 inline ApplicationHeap application_heap;
 extern "C" void ctr_sysv_heap_malloc_control();
 extern "C" void ctr_sysv_heap_free_control();
-inline int application_heap_control() {
-    ApplicationHeap state;unsigned rejected=0;
-    try {state.allocate(16);} catch(const std::runtime_error&) {++rejected;}
-    try {state.set(reinterpret_cast<void*>(1));} catch(const std::runtime_error&) {++rejected;}
-    std::array<void*,10> table{};table[0]=reinterpret_cast<void*>(&ctr_sysv_heap_malloc_control);table[1]=reinterpret_cast<void*>(&ctr_sysv_heap_free_control);
-    state.set(table.data());auto* p=static_cast<unsigned char*>(state.allocate(64));
-    if(!p) throw std::runtime_error("Host fixture allocation failed");
-    p[0]=0x42;p[63]=0x24;if(p[0]!=0x42 || p[63]!=0x24) throw std::runtime_error("Host fixture readback failed");state.release(p);
-    table[0]=nullptr;
-    try {state.allocate(64);} catch(const std::runtime_error&) {++rejected;}
-    if(rejected!=3) throw std::runtime_error("Heap negatives differ");
-    std::cout<<"{\"scope\":\"synthetic_heap_callback_registry\",\"real_host_allocate_free\":true,\"optional_null_slots_accepted\":true,\"live_table_mutation_rejected\":true,\"negative_rejections\":3,\"guest_tls_supported\":false}\n";
-    return 0;
-}
 }

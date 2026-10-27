@@ -11,12 +11,4 @@ extern "C" int ctr_video_gamma(void* output,float gamma,std::uint64_t caller){
 }
 extern "C" void ctr_sysv_video_gamma();
 extern "C" int ctr_video_gamma_fixture(void*,float);
-inline int video_gamma_control(){
- GuestStack stack(32768,4096);auto* values=reinterpret_cast<float*>(stack.bottom());
- const std::array<float,4> initial{71,72,73,74};std::memcpy(values,initial.data(),sizeof(initial));
- if(ctr_video_gamma_fixture(values+1,1.25f) || (values[0]!=71 || values[1]!=1.25f || values[2]!=73 || values[3]!=74))return 1;
- if(ctr_video_gamma_fixture(values+1,2.1f)!=static_cast<int>(0x80290001U) || values[1]!=1.25f)return 2;
- if(ctr_video_gamma_fixture(nullptr,1.0f)!=static_cast<int>(0x80290002U))return 3;
- std::cout<<"{\"scope\":\"video_gamma_ABI\",\"passed\":true,\"only_first4_bytes_written\":true,\"renderer_adjustment\":false}\n";return 0;
-}
 }

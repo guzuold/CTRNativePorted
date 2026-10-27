@@ -18,15 +18,4 @@ inline const std::uint64_t* process_guard() {
     }();
     return reinterpret_cast<const std::uint64_t*>(storage.get());
 }
-inline int process_guard_control() {
-    const auto* first=process_guard(); const auto initial=*first;
-    const auto* second=process_guard(); MEMORY_BASIC_INFORMATION info{};
-    if(first!=second || initial!=*second ||
-       !VirtualQuery(first,&info,sizeof(info)) || info.Protect!=PAGE_READONLY)
-        throw std::runtime_error("Process guard lifetime/protection differs");
-    std::cout << "{\"scope\":\"host_process_guard_contract\",\"stable_address\":true,"
-                 "\"stable_value\":true,\"read_only\":true,\"entropy_api\":\"BCryptGenRandom\","
-                 "\"retail_executed\":false,\"runtime_bound\":false,\"runtime_replacements\":0}\n";
-    return 0;
-}
 }

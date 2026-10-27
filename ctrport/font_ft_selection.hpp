@@ -22,11 +22,4 @@ inline const FontRendererSelection& font_renderer_selection(){
 }
 inline const void* font_select_library(int value){return value==0?font_library_selection().data():nullptr;}
 inline const void* font_select_renderer(int value){return value==0?&font_renderer_selection():nullptr;}
-inline int font_selection_control(){
- if(font_select_library(1) || font_select_library(-1) || font_select_renderer(1) || font_select_renderer(-1))throw std::runtime_error("Font selector invalid variant accepted");
- if(font_select_library(0)!=font_select_library(0) || font_select_renderer(0)!=font_select_renderer(0))throw std::runtime_error("Font selector unstable identity");
- if(font_library_selection()[0] || font_library_selection()[1] || font_renderer_selection().size!=0x168)throw std::runtime_error("Font selector ABI differs");
- if(ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_font_pixel_resolution),0,0,0)!=64)throw std::runtime_error("Font pixel resolution differs");
- std::cout<<"{\"scope\":\"font_ft_selection_control\",\"invalid_variants_rejected\":4,\"pixel_resolution\":64,\"library_bytes\":288,\"renderer_bytes\":32,\"callback_implementations_missing\":true}\n";return 0;
-}
 }

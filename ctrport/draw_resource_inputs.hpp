@@ -41,24 +41,4 @@ inline bool draw_snapshot_disjoint(uint64_t address,uint64_t bytes,const std::ve
  }
  return true;
 }
-inline int draw_resource_inputs_control(){
- const std::vector<std::pair<uint64_t,uint64_t>> writers{{0x2000,32}};
- if(!draw_snapshot_disjoint(0x1000,32,writers) || !draw_snapshot_disjoint(0x2020,32,writers) || draw_snapshot_disjoint(0x201f,2,writers) || draw_snapshot_disjoint(0x1fff,2,writers) || draw_snapshot_disjoint(UINT64_MAX,2,writers) || draw_snapshot_disjoint(0,32,writers))return 20;
- DrawPacketInputs packet;CtrGraphicsKeyV1 key{};key.version=1;key.size=sizeof(key);GraphicsVertexFetchOwner fetch;fetch.status=fetch.format_status=fetch.physical_status=0;fetch.value.count=1;
- fetch.value.inputs[0].binding=2;fetch.value.inputs[0].location=2;fetch.value.inputs[0].buffer_size=32;fetch.formats[0]=37;
- std::vector<LiveVertexBuffer> live{{255,2,2,0,0,0,37,99,32}};DrawResourceInputs output;std::array<uint64_t,8> colors{};
- if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,0,live,output) || output.vertices.size()!=1 || output.vertices[0].token!=99)return 1;
- if(prepare_draw_resources(255,packet,key,fetch,9,false,colors,0,0,live,output)!=88 || output.layout!=9)return 2;
- live.push_back(live[0]);if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,0,live,output)!=60 || output.vertices.size()!=1)return 3;live.pop_back();
- key.z_format=3;if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,0,live,output)!=88)return 4;
- CtrGraphicsDynamicStateV1 dynamic{};dynamic.version=1;dynamic.size=sizeof(dynamic);
- if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,0,live,output,&dynamic) || key.z_format!=3 || output.depth)return 21;
- for(uint32_t* enabled:{&dynamic.depth_test,&dynamic.depth_write,&dynamic.stencil_test}){*enabled=1;if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,0,live,output,&dynamic)!=88)return 22;*enabled=0;}
- dynamic.version=0;if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,0,live,output,&dynamic)!=60)return 23;key.z_format=0;
- packet.indexed=true;if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,0,live,output)!=88)return 5;
- if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,77,live,output) || output.index!=77)return 6;
- fetch.value.count=33;if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,77,live,output)!=60 || output.index!=77 || output.vertices.size()!=1)return 7;
- fetch.value.count=1;fetch.value.inputs[0].guest_address=1;if(prepare_draw_resources(255,packet,key,fetch,9,true,colors,0,77,live,output)!=88 || output.index!=77)return 8;
- std::cout<<"{\"scope\":\"draw_resource_inputs_control\",\"passed\":true,\"missing_dependencies_rejected\":true,\"duplicate_semantics_rejected\":true,\"failure_atomic\":true,\"synthetic\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

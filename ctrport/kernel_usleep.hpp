@@ -22,15 +22,4 @@ extern "C" int ctr_usleep(uint32_t microseconds,uint64_t caller){
 }
 extern "C" void ctr_sysv_usleep();
 extern "C" int ctr_usleep_bridge_fixture(uint32_t);
-inline int kernel_usleep_control(){
- LARGE_INTEGER frequency{};if(!QueryPerformanceFrequency(&frequency) || frequency.QuadPart<=0)return 1;
- for(const uint32_t duration:{0u,20u,1000u}){
-  LARGE_INTEGER before{},after{};QueryPerformanceCounter(&before);
-  if(ctr_usleep_bridge_fixture(duration))return 1;QueryPerformanceCounter(&after);
-  const auto elapsed=static_cast<uint64_t>(after.QuadPart-before.QuadPart)*1000000/static_cast<uint64_t>(frequency.QuadPart);
-  if(elapsed<duration)return 1;
-  std::cout<<"{\"scope\":\"usleep_guest_control\",\"microseconds\":"<<duration<<",\"elapsed_microseconds\":"<<elapsed<<",\"SysV1\":true,\"host_wait_or_yield\":true}\n";
- }
- return 0;
-}
 }

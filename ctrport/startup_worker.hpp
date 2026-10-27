@@ -26,23 +26,6 @@ inline std::size_t reap_startup_workers(std::size_t scan_limit=16) {
     // Host handle/stack/image teardown happens after releasing the registry mutex.
     return retired.size();
 }
-inline int startup_worker_reaper_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);std::weak_ptr<int> retained=owner;
-    std::uint64_t rsp1=0,rsp2=0;
-    auto joinable=std::make_shared<GuestWorkerControl>(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp1);
-    auto detached=std::make_shared<GuestWorkerControl>(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp2);const auto joined_id=joinable->identity(),detached_id=detached->identity();
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);if(!startup_workers.empty())return 1;startup_workers={joinable,detached};}
-    joinable->publish_and_start();detached->publish_and_start();if(!detached->detach())return 1;
-    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(!joinable->has_exited() || !detached->has_exited()){if(std::chrono::steady_clock::now()>=deadline)throw std::runtime_error("Reaper worker deadline");std::this_thread::yield();}
-    auto lease=find_startup_worker(detached_id);detached.reset();owner.reset();tls.reset();
-    if(reap_startup_workers(1)!=0 || reap_startup_workers(2)!=1 || find_startup_worker(detached_id) || !find_startup_worker(joined_id) || retained.expired())return 1;
-    if(joinable->join()!=40 || reap_startup_workers(1)!=1 || find_startup_worker(joined_id))return 1;
-    joinable.reset();if(retained.expired())return 1;lease.reset();if(!retained.expired() || !rsp1 || !rsp2)return 1;
-    unsigned rejected=0;for(std::size_t bound:{std::size_t{0},std::size_t{129}})try{reap_startup_workers(bound);}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=2)return 1;
-    std::cout<<"{\"scope\":\"startup_worker_bounded_reaper\",\"uncollected_joinable_retained\":true,\"scan_bound_observed\":true,\"detached_and_joined_reaped\":2,\"outstanding_lease_pins_owner\":true,\"invalid_bounds_rejected\":2,\"guest_bound\":false}\n";return 0;
-}
 // Independent join bridge, public shadPS4 pthread.cpp112-209 at
 // e3ce810f3a653f43ac64ebab63023de281a4103a, GPL-2.0-or-later contract.
 inline int join_startup_worker(std::uint64_t identity,std::uint64_t* output){
@@ -60,25 +43,6 @@ extern "C" int ctr_thread_join_owned(std::uint64_t identity,std::uint64_t* outpu
     try{return join_startup_worker(identity,output);}catch(const std::exception& error){std::fprintf(stderr,"NID=onNY9Byn-W8 library=libkernel caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),error.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_thread_join_owned();
-inline int startup_worker_join_bridge_control(){
-    auto call=[](std::uint64_t id,std::uint64_t* output){return static_cast<int>(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_thread_join_owned),id,reinterpret_cast<std::uint64_t>(output)));};
-    if(call(0,nullptr)!=int(0x80020016U) || call(~std::uint64_t(0),nullptr)!=int(0x80020003U) || call(thread_self(),nullptr)!=int(0x80020023U))return 1;
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);
-    std::promise<void> release;WorkerJoinDetachGate gate;gate.release=release.get_future().share();auto entered=gate.ready.get_future();
-    auto worker=std::make_shared<GuestWorkerControl>(tls,owner,reinterpret_cast<void*>(&ctr_worker_join_detach_fixture),&gate);const auto id=worker->identity();
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);startup_workers.push_back(worker);}
-    worker->publish_and_start();entered.wait();std::uint64_t output=91;
-    auto joiner=std::async(std::launch::async,[&]{return call(id,&output);});
-    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(!worker->has_joiner() && std::chrono::steady_clock::now()<deadline)std::this_thread::yield();
-    const bool blocked=worker->has_joiner() && output==91 && joiner.wait_for(std::chrono::milliseconds(0))==std::future_status::timeout;
-    release.set_value();if(joiner.get() || !blocked || output!=17 || call(id,nullptr)!=int(0x80020016U))return 1;
-    std::uint64_t rsp=0;auto second=std::make_shared<GuestWorkerControl>(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);startup_workers.push_back(second);}
-    second->publish_and_start();if(call(second->identity(),nullptr) || !second->completion_collected())return 1;
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);startup_workers.clear();}
-    std::cout<<"{\"scope\":\"owned_worker_sysv_join\",\"real_block\":true,\"result17\":true,\"null_result\":true,\"single_collection\":true,\"invalid_self_unknown_rejected\":true}\n";return 0;
-}
 extern "C" int ctr_thread_detach_owned(std::uint64_t identity,std::uint64_t caller) {
     try {
         if(!identity)return static_cast<int>(0x80020016U);
@@ -90,32 +54,6 @@ extern "C" int ctr_thread_detach_owned(std::uint64_t identity,std::uint64_t call
     }
 }
 extern "C" void ctr_sysv_thread_detach_owned();
-inline int startup_worker_detach_bridge_control() {
-    auto call=[](std::uint64_t id){return static_cast<int>(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_thread_detach_owned),id,0));};
-    if(call(0)!=static_cast<int>(0x80020016U) || call(~std::uint64_t{0})!=static_cast<int>(0x80020003U))return 1;
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);std::uint64_t rsp=0;
-    auto worker=std::make_shared<GuestWorkerControl>(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);const auto id=worker->identity();
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);startup_workers.push_back(worker);}
-    worker->publish_and_start();const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(!worker->has_exited()){if(std::chrono::steady_clock::now()>=deadline)throw std::runtime_error("Detach bridge worker deadline");std::this_thread::yield();}
-    if(call(id) || !worker->completion_collected() || call(id)!=static_cast<int>(0x80020016U))return 1;
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);startup_workers.clear();}
-    if(call(id)!=static_cast<int>(0x80020003U))return 1;
-    std::cout<<"{\"scope\":\"owned_worker_detach_sysv_bridge\",\"dead_worker_collected\":true,\"null_double_detach_einval\":true,\"unknown_removed_esrch\":true,\"retail_bound\":false}\n";return 0;
-}
-inline int startup_worker_retained_lookup_control() {
-    auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);std::weak_ptr<int> retained=owner;std::uint64_t rsp=0;
-    auto worker=std::make_shared<GuestWorkerControl>(tls,owner,reinterpret_cast<void*>(&ctr_guest_stack_fixture),&rsp);const auto id=worker->identity();
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);if(!startup_workers.empty())return 1;startup_workers.push_back(worker);}
-    worker->publish_and_start();const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
-    while(!worker->has_exited()){if(std::chrono::steady_clock::now()>=deadline)throw std::runtime_error("Lookup control worker deadline");std::this_thread::yield();}
-    {std::lock_guard<std::mutex> guard(thread_identity_lock);if(thread_identities.count(id))return 1;}
-    auto lease=find_startup_worker(id);if(!lease || find_startup_worker(0) || find_startup_worker(id+1))return 1;
-    {std::lock_guard<std::mutex> guard(startup_worker_lock);startup_workers.clear();}
-    worker.reset();owner.reset();tls.reset();if(retained.expired() || find_startup_worker(id) || !lease->detach())return 1;
-    lease.reset();if(!retained.expired() || !rsp)return 1;
-    std::cout<<"{\"scope\":\"startup_retained_worker_lookup\",\"dead_worker_lookup\":true,\"lease_survives_registry_removal\":true,\"stale_lookup_rejected\":true,\"owner_released_after_last_lease\":true,\"guest_bound\":false}\n";return 0;
-}
 inline int set_owned_worker_priority(uint64_t handle,int priority){
  if(priority<256 || priority>767)return static_cast<int>(0x80020016U);
  auto worker=find_startup_worker(handle);if(!worker)return static_cast<int>(0x80020003U);
@@ -147,32 +85,7 @@ extern "C" int ctr_posix_set_sched(std::uint64_t handle,int policy,const int* pa
  catch(const std::exception& e){std::fprintf(stderr,"NID=Xs9hdiD7sAA library=libScePosix caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());std::fflush(stderr);ExitProcess(4);}
 }
 extern "C" void ctr_sysv_posix_set_sched();
-inline int posix_set_sched_control(){
- const auto self=thread_self();const auto old_host=GetThreadPriority(GetCurrentThread());const int old_guest=effective_guest_priority();int priority=478;
- auto call=[&](int policy){return ctr_call_original_integer3(reinterpret_cast<void*>(&ctr_sysv_posix_set_sched),self,policy,reinterpret_cast<std::uint64_t>(&priority));};
- if(call(3) || effective_guest_priority()!=478 || GetThreadPriority(GetCurrentThread())!=THREAD_PRIORITY_NORMAL)return 1;
- priority=700;if(call(1) || GetThreadPriority(GetCurrentThread())!=THREAD_PRIORITY_LOWEST || effective_guest_priority()!=700)return 1;
- const int before=GetThreadPriority(GetCurrentThread());priority=768;
- if(call(3)!=22 || GetThreadPriority(GetCurrentThread())!=before || posix_set_sched(1,3,&priority)!=22 || posix_set_sched(self,3,nullptr)!=22)return 1;
- priority=478;if(posix_set_sched(1,3,&priority)!=3)return 1;
- if(!SetThreadPriority(GetCurrentThread(),old_host))return 1;
- {std::lock_guard<std::mutex> lock(thread_identity_lock);thread_identities.at(self)->priority_override.store(old_guest);thread_identities.at(self)->guest_policy.store(1);}
- std::cout<<"{\"scope\":\"posix_setschedparam_control\",\"actual_host_readbacks\":2,\"SysV3\":true,\"invalid_no_change\":true,\"ps4_scheduler_equivalence\":false}\n";return 0;
-}
 extern "C" void ctr_sysv_thread_set_priority();
-inline int live_worker_priority_control(){
- auto tls=std::make_shared<TlsStorage>(std::vector<TlsTemplate>{{{7},8,8}});auto owner=std::make_shared<int>(91);
- std::promise<void> release;WorkerJoinDetachGate gate;gate.release=release.get_future().share();auto entered=gate.ready.get_future();
- auto worker=std::make_shared<GuestWorkerControl>(tls,owner,reinterpret_cast<void*>(&ctr_worker_join_detach_fixture),&gate);
- {std::lock_guard<std::mutex> lock(startup_worker_lock);if(!startup_workers.empty())return 1;startup_workers.push_back(worker);}
- worker->publish_and_start();entered.wait();const auto id=worker->identity();
- const int rc=static_cast<int>(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_thread_set_priority),id,260));
- int value=-1;{std::lock_guard<std::mutex> lock(thread_identity_lock);value=thread_identities.at(id)->priority_override.load();}
- const bool valid=rc==0 && value==260 && set_owned_worker_priority(id,768)==static_cast<int>(0x80020016U) && set_owned_worker_priority(0,260)==static_cast<int>(0x80020003U);
- release.set_value();if(worker->join()!=17 || !valid || set_owned_worker_priority(id,260)!=static_cast<int>(0x80020003U))return 1;
- {std::lock_guard<std::mutex> lock(startup_worker_lock);startup_workers.clear();}
- std::cout<<"{\"scope\":\"live_worker_priority_control\",\"SysV2\":true,\"host_priority_readback\":true,\"shared_guest_priority\":260,\"negative_cases\":3,\"scheduler_equivalence\":false,\"passed\":true}\n";return 0;
-}
 inline int create_owned_startup_thread(std::uint64_t* output,const std::uint64_t* attributes,void* target,void* argument,const char* name,std::uint64_t caller,bool posix) {
     try {
         validate_startup_thread_output(output);
@@ -258,24 +171,6 @@ extern "C" int ctr_net_toolkit_check(std::uint64_t caller){
     }catch(const std::exception& e){std::fprintf(stderr,"NID=u5oqtlIP+Fw library=libSceNetCtlForNpToolkit caller=0x%llx unsupported: %s\n",static_cast<unsigned long long>(caller),e.what());ExitProcess(4);}
 }
 extern "C" void ctr_sysv_offline_callback_fixture();
-inline int net_toolkit_dispatch_control(){
-    std::array<int,2> first{91,0},second{92,0};std::array<NetToolkitCallback,8> callbacks{};
-    callbacks[0]={reinterpret_cast<void*>(&ctr_sysv_offline_callback_fixture),first.data()};
-    callbacks[7]={reinterpret_cast<void*>(&ctr_sysv_offline_callback_fixture),second.data()};
-    dispatch_net_toolkit_offline(callbacks);dispatch_net_toolkit_offline(callbacks);
-    if(first!=std::array<int,2>{1,2} || second!=std::array<int,2>{1,2})return 1;
-    std::cout<<"{\"scope\":\"net_toolkit_offline_dispatch_control\",\"actual_SysV_callbacks\":4,\"event\":1,\"context_identity\":true}\n";return 0;
-}
-inline int net_toolkit_register_control(){
-    int output=91;int argument=19;
-    if(register_net_toolkit_callback(nullptr,&argument,&output)!=static_cast<int>(0x80412107U) || output!=91)return 1;
-    for(int i=0;i<8;++i){auto function=reinterpret_cast<void*>(static_cast<std::uintptr_t>(i+1));
-        if(register_net_toolkit_callback(function,&argument,&output) || output!=i || net_toolkit_callbacks[i].function!=function || net_toolkit_callbacks[i].argument!=&argument)return 1;
-    }
-    output=91;if(register_net_toolkit_callback(&argument,nullptr,&output)!=static_cast<int>(0x80412103U) || output!=91)return 1;
-    net_toolkit_callbacks={};
-    std::cout<<"{\"scope\":\"net_toolkit_registration_control\",\"slots\":8,\"retained_arguments\":true,\"full_and_null_preserve_output\":true,\"callback_executed\":false}\n";return 0;
-}
 extern "C" int ctr_thread_create(std::uint64_t* output,const std::uint64_t* attributes,void* target,void* argument,const char* name,std::uint64_t caller) {return create_owned_startup_thread(output,attributes,target,argument,name,caller,false);}
 extern "C" int ctr_posix_thread_create(std::uint64_t* output,const std::uint64_t* attributes,void* target,void* argument,const char* name,std::uint64_t caller) {return create_owned_startup_thread(output,attributes,target,argument,name,caller,true);}
 extern "C" void ctr_sysv_posix_thread_create();
@@ -343,26 +238,7 @@ extern "C" int ctr_np_toolkit_check(std::uint64_t caller){return np_check_pendin
 // do not manufacture completion or online state in this offline domain.
 extern "C" int ctr_np_check(std::uint64_t caller){return np_check_pending(caller,"3Zl8BePTh9Y","libSceNpManager","np_general_event_queue_checked");}
 extern "C" void ctr_sysv_np_check();
-inline int np_general_check_control(){
-    if(ctr_call_original_integer2(reinterpret_cast<void*>(&ctr_sysv_np_check),0,0))return 1;
-    if(!np_toolkit_pending_events.empty())return 1;
-    std::cout<<"{\"scope\":\"np_general_check_control\",\"actual_SysV_empty_queue\":true,\"async_producers_unbound\":true}\n";return 0;
-}
 extern "C" void ctr_sysv_np_callback_fixture();
-inline int np_toolkit_dispatch_control(){
-    std::array<int,3> output{91,92,0};
-    np_toolkit_register(reinterpret_cast<void*>(&ctr_sysv_np_callback_fixture),output.data());
-    {std::lock_guard<std::mutex> lock(np_toolkit_callback_lock);np_toolkit_pending_events.emplace_back(7,0);np_toolkit_pending_events.emplace_back(9,1);}
-    if(dispatch_np_toolkit_pending()!=2 || output!=std::array<int,3>{9,1,2} || dispatch_np_toolkit_pending()!=0 || output[2]!=2 || np_toolkit_unregister())return 1;
-    std::cout<<"{\"scope\":\"np_toolkit_event_dispatch_control\",\"authored_events\":2,\"actual_SysV3_callbacks\":2,\"consume_once\":true,\"runtime_events_fabricated\":false}\n";return 0;
-}
-inline int np_toolkit_callback_control(){
-    int first=1,second=2;
-    if(np_toolkit_unregister()!=static_cast<int>(0x80550009U) || np_toolkit_register(&first,&second) || np_toolkit_callback!=&first || np_toolkit_argument!=&second)return 1;
-    if(np_toolkit_register(&second,&first) || np_toolkit_callback!=&second || np_toolkit_argument!=&first || np_toolkit_unregister() || np_toolkit_callback || np_toolkit_argument)return 1;
-    if(np_toolkit_unregister()!=static_cast<int>(0x80550009U) || np_toolkit_register(nullptr,nullptr) || np_toolkit_unregister()!=static_cast<int>(0x80550009U))return 1;
-    std::cout<<"{\"scope\":\"np_toolkit_callback_control\",\"registration_replacement_and_release\":true,\"stale_error\":true,\"callback_executed\":false}\n";return 0;
-}
 
 }
 

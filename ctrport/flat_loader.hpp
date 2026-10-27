@@ -282,11 +282,4 @@ inline std::size_t apply_tls_module_id(MappedImage& image,const ImageMetadata& m
     }
     return metadata.tls_module_slots.size();
 }
-inline int map_flat(const char* filename) {
-    auto image = load_retail_image(filename);
-    if (!VirtualFree(image.get(), 0, MEM_RELEASE))
-        throw std::runtime_error("ELF release failed");
-    image.release();
-    return 0;
-}
 }

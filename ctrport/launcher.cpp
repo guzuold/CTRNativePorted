@@ -210,59 +210,6 @@ std::string narrow(const std::wstring& text) {
     WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), n, nullptr, nullptr);
     return out;
 }
-bool parse_flat_json(const std::wstring& s, std::map<std::wstring, std::wstring>& strings, std::map<std::wstring, bool>& bools) {
-    std::size_t i = 0;
-    const auto ws = [&] { while (i < s.size() && iswspace(s[i])) ++i; };
-    const auto str = [&](std::wstring& out) {
-        if (i >= s.size() || s[i] != L'"') return false;
-        for (++i; i < s.size(); ++i) {
-            const wchar_t c = s[i];
-            if (c == L'"') { ++i; return true; }
-            if (c != L'\\') { out += c; continue; }
-            if (++i >= s.size()) return false;
-            switch (s[i]) {
-            case L'n': out += L'\n'; break;
-            case L't': out += L'\t'; break;
-            case L'r': out += L'\r'; break;
-            case L'b': out += L'\b'; break;
-            case L'f': out += L'\f'; break;
-            case L'u':
-                if (i + 4 >= s.size()) return false;
-                out += static_cast<wchar_t>(std::stoul(s.substr(i + 1, 4), nullptr, 16));
-                i += 4;
-                break;
-            default: out += s[i];
-            }
-        }
-        return false;
-    };
-    ws();
-    if (i >= s.size() || s[i++] != L'{') return false;
-    for (;;) {
-        ws();
-        if (i < s.size() && s[i] == L'}') return true;
-        std::wstring key;
-        if (!str(key)) return false;
-        ws();
-        if (i >= s.size() || s[i++] != L':') return false;
-        ws();
-        if (i < s.size() && s[i] == L'"') {
-            std::wstring value;
-            if (!str(value)) return false;
-            strings[key] = value;
-        } else if (s.compare(i, 4, L"true") == 0) {
-            bools[key] = true; i += 4;
-        } else if (s.compare(i, 5, L"false") == 0) {
-            bools[key] = false; i += 5;
-        } else {
-            while (i < s.size() && s[i] != L',' && s[i] != L'}') ++i;
-        }
-        ws();
-        if (i < s.size() && s[i] == L',') { ++i; continue; }
-        if (i < s.size() && s[i] == L'}') return true;
-        return false;
-    }
-}
 std::string json_string(const std::wstring& value) {
     std::string out = "\"";
     char buffer[8];

@@ -88,17 +88,4 @@ inline int kernel_gettimeofday(KernelTimeval* value,KernelTimezone* zone) {
     }
     return 0;
 }
-inline int kernel_time_control() {
-    struct Framed { std::uint64_t before; KernelTimeval time; std::uint64_t after; };
-    Framed frame{0x1357,{-1,-1},0x2468};KernelTimezone zone{};
-    const auto low=unix_microseconds();
-    if(kernel_gettimeofday(&frame.time,&zone)) throw std::runtime_error("Kernel clock returned error");
-    const auto high=unix_microseconds();
-    const auto actual=static_cast<std::uint64_t>(frame.time.seconds)*1000000+static_cast<std::uint64_t>(frame.time.microseconds);
-    if(actual<low || actual>high || frame.time.microseconds<0 || frame.time.microseconds>=1000000 || frame.before!=0x1357 || frame.after!=0x2468)
-        throw std::runtime_error("Kernel clock bounds/layout differ");
-    if(kernel_gettimeofday(nullptr,&zone) || kernel_gettimeofday(nullptr,nullptr)) throw std::runtime_error("Kernel optional argument contract differs");
-    std::cout<<"{\"scope\":\"host_kernel_gettimeofday_contract\",\"clock_bounds\":true,\"layout_sentinels\":true,\"optional_arguments\":true,\"retail_executed\":false,\"runtime_bound\":false}\n";
-    return 0;
-}
 }

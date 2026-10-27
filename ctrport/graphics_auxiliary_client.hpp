@@ -34,19 +34,4 @@ inline int compile_owned_vertex_auxiliary(GraphicsAuxiliaryOwner& output){
   output=std::move(prepared);return 0;
  });
 }
-inline int graphics_auxiliary_transport_control(){
- // Authored structural transport only, not executable shader fixtures.
- uint32_t words[]={0x07230203,0x00010500,0,2,0,(4u<<16)|15,1,1,0};
- GraphicsAuxiliarySink sink;
- if(graphics_auxiliary_sink(&sink,0,words,9) || sink.calls!=1 || sink.words.size()!=9)return 1;
- const auto saved=sink.words;words[7]=99;if(sink.words!=saved || graphics_auxiliary_sink(&sink,0,words,9)!=112 || sink.words!=saved)return 2;
- GraphicsAuxiliarySink rejected;words[5]=15;
- if(graphics_auxiliary_sink(&rejected,0,words,9)!=112 || rejected.calls || !rejected.words.empty())return 3;
- words[5]=(5u<<16)|15;if(graphics_auxiliary_sink(&rejected,0,words,9)!=112 || rejected.calls)return 4;
- words[5]=(4u<<16)|15;words[6]=2;if(graphics_auxiliary_sink(&rejected,0,words,9)!=112 || rejected.calls)return 5;
- if(graphics_auxiliary_sink(nullptr,0,words,9)!=60 || graphics_auxiliary_sink(&rejected,2,words,9)!=60)return 6;
- GraphicsAuxiliaryOwner actual;const int status=compile_owned_vertex_auxiliary(actual);if(status)return status;
- if(actual.control.empty() || actual.evaluation.empty())return 7;
- std::cout<<"{\"scope\":\"graphics_auxiliary_transport_control\",\"passed\":true,\"control_words\":"<<actual.control.size()<<",\"evaluation_words\":"<<actual.evaluation.size()<<",\"owned_after_DLL_unload\":true,\"duplicate_rejected\":true,\"invalid_atomic\":true,\"synthetic_transport_negatives\":true,\"public_emitter_compiled\":true,\"GPU_execution\":false}\n";return 0;
-}
 }

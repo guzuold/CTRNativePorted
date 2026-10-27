@@ -68,41 +68,5 @@ inline int compose_depth_prefix_snapshot(const CtrGuestCopyApi& memory,
   output.swap(composed);return 0;
  }catch(...){return 112;}
 }
-inline int depth_prefix_snapshot_control(){
- struct State{uint64_t address=0x100000,depth=0x101000;unsigned calls=0;bool mutate=false;int failure=0;}state;
- CtrGuestCopyApi memory{sizeof(memory),1,&state,
- +[](void* raw,uint64_t address,void* output,uint64_t bytes)->int{
-  auto& s=*static_cast<State*>(raw);++s.calls;
-  if(address!=s.address || bytes!=s.depth-s.address)return 62;
-  if(s.failure)return s.failure;
-  std::fill_n(static_cast<unsigned char*>(output),static_cast<size_t>(bytes),static_cast<unsigned char>(s.mutate && s.calls%2==0?0x26:0x25));return 0;
- },nullptr};
- std::vector<unsigned char> depth(8192,0x72),output{0xa7};
- if(compose_depth_prefix_snapshot(memory,state.address,8192,state.depth,depth,output) || state.calls!=2 || output.size()!=8192 || !std::all_of(output.begin(),output.begin()+4096,[](auto b){return b==0x25;}) || !std::all_of(output.begin()+4096,output.end(),[](auto b){return b==0x72;}))return 1;
- const auto saved=output;unsigned rejected=0;
- for(unsigned n=0;n<4;++n){const unsigned before=state.calls;
-  const auto address=n==0?state.depth:state.address;
-  const auto bytes=n==1?4096ULL:n==2?16384ULL:8192ULL;
-  auto api=memory;if(n==3)api.read=nullptr;
-  const int expected=n==3?60:88;
-  if(compose_depth_prefix_snapshot(api,address,bytes,state.depth,depth,output)!=expected || output!=saved || state.calls!=before)return 2;++rejected;
- }
- state.failure=62;if(compose_depth_prefix_snapshot(memory,state.address,8192,state.depth,depth,output)!=62 || output!=saved)return 3;++rejected;
- state.failure=0;state.calls=0;state.mutate=true;
- if(compose_depth_prefix_snapshot(memory,state.address,8192,state.depth,depth,output)!=88 || output!=saved || state.calls!=2)return 4;++rejected;
- std::cout<<"{\"scope\":\"depth_prefix_snapshot_control\",\"passed\":true,\"rejections\":"<<rejected<<",\"excluded_suffix_reads\":0,\"failed_output_unchanged\":true,\"synthetic_bytes\":true,\"guest_publication\":false}\n";return 0;
-}
-inline int depth_gpu_snapshot_preflight_control(){
- CtrDepthMS2LayoutV1 layout{1,sizeof(layout),1920,1080,1920,2,3,1,1,34559,0,0,0,0,0x1100000000ULL};
- CtrDepthBackingSpansV1 spans{1,sizeof(spans),layout.guest_address,17694720,layout.guest_address+17694720,2073600};
- std::vector<unsigned char> output{0xa7,0x73};const auto saved=output;
- unsigned rejected=0;
- for(unsigned n=0;n<4;++n){auto p=layout;if(n==0)p.samples=1;if(n==1)p.width=1919;if(n==2)p.pitch=2048;if(n==3)p.tile_mode=0;
-  if(snapshot_retained_depth_ms2(nullptr,20,4,p,spans,output)!=88 || output!=saved)return 1;++rejected;}
- auto malformed=layout;malformed.size=0;if(snapshot_retained_depth_ms2(nullptr,20,4,malformed,spans,output)!=60 || output!=saved)return 2;++rejected;
- auto partial=spans;--partial.depth_bytes;if(snapshot_retained_depth_ms2(nullptr,20,4,layout,partial,output)!=88 || output!=saved)return 3;++rejected;
- if(snapshot_retained_depth_ms2(nullptr,20,4,layout,spans,output)!=88 || output!=saved)return 4;++rejected;
- std::cout<<"{\"scope\":\"depth_GPU_snapshot_preflight_control\",\"passed\":true,\"rejections\":"<<rejected<<",\"output_unchanged\":true,\"GPU_execution\":false}\n";return 0;
-}
 
 }

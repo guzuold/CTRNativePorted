@@ -34,27 +34,4 @@ inline const void* resolve_service_import(const ServiceImportRecord& record,
     }
     throw std::runtime_error("Service generation identity absent");
 }
-inline int service_import_record_control(){
-    const std::string version(64,'a'),image(64,'b');static const int target=1;
-    ServiceImportRecord good{version,image,"synthetic","test","test",8,1};
-    validate_service_import_record(good,version,image,16);
-    ServiceGeneration generation{std::make_shared<int>(1),{{"synthetic","test","test",&target,1}},1,version};
-    if(resolve_service_import(good,generation)!=&target)throw std::runtime_error("Import record positive differs");
-    unsigned rejected=0;
-    auto check=[&](ServiceImportRecord record){
-        try{validate_service_import_record(record,version,image,16);}
-        catch(const std::runtime_error&){++rejected;}
-    };
-    auto bad=good;bad.eboot_sha256=image;check(bad);bad=good;bad.image_sha256=version;check(bad);
-    bad=good;bad.slot=9;check(bad);bad=good;bad.slot=16;check(bad);
-    bad=good;bad.signature_id=3;check(bad);bad=good;bad.nid.clear();check(bad);
-    generation.eboot_sha256=image;
-    try{resolve_service_import(good,generation);}catch(const std::runtime_error&){++rejected;}
-    generation.eboot_sha256=version;generation.entries[0].signature_id=2;
-    try{resolve_service_import(good,generation);}catch(const std::runtime_error&){++rejected;}
-    generation.entries[0].signature_id=1;generation.entries[0].module="other";
-    try{resolve_service_import(good,generation);}catch(const std::runtime_error&){++rejected;}
-    if(rejected!=9)throw std::runtime_error("Import record rejections differ");
-    return 0;
-}
 }

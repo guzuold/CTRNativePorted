@@ -47,20 +47,4 @@ inline int font_guest_memory_term(FontMem* memory){
  return font_memory_term(memory);
 }
 extern "C" int ctr_test_font_memory_init(FontMem*,void*,std::uint32_t,const FontMemInterface*,void*,void*,void*);
-inline int font_guest_memory_control(){
- auto* region=static_cast<unsigned char*>(VirtualAlloc(nullptr,8192,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
- if(!region)throw std::runtime_error("Font borrow control allocation failed");
- struct Cleanup{void* p;~Cleanup(){VirtualFree(p,0,MEM_RELEASE);}} cleanup{region};
- auto* mem=reinterpret_cast<FontMem*>(region);unsigned rejected=0;
- if(ctr_test_font_memory_init(mem,region+256,128,nullptr,reinterpret_cast<void*>(0x1234),nullptr,reinterpret_cast<void*>(0x5678))!=0 || mem->mspace_handle!=reinterpret_cast<void*>(0x1234) || mem->destroy_ctx!=reinterpret_cast<void*>(0x5678) || font_guest_memory_term(mem)!=0)throw std::runtime_error("Font borrowed lifecycle differs");
- std::memset(region,0x5a,8192);DWORD old=0;
- if(!VirtualProtect(region+4096,4096,PAGE_READONLY,&old))throw std::runtime_error("Font control protect failed");
- try{font_guest_memory_init(reinterpret_cast<FontMem*>(region+4096-32),region,8,nullptr,nullptr,nullptr,nullptr);}catch(const std::runtime_error&){++rejected;}
- for(unsigned i=4096-32;i<4096;++i)if(region[i]!=0x5a)throw std::runtime_error("Font failed output partially written");
- try{font_borrow_check(reinterpret_cast<void*>((std::numeric_limits<std::uintptr_t>::max)()-8),64,true);}catch(const std::runtime_error&){++rejected;}
- try{font_guest_memory_init(mem,region,8,reinterpret_cast<FontMemInterface*>(1),nullptr,nullptr,nullptr);}catch(const std::runtime_error&){++rejected;}
- try{font_guest_memory_init(mem,region,8,nullptr,nullptr,region,nullptr);}catch(const std::runtime_error&){++rejected;}
- if(rejected!=4)throw std::runtime_error("Font borrow negatives differ");
- std::cout<<"{\"scope\":\"font_synchronous_borrow_control\",\"negative_rejections\":4,\"failure_before_write\":true,\"retail_execution\":false}\n";return 0;
-}
 }

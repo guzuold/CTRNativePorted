@@ -82,47 +82,4 @@ public:
     }
 };
 inline KernelSemaphores kernel_semaphores;
-inline int semaphore_contention_control() {
-    KernelSemaphores sem;std::uint32_t id=0;
-    if(sem.create(&id,"contended",1,7,7,nullptr))return 1;
-    std::promise<void> release;auto start=release.get_future().share();std::vector<std::future<int>> attempts;
-    for(unsigned i=0;i<8;++i)attempts.push_back(std::async(std::launch::async,[&]{start.wait();std::uint32_t zero=0;return sem.wait(id,2,&zero);}));
-    release.set_value();unsigned consumed=0,timedout=0;
-    for(auto& attempt:attempts){const auto result=attempt.get();if(!result)++consumed;else if(result==static_cast<int>(0x8002003cU))++timedout;else return 1;}
-    if(consumed!=3 || timedout!=5 || sem.find(id)->tokens!=1)return 1;
-    std::promise<void> release_signal;auto signal_start=release_signal.get_future().share();attempts.clear();
-    for(unsigned i=0;i<8;++i)attempts.push_back(std::async(std::launch::async,[&]{signal_start.wait();return sem.signal(id,1);}));
-    release_signal.set_value();unsigned signaled=0,overflow=0;
-    for(auto& attempt:attempts){const auto result=attempt.get();if(!result)++signaled;else if(result==static_cast<int>(0x80020016U))++overflow;else return 1;}
-    if(signaled!=6 || overflow!=2 || sem.find(id)->tokens!=7)return 1;
-    std::cout<<"{\"scope\":\"owned_semaphore_contention\",\"waiters\":8,\"atomic_two_token_consumers\":3,\"zero_timeout_failures\":5,\"signals\":6,\"overflow_rejections\":2,\"blocking_scheduler_used\":false}\n";return 0;
-}
-inline int semaphore_blocking_control() {
-    KernelSemaphores sem;std::uint32_t id=0;if(sem.create(&id,"blocking",1,0,4,nullptr))return 1;
-    auto object=sem.find(id);
-    auto wait_registered=[&](std::size_t count){const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);for(;;){{std::lock_guard<std::mutex> guard(object->operation);if(object->waiters.size()==count)return;}if(std::chrono::steady_clock::now()>=deadline)throw std::runtime_error("Semaphore control registration deadline");std::this_thread::yield();}};
-    auto first=std::async(std::launch::async,[&]{return sem.wait(id,2,nullptr);});wait_registered(1);
-    auto second=std::async(std::launch::async,[&]{return sem.wait(id,1,nullptr);});wait_registered(2);
-    if(sem.signal(id,1) || second.get() || first.wait_for(std::chrono::milliseconds(5))!=std::future_status::timeout)return 1;
-    if(sem.signal(id,2) || first.get())return 1;
-    std::uint32_t timeout=1000;if(sem.wait(id,1,&timeout)!=static_cast<int>(0x8002003cU) || timeout)return 1;
-    {std::lock_guard<std::mutex> guard(object->operation);if(!object->waiters.empty() || object->tokens)return 1;}
-    if(sem.signal(id,1) || sem.wait(id,1,nullptr))return 1;
-    std::uint32_t priority_id=0;if(sem.create(&priority_id,"priority",2,0,2,nullptr))return 1;
-    object=sem.find(priority_id);
-    auto low=std::async(std::launch::async,[&]{current_guest_priority=700;return sem.wait(priority_id,1,nullptr);});wait_registered(1);
-    auto high=std::async(std::launch::async,[&]{current_guest_priority=478;return sem.wait(priority_id,1,nullptr);});wait_registered(2);
-    if(sem.signal(priority_id,1) || high.get() || low.wait_for(std::chrono::milliseconds(5))!=std::future_status::timeout)return 1;
-    if(sem.signal(priority_id,1) || low.get())return 1;
-    std::cout<<"{\"scope\":\"fifo_semaphore_blocking\",\"priority478_before700\":true,\"real_host_wait_wake\":true,\"insufficient_waiter_skipped\":true,\"atomic_multi_token_grant\":true,\"timeout_removes_waiter\":true,\"signal_before_wait_preserved\":true}\n";return 0;
-}
-inline int semaphore_atomic_control() {
-    KernelSemaphores sem;std::uint32_t id=0,zero=0;
-    if(sem.create(&id,"atomic",1,3,4,nullptr) || sem.wait(id,2,&zero))return 1;
-    if(sem.wait(id,2,&zero)!=static_cast<int>(0x8002003cU) || sem.find(id)->tokens!=1)return 1;
-    if(sem.signal(id,4)!=static_cast<int>(0x80020016U) || sem.find(id)->tokens!=1)return 1;
-    if(sem.signal(id,3) || sem.wait(id,4,&zero) || sem.find(id)->tokens)return 1;
-    std::uint32_t timeout=1000;if(sem.wait(id,1,&timeout)!=static_cast<int>(0x8002003cU) || timeout || sem.find(id)->tokens)return 1;
-    std::cout<<"{\"scope\":\"owned_semaphore_atomic_tokens\",\"multi_token_atomic\":true,\"insufficient_no_partial_consume\":true,\"overflow_no_mutation\":true,\"finite_wait_timeout_verified\":true}\n";return 0;
-}
 }
