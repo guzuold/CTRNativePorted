@@ -8526,13 +8526,13 @@ inline LONG CALLBACK entry_boundary_exception(EXCEPTION_POINTERS* exception) {
     ExitProcess(caller == boundary_source + 0x99 ? 4 : 5);
 }
 extern "C" void ctr_jump_startup(void*, const void*, void*);
-inline int run_entry_boundary(std::vector<MappedImage>& input_images, const std::vector<ImageMetadata>& metadata,
-                              bool enable_init_page = false, bool bind_guard = false, bool bind_time = false,
-                              bool bind_mutex = false, bool bind_condition = false, bool bind_attributes = false,
-                              bool bind_settype = false, bool bind_recursive = false,
-                              bool bind_attribute_destroy = false, bool bind_random = false,
-                              bool bind_sysmodule = false, bool bind_memory = false, bool bind_query = false,
-                              bool initialize_libc_only = false, bool continue_after_libc_init = false) {
+// Starts the game: binds every service, runs the original libc initialization and continues
+// into the game. The startup was brought up stage by stage; every stage is now always on.
+inline int run_entry_boundary(std::vector<MappedImage>& input_images, const std::vector<ImageMetadata>& metadata) {
+    constexpr bool enable_init_page = true, bind_guard = true, bind_time = true, bind_mutex = true,
+                   bind_condition = true, bind_attributes = true, bind_settype = true, bind_recursive = true,
+                   bind_attribute_destroy = true, bind_random = true, bind_sysmodule = true, bind_memory = true,
+                   bind_query = true, initialize_libc_only = true, continue_after_libc_init = true;
     // A startup worker must retain mappings after its creator returns. Move only
     // the non-returning startup path; initializer-only controls keep caller ownership.
     std::shared_ptr<std::vector<MappedImage>> startup_images;

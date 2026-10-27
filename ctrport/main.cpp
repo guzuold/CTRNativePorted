@@ -1050,8 +1050,7 @@ int main(int argc, char** argv) {
                 images.push_back(std::move(image));
             }
             ctrport::bind_original_images(images, metadata);
-            return ctrport::run_entry_boundary(images, metadata, true, true, true, true, true, true, true, true, true,
-                                               true, true, true, true, true, true);
+            return ctrport::run_entry_boundary(images, metadata);
         } catch (const std::exception& error) {
             std::cerr << "CTRPort multi-image loader: " << error.what() << '\n';
             return 4;
