@@ -103,7 +103,7 @@ inline int graphics_index_requirement_control(){
 }
 struct GraphicsStageOwner {
  std::vector<uint32_t> spirv;std::array<uint32_t,16> userdata{};uint32_t userdata_words=0;
- // Descriptor words are host-only, never guest-authority. Optional research
+ // Descriptor words are host-only, never guest-authority. Optional diagnostic
  // evidence goes to runtime/user/logs.
  std::vector<uint32_t> flattened_userdata;
  CtrGraphicsResourcesV1 resources{};std::vector<GraphicsBufferCapture> buffers;

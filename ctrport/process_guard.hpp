@@ -3,7 +3,7 @@
 #include "flat_loader.hpp"
 namespace ctrport {
 // Our implementation of the observed stable 64-bit canary object contract.
-// No upstream dummy constant or prof-build information is used.
+// No upstream dummy constant is used.
 inline const std::uint64_t* process_guard() {
     static const MappedImage storage=[] {
         MappedImage page(static_cast<unsigned char*>(VirtualAlloc(nullptr,4096,

@@ -1,7 +1,7 @@
 # Security branch validation
 
 Base: b95b24e (v0.5.4). Branch: security/v0.5.5. Date: 2026-10-21 Europe/Rome.
-Repository: build/online-recovery-src, origin guzuold/CTRNativePorted. build/fresh was not edited as the working repository. No push, tag or release. All payloads in these tests are synthetic; no game files or prof-derived material are included.
+Repository: build/online-recovery-src, origin guzuold/CTRNativePorted. build/fresh was not edited as the working repository. No push, tag or release. All payloads in these tests are synthetic; no game files are included.
 
 ## Repeatable commands
 
