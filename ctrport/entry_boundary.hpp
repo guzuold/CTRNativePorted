@@ -2887,7 +2887,7 @@ inline int run_entry_boundary(std::vector<MappedImage>& input_images,const std::
     // CTR_PATCHES_DIR: third-party patch XML files chosen in the launcher (guest_patch_xml.hpp),
     // applied after the built-in patches above so that they win where both write.
     if(continue_after_libc_init)
-        guest_patches::apply_from_environment(images.front().get(),metadata.front().spans,profile->title_id,profile->version);
+        guest_patches::apply_from_environment(images.front().get(),metadata.front().spans,profile->title_id,profile->version,metadata.front().executable_spans);
     // The in-game PC Settings menu and the graphics switches patch addresses of the EU 1.21
     // eboot (CUSA14876); another eboot (US CUSA13795, 1.00) runs with the original settings.
     const bool settings_eboot=metadata.front().sha256==settings::retail_graphics::retail_sha256;

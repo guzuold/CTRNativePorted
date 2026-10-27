@@ -113,6 +113,8 @@ inline const std::map<std::wstring, Entry>& table() {
         {L"How to unlock: {0}", {L"Comment l'obtenir : {0}", L"Come sbloccarlo: {0}", L"So schaltest du ihn frei: {0}", L"Cómo conseguirlo: {0}"}},
         {L"Texts in English from the {0}. Your PS4 trophy key shows the game's own.", {L"Textes en anglais de la {0}. Votre clé de trophées PS4 affiche ceux du jeu.", L"Testi in inglese dalla {0}. La tua chiave trofei PS4 mostra quelli del gioco.", L"Texte auf Englisch aus dem {0}. Mit deinem PS4-Trophäenschlüssel erscheinen die des Spiels.", L"Textos en inglés de la {0}. Tu clave de trofeos de PS4 muestra los del juego."}},
         {L"Loading the trophy texts from the Crash Bandicoot Wiki...", {L"Chargement des textes depuis le Crash Bandicoot Wiki...", L"Caricamento dei testi dalla Crash Bandicoot Wiki...", L"Texte werden aus dem Crash Bandicoot Wiki geladen...", L"Cargando los textos de la Crash Bandicoot Wiki..."}},
+        {L"Adapted from the other region of the game: {0}", {L"Adapté depuis l'autre région du jeu : {0}", L"Adattata dall'altra regione del gioco: {0}", L"Aus der anderen Region des Spiels angepasst: {0}", L"Adaptado de la otra región del juego: {0}"}},
+        {L"Not applied at the last start: {0}", {L"Non appliqué au dernier lancement : {0}", L"Non applicata all'ultimo avvio: {0}", L"Beim letzten Start nicht angewendet: {0}", L"No se aplicó en el último inicio: {0}"}},
         {L"{0} patch files", {L"{0} fichiers de patch", L"{0} file di patch", L"{0} Patch-Dateien", L"{0} archivos de parche"}},
         {L"by {0}", {L"par {0}", L"di {0}", L"von {0}", L"de {0}"}},
         {L"{0} files", {L"{0} fichiers", L"{0} file", L"{0} Dateien", L"{0} archivos"}},

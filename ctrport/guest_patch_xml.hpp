@@ -12,9 +12,12 @@
 // and ctrport.exe (C++17).
 #pragma once
 #include "mod_overlay.hpp"
+#include <bcrypt.h>
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <limits>
+#include <map>
 namespace ctrport::guest_patches {
 namespace fs = std::filesystem;
 using mods::utf8;
@@ -144,7 +147,9 @@ inline Node parse_xml(const std::string& text) {
 }
 
 // --- Patch files ------------------------------------------------------------------------------
-struct Line { std::string type, address, value, offset; };
+// signature and expected_sha256 (optional, as written by OCTR mod tools): the original bytes at
+// the site as a byte pattern and the SHA256 of the len(value) bytes a "bytes" line overwrites.
+struct Line { std::string type, address, value, offset, signature, expected_sha256; };
 struct Patch {
     std::wstring file;  // file name inside the patches folder
     std::string name, author, note, app_ver, app_elf, patch_ver;
@@ -183,7 +188,10 @@ inline std::vector<Patch> parse_patches(const std::string& text, const std::wstr
             if (list.name != "PatchList") continue;
             for (const auto& line : list.children) {
                 if (line.name != "Line") continue;
-                patch.lines.push_back({line.attribute("Type"), trim(line.attribute("Address")), line.attribute("Value"), trim(line.attribute("Offset"))});
+                std::string expected = trim(line.attribute("ExpectedSHA256"));
+                for (auto& c : expected) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                patch.lines.push_back({line.attribute("Type"), trim(line.attribute("Address")), line.attribute("Value"), trim(line.attribute("Offset")),
+                                       trim(line.attribute("Signature")), expected});
             }
         }
         patches.push_back(std::move(patch));
@@ -322,6 +330,17 @@ inline std::vector<int> pattern(const std::string& raw) {
 
 using Spans = std::vector<std::pair<std::uint64_t, std::uint64_t>>;
 struct Write { std::uint64_t offset; std::vector<unsigned char> bytes; };
+inline std::string sha256_hex(const unsigned char* data, std::size_t size) {
+    unsigned char digest[32]{};
+    BCRYPT_ALG_HANDLE algorithm = nullptr;
+    if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0) throw std::runtime_error("SHA256 provider missing");
+    const auto status = BCryptHash(algorithm, nullptr, 0, const_cast<unsigned char*>(data), static_cast<ULONG>(size), digest, 32);
+    BCryptCloseAlgorithmProvider(algorithm, 0);
+    if (status < 0) throw std::runtime_error("SHA256 failed");
+    std::string hex;
+    for (unsigned char b : digest) { hex += "0123456789abcdef"[b >> 4]; hex += "0123456789abcdef"[b & 15]; }
+    return hex;
+}
 // Image offsets and bytes of every line of a patch, validated against the mapped segments.
 inline std::vector<Write> plan(const Patch& patch, const unsigned char* image, const Spans& spans, bool version_matches) {
     std::vector<Write> writes;
@@ -358,9 +377,132 @@ inline std::vector<Write> plan(const Patch& patch, const unsigned char* image, c
             char where[32]; std::snprintf(where, sizeof(where), "0x%llx", static_cast<unsigned long long>(offset));
             throw std::runtime_error(std::string("write at image offset ") + where + " is outside the eboot's mapped segments");
         }
+        if (!line.expected_sha256.empty() && sha256_hex(image + offset, bytes.size()) != line.expected_sha256)
+            throw std::runtime_error("the original bytes at " + line.address + " differ from the patch's ExpectedSHA256");
         writes.push_back({offset, std::move(bytes)});
     }
     return writes;
+}
+
+// --- Ports between the EU (CUSA14876) and US (CUSA13795) eboots of the same version ---------
+// A patch written for the other region's eboot can be moved onto this one when every line is a
+// "bytes" line with ExpectedSHA256, so that each write first finds its own original bytes:
+// - at the same address, checked by hash; or near it through the line's Signature, a single
+//   place within 64 KB whose bytes have that hash. Such a moved line must be one call or jump
+//   (5 bytes, E8/E9); its displacement is rewritten so it still reaches its target.
+// - calls and jumps (E8/E9 rel32) inside the written code: a target that is a moved line's
+//   original callee follows it (its Signature shows the same displacement at the new place);
+//   a target inside the written code follows that code; any other target must already be the
+//   start of a function here (called from this eboot's own code), else the port is refused.
+// - RIP-relative loads, stores and LEAs (REX.W 8B/89/8D, ModRM mod=00 rm=101) to the image:
+//   the address must be used at least 4 times by this eboot's own code, else refused.
+// Nothing is guessed: a line or reference without such evidence refuses the whole port.
+inline bool other_region(const Patch& patch, const std::string& title_id, const std::string& app_ver) {
+    if (patch.app_ver != app_ver || (title_id != "CUSA14876" && title_id != "CUSA13795")) return false;
+    const std::string other = title_id == "CUSA14876" ? "CUSA13795" : "CUSA14876";
+    if (std::find(patch.title_ids.begin(), patch.title_ids.end(), other) == patch.title_ids.end()) return false;
+    return !patch.lines.empty() && std::all_of(patch.lines.begin(), patch.lines.end(), [](const Line& l) {
+        return l.type == "bytes" && l.expected_sha256.size() == 64;
+    });
+}
+struct Port { std::vector<Write> writes; std::string note; };
+inline Port port_region(const Patch& patch, const unsigned char* image, const Spans& spans, const Spans& code) {
+    constexpr std::uint64_t kBase = 0x400000;
+    const auto hex = [](std::uint64_t v) { char b[32]; std::snprintf(b, sizeof(b), "0x%llx", static_cast<unsigned long long>(v)); return std::string(b); };
+    const auto in_spans = [](const Spans& list, std::uint64_t at, std::size_t size) {
+        for (const auto& s : list) if (at >= s.first && at <= s.second && size <= s.second - at) return true;
+        return false;
+    };
+    const auto rd32 = [](const unsigned char* p) { std::int32_t v; std::memcpy(&v, p, 4); return v; };
+    const std::size_t n = patch.lines.size();
+    std::vector<std::uint64_t> original(n), site(n);
+    std::vector<std::vector<unsigned char>> value(n);
+    int moved = 0;
+    std::map<std::uint64_t, std::uint64_t> callee;  // other region's address -> this eboot's
+    for (std::size_t i = 0; i < n; ++i) {
+        const Line& line = patch.lines[i];
+        value[i] = hex_bytes(line.value);
+        const auto address = parse_number(line.address, true);
+        if (address < kBase) throw std::runtime_error("address " + line.address + " is below the 0x400000 eboot base");
+        original[i] = site[i] = address - kBase;
+        const std::size_t len = value[i].size();
+        if (in_spans(spans, original[i], len) && sha256_hex(image + original[i], len) == line.expected_sha256) continue;
+        if (line.signature.empty()) throw std::runtime_error("the original bytes at " + line.address + " are not in this eboot");
+        std::vector<unsigned char> sig;
+        for (int b : pattern(line.signature)) {
+            if (b < 0) throw std::runtime_error("signature wildcards are not supported for ports");
+            sig.push_back(static_cast<unsigned char>(b));
+        }
+        std::vector<std::uint64_t> found;
+        const std::uint64_t lo = original[i] > 0x10000 ? original[i] - 0x10000 : 0, hi = original[i] + 0x10000;
+        for (std::uint64_t at = lo; at < hi; ++at)
+            if (in_spans(code, at, (std::max)(sig.size(), len)) && std::memcmp(image + at, sig.data(), sig.size()) == 0 &&
+                sha256_hex(image + at, len) == line.expected_sha256)
+                found.push_back(at);
+        if (found.size() != 1) throw std::runtime_error("the original bytes of " + line.address + " are not found once near it (" + std::to_string(found.size()) + ")");
+        if (len != 5 || (value[i][0] != 0xE8 && value[i][0] != 0xE9))
+            throw std::runtime_error("the line at " + line.address + " moved but is not a single call or jump");
+        site[i] = found[0];
+        ++moved;
+        if (sig.size() >= 5 && (sig[0] == 0xE8 || sig[0] == 0xE9)) {
+            const std::int64_t disp = rd32(sig.data() + 1);
+            callee[original[i] + 5 + disp] = site[i] + 5 + disp;
+        }
+    }
+    // the other region's address of written code -> this eboot's
+    const auto written = [&](std::uint64_t target, std::uint64_t& here) {
+        for (std::size_t j = 0; j < n; ++j)
+            if (target >= original[j] && target < original[j] + value[j].size()) { here = site[j] + (target - original[j]); return true; }
+        return false;
+    };
+    // the evidence: calls to each address and RIP-relative uses of each address in this eboot's code
+    std::map<std::uint64_t, int> calls, uses;
+    for (std::size_t i = 0; i < n; ++i)
+        for (std::size_t p = 0; p + 5 <= value[i].size(); ++p) {
+            if (value[i][p] == 0xE8 || value[i][p] == 0xE9) calls[original[i] + p + 5 + rd32(&value[i][p + 1])] = 0;
+            if (p + 7 <= value[i].size() && (value[i][p] & 0xF0) == 0x40 && (value[i][p] & 8) && (value[i][p + 1] == 0x8B || value[i][p + 1] == 0x89 || value[i][p + 1] == 0x8D) &&
+                (value[i][p + 2] & 0xC7) == 0x05)
+                uses[original[i] + p + 7 + rd32(&value[i][p + 3])] = 0;
+        }
+    for (const auto& c : code)
+        for (std::uint64_t at = c.first; at + 7 <= c.second; ++at) {
+            if (image[at] == 0xE8) if (auto it = calls.find(at + 5 + rd32(image + at + 1)); it != calls.end()) ++it->second;
+            if ((image[at] & 0xF8) == 0x48 && (image[at + 1] == 0x8B || image[at + 1] == 0x89 || image[at + 1] == 0x8D) && (image[at + 2] & 0xC7) == 0x05)
+                if (auto it = uses.find(at + 7 + rd32(image + at + 3)); it != uses.end()) ++it->second;
+        }
+    Port port;
+    int retargeted = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        auto bytes = value[i];
+        for (std::size_t p = 0; p + 5 <= bytes.size(); ++p) {
+            if (bytes[p] != 0xE8 && bytes[p] != 0xE9) continue;
+            const std::uint64_t target = original[i] + p + 5 + rd32(&value[i][p + 1]);
+            std::uint64_t here = target;
+            if (const auto it = callee.find(target); it != callee.end()) { here = it->second; ++retargeted; }
+            else if (written(target, here)) {}
+            else if (in_spans(code, target, 1) && site[i] == original[i]) {
+                if (!calls[target]) throw std::runtime_error("written code calls " + hex(target + kBase) + ", which is not a function of this eboot");
+            } else if (site[i] == original[i]) {
+                continue;  // not an instruction: its "target" is outside the code
+            }
+            const std::int64_t disp = static_cast<std::int64_t>(here) - static_cast<std::int64_t>(site[i] + p + 5);
+            if (disp < (std::numeric_limits<std::int32_t>::min)() || disp > (std::numeric_limits<std::int32_t>::max)()) throw std::runtime_error("a moved call does not reach its target");
+            const std::int32_t d = static_cast<std::int32_t>(disp);
+            std::memcpy(&bytes[p + 1], &d, 4);
+        }
+        for (std::size_t p = 0; p + 7 <= value[i].size(); ++p)
+            if ((value[i][p] & 0xF0) == 0x40 && (value[i][p] & 8) && (value[i][p + 1] == 0x8B || value[i][p + 1] == 0x89 || value[i][p + 1] == 0x8D) &&
+                (value[i][p + 2] & 0xC7) == 0x05) {
+                const std::uint64_t target = original[i] + p + 7 + rd32(&value[i][p + 3]);
+                std::uint64_t here;
+                if (written(target, here) || !in_spans(spans, target, 1)) continue;
+                if (uses[target] < 4) throw std::runtime_error("written code uses " + hex(target + kBase) + ", which this eboot's code does not");
+            }
+        port.writes.push_back({site[i], std::move(bytes)});
+    }
+    port.note = std::to_string(n) + " writes checked by their original bytes, " + std::to_string(moved) + " moved, " +
+                std::to_string(retargeted) + " calls retargeted";
+    return port;
 }
 
 // --- param.sfo (TITLE_ID, APP_VER) --------------------------------------------------------
@@ -398,25 +540,54 @@ inline std::vector<std::pair<std::wstring, fs::path>>& mod_patch_files() {
 
 // --- Runtime: apply the selected patches of CTR_PATCHES_DIR to the mapped eboot -----------
 // Returns the number of patches applied. Problems in a selected patch stop the launch.
+// A patch for the other region of the same version moved onto this eboot (port_region), or
+// nothing with the reason in `why`.
+inline std::vector<Write> try_port(const Patch& patch, const unsigned char* image, const Spans& spans, const Spans& code,
+                                   std::string& why, std::string& note) {
+    try {
+        auto port = port_region(patch, image, spans, code);
+        note = port.note;
+        return std::move(port.writes);
+    } catch (const std::exception& e) {
+        why = std::string("cannot be ported from the other region: ") + e.what();
+        return {};
+    }
+}
+
 inline int apply_selected(unsigned char* image, const Spans& spans, const std::string& title_id, const std::string& app_ver,
-                          const fs::path& dir, const fs::path& selection_path) {
+                          const fs::path& dir, const fs::path& selection_path, const Spans& code) {
     const auto selection = read_selection(selection_path);
     // Every selected patch is validated before the first byte is written.
     std::vector<std::pair<std::wstring, std::vector<Write>>> chosen_writes;
+    // Patches of enabled octr-mod mods: one that does not fit is not applied and is reported to
+    // the launcher (mods_status.json); the game starts without it.
     for (const auto& [mod, path] : mod_patch_files()) {
         std::vector<Patch> patches;
         const std::wstring file = mod + L"/" + path.filename().wstring();
         try { patches = parse_patches(mods::read_text(path), file); }
-        catch (const std::exception& e) { throw std::runtime_error("patch file " + utf8(file) + " cannot be read: " + e.what()); }
+        catch (const std::exception& e) {
+            mods::statuses().push_back({mod, "skipped", "its patch file cannot be read: " + std::string(e.what())});
+            continue;
+        }
         for (const auto& patch : patches) {
-            const auto why = mismatch(patch, title_id, app_ver);
+            std::string why = mismatch(patch, title_id, app_ver), note;
+            std::vector<Write> writes;
+            if (why.empty()) {
+                try { writes = plan(patch, image, spans, patch.app_ver == app_ver); }
+                catch (const std::exception& e) { why = e.what(); }
+            } else if (other_region(patch, title_id, app_ver)) {
+                why.clear();
+                writes = try_port(patch, image, spans, code, why, note);
+            }
             if (!why.empty()) {
-                std::fprintf(stderr, "Patches: %s: skipped, %s\n", utf8(patch.key()).c_str(), why.c_str());
+                std::fprintf(stderr, "Patches: %s: not applied, %s\n", utf8(patch.key()).c_str(), why.c_str());
+                mods::statuses().push_back({mod, "skipped", "code patch " + patch.name + " " + why});
                 continue;
             }
-            std::vector<Write> writes;
-            try { writes = plan(patch, image, spans, patch.app_ver == app_ver); }
-            catch (const std::exception& e) { throw std::runtime_error("patch " + utf8(patch.key()) + ": " + e.what()); }
+            if (!note.empty()) {
+                std::fprintf(stderr, "Patches: %s: ported to %s: %s\n", utf8(patch.key()).c_str(), title_id.c_str(), note.c_str());
+                mods::statuses().push_back({mod, "adapted", "code patch ported (" + note + ")"});
+            }
             chosen_writes.push_back({patch.key(), std::move(writes)});
         }
     }
@@ -431,7 +602,16 @@ inline int apply_selected(unsigned char* image, const Spans& spans, const std::s
         }
         for (const auto& patch : file.patches) {
             if (!selected(patch, selection)) continue;
-            const auto why = mismatch(patch, title_id, app_ver);
+            std::string why = mismatch(patch, title_id, app_ver), note;
+            if (!why.empty() && other_region(patch, title_id, app_ver)) {
+                why.clear();
+                auto writes = try_port(patch, image, spans, code, why, note);
+                if (why.empty()) {
+                    std::fprintf(stderr, "Patches: %s: ported to %s: %s\n", utf8(patch.key()).c_str(), title_id.c_str(), note.c_str());
+                    chosen_writes.push_back({patch.key(), std::move(writes)});
+                    continue;
+                }
+            }
             if (!why.empty()) {
                 std::fprintf(stderr, "Patches: %s: skipped, %s\n", utf8(patch.key()).c_str(), why.c_str());
                 continue;
@@ -454,9 +634,12 @@ inline int apply_selected(unsigned char* image, const Spans& spans, const std::s
     std::fflush(stdout);
     std::fprintf(stderr, "Patches: %d applied\n", applied);
     std::fflush(stderr);
+    if (!mod_patch_files().empty()) mods::write_statuses();
     return applied;
 }
-inline int apply_from_environment(unsigned char* image, const Spans& spans, const std::string& title_id, unsigned version) {
+// code: the executable segments, the evidence for ports between regions; empty: all of `spans`.
+inline int apply_from_environment(unsigned char* image, const Spans& spans, const std::string& title_id, unsigned version,
+                                  const Spans& code = {}) {
     wchar_t dir[32768]{}, config[32768]{};
     const DWORD dir_len = GetEnvironmentVariableW(L"CTR_PATCHES_DIR", dir, 32768);
     if ((!dir_len || dir_len >= 32768) && mod_patch_files().empty()) return 0;
@@ -465,6 +648,6 @@ inline int apply_from_environment(unsigned char* image, const Spans& spans, cons
     const fs::path selection = config_len && config_len < 32768 ? fs::path(config) : fs::path(dir) / L"patches.json";
     char app_ver[8];
     std::snprintf(app_ver, sizeof(app_ver), "%02u.%02u", version / 100, version % 100);
-    return apply_selected(image, spans, title_id, app_ver, dir, selection);
+    return apply_selected(image, spans, title_id, app_ver, dir, selection, code.empty() ? spans : code);
 }
 }

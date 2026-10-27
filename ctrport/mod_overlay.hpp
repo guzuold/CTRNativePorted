@@ -311,6 +311,24 @@ inline Index build_index(const std::vector<Mod>& mods, const std::vector<fs::pat
     return index;
 }
 
+// What happened to mods at this start, for the launcher's MODS tab: "skipped" (not applied,
+// with the reason) or "adapted" (applied after porting from the other region of the game).
+// Written to runtime/user/logs/mods_status.json by octr_mods.hpp and guest_patch_xml.hpp.
+struct Status { std::wstring mod; std::string state, reason; };
+inline std::vector<Status>& statuses() { static std::vector<Status> list; return list; }
+inline void write_statuses() {
+    const fs::path file = L"runtime/user/logs/mods_status.json";
+    std::error_code ec;
+    fs::create_directories(file.parent_path(), ec);
+    std::ofstream out(file, std::ios::binary | std::ios::trunc);
+    const auto& list = statuses();
+    out << "[";
+    for (std::size_t i = 0; i < list.size(); ++i)
+        out << (i ? ",\n " : "\n ") << "{\"mod\": " << json_quote(list[i].mod) << ", \"state\": " << json_quote(wide(list[i].state))
+            << ", \"reason\": " << json_quote(wide(list[i].reason)) << "}";
+    out << (list.empty() ? "]\n" : "\n]\n");
+}
+
 // Runtime side: configured once at startup from CTR_MODS_DIR and CTR_MODS_CONFIG.
 class Overlay {
     std::mutex mutex_;

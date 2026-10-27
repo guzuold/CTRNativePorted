@@ -194,21 +194,68 @@ int main() {
     check(selected(parsed[0], read_back) && selected(parsed[1], read_back) && !selected(parsed[3], read_back) && !selected(parsed[2], read_back),
           "selection: explicit choices over isEnabled default");
     std::vector<unsigned char> game(0x2000, 0);
-    const int applied = apply_selected(game.data(), spans, "CUSA14876", "01.21", patches, root / "patches.json");
+    const int applied = apply_selected(game.data(), spans, "CUSA14876", "01.21", patches, root / "patches.json", spans);
     std::uint32_t word = 0; std::memcpy(&word, game.data() + 0x1010, 4);
     check(applied == 1 && game[0x1000] == 0x90 && word == 0x11223344, "runtime applies the selected matching patch only");
     selection.enabled.push_back(L"broken.xml/Anything");
     write_selection(root / "patches.json", selection);
-    check(throws([&] { apply_selected(game.data(), spans, "CUSA14876", "01.21", patches, root / "patches.json"); }, "cannot be read"),
+    check(throws([&] { apply_selected(game.data(), spans, "CUSA14876", "01.21", patches, root / "patches.json", spans); }, "cannot be read"),
           "selected patch in an unreadable file stops the launch");
     choose(selection, parsed[3], true);
     selection.enabled.erase(std::remove(selection.enabled.begin(), selection.enabled.end(), L"broken.xml/Anything"), selection.enabled.end());
     write_selection(root / "patches.json", selection);
     std::vector<unsigned char> untouched(0x2000, 0);
-    check(throws([&] { apply_selected(untouched.data(), spans, "CUSA14876", "01.21", patches, root / "patches.json"); }, "Outside"),
+    check(throws([&] { apply_selected(untouched.data(), spans, "CUSA14876", "01.21", patches, root / "patches.json", spans); }, "Outside"),
           "selected patch with an invalid address stops the launch");
     check(std::all_of(untouched.begin(), untouched.end(), [](unsigned char b) { return b == 0; }),
           "nothing is written when any selected patch is invalid");
+
+    // --- ports between regions (port_region) ----------------------------------------------
+    {
+        // This eboot: function F at 0x1000 (called twice), a call to F at 0x2010 (hook site),
+        // free code space at 0x3000. The other region: everything 0x10 later, same space.
+        std::vector<unsigned char> eboot(0x4000, 0xCC);
+        std::fill(eboot.begin() + 0x3000, eboot.begin() + 0x3100, static_cast<unsigned char>(0));
+        const auto call = [&](std::size_t at, std::size_t to) {
+            eboot[at] = 0xE8; const std::int32_t d = std::int32_t(to) - std::int32_t(at + 5); std::memcpy(&eboot[at + 1], &d, 4);
+        };
+        call(0x2010, 0x1000);
+        call(0x2400, 0x1000);
+        const auto hexs = [](const unsigned char* p, std::size_t n) { std::string s; char b[3]; for (std::size_t i = 0; i < n; ++i) { std::snprintf(b, 3, "%02x", p[i]); s += b; } return s; };
+        const auto rel = [](std::size_t at, std::size_t to) { const std::int32_t d = std::int32_t(to) - std::int32_t(at + 5); unsigned char b[5] = {0xE8}; std::memcpy(b + 1, &d, 4); return std::vector<unsigned char>(b, b + 5); };
+        // cave at the same address: call F (other region's 0x1010), then ret
+        auto cave = rel(0x3000, 0x1010); cave.push_back(0xC3);
+        const auto hook = rel(0x2020, 0x3000);                 // other region's hook site
+        const std::string signature = hexs(&eboot[0x2010], 5);  // its original call to F, same displacement
+        const std::string zeros_sha = sha256_hex(&eboot[0x3000], cave.size());
+        const std::string site_sha = sha256_hex(&eboot[0x2010], 5);
+        std::string sig_spaced;
+        for (std::size_t i = 0; i < signature.size(); i += 2) sig_spaced += (i ? " " : "") + signature.substr(i, 2);
+        const std::string port_xml = "<Patch><TitleID><ID>CUSA13795</ID></TitleID><Metadata Name=\"Gauge\" AppVer=\"01.21\" AppElf=\"eboot.bin\"><PatchList>"
+            "<Line Type=\"bytes\" Address=\"0x403000\" Value=\"" + hexs(cave.data(), cave.size()) + "\" ExpectedSHA256=\"" + zeros_sha + "\"/>"
+            "<Line Type=\"bytes\" Address=\"0x402020\" Value=\"" + hexs(hook.data(), 5) + "\" Signature=\"" + sig_spaced + "\" ExpectedSHA256=\"" + site_sha + "\"/>"
+            "</PatchList></Metadata></Patch>";
+        const auto ported_patch = parse_patches(port_xml, L"gauge.xml")[0];
+        const Spans all{{0, eboot.size()}};
+        check(!mismatch(ported_patch, "CUSA14876", "01.21").empty() && other_region(ported_patch, "CUSA14876", "01.21"), "port: US patch with hashes is portable to EU");
+        const auto port = port_region(ported_patch, eboot.data(), all, all);
+        std::int32_t to_f = 0, to_cave = 0;
+        std::memcpy(&to_f, &port.writes[0].bytes[1], 4);
+        std::memcpy(&to_cave, &port.writes[1].bytes[1], 4);
+        check(port.writes.size() == 2 && port.writes[0].offset == 0x3000 && port.writes[1].offset == 0x2010 &&
+              0x3000 + 5 + to_f == 0x1000 && 0x2010 + 5 + to_cave == 0x3000, "port: hook moved, its call kept, the moved function's call retargeted");
+        auto bad = cave;
+        const auto nowhere = rel(0x3000, 0x1810);  // no function of this eboot there
+        std::copy(nowhere.begin(), nowhere.end(), bad.begin());
+        std::string bad_xml = port_xml;
+        bad_xml.replace(bad_xml.find(hexs(cave.data(), cave.size())), cave.size() * 2, hexs(bad.data(), bad.size()));
+        check(throws([&] { port_region(parse_patches(bad_xml, L"bad.xml")[0], eboot.data(), all, all); }, "not a function"),
+              "port: a call without evidence refuses the port");
+        std::string moved_sha_xml = port_xml;
+        moved_sha_xml.replace(moved_sha_xml.find(site_sha), 64, std::string(64, '0'));
+        check(throws([&] { port_region(parse_patches(moved_sha_xml, L"x.xml")[0], eboot.data(), all, all); }, "not found once"),
+              "port: original bytes must match ExpectedSHA256");
+    }
 
     // --- param.sfo ---------------------------------------------------------------------------
     std::string sfo("\0PSF\x01\x01\0\0", 8);

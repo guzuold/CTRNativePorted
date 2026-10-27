@@ -54,8 +54,34 @@ A folder in `runtime/mods` with `mod.json` at its top is applied by the runtime
 - Any other capability (shaders, settings, variants of the `nitro-mod.json` format) or
   operation kind is refused by name, by the launcher when installing and by the runtime.
 
+- A mod is applied whole or not at all. One that does not fit the game is skipped, the game
+  starts without it, and `runtime/user/logs/mods_status.json` tells the launcher why; the MODS
+  tab shows it in orange.
+
+### Mods made for the other region (US CUSA13795 / EU CUSA14876, same version)
+
+Some mods can be moved onto the other region's game, only with proof:
+
+- **UI assets that differ only in their language tables.** The EU and US games list different
+  `.lng` files in an IGZ file's TDEP section (ar/de/es/it against mx/pt). The mod's file gets
+  this game's set when (1) this game's asset with the mod's set is byte for byte the mod's
+  `original_sha256`, and (2) the port with the mod's set given back is byte for byte its
+  payload (`patched_sha256`).
+- **Patch files whose every line has `ExpectedSHA256`** (as the OCTR tools write them): each
+  write must find its own original bytes, at the same address or once within 64 KB through
+  its `Signature`. A moved line must be a single call or jump, whose displacement is
+  rewritten. Calls to a moved line's original callee follow it. Any other call must reach a
+  function this eboot's own code calls, and any RIP-relative global must be used at least 4
+  times by this eboot's code. Without such evidence the whole mod is skipped.
+
+Adapted mods are marked in the MODS tab. Checked on the EU 1.21 dump with the US "Reserves + CNK
+Drift Gauge" 1.0.6: 5 race HUDs ported, 7 patch writes found by their original bytes (2 moved by
+-0x10, 2 calls retargeted, matching a Ghidra disassembly of the injected code), and a race with
+the gauge, the speedometer and the reserves bar on screen.
+
 `ctrport/octr_mods_control.cpp` applies the mods of a folder to the user's own game folders,
-read-only, and reads every replaced entry back through the view.
+read-only, reads every replaced entry back through the view, and plans or ports each mod
+patch on the update folder's eboot, listing where every call lands.
 
 ## Installing mods from the launcher
 

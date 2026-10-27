@@ -5,8 +5,11 @@
 // - "archive_asset" operations: entry `index` of archives/<archive> (checked against its
 //   `asset` path) is replaced by `payload` (a file of the mod) or by the entry with `runs`
 //   ([offset, original hex, patched hex]) applied. The entry the game would read must hash to
-//   `original_sha256` and the result to `patched_sha256`, otherwise the launch stops with the
-//   reason. Mods later in the load order apply on top of earlier ones. The archive is served
+//   `original_sha256` and the result to `patched_sha256`. A mod is applied whole or not at
+//   all: one that does not fit the game (another region or version, a feature this runtime
+//   lacks) is skipped, the game starts without it, and the reason is logged and written to
+//   runtime/user/logs/mods_skipped.json for the launcher. Mods later in the load order apply
+//   on top of earlier ones. The archive is served
 //   as a view (settings/menu_overlay.hpp): the original file, the replaced entries appended
 //   uncompressed after it, their 16-byte descriptors redirected; no game file is copied.
 // - "patches": the mod's XML patch files, applied while the mod is enabled (guest_patch_xml.hpp).
@@ -283,6 +286,90 @@ inline bool names_asset(const settings::menu_assets::IgaEntry& entry, const std:
                                             full[full.size() - want.size() - 1] == '/');
 }
 
+// --- IGZ assets that differ between regions only in their language tables ------------------
+// An IGZ10 file lists the files it loads in its TDEP fixup section as (name, path) pairs, sorted
+// by name without case; the .lng language tables of a UI file are there and nowhere else. The EU
+// and US games ship different sets (ar/de/es/it against mx/pt), so a US mod's UI file can be
+// moved onto the EU game by giving it the EU set, but only when this is proven:
+//  1. this game's entry with the mod's language set must be byte for byte the asset the mod was
+//     made for (its original_sha256): the regions differ in nothing else;
+//  2. the port with the mod's language set given back must be byte for byte the mod's payload
+//     (its patched_sha256): the port changed nothing else.
+namespace igz {
+using Deps = std::vector<std::pair<std::string, std::string>>;
+struct Tdep { Deps deps; std::size_t at = 0, size = 0, header = 0; };
+inline std::uint32_t u32(const Bytes& d, std::size_t at) { std::uint32_t v; std::memcpy(&v, d.data() + at, 4); return v; }
+inline bool tdep(const Bytes& d, Tdep& out) {
+    if (d.size() < 0x224 || u32(d, 0) != 0x49475A01u || u32(d, 4) != 10) return false;
+    std::size_t at = u32(d, 24);  // first chunk: the fixup sections
+    const std::uint32_t sections = u32(d, 16);
+    for (std::uint32_t i = 0; i < sections; ++i) {
+        if (at + 16 > d.size()) return false;
+        const std::uint32_t n = u32(d, at + 4), size = u32(d, at + 8), header = u32(d, at + 12);
+        if (size < header || at + size > d.size()) return false;
+        if (std::memcmp(d.data() + at, "TDEP", 4) == 0) {
+            std::vector<std::string> strings;
+            std::size_t p = at + header;
+            for (std::uint32_t k = 0; k < n * 2; ++k) {
+                const auto end = std::find(d.begin() + static_cast<std::ptrdiff_t>(p), d.begin() + static_cast<std::ptrdiff_t>(at + size), 0);
+                if (end == d.begin() + static_cast<std::ptrdiff_t>(at + size)) return false;
+                strings.emplace_back(d.begin() + static_cast<std::ptrdiff_t>(p), end);
+                p = static_cast<std::size_t>(end - d.begin()) + 1;
+            }
+            for (std::uint32_t k = 0; k < n; ++k) out.deps.push_back({strings[k * 2], strings[k * 2 + 1]});
+            out.at = at; out.size = size; out.header = header;
+            return true;
+        }
+        at += size;
+    }
+    return false;
+}
+// The file with its TDEP section replaced; chunk sizes and the following chunks' offsets updated.
+inline Bytes with_deps(const Bytes& d, const Tdep& own, const Deps& deps) {
+    Bytes payload;
+    for (const auto& [name, path] : deps) {
+        payload.insert(payload.end(), name.begin(), name.end()); payload.push_back(0);
+        payload.insert(payload.end(), path.begin(), path.end()); payload.push_back(0);
+    }
+    payload.insert(payload.end(), 4 - payload.size() % 4, 0);  // 1-4 zero bytes, as the game's files
+    Bytes section(d.begin() + static_cast<std::ptrdiff_t>(own.at), d.begin() + static_cast<std::ptrdiff_t>(own.at + own.header));
+    const std::uint32_t count = static_cast<std::uint32_t>(deps.size()), size = static_cast<std::uint32_t>(own.header + payload.size());
+    std::memcpy(section.data() + 4, &count, 4);
+    std::memcpy(section.data() + 8, &size, 4);
+    section.insert(section.end(), payload.begin(), payload.end());
+    const std::int64_t delta = static_cast<std::int64_t>(section.size()) - static_cast<std::int64_t>(own.size);
+    Bytes out(d.begin(), d.begin() + static_cast<std::ptrdiff_t>(own.at));
+    out.insert(out.end(), section.begin(), section.end());
+    out.insert(out.end(), d.begin() + static_cast<std::ptrdiff_t>(own.at + own.size), d.end());
+    const auto add = [&](std::size_t at) { const std::uint32_t v = static_cast<std::uint32_t>(u32(out, at) + delta); std::memcpy(out.data() + at, &v, 4); };
+    add(28);  // the fixup chunk's size
+    for (std::size_t entry = 36; entry + 16 <= 0x224 && u32(out, entry + 4); entry += 16) add(entry + 4);  // later chunks' offsets
+    return out;
+}
+inline bool language(const std::pair<std::string, std::string>& dep) {
+    const auto& p = dep.second;
+    return p.size() > 4 && lower(p.substr(p.size() - 4)) == ".lng";
+}
+// `d` with its language tables replaced by those of `source`, in the game's order.
+inline Bytes swap_languages(const Bytes& d, const Tdep& own, const Deps& source) {
+    Deps merged;
+    for (const auto& dep : own.deps) if (!language(dep)) merged.push_back(dep);
+    for (const auto& dep : source) if (language(dep)) merged.push_back(dep);
+    std::stable_sort(merged.begin(), merged.end(), [](const auto& a, const auto& b) { return lower(a.first) < lower(b.first); });
+    return with_deps(d, own, merged);
+}
+// The mod's payload for this game, or empty when the two proofs above do not hold.
+inline Bytes language_port(const Bytes& entry, const Bytes& payload, const std::string& original_sha256, const std::string& patched_sha256) {
+    Tdep here, mod;
+    if (!tdep(entry, here) || !tdep(payload, mod)) return {};
+    if (settings::menu_assets::sha256(swap_languages(entry, here, mod.deps)) != original_sha256) return {};
+    Bytes port = swap_languages(payload, mod, here.deps);
+    Tdep ported;
+    if (!tdep(port, ported) || settings::menu_assets::sha256(swap_languages(port, ported, mod.deps)) != patched_sha256) return {};
+    return port;
+}
+}  // namespace igz
+
 // What one archive gets: its replaced entries, by index, after every mod.
 struct Replacement {
     Bytes bytes;        // the entry, or empty when served from `file`
@@ -296,10 +383,14 @@ using Resolve = std::function<fs::path(const std::string&)>;  // /app0 relative 
 struct Result {
     std::map<std::string, std::shared_ptr<const View>> views;  // lower-case /app0 path
     std::vector<std::pair<std::wstring, fs::path>> patches;     // mod, XML file
+    std::vector<std::pair<std::wstring, std::string>> skipped;  // mod, why it was not applied
+    std::vector<std::pair<std::wstring, std::string>> adapted;  // mod, what was ported from the other region
     std::vector<std::string> log;
 };
 
-inline Result build(const std::vector<mods::Mod>& mods, const Resolve& resolve) {
+// title_id and app_ver: the running game (param.sfo); when given, a mod whose patch is for
+// another game and cannot be ported (guest_patch_xml.hpp, other_region) is skipped whole.
+inline Result build(const std::vector<mods::Mod>& mods, const Resolve& resolve, const std::string& title_id = {}, const std::string& app_ver = {}) {
     Result result;
     struct Target {
         fs::path host;
@@ -308,75 +399,103 @@ inline Result build(const std::vector<mods::Mod>& mods, const Resolve& resolve) 
     };
     std::map<std::string, Target> targets;
     for (const auto& mod : mods) {
-        const std::string who = "mod " + mods::utf8(mod.name) + ": ";
+        // A mod is applied whole or not at all: its changes are staged, and kept only when
+        // every operation checks out. A mod that does not fit this game is skipped and
+        // reported, and the game starts without it.
+        std::map<std::pair<std::string, std::uint32_t>, Replacement> staged;
         Manifest manifest;
-        try { manifest = read_manifest(mod.folder); }
-        catch (const std::exception& e) { throw std::runtime_error(who + "mod.json: " + e.what()); }
-        if (!manifest.unsupported.empty()) {
-            std::string list;
-            for (const auto& name : manifest.unsupported) list += (list.empty() ? "" : ", ") + name;
-            throw std::runtime_error(who + "needs features this runtime does not have yet (" + list + ")");
-        }
-        for (const auto& [file, hash] : manifest.files) {
-            std::error_code ec;
-            if (!fs::is_regular_file(file, ec) || file_sha256(file) != hash)
-                throw std::runtime_error(who + "file " + mods::utf8(file.lexically_relative(mod.folder).generic_wstring()) + " is missing or damaged");
-        }
-        for (const auto& op : manifest.operations) try {
-            const std::string key = lower(op.archive.find('/') == std::string::npos ? "archives/" + op.archive : op.archive);
-            auto& target = targets[key];
-            if (!target.archive) {
-                target.host = resolve(key);
-                if (target.host.empty()) throw std::runtime_error(who + op.archive + " is not in the game folders");
-                target.archive = std::make_unique<settings::menu_assets::Iga>(target.host, false);
+        int ported = 0;
+        try {
+            manifest = read_manifest(mod.folder);
+            if (!manifest.unsupported.empty()) {
+                std::string list;
+                for (const auto& name : manifest.unsupported) list += (list.empty() ? "" : ", ") + name;
+                throw std::runtime_error("needs features this runtime does not have yet (" + list + ")");
             }
-            auto& archive = *target.archive;
-            const settings::menu_assets::IgaEntry* entry = nullptr;
-            if (op.index < archive.files.size() && names_asset(archive.files[op.index], op.asset)) entry = &archive.files[op.index];
-            for (size_t i = 0; !entry && i < archive.files.size(); ++i)
-                if (!op.asset.empty() && names_asset(archive.files[i], op.asset)) entry = &archive.files[i];
-            if (!entry) throw std::runtime_error(who + op.asset + " is not in " + op.archive);
-            const auto previous = target.replaced.find(entry->index);
-            Bytes current;
-            std::string current_sha;
-            if (previous == target.replaced.end()) {
-                current = archive.extract(*entry);
-                current_sha = settings::menu_assets::sha256(current);
-            } else {
-                current_sha = previous->second.sha256;
+            if (!title_id.empty())
+                for (const auto& file : manifest.patches)
+                    for (const auto& patch : guest_patches::parse_patches(mods::read_text(file), file.filename().wstring()))
+                        if (const auto why = guest_patches::mismatch(patch, title_id, app_ver); !why.empty() && !guest_patches::other_region(patch, title_id, app_ver))
+                            throw std::runtime_error("its code patch " + patch.name + " is for another game (" + why + ") and cannot be ported");
+            for (const auto& [file, hash] : manifest.files) {
+                std::error_code ec;
+                if (!fs::is_regular_file(file, ec) || file_sha256(file) != hash)
+                    throw std::runtime_error("file " + mods::utf8(file.lexically_relative(mod.folder).generic_wstring()) + " is missing or damaged");
             }
-            if (current_sha != op.original_sha256)
-                throw std::runtime_error(who + op.asset + " in " + op.archive + " differs from the one the mod was made for (found " + current_sha.substr(0, 12) + ")" +
-                                         (previous == target.replaced.end() ? " (another game version?)" : " (changed by " + mods::utf8(previous->second.mod) + ")"));
-            Replacement next;
-            next.mod = mod.name;
-            if (!op.payload.empty()) {
-                next.file = op.payload;
-                next.size = fs::file_size(op.payload);
-                next.sha256 = file_sha256(op.payload);
-            } else {
-                if (previous != target.replaced.end())
-                    current = previous->second.file.empty() ? previous->second.bytes : file_bytes(previous->second.file);
-                for (const auto& run : op.runs) {
-                    if (run.offset + run.from.size() > current.size() || !std::equal(run.from.begin(), run.from.end(), current.begin() + std::ptrdiff_t(run.offset)))
-                        throw std::runtime_error(who + op.asset + ": bytes at " + std::to_string(run.offset) + " differ from the mod's");
-                    std::copy(run.to.begin(), run.to.end(), current.begin() + std::ptrdiff_t(run.offset));
+            for (const auto& op : manifest.operations) {
+                const std::string key = lower(op.archive.find('/') == std::string::npos ? "archives/" + op.archive : op.archive);
+                auto& target = targets[key];
+                if (!target.archive) {
+                    target.host = resolve(key);
+                    if (target.host.empty()) throw std::runtime_error(op.archive + " is not in the game folders");
+                    target.archive = std::make_unique<settings::menu_assets::Iga>(target.host, false);
                 }
-                next.sha256 = settings::menu_assets::sha256(current);
-                next.size = current.size();
-                next.bytes = std::move(current);
+                auto& archive = *target.archive;
+                const settings::menu_assets::IgaEntry* entry = nullptr;
+                if (op.index < archive.files.size() && names_asset(archive.files[op.index], op.asset)) entry = &archive.files[op.index];
+                for (size_t i = 0; !entry && i < archive.files.size(); ++i)
+                    if (!op.asset.empty() && names_asset(archive.files[i], op.asset)) entry = &archive.files[i];
+                if (!entry) throw std::runtime_error(op.asset + " is not in " + op.archive);
+                // The entry as the game would read it: this mod's own change, an earlier mod's, or the archive's.
+                const Replacement* previous = nullptr;
+                if (const auto s = staged.find({key, entry->index}); s != staged.end()) previous = &s->second;
+                else if (const auto r = target.replaced.find(entry->index); r != target.replaced.end()) previous = &r->second;
+                Bytes current;
+                std::string current_sha;
+                if (!previous) {
+                    current = archive.extract(*entry);
+                    current_sha = settings::menu_assets::sha256(current);
+                } else {
+                    current_sha = previous->sha256;
+                }
+                Replacement next;
+                next.mod = mod.name;
+                if (current_sha != op.original_sha256) {
+                    // The other region's asset: ported when it differs only in its language tables.
+                    Bytes port;
+                    if (!previous && !op.payload.empty()) port = igz::language_port(current, file_bytes(op.payload), op.original_sha256, op.patched_sha256);
+                    if (port.empty())
+                        throw std::runtime_error(op.asset + " in " + op.archive + " differs from the one the mod was made for (found " + current_sha.substr(0, 12) + ")" +
+                                                 (!previous ? " (another game version?)" : " (changed by " + mods::utf8(previous->mod) + ")"));
+                    next.sha256 = settings::menu_assets::sha256(port);
+                    next.size = port.size();
+                    next.bytes = std::move(port);
+                    ++ported;
+                } else if (!op.payload.empty()) {
+                    next.file = op.payload;
+                    next.size = fs::file_size(op.payload);
+                    next.sha256 = file_sha256(op.payload);
+                } else {
+                    if (previous) current = previous->file.empty() ? previous->bytes : file_bytes(previous->file);
+                    for (const auto& run : op.runs) {
+                        if (run.offset + run.from.size() > current.size() || !std::equal(run.from.begin(), run.from.end(), current.begin() + std::ptrdiff_t(run.offset)))
+                            throw std::runtime_error(op.asset + ": bytes at " + std::to_string(run.offset) + " differ from the mod's");
+                        std::copy(run.to.begin(), run.to.end(), current.begin() + std::ptrdiff_t(run.offset));
+                    }
+                    next.sha256 = settings::menu_assets::sha256(current);
+                    next.size = current.size();
+                    next.bytes = std::move(current);
+                }
+                if (next.sha256 != op.patched_sha256 && current_sha == op.original_sha256)
+                    throw std::runtime_error(op.asset + ": the result does not match the mod's patched_sha256");
+                staged[{key, entry->index}] = std::move(next);
             }
-            if (next.sha256 != op.patched_sha256) throw std::runtime_error(who + op.asset + ": the result does not match the mod's patched_sha256");
-            target.replaced[entry->index] = std::move(next);
         } catch (const std::exception& e) {
-            const std::string what = e.what();
-            throw std::runtime_error(what.rfind(who, 0) == 0 ? what : who + op.archive + ": " + what);
+            result.skipped.push_back({mod.name, e.what()});
+            result.log.push_back("Mods: " + mods::utf8(mod.name) + ": not applied: " + e.what());
+            continue;
+        }
+        for (auto& [where, replacement] : staged) targets[where.first].replaced[where.second] = std::move(replacement);
+        if (ported) {
+            result.adapted.push_back({mod.name, "language tables of " + std::to_string(ported) + " assets ported"});
+            result.log.push_back("Mods: " + mods::utf8(mod.name) + ": " + std::to_string(ported) + " assets ported from the other region (language tables)");
         }
         for (const auto& patch : manifest.patches) result.patches.push_back({mod.name, patch});
         result.log.push_back("Mods: " + mods::utf8(mod.name) + ": " + std::to_string(manifest.operations.size()) + " asset changes, " +
                              std::to_string(manifest.patches.size()) + " patch files");
     }
     for (auto& [key, target] : targets) {
+        if (target.replaced.empty()) continue;
         auto view = std::make_shared<View>();
         view->host = target.host;
         view->source_size = target.archive->size();
@@ -390,15 +509,25 @@ inline Result build(const std::vector<mods::Mod>& mods, const Resolve& resolve) 
 }
 
 // Runtime startup, after mods::overlay.configure_from_environment: the views of the enabled
-// octr-mod mods replace the archives they change, and their patch files are registered.
+// octr-mod mods replace the archives they change, and their patch files are registered. What
+// was skipped or adapted goes to runtime/user/logs/mods_status.json (mod_overlay.hpp).
 inline void configure(const fs::path& base, const fs::path& patch) {
+    mods::statuses().clear();
     const auto mods = mods::overlay.octr_mods();
-    if (mods.empty()) return;
+    if (mods.empty()) { mods::write_statuses(); return; }
+    std::string title_id, app_ver;
+    try {
+        const auto sfo = guest_patches::read_sfo((patch.empty() ? base : patch) / "sce_sys/param.sfo");
+        if (sfo.count("TITLE_ID") && sfo.count("APP_VER")) { title_id = sfo.at("TITLE_ID"); app_ver = sfo.at("APP_VER"); }
+    } catch (const std::exception&) {}
     auto result = build(mods, [&](const std::string& relative) -> fs::path {
         try { return app0_read_path(base, patch, relative); } catch (const std::exception&) { return {}; }
-    });
+    }, title_id, app_ver);
     for (const auto& line : result.log) std::fprintf(stderr, "%s\n", line.c_str());
     std::fflush(stderr);
+    for (const auto& [mod, why] : result.skipped) mods::statuses().push_back({mod, "skipped", why});
+    for (const auto& [mod, what] : result.adapted) mods::statuses().push_back({mod, "adapted", what});
+    mods::write_statuses();
     settings::menu_overlay::overlay.set_mod_views(std::move(result.views));
     guest_patches::mod_patch_files() = std::move(result.patches);
 }

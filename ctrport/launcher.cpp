@@ -1548,6 +1548,17 @@ void reload_mods() {
     try {
         g.mod_list = mods::list_mods(mods_dir(), mods::read_config(mods_config_path()));
     } catch (const std::exception& e) { g.mods_notice = widen(e.what()); g.mods_notice_error = true; }
+    // What the runtime did with each mod at the last start (mods_status.json, mod_overlay.hpp):
+    // not applied, or adapted from the other region of the game.
+    std::map<std::wstring, std::wstring> skipped, adapted;
+    try {
+        const auto list = ctr_online::parse_json(mods::read_text(g.root / "runtime/user/logs/mods_status.json"));
+        for (const auto& item : list.items) {
+            const auto mod = widen(ctrport::gamebanana::text_of(item, "mod")), reason = widen(ctrport::gamebanana::text_of(item, "reason"));
+            auto& into = ctrport::gamebanana::text_of(item, "state") == "adapted" ? adapted[mod] : skipped[mod];
+            into += (into.empty() ? L"" : L"; ") + reason;
+        }
+    } catch (const std::exception&) {}
     for (const auto& mod : g.mod_list) {
         try {
             auto single = mod;
@@ -1563,6 +1574,12 @@ void reload_mods() {
                     : trf(L"{0} asset changes", std::to_wstring(manifest.operations)) + L" \u00b7 " + trf(L"{0} patch files", std::to_wstring(manifest.patches)) +
                       (index.files.empty() ? L"" : L" \u00b7 " + trf(L"{0} game files", std::to_wstring(index.files.size())));
                 g.mod_bad.back() = !manifest.problem.empty();
+                if (const auto why = skipped.find(mod.name); why != skipped.end() && mod.enabled) {
+                    g.mod_details.back() = trf(L"Not applied at the last start: {0}", why->second);
+                    g.mod_bad.back() = true;
+                } else if (const auto how = adapted.find(mod.name); how != adapted.end() && mod.enabled) {
+                    g.mod_details.back() = trf(L"Adapted from the other region of the game: {0}", how->second);
+                }
             } else if (index.files.empty()) {
                 g.mod_details.back() = tr(L"No game files found");
             }
@@ -2354,6 +2371,8 @@ void game_finished(DWORD code) {
     g.process = nullptr;
     g.lock.release();
     load_config();
+    reload_mods();  // mods the runtime did not apply are marked
+    sync_mod_rows();
     for (int i=0; i<static_cast<int>(std::size(kModes)); ++i)
         if(g.cfg.upscaling_mode==kModes[i]) SendMessageW(g.scene_combo,CB_SETCURSEL,i,0);
     for (int i=0; i<static_cast<int>(std::size(kUpscalers)); ++i)
