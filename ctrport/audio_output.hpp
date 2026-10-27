@@ -5,6 +5,10 @@
 #pragma once
 #include <Windows.h>
 #include <xaudio2.h>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <cstdlib>
 #include <future>
 #include <memory>
 #include <condition_variable>
@@ -28,15 +32,119 @@ class AudioOutputBackend {
   void STDMETHODCALLTYPE OnLoopEnd(void*) override{}
   void STDMETHODCALLTYPE OnVoiceError(void*,HRESULT) override{SetEvent(event);}
  };
+ // XAudio2 reports a lost endpoint (device unplugged or disabled) on its own thread. Only a
+ // flag is set there; the owner thread drops the engine, since no XAudio2 call is allowed here.
+ struct EngineEvents:IXAudio2EngineCallback{
+  std::atomic<HRESULT> lost{S_OK};
+  void STDMETHODCALLTYPE OnProcessingPassStart() override{}
+  void STDMETHODCALLTYPE OnProcessingPassEnd() override{}
+  void STDMETHODCALLTYPE OnCriticalError(HRESULT error) override{lost.store(FAILED(error)?error:E_FAIL);}
+ };
  static constexpr unsigned queue_depth=4,block_slots=6;
- // A silent port (PC without an audio output device) has no voice: output() takes each block
- // at the real 48 kHz rate on a steady clock and discards it, so game pacing is unchanged.
- struct Port {IXAudio2SourceVoice* voice=nullptr;bool silent=false;std::chrono::steady_clock::time_point clock{};std::array<float,8> gains{1,1,1,1,1,1,1,1};uint32_t length=0;int32_t user=0;uint64_t submitted_buffers=0,nonzero_buffers=0;std::vector<unsigned char> buffer;std::unique_ptr<BlockEnd> block_end;};
- static bool used(const Port& port){return port.voice || port.silent;}
- std::array<Port,9> ports;IXAudio2* active_engine=nullptr;
+ // Without an audio output device (none at start, or lost later) an open port has no voice:
+ // output() takes each block at the real 48 kHz rate on a steady clock and discards it, so
+ // game pacing is unchanged. The owner thread retries the default device every second and
+ // gives every open port its voice back, with its volumes, when one appears.
+ struct Port {IXAudio2SourceVoice* voice=nullptr;bool open=false;WAVEFORMATEX format{};std::chrono::steady_clock::time_point clock{};std::array<float,8> gains{1,1,1,1,1,1,1,1};uint32_t length=0;int32_t user=0;uint64_t submitted_buffers=0,nonzero_buffers=0;std::vector<unsigned char> buffer;std::unique_ptr<BlockEnd> block_end;};
+ std::array<Port,9> ports;IXAudio2* active_engine=nullptr;IXAudio2MasteringVoice* active_master=nullptr;EngineEvents events;
  bool stopping=false,ready=false,silent=false;uint32_t channels=0,sample_rate=0;
+ std::chrono::steady_clock::time_point started{};
  // Windows reports no default render endpoint (no speakers or headphones, or all disabled).
  static bool no_device(HRESULT hr){return hr==HRESULT_FROM_WIN32(ERROR_NOT_FOUND) || hr==static_cast<HRESULT>(0x88890004L) || hr==static_cast<HRESULT>(0x88960004L);}
+ static long test_value(const char* name){char text[16]{};const DWORD n=GetEnvironmentVariableA(name,text,sizeof text);return n && n<sizeof text?std::strtol(text,nullptr,10):0;}
+ void release(IXAudio2*& engine,IXAudio2MasteringVoice*& master){
+  if(master)master->DestroyVoice();if(engine){engine->UnregisterForCallbacks(&events);engine->Release();}
+  master=nullptr;engine=nullptr;
+ }
+ // Owner thread: the engine and a mastering voice on the current default device.
+ HRESULT connect(IXAudio2*& engine,IXAudio2MasteringVoice*& master){
+  engine=nullptr;master=nullptr;
+  // CTR_AUDIO_TEST_NO_DEVICE=<seconds> (tests): no device for that long after AudioOutInit.
+  const long missing=test_value("CTR_AUDIO_TEST_NO_DEVICE");
+  if(missing>0 && std::chrono::steady_clock::now()<started+std::chrono::seconds(missing))return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+  HRESULT hr=XAudio2Create(&engine,0,XAUDIO2_DEFAULT_PROCESSOR);
+  if(SUCCEEDED(hr))hr=engine->RegisterForCallbacks(&events);
+  if(SUCCEEDED(hr))hr=engine->CreateMasteringVoice(&master);
+  // CTR_AUDIO_MUTE=1 (test runs): zero endpoint gain only. Voices still consume every
+  // block at the real rate, so AudioOutOutput pacing is unchanged.
+  if(SUCCEEDED(hr) && test_value("CTR_AUDIO_MUTE")==1){hr=master->SetVolume(0.0f);std::printf("{\"scope\":\"audio_endpoint_muted\",\"result\":%ld}\n",static_cast<long>(hr));}
+  if(SUCCEEDED(hr)){XAUDIO2_VOICE_DETAILS details{};master->GetVoiceDetails(&details);if(!details.InputChannels || !details.InputSampleRate)hr=E_UNEXPECTED;}
+  if(FAILED(hr))release(engine,master);
+  return hr;
+ }
+ HRESULT create_voice(Port& port){
+  if(!port.block_end){port.block_end=std::make_unique<BlockEnd>();if(!port.block_end->event)return E_OUTOFMEMORY;}
+  IXAudio2SourceVoice* voice=nullptr;
+  HRESULT hr=active_engine->CreateSourceVoice(&voice,&port.format,0,XAUDIO2_DEFAULT_FREQ_RATIO,port.block_end.get());
+  if(FAILED(hr))return hr;
+  XAUDIO2_VOICE_DETAILS details{};voice->GetVoiceDetails(&details);
+  if(details.InputChannels!=8 || details.InputSampleRate!=port.format.nSamplesPerSec)hr=E_UNEXPECTED;
+  if(SUCCEEDED(hr))hr=voice->SetChannelVolumes(8,port.gains.data());
+  if(FAILED(hr)){voice->DestroyVoice();return hr;}
+  port.voice=voice;return S_OK;
+ }
+ // Mutex held, owner thread: every port goes silent and the engine is dropped.
+ void go_silent(){
+  for(auto& port:ports)if(port.voice){port.voice->DestroyVoice();port.voice=nullptr;port.clock={};}
+  release(active_engine,active_master);silent=true;
+ }
+ // Mutex held, owner thread: the new engine takes over and every open port gets a voice.
+ bool go_live(IXAudio2* engine,IXAudio2MasteringVoice* master){
+  active_engine=engine;active_master=master;events.lost.store(S_OK);
+  for(auto& port:ports)if(port.open && FAILED(create_voice(port))){go_silent();return false;}
+  silent=false;return true;
+ }
+ void run(std::promise<HRESULT>& promise){
+  const HRESULT com=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
+  IXAudio2* engine=nullptr;IXAudio2MasteringVoice* master=nullptr;
+  const HRESULT hr=FAILED(com)?com:connect(engine,master);
+  if(SUCCEEDED(hr)){XAUDIO2_VOICE_DETAILS details{};master->GetVoiceDetails(&details);channels=details.InputChannels;sample_rate=details.InputSampleRate;active_engine=engine;active_master=master;}
+  else if(no_device(hr)){channels=8;sample_rate=48000;silent=true;}
+  const bool keep=SUCCEEDED(hr) || no_device(hr);
+  promise.set_value(hr);
+  if(keep){
+   // CTR_AUDIO_TEST_LOSE_DEVICE=<seconds> (tests): the device is lost that long after AudioOutInit, once.
+   const long lose=test_value("CTR_AUDIO_TEST_LOSE_DEVICE");bool lose_pending=lose>0;
+   std::unique_lock<std::mutex> guard(mutex);
+   while(!stopping){
+    wake.wait_for(guard,std::chrono::seconds(1),[this]{return stopping;});
+    if(stopping)break;
+    HRESULT lost=events.lost.exchange(S_OK);
+    if(lose_pending && !silent && std::chrono::steady_clock::now()>=started+std::chrono::seconds(lose)){lose_pending=false;lost=static_cast<HRESULT>(0x88960004L);}
+    if(!silent && FAILED(lost)){
+     go_silent();
+     std::fprintf(stderr,"audio: audio output device lost (HRESULT=0x%08lx); the game continues without sound\n",static_cast<unsigned long>(lost));std::fflush(stderr);
+     continue;
+    }
+    if(!silent)continue;
+    guard.unlock();const HRESULT again=connect(engine,master);guard.lock();
+    if(FAILED(again))continue;
+    if(stopping){release(engine,master);break;}
+    if(go_live(engine,master))std::fprintf(stderr,"audio: audio output device available; sound resumed\n");
+    else std::fprintf(stderr,"audio: audio output device found but its voices could not be created; retrying\n");
+    std::fflush(stderr);
+   }
+   go_silent();
+  }
+  if(SUCCEEDED(com))CoUninitialize();
+ }
+ // Mutex held: a port without a voice takes the block at the real rate and discards it.
+ int silent_output(Port& port,const void* input){
+  if(!input)return 0;SIZE_T copied=0;const auto bytes=port.buffer.size()/block_slots;
+  unsigned char* block=port.buffer.data()+bytes*(port.submitted_buffers%block_slots);
+  if(!ReadProcessMemory(GetCurrentProcess(),input,block,bytes,&copied) || copied!=bytes)return static_cast<int>(0x80260004U);
+  // Same backpressure as a device: return once the block fits within queue_depth blocks
+  // ahead of the clock; after a long stall the clock restarts instead of catching up in bursts.
+  using namespace std::chrono;
+  const auto length=duration_cast<steady_clock::duration>(duration<double>(static_cast<double>(port.length)/48000.0));
+  const auto now=steady_clock::now();
+  if(port.clock<now-length*queue_depth)port.clock=now;
+  port.clock+=length;
+  const auto ahead=port.clock-now-length*queue_depth;
+  if(ahead>steady_clock::duration::zero()){mutex.unlock();std::this_thread::sleep_for(ahead);mutex.lock();if(!port.open)return static_cast<int>(0x80260001U);}
+  ++port.submitted_buffers;
+  return static_cast<int>(port.length*8);
+ }
 public:
  ~AudioOutputBackend(){ {std::lock_guard<std::mutex> lock(mutex);stopping=true;}wake.notify_all();if(owner.joinable())owner.join();}
  int initialize(){
@@ -44,34 +152,14 @@ public:
   if(ready)return static_cast<int>(0x8026000eU);
   if(owner.joinable())throw std::runtime_error("Audio endpoint initialization previously failed");
   std::promise<HRESULT> promise;auto result=promise.get_future();
-  owner=std::thread([this,promise=std::move(promise)]()mutable{
-   const HRESULT com=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
-   IXAudio2* engine=nullptr;IXAudio2MasteringVoice* master=nullptr;
-   HRESULT hr=com;
-   if(SUCCEEDED(hr))hr=XAudio2Create(&engine,0,XAUDIO2_DEFAULT_PROCESSOR);
-   if(SUCCEEDED(hr))hr=engine->CreateMasteringVoice(&master);
-   // CTR_AUDIO_TEST_NO_DEVICE=1 (tests): behave as a PC without an audio output device.
-   char no_output[2]{};
-   if(SUCCEEDED(hr) && GetEnvironmentVariableA("CTR_AUDIO_TEST_NO_DEVICE",no_output,sizeof no_output)==1 && no_output[0]=='1'){master->DestroyVoice();master=nullptr;hr=HRESULT_FROM_WIN32(ERROR_NOT_FOUND);}
-   // CTR_AUDIO_MUTE=1 (test runs): zero endpoint gain only. Voices still consume every
-   // block at the real rate, so AudioOutOutput pacing is unchanged.
-   char mute[2]{};
-   if(SUCCEEDED(hr) && GetEnvironmentVariableA("CTR_AUDIO_MUTE",mute,sizeof mute)==1 && mute[0]=='1'){hr=master->SetVolume(0.0f);std::printf("{\"scope\":\"audio_endpoint_muted\",\"result\":%ld}\n",static_cast<long>(hr));}
-   if(SUCCEEDED(hr)){XAUDIO2_VOICE_DETAILS details{};master->GetVoiceDetails(&details);channels=details.InputChannels;sample_rate=details.InputSampleRate;active_engine=engine;}
-   promise.set_value(hr);
-   if(SUCCEEDED(hr)){
-    std::unique_lock<std::mutex> guard(mutex);wake.wait(guard,[this]{return stopping;});guard.unlock();
-   }
-   for(auto& port:ports)if(port.voice){port.voice->DestroyVoice();port.voice=nullptr;}active_engine=nullptr;
-   if(master)master->DestroyVoice();if(engine)engine->Release();if(SUCCEEDED(com))CoUninitialize();
-  });
+  started=std::chrono::steady_clock::now();
+  owner=std::thread([this,promise=std::move(promise)]()mutable{run(promise);});
   const HRESULT hr=result.get();
   if(no_device(hr)){
-   std::fprintf(stderr,"audio: no audio output device (HRESULT=0x%08lx); the game runs without sound\n",static_cast<unsigned long>(hr));std::fflush(stderr);
-   silent=true;channels=8;sample_rate=48000;ready=true;return 0;
+   std::fprintf(stderr,"audio: no audio output device (HRESULT=0x%08lx); the game runs without sound until one is connected\n",static_cast<unsigned long>(hr));std::fflush(stderr);
+   ready=true;return 0;
   }
   if(FAILED(hr))throw std::runtime_error("XAudio2 real mastering endpoint failed HRESULT="+std::to_string(static_cast<unsigned long>(hr)));
-  if(!channels || !sample_rate)throw std::runtime_error("XAudio2 endpoint format missing");
   ready=true;return 0;
  }
  int open(int32_t user,int32_t type,int32_t index,uint32_t length,uint32_t rate,uint32_t param){
@@ -83,19 +171,12 @@ public:
   if(rate!=48000)return static_cast<int>(0x80260008U);
   if((param&255)>7 || ((param>>16)&15)>2)return static_cast<int>(0x80260007U);
   if((type!=0 && type!=1) || index!=0 || (param!=5 && param!=2))throw std::runtime_error("AudioOutOpen only MAIN/BGM float8 or S16_8CH index0 routing implemented");
-  for(unsigned i=(type==1?8u:0u);i<(type==1?9u:8u);++i)if(!used(ports[i])){
-   if(silent){
-    ports[i].silent=true;ports[i].length=length;ports[i].user=user;ports[i].buffer.resize(static_cast<size_t>(length)*8*(param==2?2:4));
-    return static_cast<int>(0x20000000U|(static_cast<unsigned>(type)<<16)|i);
-   }
-   WAVEFORMATEX format{};format.wFormatTag=param==2?WAVE_FORMAT_PCM:WAVE_FORMAT_IEEE_FLOAT;format.nChannels=8;format.nSamplesPerSec=rate;format.wBitsPerSample=param==2?16:32;format.nBlockAlign=static_cast<WORD>(8*(format.wBitsPerSample/8));format.nAvgBytesPerSec=rate*format.nBlockAlign;
-   std::vector<unsigned char> buffer(static_cast<size_t>(length)*format.nBlockAlign*block_slots);IXAudio2SourceVoice* voice=nullptr;
-   auto block_end=std::make_unique<BlockEnd>();if(!block_end->event)throw std::runtime_error("Audio block event unavailable");
-   HRESULT hr=active_engine->CreateSourceVoice(&voice,&format,0,XAUDIO2_DEFAULT_FREQ_RATIO,block_end.get());
-   if(FAILED(hr))throw std::runtime_error("XAudio2 source voice failed HRESULT="+std::to_string(static_cast<unsigned long>(hr)));
-   XAUDIO2_VOICE_DETAILS details{};voice->GetVoiceDetails(&details);
-   if(details.InputChannels!=8 || details.InputSampleRate!=rate){voice->DestroyVoice();throw std::runtime_error("Audio source voice format mismatch");}
-   ports[i].voice=voice;ports[i].length=length;ports[i].user=user;ports[i].buffer=std::move(buffer);ports[i].block_end=std::move(block_end);return static_cast<int>(0x20000000U|(static_cast<unsigned>(type)<<16)|i);
+  for(unsigned i=(type==1?8u:0u);i<(type==1?9u:8u);++i)if(!ports[i].open){
+   auto& port=ports[i];
+   WAVEFORMATEX& format=port.format;format.wFormatTag=param==2?WAVE_FORMAT_PCM:WAVE_FORMAT_IEEE_FLOAT;format.nChannels=8;format.nSamplesPerSec=rate;format.wBitsPerSample=param==2?16:32;format.nBlockAlign=static_cast<WORD>(8*(format.wBitsPerSample/8));format.nAvgBytesPerSec=rate*format.nBlockAlign;
+   port.buffer.assign(static_cast<size_t>(length)*format.nBlockAlign*block_slots,0);port.length=length;port.user=user;
+   if(!silent){const HRESULT hr=create_voice(port);if(FAILED(hr)){port=Port{};throw std::runtime_error("XAudio2 source voice failed HRESULT="+std::to_string(static_cast<unsigned long>(hr)));}}
+   port.open=true;return static_cast<int>(0x20000000U|(static_cast<unsigned>(type)<<16)|i);
   }
   return static_cast<int>(0x80260005U);
  }
@@ -106,11 +187,12 @@ public:
   if(((static_cast<unsigned>(handle)>>16)&255)>1)throw std::runtime_error("Audio volume routing only MAIN/BGM implemented");
   int32_t volume=0;SIZE_T read=0;if(!value || !ReadProcessMemory(GetCurrentProcess(),value,&volume,4,&read) || read!=4)return static_cast<int>(0x80260004U);
   if(volume>32768)return static_cast<int>(0x80260009U);
-  if(id>=ports.size() || !used(ports[id]))return static_cast<int>(0x80260001U);
+  if(id>=ports.size() || !ports[id].open)return static_cast<int>(0x80260001U);
   if(volume<0)throw std::runtime_error("Negative audio gain semantics unobserved");
-  if(ports[id].silent){for(unsigned c=0;c<8;++c)if(flags&(1U<<c))ports[id].gains[c]=static_cast<float>(volume)/32768.0f;return 0;}
-  float gains[8];ports[id].voice->GetChannelVolumes(8,gains);for(unsigned c=0;c<8;++c)if(flags&(1U<<c))gains[c]=static_cast<float>(volume)/32768.0f;
-  const HRESULT hr=ports[id].voice->SetChannelVolumes(8,gains);if(FAILED(hr))throw std::runtime_error("XAudio2 channel gain application failed");return 0;
+  // The port keeps its gains, so a voice created after a device change gets them too.
+  auto& port=ports[id];for(unsigned c=0;c<8;++c)if(flags&(1U<<c))port.gains[c]=static_cast<float>(volume)/32768.0f;
+  if(port.voice && FAILED(port.voice->SetChannelVolumes(8,port.gains.data())))throw std::runtime_error("XAudio2 channel gain application failed");
+  return 0;
  }
  std::array<float,8> volume_control_readback(unsigned id){std::lock_guard<std::mutex> lock(mutex);std::array<float,8> result{};if(id>=ports.size() || !ports[id].voice)throw std::runtime_error("No audio control port");ports[id].voice->GetChannelVolumes(8,result.data());return result;}
  int output(int32_t handle,const void* input){
@@ -118,28 +200,17 @@ public:
   const unsigned id=static_cast<unsigned>(handle)&255;
   if((static_cast<unsigned>(handle)&0x3f000000U)!=0x20000000U || id>=25)return static_cast<int>(0x80260003U);
   if(((static_cast<unsigned>(handle)>>16)&255)>1)throw std::runtime_error("Audio output routing only MAIN/BGM implemented");
-  if(id>=ports.size() || !used(ports[id]))return static_cast<int>(0x80260001U);auto& port=ports[id];
-  if(port.silent){
-   if(!input)return 0;SIZE_T copied=0;
-   if(!ReadProcessMemory(GetCurrentProcess(),input,port.buffer.data(),port.buffer.size(),&copied) || copied!=port.buffer.size())return static_cast<int>(0x80260004U);
-   // Same backpressure as a device: return once the block fits within queue_depth blocks
-   // ahead of the clock; after a long stall the clock restarts instead of catching up in bursts.
-   using namespace std::chrono;
-   const auto block=duration_cast<steady_clock::duration>(duration<double>(static_cast<double>(port.length)/48000.0));
-   const auto now=steady_clock::now();
-   if(port.clock<now-block*queue_depth)port.clock=now;
-   port.clock+=block;
-   const auto ahead=port.clock-now-block*queue_depth;
-   if(ahead>steady_clock::duration::zero()){mutex.unlock();std::this_thread::sleep_for(ahead);mutex.lock();if(!port.silent)return static_cast<int>(0x80260001U);}
-   ++port.submitted_buffers;
-   return static_cast<int>(port.length*8);
-  }
+  if(id>=ports.size() || !ports[id].open)return static_cast<int>(0x80260001U);auto& port=ports[id];
   // PS4 AudioOut returns once the port can take the next block. Up to queue_depth blocks
   // (about 21 ms at 256 samples) stay queued so host scheduling jitter does not starve
   // the voice; storage rotates over block_slots because XAudio2 reads queued data in place.
+  // The owner thread can take the voice away or give it back while this waits.
   const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);XAUDIO2_VOICE_STATE state{};
-  for(;;){port.voice->GetState(&state,XAUDIO2_VOICE_NOSAMPLESPLAYED);if(state.BuffersQueued<queue_depth)break;if(std::chrono::steady_clock::now()>=deadline)throw std::runtime_error("Audio native buffer drain timeout");
-   const HANDLE event=port.block_end->event;mutex.unlock();WaitForSingleObject(event,10);mutex.lock();if(!port.voice)return static_cast<int>(0x80260001U);}
+  for(;;){
+   if(!port.open)return static_cast<int>(0x80260001U);
+   if(!port.voice)return silent_output(port,input);
+   port.voice->GetState(&state,XAUDIO2_VOICE_NOSAMPLESPLAYED);if(state.BuffersQueued<queue_depth)break;if(std::chrono::steady_clock::now()>=deadline)throw std::runtime_error("Audio native buffer drain timeout");
+   const HANDLE event=port.block_end->event;mutex.unlock();WaitForSingleObject(event,10);mutex.lock();}
   if(!input)return 0;SIZE_T copied=0;const auto bytes=port.buffer.size()/block_slots;
   unsigned char* block=port.buffer.data()+bytes*(port.submitted_buffers%block_slots);
   if(!ReadProcessMemory(GetCurrentProcess(),input,block,bytes,&copied) || copied!=bytes)return static_cast<int>(0x80260004U);
@@ -162,9 +233,8 @@ public:
   if((static_cast<unsigned>(handle)&0x3f000000U)!=0x20000000U || id>=25)return static_cast<int>(0x80260003U);
   const unsigned type=(static_cast<unsigned>(handle)>>16)&255;
   if(!(type<=4 || type==14 || type==126 || type==127))return static_cast<int>(0x8026000aU);
-  if(id>=ports.size() || !used(ports[id]))return static_cast<int>(0x80260001U);
-  auto& port=ports[id];if(port.silent){port=Port{};return 0;}
-  port.voice->Stop();port.voice->FlushSourceBuffers();port.voice->DestroyVoice();
+  if(id>=ports.size() || !ports[id].open)return static_cast<int>(0x80260001U);
+  auto& port=ports[id];if(port.voice){port.voice->Stop();port.voice->FlushSourceBuffers();port.voice->DestroyVoice();}
   port=Port{};return 0;
  }
  uint64_t played_samples_control(unsigned id){std::lock_guard<std::mutex> lock(mutex);XAUDIO2_VOICE_STATE state{};if(id>=ports.size() || !ports[id].voice)throw std::runtime_error("No audio sample control port");ports[id].voice->GetState(&state);return state.SamplesPlayed;}
