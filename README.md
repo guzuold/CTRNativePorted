@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.7.9](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.9-u2)** (US mods on the EU game, mods that do not fit no longer stop the game)
+**Latest release: [v0.7.10](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.10-u2)** (frame rate above 60 with Direct3D 11)
 
 v0.7.1 makes the **Direct3D 11 renderer** the default and lays out the graphics settings like current PC games: upscaling method (FSR 1, FSR 3,
 DLSS) with Quality/Balanced/Performance modes and sharpness, a single shadow quality, and the
@@ -66,6 +66,8 @@ complete, in private matches and in public matchmaking; see the
 - **Internal 3D resolution** from 720p to native 4K (720p, 900p, 1080p, 1440p, 1800p,
   2160p), independent of the window or display resolution.
 - **60 FPS** on v01.21, through the community "60 FPS Unlock" patch, applied in memory only.
+- **Above 60 FPS with Direct3D 11:** a frame rate limit other than Console (up to 240, or
+  Unlimited) frees the game from the console's 60 Hz pacing; V-Sync On caps at the display.
 - **PS4 Pro rendering mode.**
 - **Upscaling:**
   - AMD FSR 1 for the 3D scene, applied before the HUD;

@@ -1,7 +1,12 @@
-## Unreleased
+## v0.7.10 — 2026-10-27
+
+Frame rate above 60 with Direct3D 11.
 
 - **Frame rate above 60 with Direct3D 11:** the 60 FPS mode only made the game ask for 60 instead of 30, so the frame rate limit could never go higher. Now any **Frame rate limit** other than **Console** frees the game from the console's 60 Hz pacing and caps it at the chosen value. The new values are 144, 165, 240 and **Unlimited**; with Unlimited, **V-Sync On** caps at your display's refresh rate. The game keeps real time: a race timer matched the wall clock with no limit. **Console** (the default) keeps the old behaviour. With Vulkan, values above 60 still change nothing.
 - **"Unable to start ctrport.exe (error 0)":** since v0.7.3 the launcher sometimes showed this message although the game was starting, when the launcher was not the window in front. Fixed.
+- **PCs without an audio output device:** when Windows has no speakers or headphones to play to (none connected, or all disabled), the game stopped right at start. It now runs without sound, at normal speed, and the log says so. Sound starts by itself, without restarting, once a device is connected or enabled. If the device is unplugged during play, the game goes on without sound and picks the sound up again on the next default device. Reported on the US version in issue #4; checked by simulating a missing and a lost device.
+- **Tested:** v01.21 (EU) with Direct3D 11, menus and a race. Console 60 FPS; limit 144 gives 144; Unlimited about 370 in the menus and 150 in a race on an RTX 4070 Ti SUPER; Unlimited with V-Sync On 120 on a 120 Hz display.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
 
 ## v0.7.9 — 2026-10-27
 
