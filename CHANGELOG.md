@@ -1,3 +1,17 @@
+## v0.8.0 — 2026-10-27
+
+Fixes for the black screen and the slowdowns reported on issue #4, and a cleaner code base.
+
+- **Black screen (issue #4):** with **Anti-aliasing** set to **Off** or **SMAA**, the game drew only the HUD and the effects and left the track and the karts black, already on the title screen. It happened on every game version (EU and US) and with both renderers, ever since the option was added. The option is removed: the game always keeps its own FXAA, and an Off or SMAA already saved is ignored.
+- **Lower settings no longer lower the frame rate:** two settings meant to make the game lighter made it slower instead. Measured with Direct3D 11 and no frame rate limit in the adventure hub (normally 75–78 FPS):
+  - **Scenery detail: Reduced** fell to 30 FPS: it asked Windows three times per drawn object whether the game's memory could be read. It now reads that memory directly and safely, and stays at 75 FPS.
+  - **Textures: Medium/Low** fell to 61–72 FPS: the smaller textures share memory pages with data the game rewrites every frame, so they were decoded and uploaded again about 30 times more often than needed. They now stay at 75–77 FPS.
+
+  The other graphics settings change the frame rate very little with Direct3D 11, which is limited by the processor sending the draws rather than by the graphics card; only **Shadows: Off** gains (about 90 FPS).
+- **US version:** we have now run the US v01.21 game code ourselves. All 32 places the settings need are found, the PC Settings menu is built, and with the original settings it runs at the same frame rate as the EU game with both renderers. The US v01.00 and v01.21 addresses written by hand (Direct3D 11 renderer, 60 FPS, native 4K, online key, unlocks) were each checked against the EU game's code.
+- **Code clean-up:** about 5,500 lines of bring-up checks and code nothing called anymore are removed, `ctrport.exe` keeps only the game start and its two maintenance commands (`--settings-reset-graphics` still works), and the project's own C++ follows one layout (`.clang-format`). Program and game behaviour are otherwise unchanged.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.7.12 — 2026-10-27
 
 Fix for the US version, which closed right at start with v0.7.11.
