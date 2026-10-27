@@ -18,7 +18,7 @@ struct Row {
     const catalog::Control* control;
     schema::Option option;
     HWND combo = nullptr;
-    std::vector<unsigned> indices;  // combo position -> domain index
+    std::vector<unsigned> indices; // combo position -> domain index
     float x = 0, y = 0;
 };
 struct Header {
@@ -27,17 +27,18 @@ struct Header {
 };
 struct Child {
     HWND hwnd;
-    RECT base;  // client position at scroll 0
+    RECT base; // client position at scroll 0
 };
 inline std::vector<Row> rows;
 inline std::vector<Header> headers;
-inline std::vector<Child> children;  // every settings-tab child window, moved when the tab scrolls
-inline float bottom = 0;             // end of the section (page coordinates)
+inline std::vector<Child> children; // every settings-tab child window, moved when the tab scrolls
+inline float bottom = 0;            // end of the section (page coordinates)
 
 // pages: Display, Upscaling, Quality presets on the left; Geometry and textures, Effects and
 // lighting on the right
 inline const std::vector<std::vector<std::string>>& columns() {
-    static const std::vector<std::vector<std::string>> c = {{"display", "rendering", "presets"}, {"quality", "graphics"}};
+    static const std::vector<std::vector<std::string>> c = {{"display", "rendering", "presets"},
+                                                            {"quality", "graphics"}};
     return c;
 }
 // launcher language (en, fr, it, de, es) -> catalog locale (en, it, fr, de, es, ar)
@@ -46,17 +47,25 @@ inline size_t locale() {
     const int l = launcher_text::language;
     return l >= 0 && l < 5 ? map[l] : 0;
 }
-inline RectF box(float x, float y, float w, float h) { return classic_skin ? rect(x, y, w, h) : page_rect(x, y, w, h); }
+inline RectF box(float x, float y, float w, float h) {
+    return classic_skin ? rect(x, y, w, h) : page_rect(x, y, w, h);
+}
 // the visible band of the page, in page coordinates
-inline float view_top() { return classic_skin ? 56.f : nitro::header - 40.f; }
-inline float view_bottom() { return classic_skin ? 616.f : nitro::footer - 40.f; }
-inline float max_scroll() { return std::max(0.f, bottom + 20.f - view_bottom()); }
+inline float view_top() {
+    return classic_skin ? 56.f : nitro::header - 40.f;
+}
+inline float view_bottom() {
+    return classic_skin ? 616.f : nitro::footer - 40.f;
+}
+inline float max_scroll() {
+    return std::max(0.f, bottom + 20.f - view_bottom());
+}
 
 // The renderer chosen in the launcher decides what is offered, as the game menu's hooks do.
 inline bool available(const std::string& key, unsigned index) {
     const bool d3d11 = g.cfg.renderer == L"d3d11";
-    if (key == "upscaler") return !d3d11 || index < 2;       // Direct3D 11: Off, FSR 1
-    if (key == "shadow_quality") return index < 4 || d3d11;  // Ultra: Direct3D 11 shadow maps
+    if (key == "upscaler") return !d3d11 || index < 2;      // Direct3D 11: Off, FSR 1
+    if (key == "shadow_quality") return index < 4 || d3d11; // Ultra: Direct3D 11 shadow maps
     return true;
 }
 inline std::wstring label(const catalog::Control& c, unsigned index) {
@@ -74,7 +83,7 @@ inline ctr_online::Json current() {
     doc.set("upscaling_mode", ctr_online::Json::of(narrow(g.cfg.upscaling_mode)));
     return doc;
 }
-}  // namespace graphics_section
+} // namespace graphics_section
 
 // Lists and selections from the saved document (after a change, a preset, a renderer switch).
 inline void graphics_section_refresh() {
@@ -148,8 +157,9 @@ inline void graphics_section_create() {
                 row.y = y;
                 const RectF r = box(row.x + kLabel + 4, row.y, kCombo, 26);
                 row.combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-                    px(r.X), px(r.Y), px(r.Width), px(300), g.window,
-                    reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFirstId + rows.size())), nullptr, nullptr);
+                                            px(r.X), px(r.Y), px(r.Width), px(300), g.window,
+                                            reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFirstId + rows.size())),
+                                            nullptr, nullptr);
                 SendMessageW(row.combo, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
                 SendMessageW(row.combo, CB_SETDROPPEDWIDTH, px(classic_skin ? 230.f : nitro::page_w(160)), 0);
                 rows.push_back(row);
@@ -161,8 +171,8 @@ inline void graphics_section_create() {
     }
     graphics_section_refresh();
     // every child of the Settings tab, for scrolling
-    std::vector<HWND> tab = {g.width_edit, g.height_edit, g.online_id_edit, g.language_combo, g.renderer_combo,
-                             g.scene_combo, g.upscaler_combo};
+    std::vector<HWND> tab = {g.width_edit,     g.height_edit, g.online_id_edit, g.language_combo,
+                             g.renderer_combo, g.scene_combo, g.upscaler_combo};
     for (HWND combo : g.player_combo) tab.push_back(combo);
     for (const auto& [hwnd, control] : g.controls)
         if (control.tab == TAB_SETTINGS) tab.push_back(hwnd);
@@ -191,7 +201,8 @@ inline void graphics_section_paint(Graphics& gr) {
     for (const auto& h : headers)
         for (const auto& category : catalog::categories())
             if (category.key == h.category)
-                text(gr, widen(category.labels[locale()]), 0, 13.0f, FontStyleBold, box(h.x, h.y + 4, 322, 22), kArcadeGold);
+                text(gr, widen(category.labels[locale()]), 0, 13.0f, FontStyleBold, box(h.x, h.y + 4, 322, 22),
+                     kArcadeGold);
     for (const auto& row : rows)
         text(gr, widen(row.control->labels[locale()]), 1, 10.5f, FontStyleBold, box(row.x, row.y + 5, kLabel, 18),
              IsWindowEnabled(row.combo) ? kTextLight : kTextMuted);

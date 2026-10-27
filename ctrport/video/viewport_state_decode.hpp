@@ -7,10 +7,10 @@
 #include <vector>
 namespace CtrPm4 {
 // Whole public UpdateViewportScissorState; output POD instead of scheduler mutation.
-inline int DecodeViewportState(const Registers& captured,uint32_t maxWidth,uint32_t maxHeight,
- uint32_t unrestrictedDepth,CtrGraphicsViewportStateV1& output) {
-
-    AmdGpu::Regs regs{};std::memcpy(regs.reg_array.data(),captured.words.data(),sizeof(captured.words));
+inline int DecodeViewportState(const Registers& captured, uint32_t maxWidth, uint32_t maxHeight,
+                               uint32_t unrestrictedDepth, CtrGraphicsViewportStateV1& output) {
+    AmdGpu::Regs regs{};
+    std::memcpy(regs.reg_array.data(), captured.words.data(), sizeof(captured.words));
 
     const auto combined_scissor_value_tl = [](s16 scr, s16 win, s16 gen, s16 win_offset) {
         return std::max({scr, s16(win + win_offset), s16(gen + win_offset)});
@@ -21,21 +21,17 @@ inline int DecodeViewportState(const Registers& captured,uint32_t maxWidth,uint3
     const bool enable_offset = !regs.window_scissor.window_offset_disable;
 
     AmdGpu::Scissor scsr{};
-    scsr.top_left_x = combined_scissor_value_tl(
-        regs.screen_scissor.top_left_x, s16(regs.window_scissor.top_left_x),
-        s16(regs.generic_scissor.top_left_x),
-        enable_offset ? regs.window_offset.window_x_offset : 0);
-    scsr.top_left_y = combined_scissor_value_tl(
-        regs.screen_scissor.top_left_y, s16(regs.window_scissor.top_left_y),
-        s16(regs.generic_scissor.top_left_y),
-        enable_offset ? regs.window_offset.window_y_offset : 0);
+    scsr.top_left_x = combined_scissor_value_tl(regs.screen_scissor.top_left_x, s16(regs.window_scissor.top_left_x),
+                                                s16(regs.generic_scissor.top_left_x),
+                                                enable_offset ? regs.window_offset.window_x_offset : 0);
+    scsr.top_left_y = combined_scissor_value_tl(regs.screen_scissor.top_left_y, s16(regs.window_scissor.top_left_y),
+                                                s16(regs.generic_scissor.top_left_y),
+                                                enable_offset ? regs.window_offset.window_y_offset : 0);
     scsr.bottom_right_x = combined_scissor_value_br(
-        regs.screen_scissor.bottom_right_x, regs.window_scissor.bottom_right_x,
-        regs.generic_scissor.bottom_right_x,
+        regs.screen_scissor.bottom_right_x, regs.window_scissor.bottom_right_x, regs.generic_scissor.bottom_right_x,
         enable_offset ? regs.window_offset.window_x_offset : 0);
     scsr.bottom_right_y = combined_scissor_value_br(
-        regs.screen_scissor.bottom_right_y, regs.window_scissor.bottom_right_y,
-        regs.generic_scissor.bottom_right_y,
+        regs.screen_scissor.bottom_right_y, regs.window_scissor.bottom_right_y, regs.generic_scissor.bottom_right_y,
         enable_offset ? regs.window_offset.window_y_offset : 0);
 
     std::vector<CtrGraphicsViewportV1> viewports;
@@ -44,7 +40,6 @@ inline int DecodeViewportState(const Registers& captured,uint32_t maxWidth,uint3
     if (regs.polygon_control.enable_window_offset &&
         (regs.window_offset.window_x_offset != 0 || regs.window_offset.window_y_offset != 0)) {
         return 88; // Public unimplemented window-offset path, explicit missing.
-
     }
 
     const auto& vp_ctl = regs.viewport_control;
@@ -102,14 +97,12 @@ inline int DecodeViewportState(const Registers& captured,uint32_t maxWidth,uint3
 
         auto vp_scsr = scsr;
         if (regs.mode_control.vport_scissor_enable) {
-            vp_scsr.top_left_x =
-                std::max(vp_scsr.top_left_x, s16(regs.viewport_scissors[i].top_left_x));
-            vp_scsr.top_left_y =
-                std::max(vp_scsr.top_left_y, s16(regs.viewport_scissors[i].top_left_y));
-            vp_scsr.bottom_right_x = std::min(AmdGpu::Scissor::Clamp(vp_scsr.bottom_right_x),
-                                              regs.viewport_scissors[i].bottom_right_x);
-            vp_scsr.bottom_right_y = std::min(AmdGpu::Scissor::Clamp(vp_scsr.bottom_right_y),
-                                              regs.viewport_scissors[i].bottom_right_y);
+            vp_scsr.top_left_x = std::max(vp_scsr.top_left_x, s16(regs.viewport_scissors[i].top_left_x));
+            vp_scsr.top_left_y = std::max(vp_scsr.top_left_y, s16(regs.viewport_scissors[i].top_left_y));
+            vp_scsr.bottom_right_x =
+                std::min(AmdGpu::Scissor::Clamp(vp_scsr.bottom_right_x), regs.viewport_scissors[i].bottom_right_x);
+            vp_scsr.bottom_right_y =
+                std::min(AmdGpu::Scissor::Clamp(vp_scsr.bottom_right_y), regs.viewport_scissors[i].bottom_right_y);
         }
         scissors.push_back({
             .offset = {vp_scsr.top_left_x, vp_scsr.top_left_y},
@@ -135,9 +128,15 @@ inline int DecodeViewportState(const Registers& captured,uint32_t maxWidth,uint3
         scissors.push_back(empty_scissor);
     }
 
-    CtrGraphicsViewportStateV1 result{};result.version=1;result.size=sizeof(result);
-    result.count=static_cast<uint32_t>(viewports.size());
-    for(uint32_t i=0;i<result.count;++i){result.viewports[i]=viewports[i];result.scissors[i]=scissors[i];}
-    output=result;return 0;
+    CtrGraphicsViewportStateV1 result{};
+    result.version = 1;
+    result.size = sizeof(result);
+    result.count = static_cast<uint32_t>(viewports.size());
+    for (uint32_t i = 0; i < result.count; ++i) {
+        result.viewports[i] = viewports[i];
+        result.scissors[i] = scissors[i];
+    }
+    output = result;
+    return 0;
 }
 }

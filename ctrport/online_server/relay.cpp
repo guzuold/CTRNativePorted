@@ -14,7 +14,8 @@ std::optional<std::array<unsigned char, 4>> ipv4_bytes(const std::string& ip) {
     for (int part = 0; part < 4; ++part) {
         if (part && (i >= ip.size() || ip[i++] != '.')) return std::nullopt;
         unsigned value = 0, digits = 0;
-        while (i < ip.size() && ip[i] >= '0' && ip[i] <= '9' && digits < 4) value = value * 10 + unsigned(ip[i++] - '0'), ++digits;
+        while (i < ip.size() && ip[i] >= '0' && ip[i] <= '9' && digits < 4)
+            value = value * 10 + unsigned(ip[i++] - '0'), ++digits;
         if (!digits || value > 255) return std::nullopt;
         out[part] = static_cast<unsigned char>(value);
     }
@@ -33,7 +34,9 @@ void put_address(Bytes& out, const Endpoint& address) {
 Endpoint get_address(const Bytes& data, std::size_t offset) {
     return {ipv4_text(&data[offset]), static_cast<std::uint16_t>(data[offset + 4] << 8 | data[offset + 5])};
 }
-Json member_json(std::uint64_t account) { return Json::of(account); }
+Json member_json(std::uint64_t account) {
+    return Json::of(account);
+}
 } // namespace
 
 namespace relay {
@@ -98,7 +101,10 @@ void Relay::drop_binding(std::uint64_t account) {
     by_endpoint_.erase(it->second.endpoint.text());
     bindings_.erase(it);
     for (auto a = aliases_.begin(); a != aliases_.end();) {
-        if (a->first.first == account || a->first.second == account) a = aliases_.erase(a); else ++a;
+        if (a->first.first == account || a->first.second == account)
+            a = aliases_.erase(a);
+        else
+            ++a;
     }
 }
 
@@ -115,7 +121,8 @@ Relay::Outcome Relay::refuse(const Endpoint& to, const Endpoint& address, unsign
 }
 
 Relay::Outcome Relay::handle(const Bytes& datagram, const Endpoint& from, double now, const RelayRoster& roster) {
-    if (datagram.size() < relay::kHeader || !std::equal(kMagic, kMagic + 4, datagram.begin()) || datagram[4] != relay::kVersion)
+    if (datagram.size() < relay::kHeader || !std::equal(kMagic, kMagic + 4, datagram.begin()) ||
+        datagram[4] != relay::kVersion)
         return {}; // not ours: no answer to unknown traffic
     const unsigned char type = datagram[5];
     std::lock_guard<std::mutex> lock(mutex_);
@@ -134,7 +141,8 @@ Relay::Outcome Relay::handle(const Bytes& datagram, const Endpoint& from, double
         auto binding = bindings_.find(account);
         if (binding == bindings_.end() || !(binding->second.endpoint == from)) {
             if (binding != bindings_.end()) by_endpoint_.erase(binding->second.endpoint.text());
-            if (const auto other = by_endpoint_.find(from.text()); other != by_endpoint_.end() && other->second != account)
+            if (const auto other = by_endpoint_.find(from.text());
+                other != by_endpoint_.end() && other->second != account)
                 drop_binding(other->second); // the endpoint changed hands (NAT reuse)
             Binding fresh;
             fresh.endpoint = from;
@@ -181,7 +189,8 @@ Relay::Outcome Relay::handle(const Bytes& datagram, const Endpoint& from, double
 
     const std::vector<RelayMember> members = roster(own.room);
     const auto member_of = [&](std::uint64_t account) -> const RelayMember* {
-        for (const RelayMember& m : members) if (m.account == account) return &m;
+        for (const RelayMember& m : members)
+            if (m.account == account) return &m;
         return nullptr;
     };
     const RelayMember* self = member_of(sender);
@@ -194,21 +203,33 @@ Relay::Outcome Relay::handle(const Bytes& datagram, const Endpoint& from, double
     const RelayMember* target = nullptr;
     for (const RelayMember& m : members) {
         const auto alias = aliases_.find({sender, m.account});
-        if (m.account != sender && alias != aliases_.end() && alias->second == destination) { target = &m; break; }
+        if (m.account != sender && alias != aliases_.end() && alias->second == destination) {
+            target = &m;
+            break;
+        }
     }
     if (!target)
         for (const RelayMember& m : members)
-            if (m.account != sender && m.public_endpoint && *m.public_endpoint == destination) { target = &m; break; }
+            if (m.account != sender && m.public_endpoint && *m.public_endpoint == destination) {
+                target = &m;
+                break;
+            }
     if (!target) {
         int matches = 0;
         for (const RelayMember& m : members)
-            if (m.account != sender && m.local_endpoint && *m.local_endpoint == destination) { target = &m; ++matches; }
+            if (m.account != sender && m.local_endpoint && *m.local_endpoint == destination) {
+                target = &m;
+                ++matches;
+            }
         if (matches > 1) target = nullptr;
     }
     if (!target)
         for (const RelayMember& m : members) {
             const auto b = bindings_.find(m.account);
-            if (m.account != sender && b != bindings_.end() && b->second.endpoint == destination) { target = &m; break; }
+            if (m.account != sender && b != bindings_.end() && b->second.endpoint == destination) {
+                target = &m;
+                break;
+            }
         }
     if (!target) return refuse(from, destination, relay::UNKNOWN_DESTINATION);
     const auto peer = bindings_.find(target->account);
@@ -217,9 +238,12 @@ Relay::Outcome Relay::handle(const Bytes& datagram, const Endpoint& from, double
 
     aliases_[{sender, target->account}] = destination;
     Endpoint source = own.endpoint;
-    if (const auto alias = aliases_.find({target->account, sender}); alias != aliases_.end()) source = alias->second;
-    else if (self->public_endpoint) source = *self->public_endpoint;
-    else if (self->local_endpoint) source = *self->local_endpoint;
+    if (const auto alias = aliases_.find({target->account, sender}); alias != aliases_.end())
+        source = alias->second;
+    else if (self->public_endpoint)
+        source = *self->public_endpoint;
+    else if (self->local_endpoint)
+        source = *self->local_endpoint;
 
     own.tokens -= static_cast<double>(payload);
     ++own.forwarded;
@@ -227,8 +251,9 @@ Relay::Outcome Relay::handle(const Bytes& datagram, const Endpoint& from, double
     ++stats_.forwarded;
     stats_.forwarded_bytes += payload;
     Outcome outcome;
-    outcome.out.push_back({peer->second.endpoint,
-                           relay::encode(relay::DELIVER, source, Bytes(datagram.begin() + relay::kAddressed, datagram.end()))});
+    outcome.out.push_back(
+        {peer->second.endpoint,
+         relay::encode(relay::DELIVER, source, Bytes(datagram.begin() + relay::kAddressed, datagram.end()))});
     if (own.forwarded == 1) {
         outcome.event = "relay_first_forward";
         outcome.fields.set("from", member_json(sender));

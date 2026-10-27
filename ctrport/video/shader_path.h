@@ -4,5 +4,5 @@
 namespace CtrVideo {
 // Returns a validated path only. Does not create directories or files.
 std::filesystem::path ResolveShaderOutput(const std::filesystem::path& project_root,
-                                         const std::filesystem::path& relative);
+                                          const std::filesystem::path& relative);
 }

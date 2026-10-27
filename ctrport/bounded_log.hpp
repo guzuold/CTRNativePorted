@@ -29,9 +29,13 @@ public:
     // Creates the pipe; write() is the inheritable handle to give to the child process.
     explicit Capture(const fs::path& file) : path_(file) {
         SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
-        if (!CreatePipe(&read_, &write_, &inherit, 1 << 16)) { read_ = write_ = nullptr; return; }
+        if (!CreatePipe(&read_, &write_, &inherit, 1 << 16)) {
+            read_ = write_ = nullptr;
+            return;
+        }
         SetHandleInformation(read_, HANDLE_FLAG_INHERIT, 0);
-        out_ = CreateFileW(path_.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        out_ = CreateFileW(path_.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                           nullptr);
         done_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     }
     Capture(const Capture&) = delete;
@@ -41,16 +45,25 @@ public:
         if (thread_.joinable()) {
             // Another process that inherited the pipe can keep it open after the game exits:
             // never block on it. The still-running reader keeps this object's handles.
-            if (!wait(0)) { thread_.detach(); return; }
+            if (!wait(0)) {
+                thread_.detach();
+                return;
+            }
             thread_.join();
         }
-        for (HANDLE h : {read_, out_, done_}) if (h && h != INVALID_HANDLE_VALUE) CloseHandle(h);
+        for (HANDLE h : {read_, out_, done_})
+            if (h && h != INVALID_HANDLE_VALUE) CloseHandle(h);
     }
     bool valid() const { return read_ && write_ && out_ != INVALID_HANDLE_VALUE && done_; }
     HANDLE write() const { return write_; }
     // After CreateProcess: the launcher's copy of the write end must be closed, or the
     // reader never sees the end of the stream.
-    void close_writer() { if (write_) { CloseHandle(write_); write_ = nullptr; } }
+    void close_writer() {
+        if (write_) {
+            CloseHandle(write_);
+            write_ = nullptr;
+        }
+    }
     void start() { thread_ = std::thread(run, read_, out_, done_); }
     // Waits until the file holds everything the game wrote (bounded wait).
     bool wait(DWORD milliseconds) const { return done_ && WaitForSingleObject(done_, milliseconds) == WAIT_OBJECT_0; }
@@ -58,7 +71,10 @@ public:
 private:
     // Works on handle copies only, so a detached reader never touches a destroyed object.
     static void run(HANDLE read_, HANDLE out_, HANDLE done_) {
-        auto put = [&](const char* data, DWORD size) { DWORD written = 0; WriteFile(out_, data, size, &written, nullptr); };
+        auto put = [&](const char* data, DWORD size) {
+            DWORD written = 0;
+            WriteFile(out_, data, size, &written, nullptr);
+        };
         std::vector<char> buffer(1 << 16);
         std::uint64_t written = 0, dropped = 0, tail_size = 0;
         std::deque<std::string> tail;
@@ -67,11 +83,19 @@ private:
             const char* data = buffer.data();
             if (written < head_bytes) {
                 const DWORD direct = static_cast<DWORD>(std::min<std::uint64_t>(got, head_bytes - written));
-                put(data, direct); written += direct; data += direct; got -= direct;
+                put(data, direct);
+                written += direct;
+                data += direct;
+                got -= direct;
                 if (!got) continue;
             }
-            tail.emplace_back(data, got); tail_size += got;
-            while (tail_size - tail.front().size() >= tail_bytes) { tail_size -= tail.front().size(); dropped += tail.front().size(); tail.pop_front(); }
+            tail.emplace_back(data, got);
+            tail_size += got;
+            while (tail_size - tail.front().size() >= tail_bytes) {
+                tail_size -= tail.front().size();
+                dropped += tail.front().size();
+                tail.pop_front();
+            }
         }
         if (dropped) {
             const std::string marker = "\n...[log limited: " + std::to_string(dropped >> 20) + " MB omitted]...\n";
@@ -96,7 +120,10 @@ inline void prune(const fs::path& logs) {
         if (name.rfind(L"play_", 0) != 0 || entry.path().extension() != L".log") continue;
         const auto stem = name.substr(0, name.find(L'.'));
         auto at = std::find_if(sessions.begin(), sessions.end(), [&](const auto& s) { return s.first == stem; });
-        if (at == sessions.end()) { sessions.push_back({stem, {}}); at = sessions.end() - 1; }
+        if (at == sessions.end()) {
+            sessions.push_back({stem, {}});
+            at = sessions.end() - 1;
+        }
         at->second.push_back(entry.path());
     }
     // Session names are play_YYYYMMDD_HHMMSS: name order is time order.

@@ -29,14 +29,16 @@ namespace fs = std::filesystem;
 
 inline std::string utf8(const std::wstring& text) {
     if (text.empty()) return {};
-    const int size = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    const int size =
+        WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
     std::string out(static_cast<std::size_t>(size), '\0');
     WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), size, nullptr, nullptr);
     return out;
 }
 inline std::wstring wide(const std::string& text) {
     if (text.empty()) return {};
-    const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    const int size =
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
     if (size <= 0) throw std::runtime_error("invalid UTF-8 text");
     std::wstring out(static_cast<std::size_t>(size), L'\0');
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), out.data(), size);
@@ -52,8 +54,14 @@ using StringLists = std::map<std::string, std::vector<std::wstring>>;
 inline StringLists parse_string_lists(const std::string& text, const char* what) {
     std::size_t at = 0;
     const auto fail = [&](const char* why) { throw std::runtime_error(std::string(what) + ": " + why); };
-    const auto skip = [&] { while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at]))) ++at; };
-    const auto expect = [&](char c) { skip(); if (at >= text.size() || text[at] != c) fail("invalid JSON"); ++at; };
+    const auto skip = [&] {
+        while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at]))) ++at;
+    };
+    const auto expect = [&](char c) {
+        skip();
+        if (at >= text.size() || text[at] != c) fail("invalid JSON");
+        ++at;
+    };
     const auto string = [&]() -> std::string {
         expect('"');
         std::string out;
@@ -62,22 +70,42 @@ inline StringLists parse_string_lists(const std::string& text, const char* what)
             const char c = text[at++];
             if (c == '"') return out;
             if (static_cast<unsigned char>(c) < 0x20) fail("control character in string");
-            if (c != '\\') { out += c; continue; }
+            if (c != '\\') {
+                out += c;
+                continue;
+            }
             if (at >= text.size()) fail("invalid escape");
             const char e = text[at++];
             if (e == 'u') {
                 if (at + 4 > text.size()) fail("invalid escape");
-                unsigned code = std::stoul(text.substr(at, 4), nullptr, 16); at += 4;
-                if (code >= 0xd800 && code < 0xdc00 && at + 6 <= text.size() && text[at] == '\\' && text[at + 1] == 'u') {
+                unsigned code = std::stoul(text.substr(at, 4), nullptr, 16);
+                at += 4;
+                if (code >= 0xd800 && code < 0xdc00 && at + 6 <= text.size() && text[at] == '\\' &&
+                    text[at + 1] == 'u') {
                     const unsigned low = std::stoul(text.substr(at + 2, 4), nullptr, 16);
-                    if (low >= 0xdc00 && low < 0xe000) { code = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00); at += 6; }
+                    if (low >= 0xdc00 && low < 0xe000) {
+                        code = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
+                        at += 6;
+                    }
                 }
-                if (code < 0x80) out += static_cast<char>(code);
-                else if (code < 0x800) { out += static_cast<char>(0xc0 | (code >> 6)); out += static_cast<char>(0x80 | (code & 0x3f)); }
-                else if (code < 0x10000) { out += static_cast<char>(0xe0 | (code >> 12)); out += static_cast<char>(0x80 | ((code >> 6) & 0x3f)); out += static_cast<char>(0x80 | (code & 0x3f)); }
-                else { out += static_cast<char>(0xf0 | (code >> 18)); out += static_cast<char>(0x80 | ((code >> 12) & 0x3f)); out += static_cast<char>(0x80 | ((code >> 6) & 0x3f)); out += static_cast<char>(0x80 | (code & 0x3f)); }
+                if (code < 0x80)
+                    out += static_cast<char>(code);
+                else if (code < 0x800) {
+                    out += static_cast<char>(0xc0 | (code >> 6));
+                    out += static_cast<char>(0x80 | (code & 0x3f));
+                } else if (code < 0x10000) {
+                    out += static_cast<char>(0xe0 | (code >> 12));
+                    out += static_cast<char>(0x80 | ((code >> 6) & 0x3f));
+                    out += static_cast<char>(0x80 | (code & 0x3f));
+                } else {
+                    out += static_cast<char>(0xf0 | (code >> 18));
+                    out += static_cast<char>(0x80 | ((code >> 12) & 0x3f));
+                    out += static_cast<char>(0x80 | ((code >> 6) & 0x3f));
+                    out += static_cast<char>(0x80 | (code & 0x3f));
+                }
             } else {
-                const char* from = "\"\\/bfnrt"; const char* to = "\"\\/\b\f\n\r\t";
+                const char* from = "\"\\/bfnrt";
+                const char* to = "\"\\/\b\f\n\r\t";
                 const char* found = std::strchr(from, e);
                 if (!found || !e) fail("invalid escape");
                 out += to[found - from];
@@ -85,28 +113,39 @@ inline StringLists parse_string_lists(const std::string& text, const char* what)
         }
     };
     StringLists lists;
-    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xef) at = 3;  // UTF-8 BOM
+    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xef) at = 3; // UTF-8 BOM
     expect('{');
     skip();
-    if (at < text.size() && text[at] == '}') { ++at; return lists; }
+    if (at < text.size() && text[at] == '}') {
+        ++at;
+        return lists;
+    }
     while (true) {
         const auto key = string();
         expect(':');
         expect('[');
         auto& list = lists[key];
         skip();
-        if (at < text.size() && text[at] == ']') ++at;
-        else while (true) {
-            skip();
-            if (at >= text.size() || text[at] != '"') fail("lists must contain only strings");
-            list.push_back(wide(string()));
-            skip();
-            if (at < text.size() && text[at] == ',') { ++at; continue; }
-            expect(']');
-            break;
-        }
+        if (at < text.size() && text[at] == ']')
+            ++at;
+        else
+            while (true) {
+                skip();
+                if (at >= text.size() || text[at] != '"') fail("lists must contain only strings");
+                list.push_back(wide(string()));
+                skip();
+                if (at < text.size() && text[at] == ',') {
+                    ++at;
+                    continue;
+                }
+                expect(']');
+                break;
+            }
         skip();
-        if (at < text.size() && text[at] == ',') { ++at; continue; }
+        if (at < text.size() && text[at] == ',') {
+            ++at;
+            continue;
+        }
         expect('}');
         break;
     }
@@ -117,9 +156,15 @@ inline StringLists parse_string_lists(const std::string& text, const char* what)
 inline std::string json_quote(const std::wstring& value) {
     std::string out = "\"";
     for (const unsigned char c : utf8(value)) {
-        if (c == '"' || c == '\\') { out += '\\'; out += static_cast<char>(c); }
-        else if (c < 0x20) { char buf[8]; std::snprintf(buf, sizeof(buf), "\\u%04x", c); out += buf; }
-        else out += static_cast<char>(c);
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += static_cast<char>(c);
+        } else if (c < 0x20) {
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+            out += buf;
+        } else
+            out += static_cast<char>(c);
     }
     return out + "\"";
 }
@@ -127,7 +172,8 @@ inline std::string format_string_lists(const std::vector<std::pair<std::string, 
     std::string out = "{";
     for (std::size_t i = 0; i < lists.size(); ++i) {
         out += (i ? ",\n  " : "\n  ") + json_quote(wide(lists[i].first)) + ": [";
-        for (std::size_t j = 0; j < lists[i].second.size(); ++j) out += (j ? ", " : "") + json_quote(lists[i].second[j]);
+        for (std::size_t j = 0; j < lists[i].second.size(); ++j)
+            out += (j ? ", " : "") + json_quote(lists[i].second[j]);
         out += "]";
     }
     return out + "\n}\n";
@@ -135,7 +181,8 @@ inline std::string format_string_lists(const std::vector<std::pair<std::string, 
 inline std::string read_text(const fs::path& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw std::runtime_error("cannot read " + utf8(path.wstring()));
-    std::stringstream buffer; buffer << in.rdbuf();
+    std::stringstream buffer;
+    buffer << in.rdbuf();
     return buffer.str();
 }
 // Writes through a temporary file so a crash never leaves half a configuration.
@@ -151,7 +198,9 @@ inline void write_text(const fs::path& path, const std::string& text) {
         throw std::runtime_error("cannot replace " + utf8(path.wstring()));
 }
 
-struct Config { std::vector<std::wstring> order, disabled; };
+struct Config {
+    std::vector<std::wstring> order, disabled;
+};
 inline Config read_config(const fs::path& path) {
     Config config;
     std::error_code ec;
@@ -165,7 +214,11 @@ inline void write_config(const fs::path& path, const Config& config) {
     write_text(path, format_string_lists({{"order", config.order}, {"disabled", config.disabled}}));
 }
 
-struct Mod { std::wstring name; fs::path folder; bool enabled = true; };
+struct Mod {
+    std::wstring name;
+    fs::path folder;
+    bool enabled = true;
+};
 // Folders under mods_dir in load order (the last enabled one wins).
 inline std::vector<Mod> list_mods(const fs::path& mods_dir, const Config& config) {
     std::vector<Mod> found;
@@ -180,7 +233,10 @@ inline std::vector<Mod> list_mods(const fs::path& mods_dir, const Config& config
     std::vector<Mod> ordered;
     for (const auto& name : config.order) {
         const auto it = std::find_if(found.begin(), found.end(), [&](const Mod& mod) { return mod.name == name; });
-        if (it != found.end()) { ordered.push_back(*it); found.erase(it); }
+        if (it != found.end()) {
+            ordered.push_back(*it);
+            found.erase(it);
+        }
     }
     ordered.insert(ordered.end(), found.begin(), found.end());
     for (auto& mod : ordered)
@@ -211,7 +267,8 @@ inline bool layout_folder(const std::wstring& name) {
 }
 inline bool readme_file(const fs::path& path) {
     const auto ext = fold(path.extension().wstring());
-    return ext == L".txt" || ext == L".md" || ext == L".jpg" || ext == L".jpeg" || ext == L".png" || ext == L".ini" || ext == L".json";
+    return ext == L".txt" || ext == L".md" || ext == L".jpg" || ext == L".jpeg" || ext == L".png" || ext == L".ini" ||
+           ext == L".json";
 }
 // An octr-mod mod (mod.json at the top of its folder, octr_mods.hpp): only its game folders
 // are loose files; its payloads, patches and manifest are applied by octr_mods.hpp.
@@ -227,8 +284,10 @@ inline fs::path content_root(const fs::path& mod) {
         std::vector<fs::path> folders;
         bool other_files = false;
         for (const auto& entry : fs::directory_iterator(root)) {
-            if (entry.is_directory()) folders.push_back(entry.path());
-            else if (!readme_file(entry.path())) other_files = true;
+            if (entry.is_directory())
+                folders.push_back(entry.path());
+            else if (!readme_file(entry.path()))
+                other_files = true;
         }
         const auto layout = std::find_if(folders.begin(), folders.end(),
                                          [](const fs::path& p) { return layout_folder(p.filename().wstring()); });
@@ -253,7 +312,7 @@ struct Index {
     // folded relative path with '/' separators -> mod file
     std::map<std::wstring, fs::path> files;
     std::map<std::wstring, std::wstring> owner;
-    std::vector<std::pair<std::wstring, std::size_t>> layers;  // mod name, files
+    std::vector<std::pair<std::wstring, std::size_t>> layers; // mod name, files
     std::vector<std::string> log;
     std::size_t replaced = 0, added = 0;
 };
@@ -274,7 +333,8 @@ inline Index build_index(const std::vector<Mod>& mods, const std::vector<fs::pat
         for (auto it = fs::recursive_directory_iterator(root); it != fs::recursive_directory_iterator(); ++it) {
             const auto relative = it->path().lexically_relative(root);
             if (is_reparse(it->path()))
-                throw std::runtime_error("mod " + utf8(mod.name) + ": links are not supported (" + utf8(relative.generic_wstring()) + ")");
+                throw std::runtime_error("mod " + utf8(mod.name) + ": links are not supported (" +
+                                         utf8(relative.generic_wstring()) + ")");
             if (it.depth() == 0) {
                 const auto top = fold(relative.wstring());
                 if (top == L"eboot.bin" || top == L"sce_module" || top == L"sce_sys")
@@ -289,12 +349,16 @@ inline Index build_index(const std::vector<Mod>& mods, const std::vector<fs::pat
             if (it.depth() == 0 && readme_file(relative) && !game_folder(relative.wstring())) {
                 // Loose readme next to the game folders: documentation, not game data, unless the game has it.
                 bool game_file = false;
-                for (const auto& game : game_roots) { std::error_code ec; if (!game.empty() && fs::exists(game / relative, ec)) game_file = true; }
+                for (const auto& game : game_roots) {
+                    std::error_code ec;
+                    if (!game.empty() && fs::exists(game / relative, ec)) game_file = true;
+                }
                 if (!game_file) continue;
             }
             const auto key = key_of(relative);
             if (const auto previous = index.owner.find(key); previous != index.owner.end())
-                index.log.push_back("Mods: " + utf8(relative.generic_wstring()) + ": " + utf8(previous->second) + " -> " + utf8(mod.name));
+                index.log.push_back("Mods: " + utf8(relative.generic_wstring()) + ": " + utf8(previous->second) +
+                                    " -> " + utf8(mod.name));
             index.files[key] = it->path();
             index.owner[key] = mod.name;
             ++count;
@@ -304,18 +368,28 @@ inline Index build_index(const std::vector<Mod>& mods, const std::vector<fs::pat
     }
     for (const auto& item : index.files) {
         bool exists = false;
-        for (const auto& game : game_roots) { std::error_code ec; if (!game.empty() && fs::exists(game / item.first, ec)) exists = true; }
+        for (const auto& game : game_roots) {
+            std::error_code ec;
+            if (!game.empty() && fs::exists(game / item.first, ec)) exists = true;
+        }
         ++(exists ? index.replaced : index.added);
     }
-    index.log.push_back("Mods: " + std::to_string(index.replaced) + " game files replaced, " + std::to_string(index.added) + " added");
+    index.log.push_back("Mods: " + std::to_string(index.replaced) + " game files replaced, " +
+                        std::to_string(index.added) + " added");
     return index;
 }
 
 // What happened to mods at this start, for the launcher's MODS tab: "skipped" (not applied,
 // with the reason) or "adapted" (applied after porting from the other region of the game).
 // Written to runtime/user/logs/mods_status.json by octr_mods.hpp and guest_patch_xml.hpp.
-struct Status { std::wstring mod; std::string state, reason; };
-inline std::vector<Status>& statuses() { static std::vector<Status> list; return list; }
+struct Status {
+    std::wstring mod;
+    std::string state, reason;
+};
+inline std::vector<Status>& statuses() {
+    static std::vector<Status> list;
+    return list;
+}
 inline void write_statuses() {
     const fs::path file = L"runtime/user/logs/mods_status.json";
     std::error_code ec;
@@ -324,7 +398,8 @@ inline void write_statuses() {
     const auto& list = statuses();
     out << "[";
     for (std::size_t i = 0; i < list.size(); ++i)
-        out << (i ? ",\n " : "\n ") << "{\"mod\": " << json_quote(list[i].mod) << ", \"state\": " << json_quote(wide(list[i].state))
+        out << (i ? ",\n " : "\n ") << "{\"mod\": " << json_quote(list[i].mod)
+            << ", \"state\": " << json_quote(wide(list[i].state))
             << ", \"reason\": " << json_quote(wide(list[i].reason)) << "}";
     out << (list.empty() ? "]\n" : "\n]\n");
 }
@@ -335,8 +410,12 @@ class Overlay {
     bool active_ = false;
     Index index_;
     std::vector<Mod> octr_;
+
 public:
-    bool active() { std::lock_guard<std::mutex> lock(mutex_); return active_; }
+    bool active() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return active_;
+    }
     void configure(const fs::path& mods_dir, const fs::path& config, const std::vector<fs::path>& game_roots) {
         const auto mods = list_mods(mods_dir, read_config(config));
         auto index = build_index(mods, game_roots);
@@ -344,7 +423,8 @@ public:
         index_ = std::move(index);
         octr_.clear();
         for (const auto& mod : mods)
-            if (mod.enabled && octr_mod(content_root(mod.folder))) octr_.push_back({mod.name, content_root(mod.folder), true});
+            if (mod.enabled && octr_mod(content_root(mod.folder)))
+                octr_.push_back({mod.name, content_root(mod.folder), true});
         active_ = true;
         for (const auto& line : index_.log) std::fprintf(stderr, "%s\n", line.c_str());
         std::fflush(stderr);
@@ -364,9 +444,15 @@ public:
         const auto it = index_.files.find(fold(wide(relative)));
         return it == index_.files.end() ? fs::path{} : it->second;
     }
-    std::size_t files() { std::lock_guard<std::mutex> lock(mutex_); return index_.files.size(); }
+    std::size_t files() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return index_.files.size();
+    }
     // Enabled octr-mod mods in load order, each with the folder holding its mod.json.
-    std::vector<Mod> octr_mods() { std::lock_guard<std::mutex> lock(mutex_); return octr_; }
+    std::vector<Mod> octr_mods() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return octr_;
+    }
 };
 inline Overlay overlay;
 }

@@ -25,8 +25,13 @@ constexpr const wchar_t* title = ctr_ui::kInvitationTitle;
 using ctr_ui::Text;
 using ctr_ui::ui_text;
 using ctr_ui::ui_format;
-struct Pending { std::string id, session, sender; };
-struct Event { std::int32_t type; unsigned char data[8192]; };
+struct Pending {
+    std::string id, session, sender;
+};
+struct Event {
+    std::int32_t type;
+    unsigned char data[8192];
+};
 static_assert(sizeof(Event) == 8196);
 std::mutex service_mutex, events_mutex;
 std::deque<Event> events;
@@ -36,9 +41,10 @@ std::future<std::vector<Pending>> polling;
 std::future<Outcome> notice;
 std::atomic<unsigned long> notice_thread{0};
 std::chrono::steady_clock::time_point next_poll{};
-int(*owner)(int) = nullptr;
+int (*owner)(int) = nullptr;
 std::wstring wide(const std::string& text) {
-    const auto n = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    const auto n =
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
     if (!n && !text.empty()) throw std::runtime_error("invalid UTF-8 invitation text");
     std::wstring result(n, L'\0');
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), result.data(), n);
@@ -46,7 +52,8 @@ std::wstring wide(const std::string& text) {
 }
 bool safe_id(const std::string& id, std::size_t maximum) {
     return !id.empty() && id.size() <= maximum &&
-           id.find_first_not_of("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_") == std::string::npos;
+           id.find_first_not_of("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_") ==
+               std::string::npos;
 }
 Json exchange(const std::string& method, const std::string& path, const std::string& body, int expected) {
     online::HttpResponse response;
@@ -69,11 +76,17 @@ std::vector<Pending> fetch() {
     return result;
 }
 Outcome accept(const Pending& entry) {
-    { std::scoped_lock lock{events_mutex}; if (events.size() >= 64) throw std::runtime_error("system invitation queue full"); }
+    {
+        std::scoped_lock lock{events_mutex};
+        if (events.size() >= 64) throw std::runtime_error("system invitation queue full");
+    }
     auto reply = exchange("PUT", "/ctr/v1/session-invitations/" + entry.id, "{}", 200);
     if (reply.at("sessionId").text != entry.session || reply.at("invitationId").text != entry.id)
         throw std::runtime_error("invitation acceptance response mismatch");
-    Outcome result; result.result = 0; result.session = entry.session; result.invitation = entry.id;
+    Outcome result;
+    result.result = 0;
+    result.session = entry.session;
+    result.invitation = entry.id;
     return result;
 }
 void log_failure(const std::exception& error) {
@@ -87,8 +100,10 @@ Outcome send(std::string session, std::vector<std::uint64_t> recipients, unsigne
     try {
         if (maximum) {
             const auto& identity = online::identity();
-            auto page = exchange("GET", "/webapi/sdk:userProfile/v1/users/" + std::to_string(identity.account_id) +
-                                 "/friendList?offset=0&limit=500", "", 200);
+            auto page = exchange("GET",
+                                 "/webapi/sdk:userProfile/v1/users/" + std::to_string(identity.account_id) +
+                                     "/friendList?offset=0&limit=500",
+                                 "", 200);
             const auto& friends = page.at("friendList");
             if (!friends.is_array() || friends.items.size() > 500) throw std::runtime_error("invalid friend list");
             std::vector<std::wstring> rows;
@@ -104,14 +119,23 @@ Outcome send(std::string session, std::vector<std::uint64_t> recipients, unsigne
                 if (!account || account == identity.account_id || !seen.insert(account).second) continue;
                 const auto name = user.at("onlineId").text;
                 if (name.empty() || name.size() > 16) throw std::runtime_error("invalid friend name");
-                accounts.push_back(account); names.push_back(name); rows.push_back(wide(name));
+                accounts.push_back(account);
+                names.push_back(name);
+                rows.push_back(wide(name));
             }
             ui_thread = GetCurrentThreadId();
-            if (rows.empty()) { MessageBoxW(nullptr, ui_text(Text::NoFriends), title, MB_OK); ui_thread = 0; return result; }
+            if (rows.empty()) {
+                MessageBoxW(nullptr, ui_text(Text::NoFriends), title, MB_OK);
+                ui_thread = 0;
+                return result;
+            }
             const auto selected = choose(rows, maximum, title, ui_text(Text::Send));
             ui_thread = 0;
             if (selected.empty()) return result;
-            for (int i : selected) { recipients.push_back(accounts.at(i)); result.names.push_back(names.at(i)); }
+            for (int i : selected) {
+                recipients.push_back(accounts.at(i));
+                result.names.push_back(names.at(i));
+            }
         }
         // Recipients the game already chose (INVITE on a friend) are sent at once, without a
         // confirmation: only the recipient decides, by accepting (user decision 2026-10-20).
@@ -120,13 +144,19 @@ Outcome send(std::string session, std::vector<std::uint64_t> recipients, unsigne
         for (auto account : recipients) ids.items.push_back(Json::of(account));
         request.set("recipients", ids);
         const auto receipt = exchange("POST", "/ctr/v1/session-invitations", ctr_online::dump_json(request), 201);
-        if (!receipt.is_array() || receipt.items.size() != recipients.size()) throw std::runtime_error("invalid send receipt");
+        if (!receipt.is_array() || receipt.items.size() != recipients.size())
+            throw std::runtime_error("invalid send receipt");
         for (std::size_t i = 0; i < recipients.size(); ++i)
             if (receipt.items[i].at("accountId").text != std::to_string(recipients[i]) ||
-                !safe_id(receipt.items[i].at("invitationId").text, 60)) throw std::runtime_error("send receipt mismatch");
-        result.result = 0; result.sent = std::move(recipients);
+                !safe_id(receipt.items[i].at("invitationId").text, 60))
+                throw std::runtime_error("send receipt mismatch");
+        result.result = 0;
+        result.sent = std::move(recipients);
     } catch (const std::exception& error) {
-        ui_thread = 0; result = {}; result.error = failure; log_failure(error);
+        ui_thread = 0;
+        result = {};
+        result.error = failure;
+        log_failure(error);
     }
     return result;
 }
@@ -136,24 +166,37 @@ Outcome receive(std::atomic<unsigned long>& ui_thread) {
         std::vector<std::wstring> rows;
         for (const auto& entry : pending) rows.push_back(ui_format(Text::InvitationFrom, wide(entry.sender)));
         ui_thread = GetCurrentThreadId();
-        if (rows.empty()) { MessageBoxW(nullptr, ui_text(Text::NoInvitations), title, MB_OK); ui_thread = 0; return {}; }
+        if (rows.empty()) {
+            MessageBoxW(nullptr, ui_text(Text::NoInvitations), title, MB_OK);
+            ui_thread = 0;
+            return {};
+        }
         const auto selected = choose(rows, 1, title, ui_text(Text::Accept));
         ui_thread = 0;
         return selected.empty() ? Outcome{} : accept(pending.at(selected[0]));
     } catch (const std::exception& error) {
-        ui_thread = 0; log_failure(error); Outcome result; result.error = failure; return result;
+        ui_thread = 0;
+        log_failure(error);
+        Outcome result;
+        result.error = failure;
+        return result;
     }
 }
-void set_owner(int(*operation)(int)) { std::scoped_lock lock{service_mutex}; owner = operation; }
+void set_owner(int (*operation)(int)) {
+    std::scoped_lock lock{service_mutex};
+    owner = operation;
+}
 void post_accepted(const Outcome& outcome) {
     if (outcome.error || outcome.result || !safe_id(outcome.session, 45) || !safe_id(outcome.invitation, 60)) return;
     std::scoped_lock lock{events_mutex};
     if (std::find(delivered.begin(), delivered.end(), outcome.invitation) != delivered.end()) return;
     if (events.size() >= 64) throw std::runtime_error("system invitation queue full");
-    Event event{}; event.type = 0x10000002;
-    std::memcpy(event.data, outcome.session.data(), outcome.session.size()); // SessionId[48]
+    Event event{};
+    event.type = 0x10000002;
+    std::memcpy(event.data, outcome.session.data(), outcome.session.size());            // SessionId[48]
     std::memcpy(event.data + 48, outcome.invitation.data(), outcome.invitation.size()); // InvitationId[61]
-    const std::int32_t flag = 1; std::memcpy(event.data + 112, &flag, 4);
+    const std::int32_t flag = 1;
+    std::memcpy(event.data + 112, &flag, 4);
     const auto& name = online::identity().online_id; // Accepter, as pinned NpHandler does.
     std::memcpy(event.data + 120, name.data(), std::min<std::size_t>(16, name.size()));
     // Retail EU 1.21 copies 176 payload bytes at 0xb89dc4; 0xa46691 compares
@@ -161,7 +204,8 @@ void post_accepted(const Outcome& outcome) {
     // implementation currently exposes local user 1 exclusively.
     const std::int32_t local_user = 1;
     std::memcpy(event.data + 140, &local_user, sizeof(local_user));
-    events.push_back(event); delivered.push_back(outcome.invitation);
+    events.push_back(event);
+    delivered.push_back(outcome.invitation);
     if (delivered.size() > 256) delivered.pop_front();
     ctr_hle::log_call("libSceSystemService", "SESSION_INVITATION_accepted", 0);
 }
@@ -179,8 +223,8 @@ void tick() {
         if (polling.valid() && polling.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             const auto pending = polling.get();
             for (auto it = notified.begin(); it != notified.end();) {
-                const bool present = std::any_of(pending.begin(), pending.end(),
-                    [&](const Pending& entry) { return entry.id == *it; });
+                const bool present =
+                    std::any_of(pending.begin(), pending.end(), [&](const Pending& entry) { return entry.id == *it; });
                 it = present ? std::next(it) : notified.erase(it);
             }
             const auto candidate = std::find_if(pending.begin(), pending.end(), [&](const Pending& entry) {
@@ -205,21 +249,34 @@ void tick() {
                                     return Outcome{};
                                 } catch (const std::exception& error) {
                                     log_failure(error);
-                                    const auto message = std::wstring(ui_text(choice == IDYES ? Text::AcceptFailed : Text::DeclineFailed)) +
-                                        L"\n\n" + wide(error.what()) + L"\n\n" + ui_text(Text::RetryHint);
+                                    const auto message = std::wstring(ui_text(choice == IDYES ? Text::AcceptFailed
+                                                                                              : Text::DeclineFailed)) +
+                                                         L"\n\n" + wide(error.what()) + L"\n\n" +
+                                                         ui_text(Text::RetryHint);
                                     notice_thread = GetCurrentThreadId();
                                     const int retry = MessageBoxW(nullptr, message.c_str(), ui_text(Text::ErrorTitle),
                                                                   MB_RETRYCANCEL | MB_ICONERROR);
                                     notice_thread = 0;
-                                    if (retry != IDRETRY) { Outcome result; result.error = failure; return result; }
+                                    if (retry != IDRETRY) {
+                                        Outcome result;
+                                        result.error = failure;
+                                        return result;
+                                    }
                                 }
                             }
                         } catch (const std::exception& error) {
-                            notice_thread = 0; log_failure(error); Outcome result; result.error = failure; return result;
+                            notice_thread = 0;
+                            log_failure(error);
+                            Outcome result;
+                            result.error = failure;
+                            return result;
                         }
                     });
                     notified.insert(entry.id);
-                } catch (...) { owner(2); throw; }
+                } catch (...) {
+                    owner(2);
+                    throw;
+                }
             }
         }
         if (!notice.valid() && !polling.valid() && now >= next_poll) {
@@ -237,21 +294,26 @@ int CTR_SYSV system_status(void* output) {
     std::scoped_lock lock{events_mutex};
     auto* bytes = static_cast<unsigned char*>(output);
     const auto count = static_cast<std::int32_t>(events.size());
-    std::memcpy(bytes, &count, 4); bytes[4] = notice_thread.load() != 0 || dialog_thread.load() != 0;
-    bytes[5] = 0; bytes[6] = 1; bytes[7] = 0; bytes[8] = 0;
+    std::memcpy(bytes, &count, 4);
+    bytes[4] = notice_thread.load() != 0 || dialog_thread.load() != 0;
+    bytes[5] = 0;
+    bytes[6] = 1;
+    bytes[7] = 0;
+    bytes[8] = 0;
     return 0;
 }
 int CTR_SYSV receive_event(Event* event) {
     if (!event) return static_cast<int>(0x80A10003u);
     std::scoped_lock lock{events_mutex};
     if (events.empty()) return static_cast<int>(0x80A10004u);
-    *event = events.front(); events.pop_front();
+    *event = events.front();
+    events.pop_front();
     ctr_hle::log_call("libSceSystemService", "sceSystemServiceReceiveEvent", 0);
     return 0;
 }
 CTR_HLE_REGISTER_ONLINE("rPo6tV8D9bM", "libSceSystemService", system_status);
 CTR_HLE_REGISTER_ONLINE("656LMQSrg6U", "libSceSystemService", receive_event);
 }
-CTR_HLE_API void ctr_hle_invitation_set_owner(int(*operation)(int)) {
+CTR_HLE_API void ctr_hle_invitation_set_owner(int (*operation)(int)) {
     ctr_hle::invitation::set_owner(operation);
 }

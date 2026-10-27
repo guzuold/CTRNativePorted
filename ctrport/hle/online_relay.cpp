@@ -85,7 +85,10 @@ struct State {
     std::uint16_t port = 0;           // relay port, host order
     int last_status = -1;             // last relay-session answer, logged when it changes
     bool keeper = false;              // registration thread started
-    struct Socket { clock::time_point hello{}; bool welcomed = false; };
+    struct Socket {
+        clock::time_point hello{};
+        bool welcomed = false;
+    };
     std::map<SOCKET, Socket> sockets;
     std::map<std::uint64_t, clock::time_point> direct_until; // destination -> fallback deadline
     std::map<std::uint64_t, bool> seen_send, seen_deliver;   // first datagram per peer is logged
@@ -139,14 +142,16 @@ void keeper() {
             const int status = reached ? response.status : 0;
             if (token.size() == 32 && port > 0 && port < 65536) {
                 for (std::size_t i = 0; i < 32; i += 2)
-                    s.token.push_back(static_cast<unsigned char>(std::strtoul(token.substr(i, 2).c_str(), nullptr, 16)));
+                    s.token.push_back(
+                        static_cast<unsigned char>(std::strtoul(token.substr(i, 2).c_str(), nullptr, 16)));
                 s.port = static_cast<std::uint16_t>(port);
                 for (auto& [handle, own] : s.sockets) own = {};
             }
             if (status != s.last_status || !s.token.empty()) {
                 s.last_status = status;
-                ctr_hle::log_call("ctr_online", "relay_session", s.token.empty() ? 0 : 1,
-                                  (",\"server_status\":" + std::to_string(status) + ",\"port\":" + std::to_string(s.port)).c_str());
+                ctr_hle::log_call(
+                    "ctr_online", "relay_session", s.token.empty() ? 0 : 1,
+                    (",\"server_status\":" + std::to_string(status) + ",\"port\":" + std::to_string(s.port)).c_str());
             }
         }
         {
@@ -180,8 +185,7 @@ TransportMode mode() {
         const char* v = std::getenv("CTR_ONLINE_NAT_TRANSPORT");
         if (v && (!std::strcmp(v, "0") || !std::strcmp(v, "direct") || !std::strcmp(v, "off")))
             return TransportMode::Off;
-        if (v && (!std::strcmp(v, "relay") || !std::strcmp(v, "force")))
-            return TransportMode::Relay;
+        if (v && (!std::strcmp(v, "relay") || !std::strcmp(v, "force"))) return TransportMode::Relay;
         return TransportMode::Auto;
     }();
     return value;
@@ -252,7 +256,8 @@ SendResult send(SOCKET handle, const char* data, int size, const sockaddr_in& de
                 peer.logged_fallback = true;
                 ctr_hle::log_call("ctr_online", "relay_auto_fallback", static_cast<long long>(peer.direct_sent_count),
                                   (",\"peer\":\"" + text_of(destination.sin_addr.s_addr, destination.sin_port) +
-                                   "\",\"reason\":\"direct_probe_timeout\"").c_str());
+                                   "\",\"reason\":\"direct_probe_timeout\"")
+                                      .c_str());
             }
         }
     }
@@ -266,15 +271,15 @@ SendResult send(SOCKET handle, const char* data, int size, const sockaddr_in& de
     packet.insert(packet.end(), reinterpret_cast<const char*>(&destination.sin_port),
                   reinterpret_cast<const char*>(&destination.sin_port) + 2);
     packet.insert(packet.end(), data, data + size);
-    if (sendto(handle, packet.data(), static_cast<int>(packet.size()), 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to)) ==
-        SOCKET_ERROR)
+    if (sendto(handle, packet.data(), static_cast<int>(packet.size()), 0, reinterpret_cast<const sockaddr*>(&to),
+               sizeof(to)) == SOCKET_ERROR)
         return SendResult::Direct;
     ++s.relayed;
     if (!s.seen_send[key]) {
         s.seen_send[key] = true;
         ctr_hle::log_call("ctr_online", "relay_first_send", size,
-                          (",\"to\":\"" + text_of(destination.sin_addr.s_addr, destination.sin_port) + "\",\"relay\":\"" +
-                           text_of(to.sin_addr.s_addr, to.sin_port) + "\"")
+                          (",\"to\":\"" + text_of(destination.sin_addr.s_addr, destination.sin_port) +
+                           "\",\"relay\":\"" + text_of(to.sin_addr.s_addr, to.sin_port) + "\"")
                               .c_str());
     }
     return SendResult::Relayed;
@@ -308,8 +313,9 @@ Incoming receive(SOCKET handle, const char* datagram, int size, const sockaddr_i
                     peer.route = PeerRoute::Direct;
                     if (!peer.logged_direct) {
                         peer.logged_direct = true;
-                        ctr_hle::log_call("ctr_online", "relay_auto_direct_confirmed", 1,
-                                          (",\"peer\":\"" + text_of(from.sin_addr.s_addr, from.sin_port) + "\"").c_str());
+                        ctr_hle::log_call(
+                            "ctr_online", "relay_auto_direct_confirmed", 1,
+                            (",\"peer\":\"" + text_of(from.sin_addr.s_addr, from.sin_port) + "\"").c_str());
                     }
                 }
             }
@@ -336,7 +342,8 @@ Incoming receive(SOCKET handle, const char* datagram, int size, const sockaddr_i
                     peer.logged_fallback = true;
                     ctr_hle::log_call("ctr_online", "relay_auto_fallback", 0,
                                       (",\"peer\":\"" + text_of(address.sin_addr.s_addr, address.sin_port) +
-                                       "\",\"reason\":\"peer_using_relay\"").c_str());
+                                       "\",\"reason\":\"peer_using_relay\"")
+                                          .c_str());
                 }
             }
         }
@@ -366,8 +373,9 @@ Incoming receive(SOCKET handle, const char* datagram, int size, const sockaddr_i
                 clock::now() + (reason == UNKNOWN_DESTINATION ? kDirectAfterUnknown : kDirectAfterOffline);
         }
         if (s.logged_refusals.insert(key_of(address.sin_addr.s_addr, address.sin_port) << 8 | reason).second)
-            ctr_hle::log_call("ctr_online", "relay_refused", reason,
-                              (",\"destination\":\"" + text_of(address.sin_addr.s_addr, address.sin_port) + "\"").c_str());
+            ctr_hle::log_call(
+                "ctr_online", "relay_refused", reason,
+                (",\"destination\":\"" + text_of(address.sin_addr.s_addr, address.sin_port) + "\"").c_str());
     }
     return Incoming::Consumed;
 }

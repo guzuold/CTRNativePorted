@@ -54,18 +54,23 @@ bool crockford_decode(const std::string& text, Bytes& out) {
     for (char c : text) {
         if (c == '-' || c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
         int val = -1;
-        if (c >= '0' && c <= '9') val = c - '0';
+        if (c >= '0' && c <= '9')
+            val = c - '0';
         else if (c >= 'A' && c <= 'Z') {
-            if (c == 'I' || c == 'L') val = 1;
-            else if (c == 'O') val = 0;
+            if (c == 'I' || c == 'L')
+                val = 1;
+            else if (c == 'O')
+                val = 0;
             else {
                 const char* p = std::strchr(kCrockfordChars, c);
                 if (p) val = static_cast<int>(p - kCrockfordChars);
             }
         } else if (c >= 'a' && c <= 'z') {
             char u = static_cast<char>(c - 'a' + 'A');
-            if (u == 'I' || u == 'L') val = 1;
-            else if (u == 'O') val = 0;
+            if (u == 'I' || u == 'L')
+                val = 1;
+            else if (u == 'O')
+                val = 0;
             else {
                 const char* p = std::strchr(kCrockfordChars, u);
                 if (p) val = static_cast<int>(p - kCrockfordChars);
@@ -151,10 +156,9 @@ CodeParseError parse_friend_code(const std::string& code, FriendCodeInfo& out) {
     if (version != 1) {
         return CodeParseError::UnsupportedVersion;
     }
-    const std::uint32_t expected_crc = (static_cast<std::uint32_t>(decoded[65]) << 24) |
-                                       (static_cast<std::uint32_t>(decoded[66]) << 16) |
-                                       (static_cast<std::uint32_t>(decoded[67]) << 8) |
-                                       static_cast<std::uint32_t>(decoded[68]);
+    const std::uint32_t expected_crc =
+        (static_cast<std::uint32_t>(decoded[65]) << 24) | (static_cast<std::uint32_t>(decoded[66]) << 16) |
+        (static_cast<std::uint32_t>(decoded[67]) << 8) | static_cast<std::uint32_t>(decoded[68]);
     const std::uint32_t calculated_crc = crc32(decoded.data(), 65);
     if (expected_crc != calculated_crc) {
         return CodeParseError::ChecksumMismatch;
@@ -220,7 +224,8 @@ HostIdentity HostIdentity::load_or_create(const std::filesystem::path& file_path
             const std::string priv_hex = root.at("private_blob_hex").text;
             Bytes blob = from_hex(priv_hex);
             BCRYPT_KEY_HANDLE key = nullptr;
-            if (BCryptImportKeyPair(alg, nullptr, BCRYPT_ECCPRIVATE_BLOB, &key, blob.data(), static_cast<ULONG>(blob.size()), 0) == 0) {
+            if (BCryptImportKeyPair(alg, nullptr, BCRYPT_ECCPRIVATE_BLOB, &key, blob.data(),
+                                    static_cast<ULONG>(blob.size()), 0) == 0) {
                 ident.key_ = key;
                 ident.private_blob_ = blob;
                 loaded = true;
@@ -243,16 +248,20 @@ HostIdentity HostIdentity::load_or_create(const std::filesystem::path& file_path
         DWORD priv_len = 0;
         BCryptExportKey(key, nullptr, BCRYPT_ECCPRIVATE_BLOB, nullptr, 0, &priv_len, 0);
         ident.private_blob_.resize(priv_len);
-        if (BCryptExportKey(key, nullptr, BCRYPT_ECCPRIVATE_BLOB, ident.private_blob_.data(), priv_len, &priv_len, 0) != 0) {
+        if (BCryptExportKey(key, nullptr, BCRYPT_ECCPRIVATE_BLOB, ident.private_blob_.data(), priv_len, &priv_len, 0) !=
+            0) {
             throw std::runtime_error("BCryptExportKey ECCPRIVATE_BLOB failed");
         }
     }
 
     // Export public key blob to extract X, Y
     DWORD pub_len = 0;
-    BCryptExportKey(reinterpret_cast<BCRYPT_KEY_HANDLE>(ident.key_), nullptr, BCRYPT_ECCPUBLIC_BLOB, nullptr, 0, &pub_len, 0);
+    BCryptExportKey(reinterpret_cast<BCRYPT_KEY_HANDLE>(ident.key_), nullptr, BCRYPT_ECCPUBLIC_BLOB, nullptr, 0,
+                    &pub_len, 0);
     Bytes pub_blob(pub_len);
-    if (BCryptExportKey(reinterpret_cast<BCRYPT_KEY_HANDLE>(ident.key_), nullptr, BCRYPT_ECCPUBLIC_BLOB, pub_blob.data(), pub_len, &pub_len, 0) != 0 || pub_len < 72) {
+    if (BCryptExportKey(reinterpret_cast<BCRYPT_KEY_HANDLE>(ident.key_), nullptr, BCRYPT_ECCPUBLIC_BLOB,
+                        pub_blob.data(), pub_len, &pub_len, 0) != 0 ||
+        pub_len < 72) {
         throw std::runtime_error("BCryptExportKey ECCPUBLIC_BLOB failed");
     }
     // ECCPUBLIC_BLOB format: 8-byte header (dwMagic, cbKey=32), followed by 32 bytes X and 32 bytes Y
@@ -278,25 +287,26 @@ HostIdentity HostIdentity::load_or_create(const std::filesystem::path& file_path
     return ident;
 }
 
-Bytes HostIdentity::sign_challenge(const std::string& nonce_hex, const Bytes& traffic_key_spki, std::uint64_t timestamp) const {
+Bytes HostIdentity::sign_challenge(const std::string& nonce_hex, const Bytes& traffic_key_spki,
+                                   std::uint64_t timestamp) const {
     if (!key_) throw std::runtime_error("No host identity key");
-    const std::string message = "CTR-FRIEND-AUTH-V1:" + nonce_hex + ":" + hex(sha256(traffic_key_spki)) + ":" + std::to_string(timestamp);
+    const std::string message =
+        "CTR-FRIEND-AUTH-V1:" + nonce_hex + ":" + hex(sha256(traffic_key_spki)) + ":" + std::to_string(timestamp);
     const Bytes hash = sha256(bytes_of(message));
 
     DWORD sig_len = 0;
-    BCryptSignHash(reinterpret_cast<BCRYPT_KEY_HANDLE>(key_), nullptr, const_cast<unsigned char*>(hash.data()), static_cast<ULONG>(hash.size()), nullptr, 0, &sig_len, 0);
+    BCryptSignHash(reinterpret_cast<BCRYPT_KEY_HANDLE>(key_), nullptr, const_cast<unsigned char*>(hash.data()),
+                   static_cast<ULONG>(hash.size()), nullptr, 0, &sig_len, 0);
     Bytes signature(sig_len);
-    if (BCryptSignHash(reinterpret_cast<BCRYPT_KEY_HANDLE>(key_), nullptr, const_cast<unsigned char*>(hash.data()), static_cast<ULONG>(hash.size()), signature.data(), sig_len, &sig_len, 0) != 0) {
+    if (BCryptSignHash(reinterpret_cast<BCRYPT_KEY_HANDLE>(key_), nullptr, const_cast<unsigned char*>(hash.data()),
+                       static_cast<ULONG>(hash.size()), signature.data(), sig_len, &sig_len, 0) != 0) {
         throw std::runtime_error("BCryptSignHash ECDSA failed");
     }
     return signature;
 }
 
-bool verify_friend_response(const Bytes& public_key_64,
-                            const std::string& nonce_hex,
-                            const Bytes& traffic_key_spki,
-                            std::uint64_t timestamp,
-                            const Bytes& signature_64) {
+bool verify_friend_response(const Bytes& public_key_64, const std::string& nonce_hex, const Bytes& traffic_key_spki,
+                            std::uint64_t timestamp, const Bytes& signature_64) {
     if (public_key_64.size() != 64 || signature_64.size() != 64) return false;
 
     BCRYPT_ALG_HANDLE alg = nullptr;
@@ -313,18 +323,19 @@ bool verify_friend_response(const Bytes& public_key_64,
     std::memcpy(blob.data() + 8, public_key_64.data(), 64);
 
     BCRYPT_KEY_HANDLE pub_key = nullptr;
-    if (BCryptImportKeyPair(alg, nullptr, BCRYPT_ECCPUBLIC_BLOB, &pub_key, blob.data(), static_cast<ULONG>(blob.size()), 0) != 0) {
+    if (BCryptImportKeyPair(alg, nullptr, BCRYPT_ECCPUBLIC_BLOB, &pub_key, blob.data(), static_cast<ULONG>(blob.size()),
+                            0) != 0) {
         BCryptCloseAlgorithmProvider(alg, 0);
         return false;
     }
 
-    const std::string message = "CTR-FRIEND-AUTH-V1:" + nonce_hex + ":" + hex(sha256(traffic_key_spki)) + ":" + std::to_string(timestamp);
+    const std::string message =
+        "CTR-FRIEND-AUTH-V1:" + nonce_hex + ":" + hex(sha256(traffic_key_spki)) + ":" + std::to_string(timestamp);
     const Bytes hash = sha256(bytes_of(message));
 
-    const NTSTATUS status = BCryptVerifySignature(pub_key, nullptr, const_cast<unsigned char*>(hash.data()),
-                                                  static_cast<ULONG>(hash.size()),
-                                                  const_cast<unsigned char*>(signature_64.data()),
-                                                  static_cast<ULONG>(signature_64.size()), 0);
+    const NTSTATUS status = BCryptVerifySignature(
+        pub_key, nullptr, const_cast<unsigned char*>(hash.data()), static_cast<ULONG>(hash.size()),
+        const_cast<unsigned char*>(signature_64.data()), static_cast<ULONG>(signature_64.size()), 0);
 
     BCryptDestroyKey(pub_key);
     BCryptCloseAlgorithmProvider(alg, 0);

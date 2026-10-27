@@ -5,7 +5,9 @@
 #include <fstream>
 #include <algorithm>
 #include <windows.h>
-namespace { std::recursive_mutex friend_store_io; }
+namespace {
+std::recursive_mutex friend_store_io;
+}
 
 namespace ctr_online {
 
@@ -63,7 +65,8 @@ bool FriendStore::save(const std::filesystem::path& path) const {
         root.items.push_back(std::move(item));
     }
 
-    auto temporary = path; temporary += L".tmp";
+    auto temporary = path;
+    temporary += L".tmp";
     std::ofstream file(temporary, std::ios::trunc);
     if (!file.is_open()) return false;
     file << dump_json_spaced(root) << '\n';

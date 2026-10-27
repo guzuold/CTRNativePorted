@@ -20,7 +20,7 @@ using Word = std::uint64_t;
 constexpr char retail_sha[] = "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5";
 constexpr std::size_t selector_vtable = 0x27746c8;
 constexpr std::size_t event_rva = 0x127f500, index_rva = 0x127f5d0, setter_rva = 0x125d880;
-constexpr std::size_t slot0_rva = 0x127f4c0, load_event_type = 0x2a21ee8;  // EU 1.21 offsets (retail_map.hpp)
+constexpr std::size_t slot0_rva = 0x127f4c0, load_event_type = 0x2a21ee8; // EU 1.21 offsets (retail_map.hpp)
 constexpr std::size_t object_size = 0x1d0, option_offset = 0x1c8, player_offset = 0x1cc, index_offset = 0x1a0;
 
 inline bool accessible(const void* pointer, std::size_t size, bool write = false) noexcept {
@@ -30,22 +30,26 @@ inline bool accessible(const void* pointer, std::size_t size, bool write = false
     while (p < end) {
         MEMORY_BASIC_INFORMATION info{};
         if (!VirtualQuery(reinterpret_cast<void*>(p), &info, sizeof(info)) || info.State != MEM_COMMIT ||
-            (info.Protect & (PAGE_GUARD | PAGE_NOACCESS))) return false;
+            (info.Protect & (PAGE_GUARD | PAGE_NOACCESS)))
+            return false;
         const DWORD protection = info.Protect & 0xff;
         if (write && protection != PAGE_READWRITE && protection != PAGE_WRITECOPY &&
-            protection != PAGE_EXECUTE_READWRITE && protection != PAGE_EXECUTE_WRITECOPY) return false;
+            protection != PAGE_EXECUTE_READWRITE && protection != PAGE_EXECUTE_WRITECOPY)
+            return false;
         const auto next = reinterpret_cast<std::uintptr_t>(info.BaseAddress) + info.RegionSize;
         if (next <= p) return false;
         p = next;
     }
     return true;
 }
-template<class T> inline T read(const void* p, std::size_t offset = 0) {
+template <class T> inline T read(const void* p, std::size_t offset = 0) {
     const auto base = reinterpret_cast<std::uintptr_t>(p);
     if (offset > UINTPTR_MAX - base) throw std::runtime_error("settings: retail pointer overflow");
     const auto* address = reinterpret_cast<const void*>(base + offset);
     if (!accessible(address, sizeof(T))) throw std::runtime_error("settings: unreadable retail object");
-    T value{}; std::memcpy(&value, address, sizeof(T)); return value;
+    T value{};
+    std::memcpy(&value, address, sizeof(T));
+    return value;
 }
 
 struct Hooks {
@@ -102,17 +106,23 @@ class Adapter {
                 // Coalesce quick successive selections into one durable write.
                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
                 lock.lock();
-                batch = std::move(*queued_); queued_.reset();
+                batch = std::move(*queued_);
+                queued_.reset();
             }
-            try { store_.update(batch); }
-            catch (const std::exception& e) { error(e.what()); }
+            try {
+                store_.update(batch);
+            } catch (const std::exception& e) {
+                error(e.what());
+            }
         }
     }
 
     [[noreturn]] static void fatal(const char* message) noexcept {
-        OutputDebugStringA(message); OutputDebugStringA("\n");
+        OutputDebugStringA(message);
+        OutputDebugStringA("\n");
         // An invalid guest contract cannot safely resume through a guessed ABI.
-        TerminateProcess(GetCurrentProcess(), 4); std::terminate();
+        TerminateProcess(GetCurrentProcess(), 4);
+        std::terminate();
     }
     void error(const char* message) const noexcept { hooks_.error(message); }
     void* at(std::size_t rva) const noexcept { return image_ + rva; }
@@ -126,7 +136,8 @@ class Adapter {
         if (!menu::owns(id)) return false;
         if (read<unsigned char>(object, player_offset))
             throw std::runtime_error("settings: PC selector must not use player-specific storage");
-        option = static_cast<menu::Option>(id); return true;
+        option = static_cast<menu::Option>(id);
+        return true;
     }
     bool allowed(menu::Option option, unsigned index) const noexcept {
         if (hooks_.available) return hooks_.available(option, index);
@@ -138,7 +149,8 @@ class Adapter {
         if (!value) {
             switch (option) {
             case menu::Option::scene_height: fallback = Json::of(std::to_string(scene_height(document))); break;
-            case menu::Option::fps_60: case menu::Option::xbox_prompts: fallback = Json::of(true); break;
+            case menu::Option::fps_60:
+            case menu::Option::xbox_prompts: fallback = Json::of(true); break;
             default: fallback = menu::value(option, 0); break;
             }
             value = &fallback;
@@ -151,7 +163,7 @@ class Adapter {
     // guest metadata call) runs once per class, not once per event.
     bool load_event_cached(void* event) {
         const void* vtable = nullptr;
-        std::memcpy(&vtable, event, sizeof(vtable));  // a live event the game is dispatching
+        std::memcpy(&vtable, event, sizeof(vtable)); // a live event the game is dispatching
         for (std::size_t n = 0; n != load_kind_count_; ++n)
             if (load_kinds_[n].first == vtable) return load_kinds_[n].second;
         const bool loading = load_event(event);
@@ -189,45 +201,68 @@ class Adapter {
             !retail_map::same(static_cast<const unsigned char*>(pointer), reference, bytes.data(), bytes.size()))
             throw std::runtime_error("settings: retail callback signature mismatch; bridge not installed");
     }
+
 public:
     Adapter(void* image, const std::string& sha256, fs::path path, Hooks hooks, const Json* startup = nullptr)
-        : image_(static_cast<unsigned char*>(image)), store_(std::move(path)), applied_(startup ? *startup : store_.read()), hooks_(hooks) {
+        : image_(static_cast<unsigned char*>(image)), store_(std::move(path)),
+          applied_(startup ? *startup : store_.read()), hooks_(hooks) {
         if (!image_ || !retail_map::bound(sha256)) throw std::runtime_error("settings: unsupported executable SHA256");
-        vtable_ = retail_map::at(selector_vtable); event_rva_ = retail_map::at(event_rva); index_rva_ = retail_map::at(index_rva);
-        setter_ = retail_map::at(setter_rva); slot0_ = retail_map::at(slot0_rva); load_type_ = retail_map::at(load_event_type);
+        vtable_ = retail_map::at(selector_vtable);
+        event_rva_ = retail_map::at(event_rva);
+        index_rva_ = retail_map::at(index_rva);
+        setter_ = retail_map::at(setter_rva);
+        slot0_ = retail_map::at(slot0_rva);
+        load_type_ = retail_map::at(load_event_type);
         if (!hooks_.error) throw std::invalid_argument("settings: an error display sink is required");
         validate(applied_);
         requested_ = store_.read();
     }
     Adapter(const Adapter&) = delete;
     Adapter& operator=(const Adapter&) = delete;
-    ~Adapter() { if (installed_) fatal("settings: adapter destroyed before quiescent uninstall"); }
+    ~Adapter() {
+        if (installed_) fatal("settings: adapter destroyed before quiescent uninstall");
+    }
     const Json& applied_at_startup() const noexcept { return applied_; }
-    Json requested_document() { std::lock_guard<std::recursive_mutex> lock(callbacks_); return requested_; }
+    Json requested_document() {
+        std::lock_guard<std::recursive_mutex> lock(callbacks_);
+        return requested_;
+    }
     // Re-read the requested document after another writer changed it (for example a
     // control fixture). Never called from a GUI callback.
-    void reload() { std::lock_guard<std::recursive_mutex> lock(callbacks_); requested_ = store_.read(); }
+    void reload() {
+        std::lock_guard<std::recursive_mutex> lock(callbacks_);
+        requested_ = store_.read();
+    }
 
     // Startup/quiescent operations only: the parent must call before guest threads
     // start, and keep this object alive until every guest GUI callback has ended.
     // The original image's vtable page must still be writable (no code patch).
     void install() {
         if (installed_ || active_.load()) throw std::runtime_error("settings: bridge already active");
-        signature(at(slot0_), slot0_rva, {0x48,0x8b,0x05,0x51,0x67,0x86,0x01,0xc3,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90});
-        signature(at(event_rva_), event_rva, {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x54,0x53,0x49,0x89,0xd6,0x49,0x89});
-        signature(at(index_rva_), index_rva, {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x55,0x41,0x54,0x53,0x50,0x48,0x89});
-        signature(at(setter_), setter_rva, {0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,0x41,0x55,0x41,0x54,0x53,0x48,0x83,0xec});
+        signature(at(slot0_), slot0_rva,
+                  {0x48, 0x8b, 0x05, 0x51, 0x67, 0x86, 0x01, 0xc3, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90});
+        signature(at(event_rva_), event_rva,
+                  {0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x54, 0x53, 0x49, 0x89, 0xd6, 0x49, 0x89});
+        signature(at(index_rva_), index_rva,
+                  {0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x53, 0x50, 0x48, 0x89});
+        signature(at(setter_), setter_rva,
+                  {0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x53, 0x48, 0x83, 0xec});
         auto** table = static_cast<void**>(at(vtable_));
-        if (!accessible(table, 34 * sizeof(void*), true) || table[0] != at(slot0_) ||
-            table[25] != at(event_rva_) || table[33] != at(index_rva_))
+        if (!accessible(table, 34 * sizeof(void*), true) || table[0] != at(slot0_) || table[25] != at(event_rva_) ||
+            table[33] != at(index_rva_))
             throw std::runtime_error("settings: original selector vtable mismatch; bridge not installed");
-        event_ = table[25]; index_ = table[33];
+        event_ = table[25];
+        index_ = table[33];
         Adapter* expected = nullptr;
-        if (!active_.compare_exchange_strong(expected, this)) throw std::runtime_error("settings: concurrent bridge install");
+        if (!active_.compare_exchange_strong(expected, this))
+            throw std::runtime_error("settings: concurrent bridge install");
         table[25] = reinterpret_cast<void*>(&ctr_settings_event_thunk);
         table[33] = reinterpret_cast<void*>(&ctr_settings_index_thunk);
         installed_ = true;
-        if (!writer_started_) { std::thread([this] { writer(); }).detach(); writer_started_ = true; }
+        if (!writer_started_) {
+            std::thread([this] { writer(); }).detach();
+            writer_started_ = true;
+        }
     }
     void uninstall() {
         if (!installed_) return;
@@ -236,7 +271,10 @@ public:
             table[25] != reinterpret_cast<void*>(&ctr_settings_event_thunk) ||
             table[33] != reinterpret_cast<void*>(&ctr_settings_index_thunk))
             throw std::runtime_error("settings: bridge slots changed; refusing to overwrite foreign patch");
-        table[25] = event_; table[33] = index_; installed_ = false; active_.store(nullptr);
+        table[25] = event_;
+        table[33] = index_;
+        installed_ = false;
+        active_.store(nullptr);
     }
     Word event(Word self, Word event, Word place) {
         // Fast path for the original game's selectors: the thunk sits only in the selector
@@ -247,7 +285,8 @@ public:
         if (!menu::owns(id)) return original(event_, self, event, place);
         std::lock_guard<std::recursive_mutex> lock(callbacks_);
         auto* object = reinterpret_cast<void*>(self);
-        void* vtable = nullptr; unsigned char player = 0;
+        void* vtable = nullptr;
+        unsigned char player = 0;
         std::memcpy(&vtable, object, sizeof(vtable));
         std::memcpy(&player, static_cast<const unsigned char*>(object) + player_offset, 1);
         if (vtable != at(vtable_)) throw std::runtime_error("settings: unexpected selector instance/vtable");
@@ -260,30 +299,37 @@ public:
             // event pointer is kept after this synchronous call.
             try {
                 const unsigned selected = requested(option, requested_);
-                if (!allowed(option, selected)) throw std::runtime_error("settings: saved mode unavailable on this renderer");
+                if (!allowed(option, selected))
+                    throw std::runtime_error("settings: saved mode unavailable on this renderer");
                 original(at(setter_), self, selected, 0, 0);
                 if (read<int>(object, index_offset) != static_cast<int>(selected))
                     throw std::runtime_error("settings: original selector rejected saved index");
-            } catch (const std::exception& e) { error(e.what()); }
+            } catch (const std::exception& e) {
+                error(e.what());
+            }
         }
         return result;
     }
     Word changed(Word self, Word selection, Word place, Word reverse) {
         std::lock_guard<std::recursive_mutex> lock(callbacks_);
-        menu::Option option{}; auto* object = reinterpret_cast<void*>(self);
+        menu::Option option{};
+        auto* object = reinterpret_cast<void*>(self);
         if (!own(object, option)) return original(index_, self, selection, place, reverse);
         const int old = read<int>(object, index_offset);
         const auto selected = static_cast<std::int32_t>(selection);
         if (selected < 0 || static_cast<unsigned>(selected) >= menu::count(option)) {
-            error("settings: menu index outside verified domain"); return 0;
+            error("settings: menu index outside verified domain");
+            return 0;
         }
         if (!allowed(option, static_cast<unsigned>(selected))) {
-            error("settings: selected mode unavailable on this renderer"); return 0;
+            error("settings: selected mode unavailable on this renderer");
+            return 0;
         }
         const Word result = original(index_, self, selection, place, reverse);
         if (read<int>(object, index_offset) != selected || old == selected) return result;
         try {
-            Json changes = Json::object(); const Json value = menu::value(option, static_cast<unsigned>(selected));
+            Json changes = Json::object();
+            const Json value = menu::value(option, static_cast<unsigned>(selected));
             changes.set(menu::key(option), value);
             // Validate and expand (quality profiles) in memory, then apply and queue the save.
             validate(changes, false);
@@ -296,27 +342,42 @@ public:
             bool live = false;
             for (const auto& item : expanded.members)
                 for (auto other : control_schema::options)
-                    if (item.first == menu::key(other) && hooks_.publish_live && hooks_.publish_live(other, item.second))
+                    if (item.first == menu::key(other) && hooks_.publish_live &&
+                        hooks_.publish_live(other, item.second))
                         live |= other == option;
             if (!live && hooks_.saved_restart_required) hooks_.saved_restart_required(menu::key(option), value);
         } catch (const std::exception& e) {
             original(at(setter_), self, static_cast<Word>(old), place, reverse);
-            if (read<int>(object, index_offset) != old) fatal("settings: failed save and original selector rollback failed");
-            error(e.what()); return 0;
+            if (read<int>(object, index_offset) != old)
+                fatal("settings: failed save and original selector rollback failed");
+            error(e.what());
+            return 0;
         }
         return result;
     }
     static Word dispatch_event(Word self, Word event, Word place) noexcept {
-        auto* active = active_.load(); if (!active) fatal("settings: event without active adapter");
-        try { return active->event(self, event, place); }
-        catch (const std::exception& e) { active->error(e.what()); fatal("settings: invalid event callback contract"); }
-        catch (...) { fatal("settings: unexpected event callback exception"); }
+        auto* active = active_.load();
+        if (!active) fatal("settings: event without active adapter");
+        try {
+            return active->event(self, event, place);
+        } catch (const std::exception& e) {
+            active->error(e.what());
+            fatal("settings: invalid event callback contract");
+        } catch (...) {
+            fatal("settings: unexpected event callback exception");
+        }
     }
     static Word dispatch_index(Word self, Word index, Word place, Word reverse) noexcept {
-        auto* active = active_.load(); if (!active) fatal("settings: index without active adapter");
-        try { return active->changed(self, index, place, reverse); }
-        catch (const std::exception& e) { active->error(e.what()); fatal("settings: invalid index callback contract"); }
-        catch (...) { fatal("settings: unexpected index callback exception"); }
+        auto* active = active_.load();
+        if (!active) fatal("settings: index without active adapter");
+        try {
+            return active->changed(self, index, place, reverse);
+        } catch (const std::exception& e) {
+            active->error(e.what());
+            fatal("settings: invalid index callback contract");
+        } catch (...) {
+            fatal("settings: unexpected index callback exception");
+        }
     }
 };
 } // namespace ctrport::settings::bridge

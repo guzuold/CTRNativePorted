@@ -25,12 +25,18 @@ std::future<SendResult> pending;
 SendResult completed;
 void* callback = nullptr;
 auto& confirmation_thread = dialog_thread;
-constexpr int err(unsigned code) { return static_cast<int>(code); }
+constexpr int err(unsigned code) {
+    return static_cast<int>(code);
+}
 void collect() {
-    if (status == 2 && pending.valid() &&
-        pending.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        try { completed = pending.get(); post_accepted(completed); }
-        catch (...) { completed = {}; completed.error = err(0x80B8000Eu); }
+    if (status == 2 && pending.valid() && pending.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        try {
+            completed = pending.get();
+            post_accepted(completed);
+        } catch (...) {
+            completed = {};
+            completed.error = err(0x80B8000Eu);
+        }
         status = 3;
     }
 }
@@ -38,7 +44,8 @@ void collect() {
 CTR_HLE_API int ctr_hle_invitation_load(int (*operation)(int)) {
     std::scoped_lock lock{invitation_mutex};
     if (!ctr_hle::online_enabled() || !operation) return -1;
-    common_operation = operation; loaded = true;
+    common_operation = operation;
+    loaded = true;
     set_owner(operation);
     ctr_hle::log_call("libSceSysmodule", "load_InvitationDialog_lifecycle", 0,
                       ",\"module_id\":162,\"fixed_recipient_send_available\":true");
@@ -67,32 +74,46 @@ int CTR_SYSV sceSysmoduleUnloadInvitation(unsigned short id) {
 int CTR_SYSV sceInvitationDialogInitialize() {
     std::scoped_lock lock{invitation_mutex};
     int rc = 0;
-    if (!loaded || !common_operation || !common_operation(0)) rc = static_cast<int>(0x80B80001u);
-    else if (status) rc = static_cast<int>(0x80B80004u);
-    else if (!common_operation(1)) rc = static_cast<int>(0x80B80008u);
-    else status = 1;
-    ctr_hle::log_call(LIB, "sceInvitationDialogInitialize", rc); return rc;
+    if (!loaded || !common_operation || !common_operation(0))
+        rc = static_cast<int>(0x80B80001u);
+    else if (status)
+        rc = static_cast<int>(0x80B80004u);
+    else if (!common_operation(1))
+        rc = static_cast<int>(0x80B80008u);
+    else
+        status = 1;
+    ctr_hle::log_call(LIB, "sceInvitationDialogInitialize", rc);
+    return rc;
 }
 int CTR_SYSV sceInvitationDialogGetStatus() {
     std::scoped_lock lock{invitation_mutex};
     collect();
-    ctr_hle::log_call(LIB, "sceInvitationDialogGetStatus", status); return status;
+    ctr_hle::log_call(LIB, "sceInvitationDialogGetStatus", status);
+    return status;
 }
 int CTR_SYSV sceInvitationDialogUpdateStatus() {
     std::scoped_lock lock{invitation_mutex};
     collect();
-    ctr_hle::log_call(LIB, "sceInvitationDialogUpdateStatus", status); return status;
+    ctr_hle::log_call(LIB, "sceInvitationDialogUpdateStatus", status);
+    return status;
 }
 int CTR_SYSV sceInvitationDialogTerminate() {
     std::scoped_lock lock{invitation_mutex};
     collect();
     const int rc = status == 2 ? err(0x80B80008u) : (status ? 0 : err(0x80B80003u));
-    if (!rc) { status = 0; common_operation(2); }
-    ctr_hle::log_call(LIB, "sceInvitationDialogTerminate", rc); return rc;
+    if (!rc) {
+        status = 0;
+        common_operation(2);
+    }
+    ctr_hle::log_call(LIB, "sceInvitationDialogTerminate", rc);
+    return rc;
 }
 int CTR_SYSV sceInvitationDialogOpenA(const Param* param) {
     std::scoped_lock lock{invitation_mutex};
-    const auto finish = [](int rc) { ctr_hle::log_call(LIB, "sceInvitationDialogOpenA", rc); return rc; };
+    const auto finish = [](int rc) {
+        ctr_hle::log_call(LIB, "sceInvitationDialogOpenA", rc);
+        return rc;
+    };
     if (!param) return finish(err(0x80B8000Du));
     if (status != 1 && status != 3) return finish(err(0x80B80006u));
     if (param->size != sizeof(Param) || !param->data) return finish(err(0x80B8000Au));
@@ -117,14 +138,17 @@ int CTR_SYSV sceInvitationDialogOpenA(const Param* param) {
         } else if (data.address.type == 2) {
             maximum = data.address.info.maximum;
             if (!maximum || maximum > 16) return finish(err(0x80B8000Au));
-        } else return finish(err(0x80B8000Au));
+        } else
+            return finish(err(0x80B8000Au));
     }
     try {
         const int mode = param->mode;
         pending = std::async(std::launch::async, [session, recipients, maximum, mode] {
             return mode == 1 ? send(session, recipients, maximum, confirmation_thread) : receive(confirmation_thread);
         });
-    } catch (...) { return finish(err(0x80B80009u)); }
+    } catch (...) {
+        return finish(err(0x80B80009u));
+    }
     callback = param->callback;
     completed = {};
     status = 2;
@@ -137,13 +161,17 @@ int CTR_SYSV sceInvitationDialogClose() {
     if (status == 2) {
         bool posted = false;
         const DWORD thread = confirmation_thread.load();
-        if (thread) EnumThreadWindows(thread, [](HWND window, LPARAM argument)->BOOL {
-            wchar_t title[64]{};
-            GetWindowTextW(window, title, 64);
-            if (!std::wcscmp(title, L"CTR - Invitation"))
-                *reinterpret_cast<bool*>(argument) = PostMessageW(window, WM_COMMAND, IDCANCEL, 0) != 0;
-            return TRUE;
-        }, reinterpret_cast<LPARAM>(&posted));
+        if (thread)
+            EnumThreadWindows(
+                thread,
+                [](HWND window, LPARAM argument) -> BOOL {
+                    wchar_t title[64]{};
+                    GetWindowTextW(window, title, 64);
+                    if (!std::wcscmp(title, L"CTR - Invitation"))
+                        *reinterpret_cast<bool*>(argument) = PostMessageW(window, WM_COMMAND, IDCANCEL, 0) != 0;
+                    return TRUE;
+                },
+                reinterpret_cast<LPARAM>(&posted));
         // An in-flight HTTP operation cannot be retracted; do not report it cancelled.
         rc = posted ? 0 : err(0x80B80008u);
     }
@@ -154,9 +182,12 @@ int CTR_SYSV sceInvitationDialogGetResultA(Result* result) {
     std::scoped_lock lock{invitation_mutex};
     collect();
     int rc = 0;
-    if (!status) rc = err(0x80B80003u);
-    else if (status != 3) rc = err(0x80B80005u);
-    else if (!result) rc = err(0x80B8000Du);
+    if (!status)
+        rc = err(0x80B80003u);
+    else if (status != 3)
+        rc = err(0x80B80005u);
+    else if (!result)
+        rc = err(0x80B8000Du);
     else {
         result->callback = callback;
         result->error = completed.error;
@@ -167,7 +198,8 @@ int CTR_SYSV sceInvitationDialogGetResultA(Result* result) {
                 result->sent->users[i] = {};
                 result->sent->users[i].account = completed.sent[i];
                 if (i < completed.names.size())
-                    std::memcpy(result->sent->users[i].online_id, completed.names[i].data(), std::min<std::size_t>(16, completed.names[i].size()));
+                    std::memcpy(result->sent->users[i].online_id, completed.names[i].data(),
+                                std::min<std::size_t>(16, completed.names[i].size()));
             }
         }
         rc = completed.error ? completed.error : completed.result;

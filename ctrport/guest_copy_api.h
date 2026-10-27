@@ -8,9 +8,9 @@
    with the guest range. Owner serializes unmap/reprotect and guest/GPU mutation.
    No coherent GPU capture or arbitrary process memory access is implied. */
 typedef struct CtrGuestCopyApi {
- uint32_t size,version;
- void* context;
- int (*read)(void*,uint64_t guest_address,void* host_output,uint64_t size);
- int (*write)(void*,uint64_t guest_address,const void* host_input,uint64_t size);
+    uint32_t size, version;
+    void* context;
+    int (*read)(void*, uint64_t guest_address, void* host_output, uint64_t size);
+    int (*write)(void*, uint64_t guest_address, const void* host_input, uint64_t size);
 } CtrGuestCopyApi;
 #endif

@@ -15,7 +15,7 @@ struct Json {
     enum class Kind { Null, Bool, Int, Uint, Double, String, Array, Object };
     Kind kind = Kind::Null;
     bool boolean = false;
-    std::int64_t integer = 0;   // Kind::Int (negative or small)
+    std::int64_t integer = 0;         // Kind::Int (negative or small)
     std::uint64_t unsigned_value = 0; // Kind::Uint (>= 0)
     double number = 0;
     std::string text;
@@ -24,18 +24,44 @@ struct Json {
 
     Json() = default;
     static Json null() { return {}; }
-    static Json of(bool value) { Json j; j.kind = Kind::Bool; j.boolean = value; return j; }
-    static Json of(std::uint64_t value) { Json j; j.kind = Kind::Uint; j.unsigned_value = value; return j; }
+    static Json of(bool value) {
+        Json j;
+        j.kind = Kind::Bool;
+        j.boolean = value;
+        return j;
+    }
+    static Json of(std::uint64_t value) {
+        Json j;
+        j.kind = Kind::Uint;
+        j.unsigned_value = value;
+        return j;
+    }
     static Json of(std::int64_t value) {
         if (value >= 0) return of(static_cast<std::uint64_t>(value));
-        Json j; j.kind = Kind::Int; j.integer = value; return j;
+        Json j;
+        j.kind = Kind::Int;
+        j.integer = value;
+        return j;
     }
     static Json of(int value) { return of(static_cast<std::int64_t>(value)); }
     static Json of(unsigned value) { return of(static_cast<std::uint64_t>(value)); }
-    static Json of(const std::string& value) { Json j; j.kind = Kind::String; j.text = value; return j; }
+    static Json of(const std::string& value) {
+        Json j;
+        j.kind = Kind::String;
+        j.text = value;
+        return j;
+    }
     static Json of(const char* value) { return of(std::string(value)); }
-    static Json array() { Json j; j.kind = Kind::Array; return j; }
-    static Json object() { Json j; j.kind = Kind::Object; return j; }
+    static Json array() {
+        Json j;
+        j.kind = Kind::Array;
+        return j;
+    }
+    static Json object() {
+        Json j;
+        j.kind = Kind::Object;
+        return j;
+    }
 
     bool is_object() const { return kind == Kind::Object; }
     bool is_array() const { return kind == Kind::Array; }

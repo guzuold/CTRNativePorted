@@ -23,7 +23,7 @@ constexpr const wchar_t* kCredit = L"Crash Bandicoot Wiki (crashbandicoot.fandom
 
 struct Row {
     std::string name, detail, tip;
-    char grade = 0;  // 'P', 'G', 'S', 'B' or 0
+    char grade = 0; // 'P', 'G', 'S', 'B' or 0
 };
 
 // Wiki markup to plain text: links, bold/italic quotes, templates, tags and entities.
@@ -51,7 +51,8 @@ inline std::string plain(std::string s) {
             out += s[i++];
         }
     }
-    const std::pair<const char*, const char*> entities[] = {{"&amp;", "&"}, {"&quot;", "\""}, {"&#39;", "'"}, {"&lt;", "<"}, {"&gt;", ">"}, {"&nbsp;", " "}};
+    const std::pair<const char*, const char*> entities[] = {{"&amp;", "&"}, {"&quot;", "\""}, {"&#39;", "'"},
+                                                            {"&lt;", "<"},  {"&gt;", ">"},    {"&nbsp;", " "}};
     for (const auto& [from, to] : entities)
         for (std::size_t at; (at = out.find(from)) != std::string::npos;) out.replace(at, std::strlen(from), to);
     const auto first = out.find_first_not_of(" \t\r\n"), last = out.find_last_not_of(" \t\r\n");
@@ -83,7 +84,8 @@ inline std::vector<Row> parse_table(const std::string& wikitext, const std::map<
             if (line.empty() || line[0] != '|' || line.rfind("|+", 0) == 0 || line.rfind("|}", 0) == 0) continue;
             // "| a || b" puts several cells on one line
             std::string rest = line.substr(1);
-            for (std::size_t sep; (sep = rest.find("||")) != std::string::npos; rest.erase(0, sep + 2)) cells.push_back(rest.substr(0, sep));
+            for (std::size_t sep; (sep = rest.find("||")) != std::string::npos; rest.erase(0, sep + 2))
+                cells.push_back(rest.substr(0, sep));
             cells.push_back(rest);
         }
         if (cells.size() >= 5) {
@@ -115,9 +117,11 @@ inline char grade_of(const std::string& target) {
 // platinum. CTR Nitro-Fueled: 180 + 2*90 + 10*30 + 35*15 = 1185; the swap would give 1560.
 inline void complete_grades(const std::vector<std::string>& values, std::map<std::string, char>& grades) {
     std::map<std::string, int> count;
-    for (const auto& v : values) if (!v.empty()) ++count[v];
+    for (const auto& v : values)
+        if (!v.empty()) ++count[v];
     std::vector<std::string> unknown;
-    for (const auto& [file, n] : count) if (!grades.count(file) || !grades[file]) unknown.push_back(file);
+    for (const auto& [file, n] : count)
+        if (!grades.count(file) || !grades[file]) unknown.push_back(file);
     if (unknown.size() != 2 || count[unknown[0]] == count[unknown[1]]) return;
     if (count[unknown[0]] < count[unknown[1]]) std::swap(unknown[0], unknown[1]);
     auto guess = grades;
@@ -138,8 +142,13 @@ inline std::string api_get(const std::string& query) {
 inline std::string escape(const std::string& s) {
     std::string out;
     for (unsigned char c : s) {
-        if (std::isalnum(c) || c == '-' || c == '_' || c == '.') out += char(c);
-        else { char hex[4]; std::snprintf(hex, sizeof(hex), "%%%02X", c); out += hex; }
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.')
+            out += char(c);
+        else {
+            char hex[4];
+            std::snprintf(hex, sizeof(hex), "%%%02X", c);
+            out += hex;
+        }
     }
     return out;
 }
@@ -153,9 +162,13 @@ inline std::vector<Row> fetch() {
         if (const Json* list = parse->find("sections"))
             for (const Json& s : list->items)
                 if (const Json* line = s.find("line"); line && line->text.find("Trophies") != std::string::npos)
-                    if (const Json* i = s.find("index")) { index = i->text; break; }
+                    if (const Json* i = s.find("index")) {
+                        index = i->text;
+                        break;
+                    }
     if (index.empty()) throw std::runtime_error("the wiki page has no Trophies section");
-    const Json page = ctr_online::parse_json(api_get(std::string("action=parse&prop=wikitext&page=") + kPage + "&section=" + index));
+    const Json page =
+        ctr_online::parse_json(api_get(std::string("action=parse&prop=wikitext&page=") + kPage + "&section=" + index));
     const Json* parse = page.find("parse");
     const Json* wikitext = parse ? parse->find("wikitext") : nullptr;
     const Json* text = wikitext ? wikitext->find("*") : nullptr;
@@ -169,14 +182,17 @@ inline std::vector<Row> fetch() {
         std::string titles;
         for (const auto& file : distinct) titles += (titles.empty() ? "" : "|") + ("File:" + file);
         const Json files = ctr_online::parse_json(api_get("action=query&redirects=1&titles=" + escape(titles)));
-        std::map<std::string, std::string> target;  // normalized title -> redirect target
+        std::map<std::string, std::string> target; // normalized title -> redirect target
         if (const Json* query = files.find("query")) {
             std::map<std::string, std::string> normalized;
-            if (const Json* n = query->find("normalized")) for (const Json& e : n->items) normalized[e.at("to").text] = e.at("from").text;
-            if (const Json* r = query->find("redirects")) for (const Json& e : r->items) target[e.at("from").text] = e.at("to").text;
+            if (const Json* n = query->find("normalized"))
+                for (const Json& e : n->items) normalized[e.at("to").text] = e.at("from").text;
+            if (const Json* r = query->find("redirects"))
+                for (const Json& e : r->items) target[e.at("from").text] = e.at("to").text;
             for (const auto& file : distinct) {
                 std::string title = "File:" + file;
-                for (const auto& [to, from] : normalized) if (from == title) title = to;
+                for (const auto& [to, from] : normalized)
+                    if (from == title) title = to;
                 const auto t = target.find(title);
                 grades[file] = grade_of(t != target.end() ? t->second : title);
             }
@@ -187,7 +203,9 @@ inline std::vector<Row> fetch() {
 }
 
 // --- Copy in runtime/user/trophies/wiki.json ---------------------------------------------------
-inline fs::path cache_file(const fs::path& user_root) { return user_root / "trophies" / "wiki.json"; }
+inline fs::path cache_file(const fs::path& user_root) {
+    return user_root / "trophies" / "wiki.json";
+}
 inline void write_cache(const fs::path& file, const std::vector<Row>& rows) {
     Json root = Json::object(), list = Json::array();
     root.set("source", Json::of(std::string("https://crashbandicoot.fandom.com/wiki/") + kPage));
@@ -210,7 +228,8 @@ inline std::vector<Row> read_cache(const fs::path& file, std::int64_t* fetched =
     std::error_code ec;
     if (!fs::exists(file, ec)) return rows;
     const Json root = ctr_online::parse_json(ctrport::mods::read_text(file));
-    if (fetched) if (const Json* f = root.find("fetched"); f && f->is_integer()) *fetched = f->as_i64();
+    if (fetched)
+        if (const Json* f = root.find("fetched"); f && f->is_integer()) *fetched = f->as_i64();
     if (const Json* list = root.find("trophies"))
         for (const Json& item : list->items) {
             Row row{ctrport::gamebanana::text_of(item, "name"), ctrport::gamebanana::text_of(item, "detail"),
@@ -237,4 +256,4 @@ inline bool apply(Set& set, const std::vector<Row>& rows) {
     }
     return true;
 }
-}  // namespace ctr_trophy::wiki
+} // namespace ctr_trophy::wiki

@@ -7,13 +7,7 @@
 
 namespace ctr_online {
 
-enum class VerifyStatus {
-    Verified = 0,
-    NoResponse,
-    InvalidIdentity,
-    MalformedResponse,
-    InvalidTrafficKey
-};
+enum class VerifyStatus { Verified = 0, NoResponse, InvalidIdentity, MalformedResponse, InvalidTrafficKey };
 
 const char* verify_status_string(VerifyStatus status);
 
@@ -32,12 +26,10 @@ VerifyResult verify_friend_document(const std::string& body, const FriendCodeInf
 // Verifies a candidate server endpoint against the expected friend code / public key.
 // Performs HTTP challenge-response handshake over TCP on candidate port (default 8780).
 // Call off UI thread.
-VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint,
-                                       const FriendCodeInfo& friend_info,
+VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint, const FriendCodeInfo& friend_info,
                                        int timeout_ms = 4000);
 
-VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint,
-                                       const std::string& friend_code,
+VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint, const std::string& friend_code,
                                        int timeout_ms = 4000);
 
 // A service whose code is not known in advance (public matchmaking candidates): the code the

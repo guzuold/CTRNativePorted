@@ -18,13 +18,11 @@ struct Timespec {
 } // namespace
 
 CTR_SYSV int nanosleep_(const Timespec* request, Timespec* remain) {
-    if (!request || request->tv_sec < 0 || request->tv_nsec < 0 ||
-        request->tv_nsec >= 1000000000) {
+    if (!request || request->tv_sec < 0 || request->tv_nsec < 0 || request->tv_nsec >= 1000000000) {
         std::fprintf(stderr,
                      "NID=yS8U2TGCe1A library=libkernel caller=0x%llx unsupported: nanosleep "
                      "invalid timespec needs guest errno\n",
-                     static_cast<unsigned long long>(
-                         reinterpret_cast<std::uintptr_t>(__builtin_return_address(0))));
+                     static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(__builtin_return_address(0))));
         std::fflush(stderr);
         ExitProcess(4);
     }
@@ -32,9 +30,8 @@ CTR_SYSV int nanosleep_(const Timespec* request, Timespec* remain) {
     if (hundreds == 0) {
         SwitchToThread();
     } else {
-        HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr,
-                                              CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
-                                              TIMER_ALL_ACCESS);
+        HANDLE timer =
+            CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
         LARGE_INTEGER due{};
         due.QuadPart = -hundreds;
         if (!timer || !SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE) ||

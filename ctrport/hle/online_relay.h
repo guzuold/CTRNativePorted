@@ -52,6 +52,6 @@ enum class Incoming {
     Consumed, // relay control message, handled here
     Dropped,  // direct peer datagram dropped by the test switch
 };
-Incoming receive(SOCKET handle, const char* datagram, int size, const sockaddr_in& from, int* offset,
-                 int* payload, sockaddr_in* source);
+Incoming receive(SOCKET handle, const char* datagram, int size, const sockaddr_in& from, int* offset, int* payload,
+                 sockaddr_in* source);
 } // namespace ctr_hle::online::relay

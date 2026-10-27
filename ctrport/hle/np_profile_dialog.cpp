@@ -12,7 +12,9 @@ int (*common_operation)(int) = nullptr; // Win64: 0 ready, 1 claim, 2 release
 bool loaded = false;
 int status = 0;
 constexpr const char* LIB = "libSceNpProfileDialog";
-constexpr int error(unsigned value) { return static_cast<int>(value); }
+constexpr int error(unsigned value) {
+    return static_cast<int>(value);
+}
 }
 
 CTR_HLE_API int ctr_hle_profile_load(int (*operation)(int)) {
@@ -28,10 +30,14 @@ CTR_HLE_API int ctr_hle_profile_load(int (*operation)(int)) {
 int CTR_SYSV sceNpProfileDialogInitialize() {
     std::scoped_lock lock{profile_mutex};
     int rc = 0;
-    if (!loaded || !common_operation || !common_operation(0)) rc = error(0x80B80001u);
-    else if (status) rc = error(0x80B80004u);
-    else if (!common_operation(1)) rc = error(0x80B80008u);
-    else status = 1;
+    if (!loaded || !common_operation || !common_operation(0))
+        rc = error(0x80B80001u);
+    else if (status)
+        rc = error(0x80B80004u);
+    else if (!common_operation(1))
+        rc = error(0x80B80008u);
+    else
+        status = 1;
     ctr_hle::log_call(LIB, "sceNpProfileDialogInitialize", rc);
     return rc;
 }
@@ -48,7 +54,10 @@ int CTR_SYSV sceNpProfileDialogUpdateStatus() {
 int CTR_SYSV sceNpProfileDialogTerminate() {
     std::scoped_lock lock{profile_mutex};
     const int rc = status ? 0 : error(0x80B80003u);
-    if (!rc) { status = 0; common_operation(2); }
+    if (!rc) {
+        status = 0;
+        common_operation(2);
+    }
     ctr_hle::log_call(LIB, "sceNpProfileDialogTerminate", rc);
     return rc;
 }

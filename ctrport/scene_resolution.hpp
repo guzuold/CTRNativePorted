@@ -13,7 +13,9 @@ inline int scene_height_selected() {
     static const int height = [] {
         if (const auto* document = settings::runtime_snapshot()) {
             const int selected = settings::scene_height(*document);
-            std::printf("{\"scope\":\"settings_scene_requested\",\"schema\":1,\"height\":%d,\"application\":\"restart\"}\n", selected);
+            std::printf(
+                "{\"scope\":\"settings_scene_requested\",\"schema\":1,\"height\":%d,\"application\":\"restart\"}\n",
+                selected);
             return selected;
         }
         char value[32]{};

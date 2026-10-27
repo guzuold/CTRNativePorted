@@ -109,8 +109,7 @@ Headers effective_headers(const Object& request) {
     for (const Object* o : chain) {
         for (const auto& [name, value] : o->headers) {
             const std::string key = ctr_hle::online::lower(name);
-            std::erase_if(result,
-                          [&](const auto& kv) { return ctr_hle::online::lower(kv.first) == key; });
+            std::erase_if(result, [&](const auto& kv) { return ctr_hle::online::lower(kv.first) == key; });
             result.emplace_back(name, value);
         }
     }
@@ -134,8 +133,7 @@ const char* method_name(int method) {
     return method >= 0 && method < 8 ? names[method] : nullptr;
 }
 
-int create_request(int connection, const std::string& method, const char* url,
-                   std::uint64_t content_length) {
+int create_request(int connection, const std::string& method, const char* url, std::uint64_t content_length) {
     std::scoped_lock lock{mutex};
     if (contexts.empty()) {
         return kBeforeInit;
@@ -154,8 +152,7 @@ int create_request(int connection, const std::string& method, const char* url,
     }
     const int id = create_object(Kind::Request, connection, request);
     log_http("sceHttpCreateRequestWithURL", id,
-             ",\"method\":\"" + method + "\",\"url\":\"" +
-                 ctr_hle::online::json_escape(request->url) + "\"");
+             ",\"method\":\"" + method + "\",\"url\":\"" + ctr_hle::online::json_escape(request->url) + "\"");
     return id;
 }
 } // namespace
@@ -196,8 +193,7 @@ CTR_SYSV int sceHttpGetMemoryPoolStats(int context, MemoryPoolStats* stats) {
 }
 CTR_HLE_REGISTER_ONLINE("16sMmVuOvgU", "libSceHttp", sceHttpGetMemoryPoolStats);
 
-CTR_SYSV int sceHttpCreateTemplate(int context, const char* user_agent, int version,
-                                   int auto_proxy) {
+CTR_SYSV int sceHttpCreateTemplate(int context, const char* user_agent, int version, int auto_proxy) {
     std::scoped_lock lock{mutex};
     if (!contexts.count(context)) {
         return contexts.empty() ? kBeforeInit : kInvalidId;
@@ -233,14 +229,12 @@ CTR_SYSV int sceHttpCreateConnectionWithURL(int template_id, const char* url, bo
     auto object = std::make_shared<Object>();
     object->url = url;
     const int id = create_object(Kind::Connection, template_id, object);
-    log_http("sceHttpCreateConnectionWithURL", id,
-             ",\"url\":\"" + ctr_hle::online::json_escape(url) + "\"");
+    log_http("sceHttpCreateConnectionWithURL", id, ",\"url\":\"" + ctr_hle::online::json_escape(url) + "\"");
     return id;
 }
 CTR_HLE_REGISTER_ONLINE("qgxDBjorUxs", "libSceHttp", sceHttpCreateConnectionWithURL);
 
-CTR_SYSV int sceHttpCreateRequestWithURL(int connection, int method, const char* url,
-                                         std::uint64_t content_length) {
+CTR_SYSV int sceHttpCreateRequestWithURL(int connection, int method, const char* url, std::uint64_t content_length) {
     const char* name = method_name(method);
     if (!name) {
         return kInvalidValue;
@@ -296,8 +290,7 @@ CTR_SYSV int sceHttpAddRequestHeader(int id, const char* name, const char* value
     }
     if (mode == kHeaderOverwrite) {
         const std::string key = ctr_hle::online::lower(name);
-        std::erase_if(object->headers,
-                      [&](const auto& kv) { return ctr_hle::online::lower(kv.first) == key; });
+        std::erase_if(object->headers, [&](const auto& kv) { return ctr_hle::online::lower(kv.first) == key; });
     }
     object->headers.emplace_back(name, value);
     return 0;
@@ -363,8 +356,7 @@ CTR_SYSV int sceHttpSendRequest(int id, const void* data, std::uint64_t size) {
     const char* reason = "";
     if (!ctr_hle::online::resolve(url.host.c_str(), &address, &reason)) {
         log_http("sceHttpSendRequest", kResolverNoHost,
-                 ",\"url\":\"" + ctr_hle::online::json_escape(request->url) +
-                     "\",\"blocked_by_policy\":true");
+                 ",\"url\":\"" + ctr_hle::online::json_escape(request->url) + "\",\"blocked_by_policy\":true");
         return kResolverNoHost;
     }
     std::erase_if(headers, [](const auto& kv) { return ctr_hle::online::lower(kv.first) == "host"; });
@@ -373,8 +365,7 @@ CTR_SYSV int sceHttpSendRequest(int id, const void* data, std::uint64_t size) {
     headers.emplace_back("X-Ctr-Original-Url", request->url);
     const std::string body = data && size ? std::string(static_cast<const char*>(data), size) : "";
     ctr_hle::online::HttpResponse response;
-    const bool reached = ctr_hle::online::http_exchange(request->method, url.path, headers, body,
-                                                        &response);
+    const bool reached = ctr_hle::online::http_exchange(request->method, url.path, headers, body, &response);
     {
         std::scoped_lock lock{mutex};
         request->sent = true;
@@ -383,9 +374,8 @@ CTR_SYSV int sceHttpSendRequest(int id, const void* data, std::uint64_t size) {
     }
     const int result = reached ? 0 : kBeforeSend;
     log_http("sceHttpSendRequest", result,
-             ",\"method\":\"" + request->method + "\",\"url\":\"" +
-                 ctr_hle::online::json_escape(request->url) + "\",\"status\":" +
-                 std::to_string(request->response.status) + ",\"request_body\":\"" +
+             ",\"method\":\"" + request->method + "\",\"url\":\"" + ctr_hle::online::json_escape(request->url) +
+                 "\",\"status\":" + std::to_string(request->response.status) + ",\"request_body\":\"" +
                  ctr_hle::online::json_escape(body.substr(0, 512)) + "\",\"response_body\":\"" +
                  ctr_hle::online::json_escape(request->response.body.substr(0, 512)) + "\"");
     return result;
@@ -488,8 +478,7 @@ CTR_HLE_REGISTER_ONLINE("hvG6GfBMXg8", "libSceHttp", sceHttpAbortRequest);
 // Header block parser (shadPS4 sceHttpParseResponseHeader): returns the offset just past the
 // value's line, the value pointer and its length without the trailing CR; folded lines
 // continue the value.
-CTR_SYSV int sceHttpParseResponseHeader(const char* header, std::uint64_t length,
-                                        const char* field, const char** value,
+CTR_SYSV int sceHttpParseResponseHeader(const char* header, std::uint64_t length, const char* field, const char** value,
                                         std::uint64_t* value_length) {
     if (!header) {
         return kParseInvalidResponse;
@@ -502,8 +491,8 @@ CTR_SYSV int sceHttpParseResponseHeader(const char* header, std::uint64_t length
     std::uint64_t offset = 0;
     bool found = false, line_start = true;
     for (std::uint64_t i = 0; i < length; ++i) {
-        if (line_start && !space(static_cast<unsigned char>(header[i])) &&
-            field_length < length - i && header[i + field_length] == ':') {
+        if (line_start && !space(static_cast<unsigned char>(header[i])) && field_length < length - i &&
+            header[i + field_length] == ':') {
             bool equal = true;
             for (std::uint64_t k = 0; k < field_length && equal; ++k) {
                 equal = std::tolower(static_cast<unsigned char>(field[k])) ==
@@ -555,8 +544,7 @@ CTR_SYSV int sceHttpParseResponseHeader(const char* header, std::uint64_t length
 CTR_HLE_REGISTER_ONLINE("hPTXo3bICzI", "libSceHttp", sceHttpParseResponseHeader);
 
 // Percent-encodes everything except unreserved characters (shadPS4 sceHttpUriEscape).
-CTR_SYSV int sceHttpUriEscape(char* out, std::uint64_t* require, std::uint64_t prepare,
-                              const char* in) {
+CTR_SYSV int sceHttpUriEscape(char* out, std::uint64_t* require, std::uint64_t prepare, const char* in) {
     if (!in) {
         return kInvalidValue;
     }

@@ -9,8 +9,8 @@ struct HWND__;
 // launcher's CTR_GPU_FULLSCREEN for "original"). Exclusive: the swap chain takes the output.
 struct DisplayConfig {
     enum Mode { Windowed, Borderless, Exclusive } mode = Windowed;
-    int width = 1280, height = 720;  // window client size; exclusive: the display mode
-    float refresh = 0;               // exclusive only: requested Hz, 0 = the desktop's
+    int width = 1280, height = 720; // window client size; exclusive: the display mode
+    float refresh = 0;              // exclusive only: requested Hz, 0 = the desktop's
 };
 // Creates the window (ctr_gpu_init); the renderer's swap chain is bound to it.
 void VideoOutStartWindow(const char* title, int width, int height);

@@ -37,7 +37,8 @@ inline std::size_t saves_in(const fs::path& title) {
 inline fs::file_time_type newest(const fs::path& folder) {
     std::error_code ec;
     fs::file_time_type result{};
-    for (auto it = fs::recursive_directory_iterator(folder, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+    for (auto it = fs::recursive_directory_iterator(folder, ec); !ec && it != fs::recursive_directory_iterator();
+         it.increment(ec)) {
         const auto time = it->last_write_time(ec);
         if (!ec && time > result) result = time;
     }
@@ -69,7 +70,8 @@ inline void run(const std::string& title) {
     const auto shadps4 = shadps4_sources(title);
     for (const auto& candidate : shadps4)
         if (source.empty() || newest(candidate) > newest(source)) source = candidate;
-    if (!source.empty()) origin = "shadPS4";
+    if (!source.empty())
+        origin = "shadPS4";
     else if (title != "CUSA14876" && saves_in(fs::path("runtime/user/savedata/1/CUSA14876"))) {
         source = fs::path("runtime/user/savedata/1/CUSA14876");
         origin = "this runtime's earlier EU-titled folder";
@@ -79,10 +81,11 @@ inline void run(const std::string& title) {
     fs::create_directories(target, ec);
     fs::copy(source, target, fs::copy_options::recursive | fs::copy_options::skip_existing, ec);
     if (ec) {
-        std::fprintf(stderr, "saves: copying %s saves from %s failed: %s\n", title.c_str(), source.string().c_str(), ec.message().c_str());
+        std::fprintf(stderr, "saves: copying %s saves from %s failed: %s\n", title.c_str(), source.string().c_str(),
+                     ec.message().c_str());
     } else {
-        std::fprintf(stderr, "saves: no %s save yet; copied %zu save folder(s) from %s (%s)\n", title.c_str(), saves_in(target), origin,
-                     source.string().c_str());
+        std::fprintf(stderr, "saves: no %s save yet; copied %zu save folder(s) from %s (%s)\n", title.c_str(),
+                     saves_in(target), origin, source.string().c_str());
     }
     std::fflush(stderr);
 }

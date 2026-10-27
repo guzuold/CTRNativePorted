@@ -22,13 +22,20 @@ Bytes slice(const Bytes& data, std::size_t from, std::size_t to) {
     to = std::min(std::max(to, from), data.size());
     return Bytes(data.begin() + from, data.begin() + to);
 }
-void append(Bytes& out, const Bytes& more) { out.insert(out.end(), more.begin(), more.end()); }
-void append(Bytes& out, const std::string& more) { out.insert(out.end(), more.begin(), more.end()); }
+void append(Bytes& out, const Bytes& more) {
+    out.insert(out.end(), more.begin(), more.end());
+}
+void append(Bytes& out, const std::string& more) {
+    out.insert(out.end(), more.begin(), more.end());
+}
 
 // Protobuf-style fields of the HTTP proxy task.
 Bytes varint(std::uint64_t value) {
     Bytes out;
-    while (value >= 128) { out.push_back(static_cast<unsigned char>((value & 127) | 128)); value >>= 7; }
+    while (value >= 128) {
+        out.push_back(static_cast<unsigned char>((value & 127) | 128));
+        value >>= 7;
+    }
     out.push_back(static_cast<unsigned char>(value));
     return out;
 }
@@ -38,8 +45,10 @@ std::uint64_t read_varint(const Bytes& data, std::size_t& offset) {
         if (offset >= data.size()) throw ProtocolError("truncated varint");
         const unsigned byte = data[offset++];
         const std::uint64_t bits = byte & 127;
-        if (shift == 63 && bits > 1) { if (!(byte & 128)) throw ProtocolError("varint overflow"); }
-        else value |= bits << shift;
+        if (shift == 63 && bits > 1) {
+            if (!(byte & 128)) throw ProtocolError("varint overflow");
+        } else
+            value |= bits << shift;
         if (!(byte & 128)) {
             if (shift == 63 && bits > 1) throw ProtocolError("varint overflow");
             return value;
@@ -59,9 +68,12 @@ std::vector<Field> fields(const Bytes& data) {
             f.number = read_varint(data, offset);
         } else {
             std::uint64_t size;
-            if (f.wire == 2) size = read_varint(data, offset);
-            else if (f.wire == 1 || f.wire == 5) size = f.wire == 1 ? 8 : 4;
-            else throw ProtocolError("unsupported wire type");
+            if (f.wire == 2)
+                size = read_varint(data, offset);
+            else if (f.wire == 1 || f.wire == 5)
+                size = f.wire == 1 ? 8 : 4;
+            else
+                throw ProtocolError("unsupported wire type");
             if (size > data.size() - offset) throw ProtocolError("truncated field");
             f.data = slice(data, offset, offset + static_cast<std::size_t>(size));
             offset += static_cast<std::size_t>(size);
@@ -70,7 +82,11 @@ std::vector<Field> fields(const Bytes& data) {
     }
     return result;
 }
-Bytes pb_uint(std::uint64_t tag, std::uint64_t value) { Bytes out = varint(tag << 3); append(out, varint(value)); return out; }
+Bytes pb_uint(std::uint64_t tag, std::uint64_t value) {
+    Bytes out = varint(tag << 3);
+    append(out, varint(value));
+    return out;
+}
 Bytes pb_blob(std::uint64_t tag, const Bytes& value) {
     Bytes out = varint((tag << 3) | 2);
     append(out, varint(value.size()));
@@ -86,8 +102,12 @@ std::string utf8_strict(const Bytes& data) {
 std::atomic<std::uint64_t> transactions{0};
 } // namespace
 
-std::vector<PbField> pb_fields(const Bytes& data) { return fields(data); }
-Bytes pb_varint(std::uint64_t value) { return varint(value); }
+std::vector<PbField> pb_fields(const Bytes& data) {
+    return fields(data);
+}
+Bytes pb_varint(std::uint64_t value) {
+    return varint(value);
+}
 
 Json params_json(const std::vector<Param>& params) {
     Json out = Json::array();
@@ -109,9 +129,10 @@ unsigned Reader::raw_u8() {
 }
 Param Reader::value() {
     const int kind = static_cast<int>(raw_u8());
-    static const std::map<int, std::size_t> sizes = {
-        {typed::BOOL, 1}, {typed::INT8, 1}, {typed::UINT8, 1}, {typed::WCHAR16, 2}, {typed::INT16, 2}, {typed::UINT16, 2}, {typed::INT32, 4},
-        {typed::UINT32, 4}, {typed::INT64, 8}, {typed::UINT64, 8}, {typed::FLOAT32, 4}, {typed::FLOAT64, 8}};
+    static const std::map<int, std::size_t> sizes = {{typed::BOOL, 1},    {typed::INT8, 1},    {typed::UINT8, 1},
+                                                     {typed::WCHAR16, 2}, {typed::INT16, 2},   {typed::UINT16, 2},
+                                                     {typed::INT32, 4},   {typed::UINT32, 4},  {typed::INT64, 8},
+                                                     {typed::UINT64, 8},  {typed::FLOAT32, 4}, {typed::FLOAT64, 8}};
     Param p;
     p.kind = kind;
     if (const auto it = sizes.find(kind); it != sizes.end()) {
@@ -119,13 +140,28 @@ Param Reader::value() {
         if (data_.size() - offset_ < size) throw ProtocolError("truncated typed number");
         const unsigned char* raw = data_.data() + offset_;
         offset_ += size;
-        if (kind == typed::FLOAT32) { float f; std::memcpy(&f, raw, 4); p.value.kind = Json::Kind::Double; p.value.number = f; return p; }
-        if (kind == typed::FLOAT64) { double d; std::memcpy(&d, raw, 8); p.value.kind = Json::Kind::Double; p.value.number = d; return p; }
+        if (kind == typed::FLOAT32) {
+            float f;
+            std::memcpy(&f, raw, 4);
+            p.value.kind = Json::Kind::Double;
+            p.value.number = f;
+            return p;
+        }
+        if (kind == typed::FLOAT64) {
+            double d;
+            std::memcpy(&d, raw, 8);
+            p.value.kind = Json::Kind::Double;
+            p.value.number = d;
+            return p;
+        }
         std::uint64_t v = load_le(raw, size);
-        if ((kind == typed::INT8 || kind == typed::INT16 || kind == typed::INT32 || kind == typed::INT64) && size < 8 && (v >> (size * 8 - 1)) & 1)
+        if ((kind == typed::INT8 || kind == typed::INT16 || kind == typed::INT32 || kind == typed::INT64) && size < 8 &&
+            (v >> (size * 8 - 1)) & 1)
             v |= ~0ull << (size * 8);
-        if (kind == typed::INT8 || kind == typed::INT16 || kind == typed::INT32 || kind == typed::INT64) p.value = Json::of(static_cast<std::int64_t>(v));
-        else p.value = Json::of(v);
+        if (kind == typed::INT8 || kind == typed::INT16 || kind == typed::INT32 || kind == typed::INT64)
+            p.value = Json::of(static_cast<std::int64_t>(v));
+        else
+            p.value = Json::of(v);
         return p;
     }
     if (kind == typed::STRING || kind == typed::USTRING || kind == typed::MBSTRING) {
@@ -137,24 +173,20 @@ Param Reader::value() {
         return p;
     }
     if (kind == typed::BLOB) {
-        if (raw_u8() != typed::UINT32 || data_.size() - offset_ < 4)
-            throw ProtocolError("expected UINT32 length");
+        if (raw_u8() != typed::UINT32 || data_.size() - offset_ < 4) throw ProtocolError("expected UINT32 length");
         const auto length = load_le(data_.data() + offset_, 4);
         offset_ += 4;
-        if (length > data_.size() - offset_)
-            throw ProtocolError("invalid typed blob length");
+        if (length > data_.size() - offset_) throw ProtocolError("invalid typed blob length");
         const std::size_t n = static_cast<std::size_t>(length);
         p.value = Json::of(hex(slice(data_, offset_, offset_ + n)));
         offset_ += n;
         return p;
     }
     if (kind == typed::STRUCT) {
-        if (raw_u8() != typed::UINT32 || data_.size() - offset_ < 4)
-            throw ProtocolError("expected UINT32 length");
+        if (raw_u8() != typed::UINT32 || data_.size() - offset_ < 4) throw ProtocolError("expected UINT32 length");
         const auto length = load_le(data_.data() + offset_, 4);
         offset_ += 4;
-        if (length > data_.size() - offset_)
-            throw ProtocolError("invalid struct buffer length");
+        if (length > data_.size() - offset_) throw ProtocolError("invalid struct buffer length");
         const std::size_t n = static_cast<std::size_t>(length);
         p.value = Json::of(hex(slice(data_, offset_, offset_ + n)));
         offset_ += n;
@@ -165,7 +197,10 @@ Param Reader::value() {
 std::vector<Param> Reader::values() {
     std::vector<Param> out;
     while (offset_ < data_.size()) {
-        if (data_[offset_] == 0) { ++offset_; continue; } // trailing zero byte after the last value
+        if (data_[offset_] == 0) {
+            ++offset_;
+            continue;
+        } // trailing zero byte after the last value
         out.push_back(value());
     }
     return out;
@@ -177,8 +212,16 @@ Writer& Writer::u8(unsigned value) {
     data_.push_back(static_cast<unsigned char>(value));
     return *this;
 }
-Writer& Writer::u32(std::uint32_t value) { data_.push_back(typed::UINT32); put_le(data_, value, 4); return *this; }
-Writer& Writer::u64(std::uint64_t value) { data_.push_back(typed::UINT64); put_le(data_, value, 8); return *this; }
+Writer& Writer::u32(std::uint32_t value) {
+    data_.push_back(typed::UINT32);
+    put_le(data_, value, 4);
+    return *this;
+}
+Writer& Writer::u64(std::uint64_t value) {
+    data_.push_back(typed::UINT64);
+    put_le(data_, value, 8);
+    return *this;
+}
 Writer& Writer::blob(const Bytes& value) {
     data_.push_back(typed::BLOB);
     u32(static_cast<std::uint32_t>(value.size()));
@@ -197,8 +240,15 @@ Writer& Writer::string(const std::string& value) {
     data_.push_back(0);
     return *this;
 }
-Writer& Writer::boolean(bool value) { data_.push_back(typed::BOOL); data_.push_back(value ? 1 : 0); return *this; }
-Writer& Writer::raw(const Bytes& value) { append(data_, value); return *this; }
+Writer& Writer::boolean(bool value) {
+    data_.push_back(typed::BOOL);
+    data_.push_back(value ? 1 : 0);
+    return *this;
+}
+Writer& Writer::raw(const Bytes& value) {
+    append(data_, value);
+    return *this;
+}
 
 Json RestRequest::json() const {
     Json out = Json::object();
@@ -222,7 +272,11 @@ RestRequest parse_rest_request(const Bytes& data) {
     auto text = [&](std::uint64_t tag) {
         const Field* match = nullptr;
         int count = 0;
-        for (const Field& f : values) if (f.tag == tag && f.wire == 2) { match = &f; ++count; }
+        for (const Field& f : values)
+            if (f.tag == tag && f.wire == 2) {
+                match = &f;
+                ++count;
+            }
         if (count != 1) throw ProtocolError("missing or duplicate HTTP field");
         return utf8_strict(match->data);
     };
@@ -232,7 +286,8 @@ RestRequest parse_rest_request(const Bytes& data) {
     for (const Field& f : values) {
         if (f.tag != 4 || f.wire != 2) continue;
         std::map<std::uint64_t, std::string> header;
-        for (const Field& h : fields(f.data)) if (h.wire == 2) header[h.tag] = utf8_strict(h.data);
+        for (const Field& h : fields(f.data))
+            if (h.wire == 2) header[h.tag] = utf8_strict(h.data);
         if (!header.count(1) || !header.count(2)) throw ProtocolError("invalid HTTP header");
         request.headers.emplace_back(header[1], header[2]);
     }
@@ -253,9 +308,11 @@ std::pair<int, std::string> rest_route(const RestRequest& request) {
     }
     auto enrollments = [](const std::string& p) {
         const std::string head = "/v2/users/psn-", tail = "/enrollments/";
-        if (p.size() <= head.size() + tail.size() || p.compare(0, head.size(), head) || p.compare(p.size() - tail.size(), tail.size(), tail))
+        if (p.size() <= head.size() + tail.size() || p.compare(0, head.size(), head) ||
+            p.compare(p.size() - tail.size(), tail.size(), tail))
             return false;
-        for (std::size_t i = head.size(); i < p.size() - tail.size(); ++i) if (p[i] < '0' || p[i] > '9') return false;
+        for (std::size_t i = head.size(); i < p.size() - tail.size(); ++i)
+            if (p[i] < '0' || p[i] > '9') return false;
         return true;
     };
     if (request.method == "POST" && scheme == "http" && netloc == "abtesting" && enrollments(path))
@@ -280,13 +337,16 @@ Bytes rest_response(const RestRequest& request) {
 bool is_rest_task(unsigned service, std::uint64_t task) {
     return (service == 194 && task == 1) || (service == 193 && task == 8);
 }
-Json TaskRequest::params_json() const { return rest ? rest->json() : ctr_online::params_json(params); }
+Json TaskRequest::params_json() const {
+    return rest ? rest->json() : ctr_online::params_json(params);
+}
 TaskRequest parse_task_request(const Bytes& payload) {
     Reader reader(payload);
     TaskRequest request;
     request.service = reader.raw_u8();
     const Param task = reader.value();
-    if (!task.value.is_integer() || task.value.kind == Json::Kind::Int) throw ProtocolError("task ID is not an unsigned integer");
+    if (!task.value.is_integer() || task.value.kind == Json::Kind::Int)
+        throw ProtocolError("task ID is not an unsigned integer");
     request.task = task.value.as_u64();
     if (is_rest_task(request.service, request.task)) {
         request.rest = parse_rest_request(slice(payload, reader.offset(), payload.size()));
@@ -304,13 +364,17 @@ TaskRequest parse_task_request(const Bytes& payload) {
     }
     return request;
 }
-std::uint64_t next_transaction() { return ++transactions; }
+std::uint64_t next_transaction() {
+    return ++transactions;
+}
 Bytes task_reply(std::uint64_t task, const Writer* results, std::uint32_t error) {
     Writer writer;
     writer.u64(next_transaction()).u32(error).u8(static_cast<unsigned>(task));
     if (!error) {
-        if (!results) writer.u32(0);
-        else writer.raw(results->data());
+        if (!results)
+            writer.u32(0);
+        else
+            writer.raw(results->data());
     }
     return writer.data();
 }
@@ -332,7 +396,8 @@ const char* task_name(unsigned service, std::uint64_t task) {
 }
 
 std::string room_token(const std::string& password) {
-    if (password.empty() || password.size() > 256) throw std::invalid_argument("room password must contain 1..256 UTF-8 bytes");
+    if (password.empty() || password.size() > 256)
+        throw std::invalid_argument("room password must contain 1..256 UTF-8 bytes");
     Bytes data = bytes_of(std::string("ctr-room-v1", 11));
     data.push_back(0);
     append(data, password);
@@ -346,7 +411,8 @@ const std::string& public_room_token() {
 }
 bool valid_room_token(const std::string& value) {
     if (value.size() != 64) return false;
-    for (const char c : value) if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+    for (const char c : value)
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
     return true;
 }
 
@@ -358,7 +424,8 @@ std::uint64_t user_id(const std::string& online_id) {
 std::uint64_t player_account(const std::string& service_code, const std::string& online_id) {
     if (service_code.empty()) return user_id(online_id);
     std::uint64_t value = 0xcbf29ce484222325ull;
-    for (const unsigned char byte : "ctr-player-v1\n" + service_code + "\n" + online_id) value = (value ^ byte) * 0x100000001b3ull;
+    for (const unsigned char byte : "ctr-player-v1\n" + service_code + "\n" + online_id)
+        value = (value ^ byte) * 0x100000001b3ull;
     return value ? value : 1;
 }
 namespace {
@@ -368,8 +435,8 @@ Bytes name64(const std::string& online_id) {
     return name;
 }
 } // namespace
-Bytes client_ticket(std::uint32_t title_id, const std::string& online_id, const Bytes& session_key,
-                    std::uint32_t now, std::uint32_t lifetime, std::uint64_t account) {
+Bytes client_ticket(std::uint32_t title_id, const std::string& online_id, const Bytes& session_key, std::uint32_t now,
+                    std::uint32_t lifetime, std::uint64_t account) {
     Bytes ticket;
     put_le(ticket, 0xEFBDADDEu, 4);
     ticket.push_back(0);
@@ -407,14 +474,21 @@ Json python_int(const Json* value) {
         std::string digits;
         bool negative = false;
         std::size_t i = 0;
-        if (t[0] == '+' || t[0] == '-') { negative = t[0] == '-'; i = 1; }
+        if (t[0] == '+' || t[0] == '-') {
+            negative = t[0] == '-';
+            i = 1;
+        }
         for (; i < t.size(); ++i) {
-            if (t[i] >= '0' && t[i] <= '9') digits += t[i];
-            else if (t[i] == '_' && !digits.empty() && i + 1 < t.size() && t[i + 1] >= '0' && t[i + 1] <= '9') continue;
-            else throw ProtocolError("invalid literal for int()");
+            if (t[i] >= '0' && t[i] <= '9')
+                digits += t[i];
+            else if (t[i] == '_' && !digits.empty() && i + 1 < t.size() && t[i + 1] >= '0' && t[i + 1] <= '9')
+                continue;
+            else
+                throw ProtocolError("invalid literal for int()");
         }
         if (digits.empty()) throw ProtocolError("invalid literal for int()");
-        return parse_json((negative ? "-" : "") + digits.substr(std::min(digits.find_first_not_of('0'), digits.size() - 1)));
+        return parse_json((negative ? "-" : "") +
+                          digits.substr(std::min(digits.find_first_not_of('0'), digits.size() - 1)));
     }
     throw ProtocolError("int() argument must be a string or a number");
 }
@@ -439,8 +513,9 @@ Auth3Reply auth3_reply(const Json& request, const std::string& online_id, const 
     body.set("auth_task", Json::of("47"));
     body.set("code", Json::of("700"));
     body.set("iv_seed", Json::of(dump_json(iv_seed)));
-    body.set("client_ticket", Json::of(base64_encode(client_ticket(title_id, online_id, session_key,
-                                                                   static_cast<std::uint32_t>(std::time(nullptr)), 86400, account))));
+    body.set("client_ticket",
+             Json::of(base64_encode(client_ticket(title_id, online_id, session_key,
+                                                  static_cast<std::uint32_t>(std::time(nullptr)), 86400, account))));
     body.set("server_ticket", Json::of(base64_encode(server_ticket(online_id, session_key, account))));
     body.set("client_id", Json::of(""));
     body.set("account_type", Json::of("psn"));
@@ -461,8 +536,8 @@ Bytes lobby_frame(unsigned type, const Bytes& payload) {
     return out;
 }
 LobbySession::LobbySession(const Bytes& keys)
-    : client_mac_(slice(keys, 0, 20)), server_mac_(slice(keys, 20, 40)),
-      client_aes_(slice(keys, 40, 56)), server_aes_(slice(keys, 56, 72)) {}
+    : client_mac_(slice(keys, 0, 20)), server_mac_(slice(keys, 20, 40)), client_aes_(slice(keys, 40, 56)),
+      server_aes_(slice(keys, 56, 72)) {}
 std::pair<unsigned, Bytes> LobbySession::open_record(const Bytes& data) {
     if (data.size() < 30) throw ProtocolError("short lobby record");
     Bytes whole;
@@ -473,7 +548,8 @@ std::pair<unsigned, Bytes> LobbySession::open_record(const Bytes& data) {
         throw ProtocolError("lobby record HMAC mismatch");
     const auto counter = static_cast<std::uint32_t>(load_le(data.data() + 2, 4));
     if (counter != receive_counter_)
-        throw ProtocolError("lobby record counter " + std::to_string(counter) + ", expected " + std::to_string(receive_counter_));
+        throw ProtocolError("lobby record counter " + std::to_string(counter) + ", expected " +
+                            std::to_string(receive_counter_));
     ++receive_counter_;
     const Bytes encrypted = slice(data, 22, data.size() - 8);
     if (encrypted.empty() || encrypted.size() % 16) throw ProtocolError("lobby record size");
@@ -544,17 +620,27 @@ std::uint32_t parse_ipv4(const std::string& ip) {
     while (parts < 4) {
         if (i >= ip.size() || ip[i] < '0' || ip[i] > '9') throw ProtocolError("invalid IPv4 address " + ip);
         unsigned part = 0, digits = 0;
-        while (i < ip.size() && ip[i] >= '0' && ip[i] <= '9' && digits < 4) { part = part * 10 + (ip[i++] - '0'); ++digits; }
+        while (i < ip.size() && ip[i] >= '0' && ip[i] <= '9' && digits < 4) {
+            part = part * 10 + (ip[i++] - '0');
+            ++digits;
+        }
         if (part > 255 || digits > 3) throw ProtocolError("invalid IPv4 address " + ip);
         value = value << 8 | part;
-        if (++parts < 4) { if (i >= ip.size() || ip[i] != '.') throw ProtocolError("invalid IPv4 address " + ip); ++i; }
+        if (++parts < 4) {
+            if (i >= ip.size() || ip[i] != '.') throw ProtocolError("invalid IPv4 address " + ip);
+            ++i;
+        }
     }
     if (i != ip.size()) throw ProtocolError("invalid IPv4 address " + ip);
     return value;
 }
 } // namespace
 bool is_loopback(const std::string& ip) {
-    try { return (parse_ipv4(ip) >> 24) == 127; } catch (const ProtocolError&) { return false; }
+    try {
+        return (parse_ipv4(ip) >> 24) == 127;
+    } catch (const ProtocolError&) {
+        return false;
+    }
 }
 std::vector<Endpoint> DiscoveryLayout::endpoints() const {
     const std::uint16_t sa = secondary_alternate_port.value_or(alternate_port);
@@ -575,7 +661,8 @@ Bytes discovery_address(const Endpoint& endpoint, bool protected_form) {
 }
 std::optional<std::pair<Endpoint, Bytes>> discovery_answer(const Bytes& data, const Endpoint& peer,
                                                            const DiscoveryLayout& layout) {
-    const Endpoint seen = !layout.public_host.empty() && is_loopback(peer.ip) ? Endpoint{layout.public_host, peer.port} : peer;
+    const Endpoint seen =
+        !layout.public_host.empty() && is_loopback(peer.ip) ? Endpoint{layout.public_host, peer.port} : peer;
     if (data == Bytes{30, 3, 0}) {
         Bytes reply{31, 3, 0};
         append(reply, discovery_address(seen, false));
@@ -622,7 +709,11 @@ std::vector<Part> parse_session_parts(const std::string& content_type, const Byt
         bool quoted = false;
         for (const char c : content_type) {
             if (c == '"') quoted = !quoted;
-            if (c == ';' && !quoted) { pieces.push_back(current); current.clear(); } else current += c;
+            if (c == ';' && !quoted) {
+                pieces.push_back(current);
+                current.clear();
+            } else
+                current += c;
         }
         pieces.push_back(current);
     }
@@ -633,11 +724,13 @@ std::vector<Part> parse_session_parts(const std::string& content_type, const Byt
         const std::size_t eq = pieces[i].find('=');
         if (eq == std::string::npos || lower(trim(pieces[i].substr(0, eq))) != "boundary") continue;
         boundary = trim(pieces[i].substr(eq + 1));
-        if (boundary.size() >= 2 && boundary.front() == '"' && boundary.back() == '"') boundary = boundary.substr(1, boundary.size() - 2);
+        if (boundary.size() >= 2 && boundary.front() == '"' && boundary.back() == '"')
+            boundary = boundary.substr(1, boundary.size() - 2);
     }
     if (media != "multipart/mixed" || boundary.empty() || body.size() > 2 * 1024 * 1024)
         throw ProtocolError("unsupported session multipart");
-    for (const unsigned char c : boundary) if (c >= 0x80) throw ProtocolError("non-ASCII boundary");
+    for (const unsigned char c : boundary)
+        if (c >= 0x80) throw ProtocolError("non-ASCII boundary");
     const std::string marker = "--" + boundary;
     std::size_t offset = 0;
     std::vector<Part> parts;
@@ -654,11 +747,13 @@ std::vector<Part> parse_session_parts(const std::string& content_type, const Byt
         if (end == std::string::npos) throw ProtocolError("substring not found");
         std::map<std::string, std::string> headers;
         const std::string block(body.begin() + offset, body.begin() + end);
-        for (const unsigned char c : block) if (c >= 0x80) throw ProtocolError("non-ASCII part header");
+        for (const unsigned char c : block)
+            if (c >= 0x80) throw ProtocolError("non-ASCII part header");
         std::size_t line_start = 0;
         while (true) {
             const std::size_t line_end = block.find("\r\n", line_start);
-            const std::string line = block.substr(line_start, line_end == std::string::npos ? std::string::npos : line_end - line_start);
+            const std::string line =
+                block.substr(line_start, line_end == std::string::npos ? std::string::npos : line_end - line_start);
             const std::size_t colon = line.find(':');
             if (colon == std::string::npos) throw ProtocolError("part header without colon");
             headers[lower(line.substr(0, colon))] = trim(line.substr(colon + 1));
@@ -675,10 +770,14 @@ std::vector<Part> parse_session_parts(const std::string& content_type, const Byt
         {
             std::size_t i = 0;
             bool negative = false;
-            if (!length_text.empty() && (length_text[0] == '+' || length_text[0] == '-')) { negative = length_text[0] == '-'; i = 1; }
+            if (!length_text.empty() && (length_text[0] == '+' || length_text[0] == '-')) {
+                negative = length_text[0] == '-';
+                i = 1;
+            }
             if (i >= length_text.size()) throw ProtocolError("invalid content-length");
             for (; i < length_text.size(); ++i) {
-                if (length_text[i] < '0' || length_text[i] > '9' || size > (1ll << 40)) throw ProtocolError("invalid content-length");
+                if (length_text[i] < '0' || length_text[i] > '9' || size > (1ll << 40))
+                    throw ProtocolError("invalid content-length");
                 size = size * 10 + (length_text[i] - '0');
             }
             if (negative) size = -size;
@@ -709,23 +808,41 @@ std::string utf8_replace(const std::string& raw) {
     std::size_t i = 0;
     while (i < n) {
         const unsigned char c = s[i];
-        if (c < 0x80) { out += static_cast<char>(c); ++i; continue; }
+        if (c < 0x80) {
+            out += static_cast<char>(c);
+            ++i;
+            continue;
+        }
         int need = 0;
         unsigned char lo = 0x80, hi = 0xBF;
-        if (c >= 0xC2 && c <= 0xDF) need = 1;
-        else if (c >= 0xE0 && c <= 0xEF) { need = 2; if (c == 0xE0) lo = 0xA0; if (c == 0xED) hi = 0x9F; }
-        else if (c >= 0xF0 && c <= 0xF4) { need = 3; if (c == 0xF0) lo = 0x90; if (c == 0xF4) hi = 0x8F; }
-        else { out += replacement; ++i; continue; }
+        if (c >= 0xC2 && c <= 0xDF)
+            need = 1;
+        else if (c >= 0xE0 && c <= 0xEF) {
+            need = 2;
+            if (c == 0xE0) lo = 0xA0;
+            if (c == 0xED) hi = 0x9F;
+        } else if (c >= 0xF0 && c <= 0xF4) {
+            need = 3;
+            if (c == 0xF0) lo = 0x90;
+            if (c == 0xF4) hi = 0x8F;
+        } else {
+            out += replacement;
+            ++i;
+            continue;
+        }
         std::size_t j = i + 1;
         int got = 0;
         while (got < need && j < n) {
             const unsigned char b = s[j];
             const unsigned char l = got == 0 ? lo : 0x80, h = got == 0 ? hi : 0xBF;
             if (b < l || b > h) break;
-            ++j; ++got;
+            ++j;
+            ++got;
         }
-        if (got == need) out.append(raw, i, j - i);
-        else out += replacement;
+        if (got == need)
+            out.append(raw, i, j - i);
+        else
+            out += replacement;
         i = j;
     }
     return out;
@@ -734,7 +851,9 @@ Bytes base64_decode_lenient(const std::string& text) {
     // Non-alphabet characters are discarded, as binascii does without validate.
     std::string kept;
     for (const char c : text)
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '/' || c == '=') kept += c;
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '/' ||
+            c == '=')
+            kept += c;
     const std::size_t pad = kept.find('=');
     std::string data = kept.substr(0, pad);
     if (data.size() % 4 == 1) throw ProtocolError("invalid base64");
@@ -746,7 +865,12 @@ Bytes base64_decode_lenient(const std::string& text) {
 }
 std::string token_urlsafe(std::size_t bytes) {
     std::string text = base64_encode(random_bytes(bytes));
-    for (char& c : text) { if (c == '+') c = '-'; else if (c == '/') c = '_'; }
+    for (char& c : text) {
+        if (c == '+')
+            c = '-';
+        else if (c == '/')
+            c = '_';
+    }
     while (!text.empty() && text.back() == '=') text.pop_back();
     return text;
 }

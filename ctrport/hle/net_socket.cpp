@@ -34,28 +34,86 @@ namespace {
 constexpr int kErrorBase = static_cast<int>(0x80410100u);
 // PS4 errno values (net_error.h).
 enum : int {
-    E_INTR = 4, E_BADF = 9, E_NOMEM = 12, E_ACCES = 13, E_FAULT = 14, E_EXIST = 17,
-    E_INVAL = 22, E_MFILE = 24, E_NOSPC = 28, E_PIPE = 32, E_WOULDBLOCK = 35,
-    E_INPROGRESS = 36, E_ALREADY = 37, E_NOTSOCK = 38, E_DESTADDRREQ = 39, E_MSGSIZE = 40,
-    E_PROTOTYPE = 41, E_NOPROTOOPT = 42, E_PROTONOSUPPORT = 43, E_OPNOTSUPP = 45,
-    E_AFNOSUPPORT = 47, E_ADDRINUSE = 48, E_ADDRNOTAVAIL = 49, E_NETDOWN = 50,
-    E_NETUNREACH = 51, E_NETRESET = 52, E_CONNABORTED = 53, E_CONNRESET = 54,
-    E_NOBUFS = 55, E_ISCONN = 56, E_NOTCONN = 57, E_TIMEDOUT = 60, E_CONNREFUSED = 61,
-    E_LOOP = 62, E_NAMETOOLONG = 63, E_HOSTDOWN = 64, E_HOSTUNREACH = 65,
-    E_NOTEMPTY = 66, E_INTERNAL = 204, E_RESOLVER_EBUSY = 221, E_RESOLVER_ENOHOST = 230,
+    E_INTR = 4,
+    E_BADF = 9,
+    E_NOMEM = 12,
+    E_ACCES = 13,
+    E_FAULT = 14,
+    E_EXIST = 17,
+    E_INVAL = 22,
+    E_MFILE = 24,
+    E_NOSPC = 28,
+    E_PIPE = 32,
+    E_WOULDBLOCK = 35,
+    E_INPROGRESS = 36,
+    E_ALREADY = 37,
+    E_NOTSOCK = 38,
+    E_DESTADDRREQ = 39,
+    E_MSGSIZE = 40,
+    E_PROTOTYPE = 41,
+    E_NOPROTOOPT = 42,
+    E_PROTONOSUPPORT = 43,
+    E_OPNOTSUPP = 45,
+    E_AFNOSUPPORT = 47,
+    E_ADDRINUSE = 48,
+    E_ADDRNOTAVAIL = 49,
+    E_NETDOWN = 50,
+    E_NETUNREACH = 51,
+    E_NETRESET = 52,
+    E_CONNABORTED = 53,
+    E_CONNRESET = 54,
+    E_NOBUFS = 55,
+    E_ISCONN = 56,
+    E_NOTCONN = 57,
+    E_TIMEDOUT = 60,
+    E_CONNREFUSED = 61,
+    E_LOOP = 62,
+    E_NAMETOOLONG = 63,
+    E_HOSTDOWN = 64,
+    E_HOSTUNREACH = 65,
+    E_NOTEMPTY = 66,
+    E_INTERNAL = 204,
+    E_RESOLVER_EBUSY = 221,
+    E_RESOLVER_ENOHOST = 230,
 };
 // Socket types, levels and options (net.h).
 enum : int {
-    SOCK_STREAM_ = 1, SOCK_DGRAM_ = 2, SOCK_RAW_ = 3, SOCK_DGRAM_P2P = 6, SOCK_STREAM_P2P = 10,
-    AF_INET_ = 2, LEVEL_SOCKET = 0xFFFF, LEVEL_IP = 0, LEVEL_TCP = 6,
-    SO_NBIO_ = 0x1200, SO_SNDTIMEO_ = 0x1105, SO_RCVTIMEO_ = 0x1106, SO_ERROR_EX_ = 0x1107,
-    SO_CONNECTTIMEO_ = 0x1109, SO_REUSEPORT_ = 0x200, SO_ONESBCAST_ = 0x10000,
-    SO_USECRYPTO_ = 0x20000, SO_USESIGNATURE_ = 0x40000, SO_NAME_ = 0x1202,
-    SO_POLICY_ = 0x1201, SO_PRIORITY_ = 0x1203, IP_TTLCHK_ = 23, IP_MAXTTL_ = 24,
+    SOCK_STREAM_ = 1,
+    SOCK_DGRAM_ = 2,
+    SOCK_RAW_ = 3,
+    SOCK_DGRAM_P2P = 6,
+    SOCK_STREAM_P2P = 10,
+    AF_INET_ = 2,
+    LEVEL_SOCKET = 0xFFFF,
+    LEVEL_IP = 0,
+    LEVEL_TCP = 6,
+    SO_NBIO_ = 0x1200,
+    SO_SNDTIMEO_ = 0x1105,
+    SO_RCVTIMEO_ = 0x1106,
+    SO_ERROR_EX_ = 0x1107,
+    SO_CONNECTTIMEO_ = 0x1109,
+    SO_REUSEPORT_ = 0x200,
+    SO_ONESBCAST_ = 0x10000,
+    SO_USECRYPTO_ = 0x20000,
+    SO_USESIGNATURE_ = 0x40000,
+    SO_NAME_ = 0x1202,
+    SO_POLICY_ = 0x1201,
+    SO_PRIORITY_ = 0x1203,
+    IP_TTLCHK_ = 23,
+    IP_MAXTTL_ = 24,
     TCP_MSS_TO_ADVERTISE_ = 3,
-    MSG_PEEK_ = 0x2, MSG_WAITALL_ = 0x40, MSG_DONTWAIT_ = 0x80,
-    EPOLLIN_ = 0x1, EPOLLOUT_ = 0x2, EPOLLERR_ = 0x8, EPOLLHUP_ = 0x10, EPOLLDESCID_ = 0x10000,
-    EPOLL_CTL_ADD_ = 1, EPOLL_CTL_MOD_ = 2, EPOLL_CTL_DEL_ = 3, RESOLVER_ASYNC_ = 0x1,
+    MSG_PEEK_ = 0x2,
+    MSG_WAITALL_ = 0x40,
+    MSG_DONTWAIT_ = 0x80,
+    EPOLLIN_ = 0x1,
+    EPOLLOUT_ = 0x2,
+    EPOLLERR_ = 0x8,
+    EPOLLHUP_ = 0x10,
+    EPOLLDESCID_ = 0x10000,
+    EPOLL_CTL_ADD_ = 1,
+    EPOLL_CTL_MOD_ = 2,
+    EPOLL_CTL_DEL_ = 3,
+    RESOLVER_ASYNC_ = 0x1,
 };
 
 struct OrbisSockaddrIn {
@@ -87,11 +145,11 @@ struct Socket {
     SOCKET handle = INVALID_SOCKET;
     int type = 0;
     std::string name;
-    int nbio = 0, connect_timeout = 0, reuseport = 0, onesbcast = 0, usecrypto = 0,
-        usesignature = 0, ttlchk = 0, maxttl = 0, mss = 0;
+    int nbio = 0, connect_timeout = 0, reuseport = 0, onesbcast = 0, usecrypto = 0, usesignature = 0, ttlchk = 0,
+        maxttl = 0, mss = 0;
     std::uint32_t peer = 0; // last connect destination, network order
     std::uint16_t peer_port = 0;
-    bool game = false;      // UDP socket bound to the game's peer port 3074
+    bool game = false; // UDP socket bound to the game's peer port 3074
 };
 struct Resolver {
     std::string name;
@@ -237,8 +295,7 @@ void map_discovery_destination(const Socket& entry, sockaddr_in* host) {
 
 void map_discovery_source(const Socket& entry, sockaddr_in* host) {
     const std::uint16_t port = ctr_hle::online::known_discovery_port();
-    if (port != 3074 && datagram(entry) &&
-        host->sin_addr.s_addr == ctr_hle::online::server_address() &&
+    if (port != 3074 && datagram(entry) && host->sin_addr.s_addr == ctr_hle::online::server_address() &&
         ntohs(host->sin_port) == port) {
         host->sin_port = htons(3074);
     }
@@ -310,13 +367,10 @@ CTR_SYSV int sceNetSocket(const char* name, int family, int type, int protocol) 
         host_type = SOCK_DGRAM;
         host_protocol = IPPROTO_UDP;
         break;
-    default:
-        break;
+    default: break;
     }
-    std::string extra = ",\"name\":\"" + std::string(name ? name : "") +
-                        "\",\"family\":" + std::to_string(family) +
-                        ",\"type\":" + std::to_string(type) +
-                        ",\"protocol\":" + std::to_string(protocol);
+    std::string extra = ",\"name\":\"" + std::string(name ? name : "") + "\",\"family\":" + std::to_string(family) +
+                        ",\"type\":" + std::to_string(type) + ",\"protocol\":" + std::to_string(protocol);
     if (family != AF_INET_ || !host_type) {
         const int result = fail(family != AF_INET_ ? E_AFNOSUPPORT : E_PROTONOSUPPORT);
         log_net("sceNetSocket", result, extra + ",\"unsupported\":true");
@@ -385,15 +439,14 @@ CTR_SYSV int sceNetBind(int id, const void* address, std::uint32_t length) {
                 host.sin_port = htons(static_cast<unsigned short>(3074 + offset));
             }
         }
-        result = bind(entry->handle, reinterpret_cast<sockaddr*>(&host), sizeof(host)) ? fail_wsa()
-                                                                                         : 0;
+        result = bind(entry->handle, reinterpret_cast<sockaddr*>(&host), sizeof(host)) ? fail_wsa() : 0;
         if (result == 0 && entry->game) {
             ctr_hle::online::relay::attach(entry->handle);
         }
     }
     log_net("sceNetBind", result,
-            ",\"socket\":" + std::to_string(id) + ",\"address\":\"" +
-                endpoint(host.sin_addr.s_addr, host.sin_port) + "\"");
+            ",\"socket\":" + std::to_string(id) + ",\"address\":\"" + endpoint(host.sin_addr.s_addr, host.sin_port) +
+                "\"");
     return result;
 }
 CTR_HLE_REGISTER_ONLINE("bErx49PgxyY", "libSceNet", sceNetBind);
@@ -439,8 +492,8 @@ CTR_SYSV int sceNetAccept(int id, void* address, std::uint32_t* length) {
         sockets[child_id] = child;
     }
     log_net("sceNetAccept", child_id,
-            ",\"socket\":" + std::to_string(id) + ",\"peer\":\"" +
-                endpoint(host.sin_addr.s_addr, host.sin_port) + "\"");
+            ",\"socket\":" + std::to_string(id) + ",\"peer\":\"" + endpoint(host.sin_addr.s_addr, host.sin_port) +
+                "\"");
     return child_id;
 }
 CTR_HLE_REGISTER_ONLINE("PIWqhn9oSxc", "libSceNet", sceNetAccept);
@@ -471,9 +524,8 @@ CTR_SYSV int sceNetConnect(int id, const void* address, std::uint32_t length) {
         }
     }
     log_net("sceNetConnect", result,
-            ",\"socket\":" + std::to_string(id) + ",\"address\":\"" +
-                endpoint(host.sin_addr.s_addr, host.sin_port) + "\"" +
-                (blocked ? ",\"blocked_by_policy\":true" : ""));
+            ",\"socket\":" + std::to_string(id) + ",\"address\":\"" + endpoint(host.sin_addr.s_addr, host.sin_port) +
+                "\"" + (blocked ? ",\"blocked_by_policy\":true" : ""));
     return result;
 }
 CTR_HLE_REGISTER_ONLINE("OXXX4mUk3uk", "libSceNet", sceNetConnect);
@@ -490,15 +542,15 @@ CTR_SYSV int sceNetGetsockname(int id, void* address, std::uint32_t* length) {
     }
     to_guest(host, address, length);
     log_net("sceNetGetsockname", 0,
-            ",\"socket\":" + std::to_string(id) + ",\"address\":\"" +
-                endpoint(host.sin_addr.s_addr, host.sin_port) + "\"");
+            ",\"socket\":" + std::to_string(id) + ",\"address\":\"" + endpoint(host.sin_addr.s_addr, host.sin_port) +
+                "\"");
     return 0;
 }
 CTR_HLE_REGISTER_ONLINE("hoOAofhhRvE", "libSceNet", sceNetGetsockname);
 
 namespace {
-int send_common(const char* function, int id, const void* data, std::uint64_t length, int flags,
-                const void* address, std::uint32_t address_length) {
+int send_common(const char* function, int id, const void* data, std::uint64_t length, int flags, const void* address,
+                std::uint32_t address_length) {
     const auto entry = find_socket(id);
     if (!entry) {
         return fail(E_BADF);
@@ -513,8 +565,7 @@ int send_common(const char* function, int id, const void* data, std::uint64_t le
             const int result = fail(E_HOSTUNREACH);
             log_net(function, result,
                     ",\"socket\":" + std::to_string(id) + ",\"address\":\"" +
-                        endpoint(host.sin_addr.s_addr, host.sin_port) +
-                        "\",\"blocked_by_policy\":true");
+                        endpoint(host.sin_addr.s_addr, host.sin_port) + "\",\"blocked_by_policy\":true");
             return result;
         }
     }
@@ -524,18 +575,16 @@ int send_common(const char* function, int id, const void* data, std::uint64_t le
     const int size = length > 0x7fffffff ? 0x7fffffff : static_cast<int>(length);
     namespace relay = ctr_hle::online::relay;
     if (has_address && entry->game && (relay::enabled() || relay::block_direct()) && relay::is_peer(host)) {
-        const bool relayed = relay::enabled() &&
-                             relay::send(entry->handle, static_cast<const char*>(data), size, host) ==
-                                 relay::SendResult::Relayed;
+        const bool relayed = relay::enabled() && relay::send(entry->handle, static_cast<const char*>(data), size,
+                                                             host) == relay::SendResult::Relayed;
         if (relayed || relay::block_direct()) {
             // Relayed, or dropped by the test switch as a NAT would: the game sees a normal send.
             if (!relayed) {
                 relay::note_dropped_out(host);
             }
             log_net(function, size,
-                    ",\"socket\":" + std::to_string(id) + ",\"to\":\"" +
-                        endpoint(host.sin_addr.s_addr, host.sin_port) + "\",\"" +
-                        (relayed ? "relayed" : "test_dropped") + "\":true,\"bytes\":\"" +
+                    ",\"socket\":" + std::to_string(id) + ",\"to\":\"" + endpoint(host.sin_addr.s_addr, host.sin_port) +
+                        "\",\"" + (relayed ? "relayed" : "test_dropped") + "\":true,\"bytes\":\"" +
                         hex_prefix(data, size) + "\"");
             return size;
         }
@@ -543,10 +592,9 @@ int send_common(const char* function, int id, const void* data, std::uint64_t le
     if (has_address) {
         map_discovery_destination(*entry, &host);
     }
-    const int sent =
-        has_address ? sendto(entry->handle, static_cast<const char*>(data), size, 0,
-                             reinterpret_cast<sockaddr*>(&host), sizeof(host))
-                    : send(entry->handle, static_cast<const char*>(data), size, 0);
+    const int sent = has_address ? sendto(entry->handle, static_cast<const char*>(data), size, 0,
+                                          reinterpret_cast<sockaddr*>(&host), sizeof(host))
+                                 : send(entry->handle, static_cast<const char*>(data), size, 0);
     if (sent == SOCKET_ERROR) {
         const int result = fail_wsa();
         if (net_errno != E_WOULDBLOCK) {
@@ -557,16 +605,16 @@ int send_common(const char* function, int id, const void* data, std::uint64_t le
     const std::uint32_t to = has_address ? host.sin_addr.s_addr : entry->peer;
     const std::uint16_t to_port = has_address ? host.sin_port : entry->peer_port;
     log_net(function, sent,
-            ",\"socket\":" + std::to_string(id) + ",\"to\":\"" + endpoint(to, to_port) +
-                "\",\"bytes\":\"" + hex_prefix(data, sent) + "\"");
+            ",\"socket\":" + std::to_string(id) + ",\"to\":\"" + endpoint(to, to_port) + "\",\"bytes\":\"" +
+                hex_prefix(data, sent) + "\"");
     return sent;
 }
 
 // Receive every UDP datagram whole into private scratch space. Check its real source
 // before copying bytes to the guest, decoding the relay or remapping discovery.
 // Relay controls and rejected packets are consumed even for a guest MSG_PEEK.
-int receive_game(const char* function, int id, const Socket& entry, char* buffer, int size, int flags,
-                 int host_flags, void* address, std::uint32_t* address_length) {
+int receive_game(const char* function, int id, const Socket& entry, char* buffer, int size, int flags, int host_flags,
+                 void* address, std::uint32_t* address_length) {
     namespace relay = ctr_hle::online::relay;
     thread_local std::vector<char> scratch(65536);
     // A blocking call waits in recvfrom for the next datagram, so skipping refused ones costs
@@ -587,8 +635,8 @@ int receive_game(const char* function, int id, const Socket& entry, char* buffer
         }
         int offset = 0, payload = received;
         sockaddr_in source = host;
-        const relay::Incoming kind = !ctr_hle::online::source_allowed(host.sin_addr.s_addr)
-            ? relay::Incoming::Dropped
+        const relay::Incoming kind =
+            !ctr_hle::online::source_allowed(host.sin_addr.s_addr) ? relay::Incoming::Dropped
             : entry.game && (relay::enabled() || relay::block_direct())
                 ? relay::receive(entry.handle, scratch.data(), received, host, &offset, &payload, &source)
                 : relay::Incoming::Pass;
@@ -609,19 +657,18 @@ int receive_game(const char* function, int id, const Socket& entry, char* buffer
         if (address) {
             to_guest(source, address, address_length);
         }
-        log_net(function, copied,
-                ",\"socket\":" + std::to_string(id) + ",\"from\":\"" +
-                    endpoint(source.sin_addr.s_addr, source.sin_port) + "\"" +
-                    (kind == relay::Incoming::Data ? ",\"relayed\":true" : "") +
-                    (payload > size ? ",\"truncated\":true" : "") + ",\"bytes\":\"" +
-                    hex_prefix(buffer, copied) + "\"");
+        log_net(
+            function, copied,
+            ",\"socket\":" + std::to_string(id) + ",\"from\":\"" + endpoint(source.sin_addr.s_addr, source.sin_port) +
+                "\"" + (kind == relay::Incoming::Data ? ",\"relayed\":true" : "") +
+                (payload > size ? ",\"truncated\":true" : "") + ",\"bytes\":\"" + hex_prefix(buffer, copied) + "\"");
         return copied;
     }
     return fail(E_WOULDBLOCK); // Non-blocking: bound work per call under a continuous rejected flood.
 }
 
-int receive_common(const char* function, int id, void* buffer, std::uint64_t length, int flags,
-                   void* address, std::uint32_t* address_length) {
+int receive_common(const char* function, int id, void* buffer, std::uint64_t length, int flags, void* address,
+                   std::uint32_t* address_length) {
     const auto entry = find_socket(id);
     if (!entry) {
         return fail(E_BADF);
@@ -668,9 +715,8 @@ int receive_common(const char* function, int id, void* buffer, std::uint64_t len
         to_guest(host, address, address_length);
     }
     log_net(function, received,
-            ",\"socket\":" + std::to_string(id) + ",\"from\":\"" +
-                endpoint(host.sin_addr.s_addr, host.sin_port) + "\",\"bytes\":\"" +
-                hex_prefix(buffer, received) + "\"");
+            ",\"socket\":" + std::to_string(id) + ",\"from\":\"" + endpoint(host.sin_addr.s_addr, host.sin_port) +
+                "\",\"bytes\":\"" + hex_prefix(buffer, received) + "\"");
     return received;
 }
 } // namespace
@@ -680,8 +726,8 @@ CTR_SYSV int sceNetSend(int id, const void* data, std::uint64_t length, int flag
 }
 CTR_HLE_REGISTER_ONLINE("beRjXBn-z+o", "libSceNet", sceNetSend);
 
-CTR_SYSV int sceNetSendto(int id, const void* data, std::uint64_t length, int flags,
-                          const void* address, std::uint32_t address_length) {
+CTR_SYSV int sceNetSendto(int id, const void* data, std::uint64_t length, int flags, const void* address,
+                          std::uint32_t address_length) {
     return send_common("sceNetSendto", id, data, length, flags, address, address_length);
 }
 CTR_HLE_REGISTER_ONLINE("gvD1greCu0A", "libSceNet", sceNetSendto);
@@ -719,13 +765,12 @@ int* stored_option(Socket& entry, int level, int name) {
 // Options whose PS4 number equals the Winsock number at the same level.
 bool passthrough_option(int level, int name) {
     if (level == LEVEL_SOCKET) {
-        return name == SO_REUSEADDR || name == SO_KEEPALIVE || name == SO_BROADCAST ||
-               name == SO_LINGER || name == SO_SNDBUF || name == SO_RCVBUF;
+        return name == SO_REUSEADDR || name == SO_KEEPALIVE || name == SO_BROADCAST || name == SO_LINGER ||
+               name == SO_SNDBUF || name == SO_RCVBUF;
     }
     if (level == LEVEL_IP) {
-        return name == IP_TOS || name == IP_TTL || name == IP_MULTICAST_IF ||
-               name == IP_MULTICAST_TTL || name == IP_MULTICAST_LOOP ||
-               name == IP_ADD_MEMBERSHIP || name == IP_DROP_MEMBERSHIP;
+        return name == IP_TOS || name == IP_TTL || name == IP_MULTICAST_IF || name == IP_MULTICAST_TTL ||
+               name == IP_MULTICAST_LOOP || name == IP_ADD_MEMBERSHIP || name == IP_DROP_MEMBERSHIP;
     }
     if (level == LEVEL_TCP) {
         return name == TCP_NODELAY || name == TCP_MAXSEG;
@@ -741,8 +786,7 @@ std::string option_text(int id, int level, int name) {
 }
 } // namespace
 
-CTR_SYSV int sceNetSetsockopt(int id, int level, int name, const void* value,
-                              std::uint32_t length) {
+CTR_SYSV int sceNetSetsockopt(int id, int level, int name, const void* value, std::uint32_t length) {
     const auto entry = find_socket(id);
     int result;
     if (!entry) {
@@ -760,10 +804,10 @@ CTR_SYSV int sceNetSetsockopt(int id, int level, int name, const void* value,
                 result = ioctlsocket(entry->handle, FIONBIO, &mode) ? fail_wsa() : 0;
             } else if (level == LEVEL_SOCKET && name == SO_ONESBCAST_) {
                 const BOOL on = *stored ? TRUE : FALSE;
-                result = setsockopt(entry->handle, SOL_SOCKET, SO_BROADCAST,
-                                    reinterpret_cast<const char*>(&on), sizeof(on))
-                             ? fail_wsa()
-                             : 0;
+                result =
+                    setsockopt(entry->handle, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&on), sizeof(on))
+                        ? fail_wsa()
+                        : 0;
             }
         }
     } else if (level == LEVEL_SOCKET && (name == SO_SNDTIMEO_ || name == SO_RCVTIMEO_)) {
@@ -772,15 +816,14 @@ CTR_SYSV int sceNetSetsockopt(int id, int level, int name, const void* value,
         } else {
             // PS4 timeouts are microseconds; Winsock takes milliseconds.
             const DWORD milliseconds = static_cast<DWORD>(*static_cast<const int*>(value) / 1000);
-            result = setsockopt(entry->handle, SOL_SOCKET,
-                                name == SO_SNDTIMEO_ ? SO_SNDTIMEO : SO_RCVTIMEO,
+            result = setsockopt(entry->handle, SOL_SOCKET, name == SO_SNDTIMEO_ ? SO_SNDTIMEO : SO_RCVTIMEO,
                                 reinterpret_cast<const char*>(&milliseconds), sizeof(milliseconds))
                          ? fail_wsa()
                          : 0;
         }
     } else if (passthrough_option(level, name)) {
-        result = setsockopt(entry->handle, host_level(level), name,
-                            static_cast<const char*>(value), static_cast<int>(length))
+        result = setsockopt(entry->handle, host_level(level), name, static_cast<const char*>(value),
+                            static_cast<int>(length))
                      ? fail_wsa()
                      : 0;
     } else {
@@ -812,8 +855,7 @@ CTR_SYSV int sceNetGetsockopt(int id, int level, int name, void* value, std::uin
     } else if (level == LEVEL_SOCKET && (name == SO_ERROR || name == SO_ERROR_EX_)) {
         int error = 0;
         int error_length = sizeof(error);
-        result = getsockopt(entry->handle, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error),
-                            &error_length)
+        result = getsockopt(entry->handle, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &error_length)
                      ? fail_wsa()
                      : 0;
         const int mapped = error ? map_wsa(error) : 0;
@@ -836,8 +878,7 @@ CTR_SYSV int sceNetGetsockopt(int id, int level, int name, void* value, std::uin
         }
     } else if (passthrough_option(level, name)) {
         int host_length = static_cast<int>(*length);
-        result = getsockopt(entry->handle, host_level(level), name, static_cast<char*>(value),
-                            &host_length)
+        result = getsockopt(entry->handle, host_level(level), name, static_cast<char*>(value), &host_length)
                      ? fail_wsa()
                      : 0;
         *length = static_cast<std::uint32_t>(host_length);
@@ -864,8 +905,7 @@ int resolve_now(const std::string& hostname, std::uint32_t* output) {
     const int result = allowed ? 0 : kErrorBase | E_RESOLVER_ENOHOST;
     log_net("sceNetResolverStartNtoa.resolution", result,
             ",\"hostname\":\"" + hostname + "\",\"policy\":\"" + reason + "\"" +
-                (allowed ? ",\"address\":\"" + ctr_hle::online::format_address(address) + "\""
-                         : std::string()));
+                (allowed ? ",\"address\":\"" + ctr_hle::online::format_address(address) + "\"" : std::string()));
     return result;
 }
 } // namespace
@@ -907,8 +947,8 @@ CTR_SYSV int sceNetResolverAbort(int id, int flags) {
 }
 CTR_HLE_REGISTER_ONLINE("AzqoBha7js4", "libSceNet", sceNetResolverAbort);
 
-CTR_SYSV int sceNetResolverStartNtoa(int id, const char* hostname, std::uint32_t* address,
-                                     int timeout, int retry, int flags) {
+CTR_SYSV int sceNetResolverStartNtoa(int id, const char* hostname, std::uint32_t* address, int timeout, int retry,
+                                     int flags) {
     std::shared_ptr<Resolver> entry;
     {
         std::scoped_lock lock{table_mutex};
@@ -996,8 +1036,7 @@ CTR_SYSV int sceNetEpollControl(int id, int operation, int target, const OrbisEp
         if (found == entries.end()) return fail(E_BADF);
         entries.erase(found);
         return 0;
-    default:
-        return fail(E_INVAL);
+    default: return fail(E_INVAL);
     }
 }
 CTR_HLE_REGISTER_ONLINE("ZVw46bsasAk", "libSceNet", sceNetEpollControl);
@@ -1068,8 +1107,7 @@ CTR_SYSV int sceNetEpollWait(int id, OrbisEpollEvent* events, int max_events, in
                 ++count;
             }
         }
-        if (count || timeout == 0 ||
-            (timeout > 0 && std::chrono::steady_clock::now() >= deadline)) {
+        if (count || timeout == 0 || (timeout > 0 && std::chrono::steady_clock::now() >= deadline)) {
             return count;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));

@@ -14,7 +14,10 @@ namespace fs = std::filesystem;
 using namespace ctrport;
 
 int main(int argc, char** argv) {
-    if (argc != 4) { std::cerr << "usage: octr_mods_control <mods> <update> <base>\n"; return 2; }
+    if (argc != 4) {
+        std::cerr << "usage: octr_mods_control <mods> <update> <base>\n";
+        return 2;
+    }
     const fs::path mods_dir = argv[1], patch = argv[2], base = argv[3];
     const auto sfo = guest_patches::read_sfo(patch / "sce_sys/param.sfo");
     const std::string title_id = sfo.at("TITLE_ID"), app_ver = sfo.at("APP_VER");
@@ -28,23 +31,39 @@ int main(int argc, char** argv) {
         if (!mods::octr_mod(root)) continue;
         const mods::Mod mod{entry.path().filename().wstring(), root, true};
         try {
-            const auto result = octr::build({mod}, [&](const std::string& relative) -> fs::path {
-                try { return app0_read_path(base, patch, relative); } catch (const std::exception&) { return {}; }
-            }, title_id, app_ver);
+            const auto result = octr::build(
+                {mod},
+                [&](const std::string& relative) -> fs::path {
+                    try {
+                        return app0_read_path(base, patch, relative);
+                    } catch (const std::exception&) {
+                        return {};
+                    }
+                },
+                title_id, app_ver);
             for (const auto& line : result.log) std::cout << "  " << line << "\n";
             if (!result.skipped.empty()) throw std::runtime_error(result.skipped.front().second);
             // Read every redirected entry back through the view.
             for (const auto& [key, view] : result.views)
                 for (const auto& [at, descriptor] : view->patches) {
-                    std::uint64_t offset = 0; std::uint32_t size = 0, high = 0;
-                    std::memcpy(&offset, descriptor.data(), 4); std::memcpy(&high, descriptor.data() + 4, 4); std::memcpy(&size, descriptor.data() + 8, 4);
+                    std::uint64_t offset = 0;
+                    std::uint32_t size = 0, high = 0;
+                    std::memcpy(&offset, descriptor.data(), 4);
+                    std::memcpy(&high, descriptor.data() + 4, 4);
+                    std::memcpy(&size, descriptor.data() + 8, 4);
                     offset |= std::uint64_t(high & 0xFF) << 32;
                     std::vector<std::uint8_t> bytes(size);
-                    HANDLE file = CreateFileW(view->host.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-                    const auto got = settings::menu_overlay::read(*view, offset, bytes.data(), size, [&](std::uint64_t o, std::uint8_t* t, std::uint64_t n) {
-                        OVERLAPPED ov{}; ov.Offset = DWORD(o); ov.OffsetHigh = DWORD(o >> 32); DWORD r = 0;
-                        ReadFile(file, t, DWORD(n), &r, &ov); return std::uint64_t(r);
-                    });
+                    HANDLE file = CreateFileW(view->host.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                                              0, nullptr);
+                    const auto got = settings::menu_overlay::read(
+                        *view, offset, bytes.data(), size, [&](std::uint64_t o, std::uint8_t* t, std::uint64_t n) {
+                            OVERLAPPED ov{};
+                            ov.Offset = DWORD(o);
+                            ov.OffsetHigh = DWORD(o >> 32);
+                            DWORD r = 0;
+                            ReadFile(file, t, DWORD(n), &r, &ov);
+                            return std::uint64_t(r);
+                        });
                     CloseHandle(file);
                     if (got != size) throw std::runtime_error(key + ": short read of a replaced entry");
                 }
@@ -61,14 +80,18 @@ int main(int argc, char** argv) {
                         writes = std::move(port.writes);
                     }
                     for (const auto& w : writes) {
-                        std::cout << "    write 0x" << std::hex << (w.offset + 0x400000) << std::dec << " " << w.bytes.size() << " bytes";
+                        std::cout << "    write 0x" << std::hex << (w.offset + 0x400000) << std::dec << " "
+                                  << w.bytes.size() << " bytes";
                         // where its calls and jumps land once written here
                         for (std::size_t at = 0; at + 5 <= w.bytes.size(); ++at)
                             if (w.bytes[at] == 0xE8 || w.bytes[at] == 0xE9) {
-                                std::int32_t d; std::memcpy(&d, &w.bytes[at + 1], 4);
-                                const auto target = static_cast<std::uint64_t>(static_cast<std::int64_t>(w.offset + at + 5) + d);
+                                std::int32_t d;
+                                std::memcpy(&d, &w.bytes[at + 1], 4);
+                                const auto target =
+                                    static_cast<std::uint64_t>(static_cast<std::int64_t>(w.offset + at + 5) + d);
                                 if (target < info.spans.front().second)
-                                    std::cout << " " << (w.bytes[at] == 0xE8 ? "call" : "jmp") << "@+" << at << "->0x" << std::hex << (target + 0x400000) << std::dec;
+                                    std::cout << " " << (w.bytes[at] == 0xE8 ? "call" : "jmp") << "@+" << at << "->0x"
+                                              << std::hex << (target + 0x400000) << std::dec;
                             }
                         std::cout << "\n";
                     }

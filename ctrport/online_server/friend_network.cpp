@@ -14,7 +14,9 @@ int http_request(const std::string& ipv4, std::uint16_t port, const std::string&
 
 namespace {
 const char* const kDomain = "ctr-peer-v1:";
-std::string digest_text(const std::string& body) { return kDomain + hex(sha256(bytes_of(body))); }
+std::string digest_text(const std::string& body) {
+    return kDomain + hex(sha256(bytes_of(body)));
+}
 std::string text_or_empty(const Json& object, const std::string& key) {
     const Json* value = object.find(key);
     return value && value->is_string() ? value->text : std::string();
@@ -53,16 +55,21 @@ Json verify_peer_message(const Json& packet, const std::string& expected_code, s
     return payload;
 }
 
-Json peer_request(const HostIdentity& self, const std::string& ip, std::uint16_t port,
-                  const std::string& target_code, Json payload, int timeout_ms) {
+Json peer_request(const HostIdentity& self, const std::string& ip, std::uint16_t port, const std::string& target_code,
+                  Json payload, int timeout_ms) {
     const auto nonce = hex(random_bytes(16));
     payload.set("nonce", Json::of(nonce));
     payload.set("to", Json::of(target_code));
     std::string body;
-    const int status = http_request(ip, port, "/ctr/v1/peer", dump_json(sign_peer_message(self, payload)), body, timeout_ms);
+    const int status =
+        http_request(ip, port, "/ctr/v1/peer", dump_json(sign_peer_message(self, payload)), body, timeout_ms);
     if (status != 200) {
-        std::string reason = status == 0 ? "Friend service unreachable" : "Friend service: HTTP " + std::to_string(status);
-        try { const auto error = parse_json(body); if (error.find("error")) reason = error.at("error").text; } catch (...) {}
+        std::string reason =
+            status == 0 ? "Friend service unreachable" : "Friend service: HTTP " + std::to_string(status);
+        try {
+            const auto error = parse_json(body);
+            if (error.find("error")) reason = error.at("error").text;
+        } catch (...) {}
         throw std::runtime_error(reason);
     }
     Json response = verify_peer_message(parse_json(body), target_code, party_now());
@@ -103,7 +110,9 @@ FriendWatcher::FriendWatcher(const HostIdentity& self, std::filesystem::path fri
     }
 }
 
-FriendWatcher::~FriendWatcher() { stop(); }
+FriendWatcher::~FriendWatcher() {
+    stop();
+}
 
 void FriendWatcher::start() {
     if (thread_.joinable()) return;
@@ -122,7 +131,9 @@ void FriendWatcher::stop() {
 
 void FriendWatcher::run() {
     while (!stopping_) {
-        try { poll_now(); } catch (...) {}
+        try {
+            poll_now();
+        } catch (...) {}
         std::unique_lock<std::mutex> lock(wake_mutex_);
         wake_.wait_for(lock, period_, [this] { return stopping_.load(); });
     }
@@ -134,8 +145,7 @@ std::optional<std::pair<std::string, std::uint16_t>> FriendWatcher::endpoint_of(
         const auto it = states_.find(code);
         if (it != states_.end() && it->second.online && !it->second.ip.empty())
             return std::make_pair(it->second.ip, it->second.port);
-        if (const auto observed = observed_.find(code); observed != observed_.end())
-            return observed->second;
+        if (const auto observed = observed_.find(code); observed != observed_.end()) return observed->second;
     }
     return resolver_ ? resolver_(code) : std::nullopt;
 }
@@ -180,7 +190,8 @@ void FriendWatcher::poll_now() {
                 state.account = state.name.empty() ? 0 : player_account(state.code, state.name);
                 // A friend added by code alone gets its player's name in the rubrica, so the
                 // launcher shows it also while Online is off.
-                if (!state.name.empty() && (entry.nickname.empty() || entry.nickname == "Friend" || entry.nickname == "Amico")) {
+                if (!state.name.empty() &&
+                    (entry.nickname.empty() || entry.nickname == "Friend" || entry.nickname == "Amico")) {
                     FriendStore(friends_path_).add_or_update(state.code, state.name);
                     state.nickname = state.name;
                 }

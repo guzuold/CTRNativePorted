@@ -28,13 +28,19 @@ int failures = 0;
 bool common_ready = false, common_used = false;
 int common_operation(int op) {
     if (op == 0) return common_ready;
-    if (op == 1) { if (common_used) return 0; common_used = true; return 1; }
-    if (op == 2) { common_used = false; return 0; }
+    if (op == 1) {
+        if (common_used) return 0;
+        common_used = true;
+        return 1;
+    }
+    if (op == 2) {
+        common_used = false;
+        return 0;
+    }
     return -1;
 }
 
-template <typename F>
-F bind(const char* nid, const char* library) {
+template <typename F> F bind(const char* nid, const char* library) {
     const auto address = resolve(nid, library);
     if (!address) {
         std::printf("{\"scope\":\"online_services_test\",\"missing\":\"%s %s\"}\n", library, nid);
@@ -85,7 +91,9 @@ OrbisSockaddrIn guest_address(const char* ip, std::uint16_t port) {
     inet_pton(AF_INET, ip, &a.addr);
     return a;
 }
-std::string bytes_text(const char* data, int size) { return std::string(data, data + (size > 0 ? size : 0)); }
+std::string bytes_text(const char* data, int size) {
+    return std::string(data, data + (size > 0 ? size : 0));
+}
 
 // Relay transport against a fake project server. block: CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT=1
 // without the relay (direct peer traffic dropped both ways).
@@ -140,12 +148,14 @@ int relay_test(const char* test_mode) {
             while (head.find("\r\n\r\n") == std::string::npos && recv(c, &ch, 1, 0) == 1) head += ch;
             requests.push_back(head);
             // /ctr/v1/config: discovery on the relay socket's port, public address 127.0.0.5.
-            const std::string body = head.rfind("GET /ctr/v1/config ", 0) == 0
-                                         ? "{\"discovery_port\": " + std::to_string(relay_port) + ", \"public_host\": \"127.0.0.5\"}"
-                                         : "{\"token\": \"00112233445566778899aabbccddeeff\", \"port\": " +
-                                               std::to_string(relay_port) + ", \"lease\": 60}";
-            const std::string reply = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " +
-                                      std::to_string(body.size()) + "\r\nConnection: close\r\n\r\n" + body;
+            const std::string body =
+                head.rfind("GET /ctr/v1/config ", 0) == 0
+                    ? "{\"discovery_port\": " + std::to_string(relay_port) + ", \"public_host\": \"127.0.0.5\"}"
+                    : "{\"token\": \"00112233445566778899aabbccddeeff\", \"port\": " + std::to_string(relay_port) +
+                          ", \"lease\": 60}";
+            const std::string reply =
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + std::to_string(body.size()) +
+                "\r\nConnection: close\r\n\r\n" + body;
             send(c, reply.data(), static_cast<int>(reply.size()), 0);
             closesocket(c);
         }
@@ -177,8 +187,10 @@ int relay_test(const char* test_mode) {
     auto net_init = bind<int(SYSV*)()>("Nlev7Lg8k3A", "libSceNet");
     auto net_socket = bind<int(SYSV*)(const char*, int, int, int)>("Q4qBuN-c0ZM", "libSceNet");
     auto net_bind = bind<int(SYSV*)(int, const void*, std::uint32_t)>("bErx49PgxyY", "libSceNet");
-    auto net_sendto = bind<int(SYSV*)(int, const void*, std::uint64_t, int, const void*, std::uint32_t)>("gvD1greCu0A", "libSceNet");
-    auto net_recvfrom = bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, std::uint32_t*)>("304ooNZxWDY", "libSceNet");
+    auto net_sendto =
+        bind<int(SYSV*)(int, const void*, std::uint64_t, int, const void*, std::uint32_t)>("gvD1greCu0A", "libSceNet");
+    auto net_recvfrom =
+        bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, std::uint32_t*)>("304ooNZxWDY", "libSceNet");
     auto net_setsockopt = bind<int(SYSV*)(int, int, int, const void*, std::uint32_t)>("2mKX2Spso7I", "libSceNet");
     auto net_close = bind<int(SYSV*)(int)>("45ggEzakPJQ", "libSceNet");
     net_init();
@@ -195,8 +207,10 @@ int relay_test(const char* test_mode) {
     int from_length = sizeof(from);
 
     if (block) {
-        check(net_sendto(game, "lost", 4, 0, &peer, sizeof(peer)) == 4, "relay test switch: direct send reported as sent");
-        check(recv(direct_peer, buffer, sizeof(buffer), 0) == SOCKET_ERROR, "relay test switch: nothing reaches the peer directly");
+        check(net_sendto(game, "lost", 4, 0, &peer, sizeof(peer)) == 4,
+              "relay test switch: direct send reported as sent");
+        check(recv(direct_peer, buffer, sizeof(buffer), 0) == SOCKET_ERROR,
+              "relay test switch: nothing reaches the peer directly");
         sendto(direct_peer, "in", 2, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
         const SOCKET discovery = udp("127.0.0.2"); // a project server address in development
         sendto(discovery, "server", 6, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
@@ -234,7 +248,8 @@ int relay_test(const char* test_mode) {
         check(net_sendto(game, "probe_lost", 10, 0, &peer, sizeof(peer)) == 10,
               "relay auto fallback: initial probe sent directly");
         n = recv(direct_peer, buffer, sizeof(buffer), 0);
-        check(n == 10 && bytes_text(buffer, n) == "probe_lost", "relay auto fallback: direct peer drops probe (no reply)");
+        check(n == 10 && bytes_text(buffer, n) == "probe_lost",
+              "relay auto fallback: direct peer drops probe (no reply)");
         Sleep(80); // exceed 50ms probe timeout
         check(net_sendto(game, "relayed_after_to", 16, 0, &peer, sizeof(peer)) == 16,
               "relay auto fallback: send after probe timeout");
@@ -271,11 +286,13 @@ int relay_test(const char* test_mode) {
         check(recv(direct_peer, buffer, sizeof(buffer), 0) == SOCKET_ERROR, "relay: nothing sent directly to the peer");
         check(!requests.empty() && requests[0].rfind("POST /ctr/v1/relay-session ", 0) == 0 &&
                   requests[0].find("RelayRacer") != std::string::npos &&
-                  requests[0].find("abababababababababababababababababababababababababababababababab") != std::string::npos,
+                  requests[0].find("abababababababababababababababababababababababababababababababab") !=
+                      std::string::npos,
               "relay: session asked with identity and room token");
 
         const char welcome[] = "CTRR\x01\x02\x7f\x00\x00\x01\x14\x1e\x00\x3c";
-        const char deliver[] = "CTRR\x01\x04\xc6\x33\x64\x07\x0c\xca" "from host";
+        const char deliver[] = "CTRR\x01\x04\xc6\x33\x64\x07\x0c\xca"
+                               "from host";
         sendto(relay, welcome, 14, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
         sendto(relay, deliver, 21, 0, reinterpret_cast<sockaddr*>(&game_host), sizeof(game_host));
         OrbisSockaddrIn source{};
@@ -283,7 +300,8 @@ int relay_test(const char* test_mode) {
         int got = net_recvfrom(game, buffer, sizeof(buffer), 0, &source, &source_length);
         char text[16] = {};
         inet_ntop(AF_INET, &source.addr, text, sizeof(text));
-        check(got == 9 && bytes_text(buffer, got) == "from host" && !std::strcmp(text, "198.51.100.7") && ntohs(source.port) == 3274,
+        check(got == 9 && bytes_text(buffer, got) == "from host" && !std::strcmp(text, "198.51.100.7") &&
+                  ntohs(source.port) == 3274,
               "relay: WELCOME skipped, DELIVER unwrapped with the sender address from the relay");
         // A refused destination falls back to the direct path.
         char refused[13];
@@ -315,11 +333,14 @@ int relay_test(const char* test_mode) {
         const OrbisSockaddrIn discovery = guest_address("127.0.0.1", 3074);
         check(net_sendto(game, "probe", 5, 0, &discovery, sizeof(discovery)) == 5, "relay: discovery send");
         n = recv_relay(buffer, sizeof(buffer));
-        check(n == 5 && bytes_text(buffer, n) == "probe", "relay: discovery sent as is to the configured discovery port");
+        check(n == 5 && bytes_text(buffer, n) == "probe",
+              "relay: discovery sent as is to the configured discovery port");
         const OrbisSockaddrIn public_service = guest_address("127.0.0.5", relay_port);
-        check(net_sendto(game, "public", 6, 0, &public_service, sizeof(public_service)) == 6, "relay: send to the public address");
+        check(net_sendto(game, "public", 6, 0, &public_service, sizeof(public_service)) == 6,
+              "relay: send to the public address");
         n = recv_relay(buffer, sizeof(buffer));
-        check(n == 6 && bytes_text(buffer, n) == "public", "relay: server's public address with a service port not relayed");
+        check(n == 6 && bytes_text(buffer, n) == "public",
+              "relay: server's public address with a service port not relayed");
     }
     net_close(game);
     stop = true;
@@ -331,231 +352,402 @@ int relay_test(const char* test_mode) {
 }
 } // namespace
 
-
 // Real local sockets: strict mode makes the LAN interface require service approval.
 int ingress_test() {
-    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
-    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
-    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
-    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
-    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
-    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
-    lan.sin_port=0;
-    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
-    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
-    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,8);
-    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
-    std::atomic<bool> allow{false}, stop{false}; std::atomic<int> requests{0};
-    std::thread service([&]{while(!stop){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
-        char request[4096]; recv(c,request,sizeof(request),0); ++requests;
-        std::string response=std::string("HTTP/1.1 ")+(allow?"200 OK":"403 Forbidden")+"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-        send(c,response.data(),static_cast<int>(response.size()),0); closesocket(c); }});
-    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
-    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
-    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
-    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
-    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
-    if(!resolve) std::exit(2);
-    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
-    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
-    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
-    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
-    auto close=bind<int(SYSV*)(int)>("45ggEzakPJQ","libSceNet");
-    auto listen_guest=bind<int(SYSV*)(int,int)>("kOj1HiAGE54","libSceNet");
-    auto accept_guest=bind<int(SYSV*)(int,void*,unsigned*)>("PIWqhn9oSxc","libSceNet");
-    SOCKET sender=socket(AF_INET,SOCK_DGRAM,0); ::bind(sender,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    for(unsigned port: {0u,3074u}) {
-        int g=ns("ingress",2,2,0); auto addr=loopback(static_cast<unsigned short>(port)); addr.addr=0;
-        check(nb(g,&addr,sizeof(addr))==0,"ingress: bind"); unsigned size=sizeof(addr); name(g,&addr,&size);
-        sockaddr_in dst=lan; dst.sin_port=addr.port;
-        char buffer[8]{}; sendto(sender,"bad",3,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst)); Sleep(20);
-        check(receive(g,buffer,1,0x82,nullptr,nullptr)==(kErrorBase|35),"ingress: unauthorized oversized PEEK datagram dropped");
-        check(receive(g,buffer,8,0x80,nullptr,nullptr)==(kErrorBase|35),"ingress: rejected PEEK removed from queue");
-        allow=true; int got=-1;
-        for(int i=0;i<80 && got!=2;++i){sendto(sender,"ok",2,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst)); Sleep(50); got=receive(g,buffer,8,0x80,nullptr,nullptr);}
-        check(got==2 && !memcmp(buffer,"ok",2),"ingress: newly assigned peer accepted without outbound game traffic");
-        close(g); allow=false; Sleep(1200);
+    WSADATA wd{};
+    WSAStartup(MAKEWORD(2, 2), &wd);
+    SOCKET route = socket(AF_INET, SOCK_DGRAM, 0);
+    sockaddr_in lan{};
+    lan.sin_family = AF_INET;
+    lan.sin_port = htons(9);
+    inet_pton(AF_INET, "198.51.100.1", &lan.sin_addr);
+    connect(route, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    int len = sizeof(lan);
+    getsockname(route, reinterpret_cast<sockaddr*>(&lan), &len);
+    closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr) >> 24) == 127) return 2;
+    lan.sin_port = 0;
+    SOCKET http = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in local{};
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ::bind(http, reinterpret_cast<sockaddr*>(&local), sizeof(local));
+    listen(http, 8);
+    len = sizeof(local);
+    getsockname(http, reinterpret_cast<sockaddr*>(&local), &len);
+    std::atomic<bool> allow{false}, stop{false};
+    std::atomic<int> requests{0};
+    std::thread service([&] {
+        while (!stop) {
+            SOCKET c = accept(http, nullptr, nullptr);
+            if (c == INVALID_SOCKET) break;
+            char request[4096];
+            recv(c, request, sizeof(request), 0);
+            ++requests;
+            std::string response = std::string("HTTP/1.1 ") + (allow ? "200 OK" : "403 Forbidden") +
+                                   "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            send(c, response.data(), static_cast<int>(response.size()), 0);
+            closesocket(c);
+        }
+    });
+    set_env("CTR_ONLINE", "1");
+    set_env("CTR_ONLINE_STRICT_PEERS", "1");
+    set_env("CTR_ONLINE_SERVER", "127.0.0.1");
+    set_env("CTR_ONLINE_NAT_TRANSPORT", "off");
+    set_env("CTR_ONLINE_HTTP_PORT", std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library = LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve")) : nullptr;
+    if (!resolve) std::exit(2);
+    auto ns = bind<int(SYSV*)(const char*, int, int, int)>("Q4qBuN-c0ZM", "libSceNet");
+    auto nb = bind<int(SYSV*)(int, const void*, unsigned)>("bErx49PgxyY", "libSceNet");
+    auto name = bind<int(SYSV*)(int, void*, unsigned*)>("hoOAofhhRvE", "libSceNet");
+    auto receive = bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, unsigned*)>("304ooNZxWDY", "libSceNet");
+    auto close = bind<int(SYSV*)(int)>("45ggEzakPJQ", "libSceNet");
+    auto listen_guest = bind<int(SYSV*)(int, int)>("kOj1HiAGE54", "libSceNet");
+    auto accept_guest = bind<int(SYSV*)(int, void*, unsigned*)>("PIWqhn9oSxc", "libSceNet");
+    SOCKET sender = socket(AF_INET, SOCK_DGRAM, 0);
+    ::bind(sender, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    for (unsigned port : {0u, 3074u}) {
+        int g = ns("ingress", 2, 2, 0);
+        auto addr = loopback(static_cast<unsigned short>(port));
+        addr.addr = 0;
+        check(nb(g, &addr, sizeof(addr)) == 0, "ingress: bind");
+        unsigned size = sizeof(addr);
+        name(g, &addr, &size);
+        sockaddr_in dst = lan;
+        dst.sin_port = addr.port;
+        char buffer[8]{};
+        sendto(sender, "bad", 3, 0, reinterpret_cast<sockaddr*>(&dst), sizeof(dst));
+        Sleep(20);
+        check(receive(g, buffer, 1, 0x82, nullptr, nullptr) == (kErrorBase | 35),
+              "ingress: unauthorized oversized PEEK datagram dropped");
+        check(receive(g, buffer, 8, 0x80, nullptr, nullptr) == (kErrorBase | 35),
+              "ingress: rejected PEEK removed from queue");
+        allow = true;
+        int got = -1;
+        for (int i = 0; i < 80 && got != 2; ++i) {
+            sendto(sender, "ok", 2, 0, reinterpret_cast<sockaddr*>(&dst), sizeof(dst));
+            Sleep(50);
+            got = receive(g, buffer, 8, 0x80, nullptr, nullptr);
+        }
+        check(got == 2 && !memcmp(buffer, "ok", 2),
+              "ingress: newly assigned peer accepted without outbound game traffic");
+        close(g);
+        allow = false;
+        Sleep(1200);
     }
-    int listener=ns("ingress-tcp",2,1,0); auto addr=loopback(0); addr.addr=0; nb(listener,&addr,sizeof(addr));
-    unsigned size=sizeof(addr); name(listener,&addr,&size); listen_guest(listener,8);
-    auto attempt=[&](){SOCKET c=socket(AF_INET,SOCK_STREAM,0); ::bind(c,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-        sockaddr_in dst=lan; dst.sin_port=addr.port; connect(c,reinterpret_cast<sockaddr*>(&dst),sizeof(dst));
-        int child=accept_guest(listener,nullptr,nullptr); if(child>0) close(child); closesocket(c); return child;};
-    check(attempt()<0,"ingress: unauthorized TCP closed"); allow=true; int child=-1;
-    for(int i=0;i<80 && child<0;++i){Sleep(50); child=attempt();}
-    check(child>0,"ingress: authorized TCP accepted"); close(listener); closesocket(sender);
-    check(requests<35,"ingress: authorization requests rate limited");
-    stop=true; closesocket(http); service.join();
-    std::printf("ingress failures=%d requests=%d\n",failures,requests.load()); return failures?1:0;
+    int listener = ns("ingress-tcp", 2, 1, 0);
+    auto addr = loopback(0);
+    addr.addr = 0;
+    nb(listener, &addr, sizeof(addr));
+    unsigned size = sizeof(addr);
+    name(listener, &addr, &size);
+    listen_guest(listener, 8);
+    auto attempt = [&]() {
+        SOCKET c = socket(AF_INET, SOCK_STREAM, 0);
+        ::bind(c, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+        sockaddr_in dst = lan;
+        dst.sin_port = addr.port;
+        connect(c, reinterpret_cast<sockaddr*>(&dst), sizeof(dst));
+        int child = accept_guest(listener, nullptr, nullptr);
+        if (child > 0) close(child);
+        closesocket(c);
+        return child;
+    };
+    check(attempt() < 0, "ingress: unauthorized TCP closed");
+    allow = true;
+    int child = -1;
+    for (int i = 0; i < 80 && child < 0; ++i) {
+        Sleep(50);
+        child = attempt();
+    }
+    check(child > 0, "ingress: authorized TCP accepted");
+    close(listener);
+    closesocket(sender);
+    check(requests < 35, "ingress: authorization requests rate limited");
+    stop = true;
+    closesocket(http);
+    service.join();
+    std::printf("ingress failures=%d requests=%d\n", failures, requests.load());
+    return failures ? 1 : 0;
 }
 
 // A blocking guest receive under a flood of refused datagrams waits for the first accepted
 // one instead of failing with EWOULDBLOCK. Refused: this PC's LAN address (strict mode,
 // service answers 403). Accepted: loopback.
 int ingress_blocking_test() {
-    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
-    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
-    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
-    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
-    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
-    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
-    lan.sin_port=0;
-    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
-    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
-    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,8);
-    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
-    std::thread service([&]{for(;;){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
-        char request[4096]; recv(c,request,sizeof(request),0);
-        const char* response="HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-        send(c,response,static_cast<int>(std::strlen(response)),0); closesocket(c); }});
-    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
-    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
-    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
-    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
-    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
-    if(!resolve) std::exit(2);
-    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
-    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
-    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
-    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
-    int g=ns("ingress-blocking",2,2,0); auto addr=loopback(0); addr.addr=0;
-    check(nb(g,&addr,sizeof(addr))==0,"ingress blocking: bind");
-    unsigned size=sizeof(addr); name(g,&addr,&size);
-    SOCKET refused=socket(AF_INET,SOCK_DGRAM,0); ::bind(refused,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    sockaddr_in to_lan=lan; to_lan.sin_port=addr.port;
-    for(int i=0;i<100;++i) sendto(refused,"bad",3,0,reinterpret_cast<sockaddr*>(&to_lan),sizeof(to_lan));
-    SOCKET accepted=socket(AF_INET,SOCK_DGRAM,0);
-    sockaddr_in to_loop{}; to_loop.sin_family=AF_INET; to_loop.sin_addr.s_addr=htonl(INADDR_LOOPBACK); to_loop.sin_port=addr.port;
-    sendto(accepted,"ok",2,0,reinterpret_cast<sockaddr*>(&to_loop),sizeof(to_loop));
+    WSADATA wd{};
+    WSAStartup(MAKEWORD(2, 2), &wd);
+    SOCKET route = socket(AF_INET, SOCK_DGRAM, 0);
+    sockaddr_in lan{};
+    lan.sin_family = AF_INET;
+    lan.sin_port = htons(9);
+    inet_pton(AF_INET, "198.51.100.1", &lan.sin_addr);
+    connect(route, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    int len = sizeof(lan);
+    getsockname(route, reinterpret_cast<sockaddr*>(&lan), &len);
+    closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr) >> 24) == 127) return 2;
+    lan.sin_port = 0;
+    SOCKET http = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in local{};
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ::bind(http, reinterpret_cast<sockaddr*>(&local), sizeof(local));
+    listen(http, 8);
+    len = sizeof(local);
+    getsockname(http, reinterpret_cast<sockaddr*>(&local), &len);
+    std::thread service([&] {
+        for (;;) {
+            SOCKET c = accept(http, nullptr, nullptr);
+            if (c == INVALID_SOCKET) break;
+            char request[4096];
+            recv(c, request, sizeof(request), 0);
+            const char* response = "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            send(c, response, static_cast<int>(std::strlen(response)), 0);
+            closesocket(c);
+        }
+    });
+    set_env("CTR_ONLINE", "1");
+    set_env("CTR_ONLINE_STRICT_PEERS", "1");
+    set_env("CTR_ONLINE_SERVER", "127.0.0.1");
+    set_env("CTR_ONLINE_NAT_TRANSPORT", "off");
+    set_env("CTR_ONLINE_HTTP_PORT", std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library = LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve")) : nullptr;
+    if (!resolve) std::exit(2);
+    auto ns = bind<int(SYSV*)(const char*, int, int, int)>("Q4qBuN-c0ZM", "libSceNet");
+    auto nb = bind<int(SYSV*)(int, const void*, unsigned)>("bErx49PgxyY", "libSceNet");
+    auto name = bind<int(SYSV*)(int, void*, unsigned*)>("hoOAofhhRvE", "libSceNet");
+    auto receive = bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, unsigned*)>("304ooNZxWDY", "libSceNet");
+    int g = ns("ingress-blocking", 2, 2, 0);
+    auto addr = loopback(0);
+    addr.addr = 0;
+    check(nb(g, &addr, sizeof(addr)) == 0, "ingress blocking: bind");
+    unsigned size = sizeof(addr);
+    name(g, &addr, &size);
+    SOCKET refused = socket(AF_INET, SOCK_DGRAM, 0);
+    ::bind(refused, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    sockaddr_in to_lan = lan;
+    to_lan.sin_port = addr.port;
+    for (int i = 0; i < 100; ++i) sendto(refused, "bad", 3, 0, reinterpret_cast<sockaddr*>(&to_lan), sizeof(to_lan));
+    SOCKET accepted = socket(AF_INET, SOCK_DGRAM, 0);
+    sockaddr_in to_loop{};
+    to_loop.sin_family = AF_INET;
+    to_loop.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    to_loop.sin_port = addr.port;
+    sendto(accepted, "ok", 2, 0, reinterpret_cast<sockaddr*>(&to_loop), sizeof(to_loop));
     Sleep(100);
-    std::atomic<int> got{0}; char buffer[8]{};
-    std::thread reader([&]{ got=receive(g,buffer,sizeof(buffer),0,nullptr,nullptr); });
-    for(int i=0;i<50 && !got.load();++i) Sleep(100);
-    if(!got.load()) { check(false,"ingress blocking: receive returned within 5 s"); std::printf("ingress-blocking failures=%d\n",failures); std::_Exit(1); }
+    std::atomic<int> got{0};
+    char buffer[8]{};
+    std::thread reader([&] { got = receive(g, buffer, sizeof(buffer), 0, nullptr, nullptr); });
+    for (int i = 0; i < 50 && !got.load(); ++i) Sleep(100);
+    if (!got.load()) {
+        check(false, "ingress blocking: receive returned within 5 s");
+        std::printf("ingress-blocking failures=%d\n", failures);
+        std::_Exit(1);
+    }
     reader.join();
-    std::printf("{\"scope\":\"online_services_test\",\"blocking_receive\":%d}\n",got.load());
-    check(got.load()==2 && !std::memcmp(buffer,"ok",2),"ingress blocking: blocking receive skips 100 refused datagrams and returns the accepted one");
-    closesocket(refused); closesocket(accepted);
-    closesocket(http); service.join();
-    std::printf("ingress-blocking failures=%d\n",failures); return failures?1:0;
+    std::printf("{\"scope\":\"online_services_test\",\"blocking_receive\":%d}\n", got.load());
+    check(got.load() == 2 && !std::memcmp(buffer, "ok", 2),
+          "ingress blocking: blocking receive skips 100 refused datagrams and returns the accepted one");
+    closesocket(refused);
+    closesocket(accepted);
+    closesocket(http);
+    service.join();
+    std::printf("ingress-blocking failures=%d\n", failures);
+    return failures ? 1 : 0;
 }
 
 // An authorized peer (this PC's LAN address in strict mode, service answering 200 after
 // `delay_ms`) streams 60 datagrams/s for 6 s to a game socket: none may be lost to renewals.
 int ingress_steady_test(int delay_ms) {
-    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
-    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
-    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
-    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
-    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
-    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
-    lan.sin_port=0;
-    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
-    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
-    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,16);
-    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
-    std::thread service([&]{for(;;){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
-        char request[4096]; recv(c,request,sizeof(request),0); if(delay_ms) Sleep(delay_ms);
-        const char* response="HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-        send(c,response,static_cast<int>(std::strlen(response)),0); closesocket(c); }});
-    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
-    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
-    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
-    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
-    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
-    if(!resolve) std::exit(2);
-    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
-    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
-    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
-    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
-    int g=ns("ingress-steady",2,2,0); auto addr=loopback(0); addr.addr=0;
-    check(nb(g,&addr,sizeof(addr))==0,"ingress steady: bind");
-    unsigned size=sizeof(addr); name(g,&addr,&size);
-    SOCKET sender=socket(AF_INET,SOCK_DGRAM,0); ::bind(sender,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    sockaddr_in dst=lan; dst.sin_port=addr.port;
-    std::uint32_t warm=0xffffffffu; char buffer[64];
-    for(int i=0;i<100;++i){
-        sendto(sender,reinterpret_cast<char*>(&warm),4,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst)); Sleep(20);
-        if(receive(g,buffer,sizeof(buffer),0x80,nullptr,nullptr)>0) break;
+    WSADATA wd{};
+    WSAStartup(MAKEWORD(2, 2), &wd);
+    SOCKET route = socket(AF_INET, SOCK_DGRAM, 0);
+    sockaddr_in lan{};
+    lan.sin_family = AF_INET;
+    lan.sin_port = htons(9);
+    inet_pton(AF_INET, "198.51.100.1", &lan.sin_addr);
+    connect(route, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    int len = sizeof(lan);
+    getsockname(route, reinterpret_cast<sockaddr*>(&lan), &len);
+    closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr) >> 24) == 127) return 2;
+    lan.sin_port = 0;
+    SOCKET http = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in local{};
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ::bind(http, reinterpret_cast<sockaddr*>(&local), sizeof(local));
+    listen(http, 16);
+    len = sizeof(local);
+    getsockname(http, reinterpret_cast<sockaddr*>(&local), &len);
+    std::thread service([&] {
+        for (;;) {
+            SOCKET c = accept(http, nullptr, nullptr);
+            if (c == INVALID_SOCKET) break;
+            char request[4096];
+            recv(c, request, sizeof(request), 0);
+            if (delay_ms) Sleep(delay_ms);
+            const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            send(c, response, static_cast<int>(std::strlen(response)), 0);
+            closesocket(c);
+        }
+    });
+    set_env("CTR_ONLINE", "1");
+    set_env("CTR_ONLINE_STRICT_PEERS", "1");
+    set_env("CTR_ONLINE_SERVER", "127.0.0.1");
+    set_env("CTR_ONLINE_NAT_TRANSPORT", "off");
+    set_env("CTR_ONLINE_HTTP_PORT", std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library = LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve")) : nullptr;
+    if (!resolve) std::exit(2);
+    auto ns = bind<int(SYSV*)(const char*, int, int, int)>("Q4qBuN-c0ZM", "libSceNet");
+    auto nb = bind<int(SYSV*)(int, const void*, unsigned)>("bErx49PgxyY", "libSceNet");
+    auto name = bind<int(SYSV*)(int, void*, unsigned*)>("hoOAofhhRvE", "libSceNet");
+    auto receive = bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, unsigned*)>("304ooNZxWDY", "libSceNet");
+    int g = ns("ingress-steady", 2, 2, 0);
+    auto addr = loopback(0);
+    addr.addr = 0;
+    check(nb(g, &addr, sizeof(addr)) == 0, "ingress steady: bind");
+    unsigned size = sizeof(addr);
+    name(g, &addr, &size);
+    SOCKET sender = socket(AF_INET, SOCK_DGRAM, 0);
+    ::bind(sender, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    sockaddr_in dst = lan;
+    dst.sin_port = addr.port;
+    std::uint32_t warm = 0xffffffffu;
+    char buffer[64];
+    for (int i = 0; i < 100; ++i) {
+        sendto(sender, reinterpret_cast<char*>(&warm), 4, 0, reinterpret_cast<sockaddr*>(&dst), sizeof(dst));
+        Sleep(20);
+        if (receive(g, buffer, sizeof(buffer), 0x80, nullptr, nullptr) > 0) break;
     }
-    std::atomic<bool> done{false}; std::vector<bool> got(360,false);
-    std::thread reader([&]{ while(!done){ const int n=receive(g,buffer,sizeof(buffer),0x80,nullptr,nullptr);
-        std::uint32_t v; if(n==4 && (std::memcpy(&v,buffer,4),v<360)) got[v]=true; else if(n<=0) Sleep(1); } });
-    const auto start=std::chrono::steady_clock::now();
-    for(std::uint32_t i=0;i<360;++i){
-        std::this_thread::sleep_until(start+std::chrono::microseconds(16667)*i);
-        sendto(sender,reinterpret_cast<char*>(&i),4,0,reinterpret_cast<sockaddr*>(&dst),sizeof(dst));
+    std::atomic<bool> done{false};
+    std::vector<bool> got(360, false);
+    std::thread reader([&] {
+        while (!done) {
+            const int n = receive(g, buffer, sizeof(buffer), 0x80, nullptr, nullptr);
+            std::uint32_t v;
+            if (n == 4 && (std::memcpy(&v, buffer, 4), v < 360))
+                got[v] = true;
+            else if (n <= 0)
+                Sleep(1);
+        }
+    });
+    const auto start = std::chrono::steady_clock::now();
+    for (std::uint32_t i = 0; i < 360; ++i) {
+        std::this_thread::sleep_until(start + std::chrono::microseconds(16667) * i);
+        sendto(sender, reinterpret_cast<char*>(&i), 4, 0, reinterpret_cast<sockaddr*>(&dst), sizeof(dst));
     }
-    Sleep(300); done=true; reader.join();
-    unsigned received=0; for(bool b:got) received+=b;
-    std::printf("{\"scope\":\"online_services_test\",\"steady_delay_ms\":%d,\"sent\":360,\"received\":%u}\n",delay_ms,received);
-    check(received==360,"ingress steady: an authorized peer loses no datagram across renewals");
-    closesocket(sender); closesocket(http); service.join();
-    std::printf("ingress-steady failures=%d\n",failures); return failures?1:0;
+    Sleep(300);
+    done = true;
+    reader.join();
+    unsigned received = 0;
+    for (bool b : got) received += b;
+    std::printf("{\"scope\":\"online_services_test\",\"steady_delay_ms\":%d,\"sent\":360,\"received\":%u}\n", delay_ms,
+                received);
+    check(received == 360, "ingress steady: an authorized peer loses no datagram across renewals");
+    closesocket(sender);
+    closesocket(http);
+    service.join();
+    std::printf("ingress-steady failures=%d\n", failures);
+    return failures ? 1 : 0;
 }
 
 // The game writes to a peer the service authorizes; the peer answers at once, with a single
 // datagram and nothing more for several seconds, as a connection handshake does. The answer
 // must reach the game: the first datagram of a reply may not be lost to a pending check.
 int ingress_reply_test() {
-    WSADATA wd{}; WSAStartup(MAKEWORD(2,2), &wd);
-    SOCKET route=socket(AF_INET,SOCK_DGRAM,0);
-    sockaddr_in lan{}; lan.sin_family=AF_INET; lan.sin_port=htons(9);
-    inet_pton(AF_INET,"198.51.100.1",&lan.sin_addr);
-    connect(route,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    int len=sizeof(lan); getsockname(route,reinterpret_cast<sockaddr*>(&lan),&len); closesocket(route);
-    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr)>>24)==127) return 2;
-    lan.sin_port=0;
-    SOCKET http=socket(AF_INET,SOCK_STREAM,0);
-    sockaddr_in local{}; local.sin_family=AF_INET; local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
-    ::bind(http,reinterpret_cast<sockaddr*>(&local),sizeof(local)); listen(http,16);
-    len=sizeof(local); getsockname(http,reinterpret_cast<sockaddr*>(&local),&len);
-    std::thread service([&]{for(;;){SOCKET c=accept(http,nullptr,nullptr); if(c==INVALID_SOCKET) break;
-        char request[4096]; recv(c,request,sizeof(request),0); Sleep(100); // a remote hub is asked
-        const char* response="HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-        send(c,response,static_cast<int>(std::strlen(response)),0); closesocket(c); }});
-    set_env("CTR_ONLINE","1"); set_env("CTR_ONLINE_STRICT_PEERS","1");
-    set_env("CTR_ONLINE_SERVER","127.0.0.1"); set_env("CTR_ONLINE_NAT_TRANSPORT","off");
-    set_env("CTR_ONLINE_HTTP_PORT",std::to_string(ntohs(local.sin_port)).c_str());
-    HMODULE library=LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
-    resolve=library?reinterpret_cast<Resolve>(GetProcAddress(library,"ctr_hle_resolve")):nullptr;
-    if(!resolve) std::exit(2);
-    auto ns=bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM","libSceNet");
-    auto nb=bind<int(SYSV*)(int,const void*,unsigned)>("bErx49PgxyY","libSceNet");
-    auto name=bind<int(SYSV*)(int,void*,unsigned*)>("hoOAofhhRvE","libSceNet");
-    auto send_to=bind<int(SYSV*)(int,const void*,std::uint64_t,int,const void*,unsigned)>("gvD1greCu0A","libSceNet");
-    auto receive=bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,unsigned*)>("304ooNZxWDY","libSceNet");
-    int g=ns("ingress-reply",2,2,0); auto addr=loopback(0); addr.addr=0;
-    check(nb(g,&addr,sizeof(addr))==0,"ingress reply: bind");
-    unsigned size=sizeof(addr); name(g,&addr,&size);
-    SOCKET peer=socket(AF_INET,SOCK_DGRAM,0); ::bind(peer,reinterpret_cast<sockaddr*>(&lan),sizeof(lan));
-    sockaddr_in peer_address{}; int peer_length=sizeof(peer_address); getsockname(peer,reinterpret_cast<sockaddr*>(&peer_address),&peer_length);
-    OrbisSockaddrIn to{}; to.len=sizeof(to); to.family=2; to.port=peer_address.sin_port; to.addr=peer_address.sin_addr.s_addr;
-    check(send_to(g,"hi",2,0,&to,sizeof(to))==2,"ingress reply: game writes to the peer");
-    char buffer[8]{}; sockaddr_in from{}; int from_length=sizeof(from);
-    const int got=recvfrom(peer,buffer,sizeof(buffer),0,reinterpret_cast<sockaddr*>(&from),&from_length);
-    check(got==2,"ingress reply: peer receives the game's datagram");
-    sendto(peer,"ok",2,0,reinterpret_cast<sockaddr*>(&from),from_length); // one answer, at once
+    WSADATA wd{};
+    WSAStartup(MAKEWORD(2, 2), &wd);
+    SOCKET route = socket(AF_INET, SOCK_DGRAM, 0);
+    sockaddr_in lan{};
+    lan.sin_family = AF_INET;
+    lan.sin_port = htons(9);
+    inet_pton(AF_INET, "198.51.100.1", &lan.sin_addr);
+    connect(route, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    int len = sizeof(lan);
+    getsockname(route, reinterpret_cast<sockaddr*>(&lan), &len);
+    closesocket(route);
+    if (!lan.sin_addr.s_addr || (ntohl(lan.sin_addr.s_addr) >> 24) == 127) return 2;
+    lan.sin_port = 0;
+    SOCKET http = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in local{};
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ::bind(http, reinterpret_cast<sockaddr*>(&local), sizeof(local));
+    listen(http, 16);
+    len = sizeof(local);
+    getsockname(http, reinterpret_cast<sockaddr*>(&local), &len);
+    std::thread service([&] {
+        for (;;) {
+            SOCKET c = accept(http, nullptr, nullptr);
+            if (c == INVALID_SOCKET) break;
+            char request[4096];
+            recv(c, request, sizeof(request), 0);
+            Sleep(100); // a remote hub is asked
+            const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            send(c, response, static_cast<int>(std::strlen(response)), 0);
+            closesocket(c);
+        }
+    });
+    set_env("CTR_ONLINE", "1");
+    set_env("CTR_ONLINE_STRICT_PEERS", "1");
+    set_env("CTR_ONLINE_SERVER", "127.0.0.1");
+    set_env("CTR_ONLINE_NAT_TRANSPORT", "off");
+    set_env("CTR_ONLINE_HTTP_PORT", std::to_string(ntohs(local.sin_port)).c_str());
+    HMODULE library = LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
+    resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve")) : nullptr;
+    if (!resolve) std::exit(2);
+    auto ns = bind<int(SYSV*)(const char*, int, int, int)>("Q4qBuN-c0ZM", "libSceNet");
+    auto nb = bind<int(SYSV*)(int, const void*, unsigned)>("bErx49PgxyY", "libSceNet");
+    auto name = bind<int(SYSV*)(int, void*, unsigned*)>("hoOAofhhRvE", "libSceNet");
+    auto send_to =
+        bind<int(SYSV*)(int, const void*, std::uint64_t, int, const void*, unsigned)>("gvD1greCu0A", "libSceNet");
+    auto receive = bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, unsigned*)>("304ooNZxWDY", "libSceNet");
+    int g = ns("ingress-reply", 2, 2, 0);
+    auto addr = loopback(0);
+    addr.addr = 0;
+    check(nb(g, &addr, sizeof(addr)) == 0, "ingress reply: bind");
+    unsigned size = sizeof(addr);
+    name(g, &addr, &size);
+    SOCKET peer = socket(AF_INET, SOCK_DGRAM, 0);
+    ::bind(peer, reinterpret_cast<sockaddr*>(&lan), sizeof(lan));
+    sockaddr_in peer_address{};
+    int peer_length = sizeof(peer_address);
+    getsockname(peer, reinterpret_cast<sockaddr*>(&peer_address), &peer_length);
+    OrbisSockaddrIn to{};
+    to.len = sizeof(to);
+    to.family = 2;
+    to.port = peer_address.sin_port;
+    to.addr = peer_address.sin_addr.s_addr;
+    check(send_to(g, "hi", 2, 0, &to, sizeof(to)) == 2, "ingress reply: game writes to the peer");
+    char buffer[8]{};
+    sockaddr_in from{};
+    int from_length = sizeof(from);
+    const int got = recvfrom(peer, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&from), &from_length);
+    check(got == 2, "ingress reply: peer receives the game's datagram");
+    sendto(peer, "ok", 2, 0, reinterpret_cast<sockaddr*>(&from), from_length); // one answer, at once
     Sleep(50);
-    const int answer=receive(g,buffer,sizeof(buffer),0x80,nullptr,nullptr);
-    std::printf("{\"scope\":\"online_services_test\",\"reply_receive\":%d}\n",answer);
-    check(answer==2 && !std::memcmp(buffer,"ok",2),"ingress reply: the peer's immediate answer reaches the game");
-    closesocket(peer); closesocket(http); service.join();
-    std::printf("ingress-reply failures=%d\n",failures); return failures?1:0;
+    const int answer = receive(g, buffer, sizeof(buffer), 0x80, nullptr, nullptr);
+    std::printf("{\"scope\":\"online_services_test\",\"reply_receive\":%d}\n", answer);
+    check(answer == 2 && !std::memcmp(buffer, "ok", 2), "ingress reply: the peer's immediate answer reaches the game");
+    closesocket(peer);
+    closesocket(http);
+    service.join();
+    std::printf("ingress-reply failures=%d\n", failures);
+    return failures ? 1 : 0;
 }
 
 int main(int argc, char** argv) {
-    if(argc>1 && !std::strcmp(argv[1],"--ingress-reply")) return ingress_reply_test();
-    if(argc>2 && !std::strcmp(argv[1],"--ingress-steady")) return ingress_steady_test(std::atoi(argv[2]));
-    if(argc>1 && !std::strcmp(argv[1],"--ingress")) return ingress_test();
-    if(argc>1 && !std::strcmp(argv[1],"--ingress-blocking")) return ingress_blocking_test();
-    if (argc > 1 && (!std::strcmp(argv[1], "--relay") ||
-                     !std::strcmp(argv[1], "--relay-block") ||
-                     !std::strcmp(argv[1], "--relay-auto-direct") ||
-                     !std::strcmp(argv[1], "--relay-auto-fallback"))) {
+    if (argc > 1 && !std::strcmp(argv[1], "--ingress-reply")) return ingress_reply_test();
+    if (argc > 2 && !std::strcmp(argv[1], "--ingress-steady")) return ingress_steady_test(std::atoi(argv[2]));
+    if (argc > 1 && !std::strcmp(argv[1], "--ingress")) return ingress_test();
+    if (argc > 1 && !std::strcmp(argv[1], "--ingress-blocking")) return ingress_blocking_test();
+    if (argc > 1 && (!std::strcmp(argv[1], "--relay") || !std::strcmp(argv[1], "--relay-block") ||
+                     !std::strcmp(argv[1], "--relay-auto-direct") || !std::strcmp(argv[1], "--relay-auto-fallback"))) {
         return relay_test(argv[1] + 2);
     }
     // --offline: without CTR_ONLINE no online registration is resolved, so the offline
@@ -564,17 +756,13 @@ int main(int argc, char** argv) {
         _putenv_s("CTR_ONLINE", "");
         SetEnvironmentVariableA("CTR_ONLINE", nullptr);
         HMODULE library = LoadLibraryW(L"build/CTRPort-gpu/ctr_hle.dll");
-        resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve"))
-                          : nullptr;
+        resolve = library ? reinterpret_cast<Resolve>(GetProcAddress(library, "ctr_hle_resolve")) : nullptr;
         if (!resolve) {
             return 2;
         }
-        const char* online[][2] = {{"Q4qBuN-c0ZM", "libSceNet"},
-                                   {"Nlev7Lg8k3A", "libSceNet"},
-                                   {"uBPlr0lbuiI", "libSceNetCtl"},
-                                   {"u5oqtlIP+Fw", "libSceNetCtlForNpToolkit"},
-                                   {"3Zl8BePTh9Y", "libSceNpManager"},
-                                   {"p-o74CnoNzY", "libSceNpManager"},
+        const char* online[][2] = {{"Q4qBuN-c0ZM", "libSceNet"},       {"Nlev7Lg8k3A", "libSceNet"},
+                                   {"uBPlr0lbuiI", "libSceNetCtl"},    {"u5oqtlIP+Fw", "libSceNetCtlForNpToolkit"},
+                                   {"3Zl8BePTh9Y", "libSceNpManager"}, {"p-o74CnoNzY", "libSceNpManager"},
                                    {"qAUXQ9GdWp8", "libSceNpAuth"}};
         bool none = true;
         for (const auto& entry : online) {
@@ -613,51 +801,40 @@ int main(int argc, char** argv) {
     auto net_bind = bind<int(SYSV*)(int, const void*, std::uint32_t)>("bErx49PgxyY", "libSceNet");
     auto net_listen = bind<int(SYSV*)(int, int)>("kOj1HiAGE54", "libSceNet");
     auto net_accept = bind<int(SYSV*)(int, void*, std::uint32_t*)>("PIWqhn9oSxc", "libSceNet");
-    auto net_connect =
-        bind<int(SYSV*)(int, const void*, std::uint32_t)>("OXXX4mUk3uk", "libSceNet");
-    auto net_getsockname =
-        bind<int(SYSV*)(int, void*, std::uint32_t*)>("hoOAofhhRvE", "libSceNet");
-    auto net_send = bind<int(SYSV*)(int, const void*, std::uint64_t, int)>("beRjXBn-z+o",
-                                                                            "libSceNet");
+    auto net_connect = bind<int(SYSV*)(int, const void*, std::uint32_t)>("OXXX4mUk3uk", "libSceNet");
+    auto net_getsockname = bind<int(SYSV*)(int, void*, std::uint32_t*)>("hoOAofhhRvE", "libSceNet");
+    auto net_send = bind<int(SYSV*)(int, const void*, std::uint64_t, int)>("beRjXBn-z+o", "libSceNet");
     auto net_recv = bind<int(SYSV*)(int, void*, std::uint64_t, int)>("9wO9XrMsNhc", "libSceNet");
-    auto net_sendto = bind<int(SYSV*)(int, const void*, std::uint64_t, int, const void*,
-                                      std::uint32_t)>("gvD1greCu0A", "libSceNet");
-    auto net_recvfrom = bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, std::uint32_t*)>(
-        "304ooNZxWDY", "libSceNet");
-    auto net_setsockopt = bind<int(SYSV*)(int, int, int, const void*, std::uint32_t)>(
-        "2mKX2Spso7I", "libSceNet");
-    auto net_getsockopt =
-        bind<int(SYSV*)(int, int, int, void*, std::uint32_t*)>("xphrZusl78E", "libSceNet");
+    auto net_sendto =
+        bind<int(SYSV*)(int, const void*, std::uint64_t, int, const void*, std::uint32_t)>("gvD1greCu0A", "libSceNet");
+    auto net_recvfrom =
+        bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, std::uint32_t*)>("304ooNZxWDY", "libSceNet");
+    auto net_setsockopt = bind<int(SYSV*)(int, int, int, const void*, std::uint32_t)>("2mKX2Spso7I", "libSceNet");
+    auto net_getsockopt = bind<int(SYSV*)(int, int, int, void*, std::uint32_t*)>("xphrZusl78E", "libSceNet");
     auto resolver_create = bind<int(SYSV*)(const char*, int, int)>("C4UgDHHPvdw", "libSceNet");
-    auto resolver_start = bind<int(SYSV*)(int, const char*, std::uint32_t*, int, int, int)>(
-        "Nd91WaWmG2w", "libSceNet");
+    auto resolver_start = bind<int(SYSV*)(int, const char*, std::uint32_t*, int, int, int)>("Nd91WaWmG2w", "libSceNet");
     auto resolver_destroy = bind<int(SYSV*)(int)>("kJlYH5uMAWI", "libSceNet");
     auto epoll_create = bind<int(SYSV*)(const char*, int)>("SF47kB2MNTo", "libSceNet");
-    auto epoll_control =
-        bind<int(SYSV*)(int, int, int, const EpollEvent*)>("ZVw46bsasAk", "libSceNet");
+    auto epoll_control = bind<int(SYSV*)(int, int, int, const EpollEvent*)>("ZVw46bsasAk", "libSceNet");
     auto epoll_wait = bind<int(SYSV*)(int, EpollEvent*, int, int)>("drjIbDbA7UQ", "libSceNet");
     auto epoll_destroy = bind<int(SYSV*)(int)>("Inp1lfL+Jdw", "libSceNet");
     auto htons_ = bind<std::uint16_t(SYSV*)(std::uint16_t)>("iWQWrwiSt8A", "libSceNet");
-    auto ntop = bind<const char*(SYSV*)(int, const void*, char*, std::uint32_t)>("9vA2aW+CHuA",
-                                                                                  "libSceNet");
+    auto ntop = bind<const char*(SYSV*)(int, const void*, char*, std::uint32_t)>("9vA2aW+CHuA", "libSceNet");
 
     check(net_init() == 0, "sceNetInit");
     check(htons_(0x1234) == 0x3412, "sceNetHtons");
     std::uint32_t four = htonl(0x0a000102);
     char text[16] = {};
-    check(ntop(2, &four, text, sizeof(text)) == text && !std::strcmp(text, "10.0.1.2"),
-          "sceNetInetNtop");
+    check(ntop(2, &four, text, sizeof(text)) == text && !std::strcmp(text, "10.0.1.2"), "sceNetInetNtop");
 
     // UDP: two sockets, non-blocking receive before data, then sendto/recvfrom with source.
     const int a = net_socket("udp_a", 2, 2, 0), b = net_socket("udp_b", 2, 2, 0);
     check(a > 0 && b > 0 && a != b, "sceNetSocket dgram");
     auto any_a = loopback(0), any_b = loopback(0);
-    check(net_bind(a, &any_a, sizeof(any_a)) == 0 && net_bind(b, &any_b, sizeof(any_b)) == 0,
-          "sceNetBind");
+    check(net_bind(a, &any_a, sizeof(any_a)) == 0 && net_bind(b, &any_b, sizeof(any_b)) == 0, "sceNetBind");
     OrbisSockaddrIn name_b{};
     std::uint32_t name_length = sizeof(name_b);
-    check(net_getsockname(b, &name_b, &name_length) == 0 && name_b.family == 2 &&
-              name_b.port != 0 && name_length == 16,
+    check(net_getsockname(b, &name_b, &name_length) == 0 && name_b.family == 2 && name_b.port != 0 && name_length == 16,
           "sceNetGetsockname");
     int nbio = 1;
     check(net_setsockopt(b, 0xFFFF, 0x1200, &nbio, 4) == 0, "sceNetSetsockopt SO_NBIO");
@@ -667,11 +844,9 @@ int main(int argc, char** argv) {
           "sceNetRecv EWOULDBLOCK on empty non-blocking socket");
     int got = 0;
     std::uint32_t got_length = 4;
-    check(net_getsockopt(b, 0xFFFF, 0x1200, &got, &got_length) == 0 && got == 1,
-          "sceNetGetsockopt SO_NBIO");
+    check(net_getsockopt(b, 0xFFFF, 0x1200, &got, &got_length) == 0 && got == 1, "sceNetGetsockopt SO_NBIO");
     const char payload[] = "ctr-online";
-    check(net_sendto(a, payload, sizeof(payload), 0, &name_b, sizeof(name_b)) ==
-              static_cast<int>(sizeof(payload)),
+    check(net_sendto(a, payload, sizeof(payload), 0, &name_b, sizeof(name_b)) == static_cast<int>(sizeof(payload)),
           "sceNetSendto loopback");
 
     // Epoll: the readable UDP socket is reported with its user data.
@@ -698,15 +873,13 @@ int main(int argc, char** argv) {
     external.family = 2;
     external.port = htons(3074);
     InetPtonA(AF_INET, "8.8.8.8", &external.addr);
-    check(net_sendto(a, payload, sizeof(payload), 0, &external, sizeof(external)) ==
-              (kErrorBase | 65),
+    check(net_sendto(a, payload, sizeof(payload), 0, &external, sizeof(external)) == (kErrorBase | 65),
           "sceNetSendto external address blocked");
 
     // TCP: listen, connect, accept, send, receive.
     const int server = net_socket("tcp_server", 2, 1, 0);
     auto any_server = loopback(0);
-    check(net_bind(server, &any_server, sizeof(any_server)) == 0 && net_listen(server, 4) == 0,
-          "sceNetListen");
+    check(net_bind(server, &any_server, sizeof(any_server)) == 0 && net_listen(server, 4) == 0, "sceNetListen");
     OrbisSockaddrIn server_name{};
     std::uint32_t server_name_length = sizeof(server_name);
     net_getsockname(server, &server_name, &server_name_length);
@@ -718,16 +891,14 @@ int main(int argc, char** argv) {
     std::uint32_t peer_length = sizeof(peer);
     const int accepted = net_accept(server, &peer, &peer_length);
     check(accepted > 0 && peer.family == 2, "sceNetAccept");
-    check(net_send(client, payload, sizeof(payload), 0) == static_cast<int>(sizeof(payload)),
-          "sceNetSend");
+    check(net_send(client, payload, sizeof(payload), 0) == static_cast<int>(sizeof(payload)), "sceNetSend");
     std::memset(buffer, 0, sizeof(buffer));
     check(net_recv(accepted, buffer, sizeof(payload), 0x40) == static_cast<int>(sizeof(payload)) &&
               !std::strcmp(buffer, payload),
           "sceNetRecv WAITALL");
     int type = 0;
     std::uint32_t type_length = 4;
-    check(net_getsockopt(client, 0xFFFF, 0x1008, &type, &type_length) == 0 && type == 1,
-          "sceNetGetsockopt SO_TYPE");
+    check(net_getsockopt(client, 0xFFFF, 0x1008, &type, &type_length) == 0 && type == 1, "sceNetGetsockopt SO_TYPE");
     const int unknown_option = 0x7777;
     check(net_setsockopt(client, 0xFFFF, unknown_option, &nbio, 4) == (kErrorBase | 42),
           "sceNetSetsockopt unknown option fails");
@@ -739,16 +910,14 @@ int main(int argc, char** argv) {
     // Resolver policy.
     const int resolver = resolver_create("test_resolver", 0, 0);
     std::uint32_t resolved = 0;
-    check(resolver_start(resolver, "lavender-ps4-auth3.live.demonware.net", &resolved, 0, 0, 0) ==
-                  0 &&
+    check(resolver_start(resolver, "lavender-ps4-auth3.live.demonware.net", &resolved, 0, 0, 0) == 0 &&
               resolved == htonl(INADDR_LOOPBACK),
           "resolver demonware -> project server");
     resolved = 0;
     check(resolver_start(resolver, "STUN.EU.DEMONWARE.NET", &resolved, 0, 0, 0) == 0 &&
               resolved == htonl(INADDR_LOOPBACK),
           "resolver case-insensitive demonware");
-    check(resolver_start(resolver, "auth.np.ac.playstation.net", &resolved, 0, 0, 0) ==
-              (kErrorBase | 230),
+    check(resolver_start(resolver, "auth.np.ac.playstation.net", &resolved, 0, 0, 0) == (kErrorBase | 230),
           "resolver Sony host blocked");
     check(resolver_start(resolver, "www.activision.com", &resolved, 0, 0, 0) == (kErrorBase | 230),
           "resolver Activision host blocked");
@@ -759,11 +928,10 @@ int main(int argc, char** argv) {
     EpollEvent resolver_event{0x10000, 0, 0, 77};
     resolved = 0;
     check(epoll_control(ep2, 1, resolver, &resolver_event) == 0 &&
-              resolver_start(resolver, "lavender-ps4-lobby.live.demonware.net", &resolved, 0, 0,
-                             1) == 0,
+              resolver_start(resolver, "lavender-ps4-lobby.live.demonware.net", &resolved, 0, 0, 1) == 0,
           "resolver async start");
-    check(epoll_wait(ep2, events, 4, 100000) == 1 && events[0].events == 0x10000 &&
-              events[0].data == 77 && resolved == htonl(INADDR_LOOPBACK),
+    check(epoll_wait(ep2, events, 4, 100000) == 1 && events[0].events == 0x10000 && events[0].data == 77 &&
+              resolved == htonl(INADDR_LOOPBACK),
           "resolver async completion via epoll");
     check(resolver_destroy(resolver) == 0 && epoll_destroy(ep) == 0 && epoll_destroy(ep2) == 0,
           "resolver and epoll destroy");
@@ -777,8 +945,7 @@ int main(int argc, char** argv) {
     // With the project server on loopback the console reports the host's LAN address (the
     // default-route source), loopback only on a machine without any network route.
     in_addr reported{};
-    check(netctl_info(14, info) == 0 && InetPtonA(AF_INET, info, &reported) == 1 &&
-              reported.s_addr != 0,
+    check(netctl_info(14, info) == 0 && InetPtonA(AF_INET, info, &reported) == 1 && reported.s_addr != 0,
           "sceNetCtlGetInfo IP_ADDRESS (LAN address with a loopback server)");
     check(netctl_info(6, info) == static_cast<int>(0x80412109u), "sceNetCtlGetInfo SSID not avail");
 
@@ -786,27 +953,23 @@ int main(int argc, char** argv) {
     auto np_state = bind<int(SYSV*)(int, int*)>("eQH7nWPcAgc", "libSceNpManager");
     auto np_online_id = bind<int(SYSV*)(int, char*)>("XDncXQIJUSk", "libSceNpManager");
     auto np_account = bind<int(SYSV*)(int, std::uint64_t*)>("rbknaUjpqWo", "libSceNpManager");
-    auto np_user_by_account =
-        bind<int(SYSV*)(std::uint64_t, int*)>("VgYczPGB5ss", "libSceNpManager");
+    auto np_user_by_account = bind<int(SYSV*)(std::uint64_t, int*)>("VgYczPGB5ss", "libSceNpManager");
     auto np_create_async = bind<int(SYSV*)(const void*)>("eiqMCt9UshI", "libSceNpManager");
     auto np_availability = bind<int(SYSV*)(int, int)>("8Z2Jc5GvGDI", "libSceNpManager");
     auto np_poll = bind<int(SYSV*)(int, int*)>("uqcPJLWL08M", "libSceNpManager");
     auto np_delete = bind<int(SYSV*)(int)>("S7QTn72PrDw", "libSceNpManager");
     auto register_toolkit =
-        bind<int(SYSV*)(void(SYSV*)(int, int, void*), void*)>("0c7HbXRKUt4",
-                                                              "libSceNpManagerForToolkit");
+        bind<int(SYSV*)(void(SYSV*)(int, int, void*), void*)>("0c7HbXRKUt4", "libSceNpManagerForToolkit");
     auto check_for_lib = bind<int(SYSV*)()>("JELHf4xPufo", "libSceNpManagerForToolkit");
     auto auth_create = bind<int(SYSV*)()>("6bwFkosYRQg", "libSceNpAuth");
     auto auth_code = bind<int(SYSV*)(int, const void*, char*, int*)>("qAUXQ9GdWp8", "libSceNpAuth");
 
     check(np_state(1, &state) == 0 && state == 2, "sceNpGetState SignedIn");
     char online_id[20] = {};
-    check(np_online_id(1, online_id) == 0 && !std::strcmp(online_id, "TestRacer"),
-          "sceNpGetOnlineId local identity");
+    check(np_online_id(1, online_id) == 0 && !std::strcmp(online_id, "TestRacer"), "sceNpGetOnlineId local identity");
     std::uint64_t account = 0;
     int user = 0;
-    check(np_account(1, &account) == 0 && account != 0 &&
-              np_user_by_account(account, &user) == 0 && user == 1,
+    check(np_account(1, &account) == 0 && account != 0 && np_user_by_account(account, &user) == 0 && user == 1,
           "sceNpGetAccountIdA round trip");
     struct {
         std::uint64_t size, mask;
@@ -842,8 +1005,7 @@ int main(int argc, char** argv) {
     char code[136] = {};
     int issuer = 0;
     const int auth_request = auth_create();
-    check(auth_code(auth_request, &code_parameter, code, &issuer) == 0 &&
-              !std::strcmp(code, "ctrlocal:TestRacer"),
+    check(auth_code(auth_request, &code_parameter, code, &issuer) == 0 && !std::strcmp(code, "ctrlocal:TestRacer"),
           "sceNpAuthGetAuthorizationCodeA local token");
     {
         auto id_token = bind<int(SYSV*)(int, const void*, char*)>("CocbHVIKPE8", "libSceNpAuth");
@@ -866,13 +1028,13 @@ int main(int argc, char** argv) {
         std::string decoded;
         if (CryptStringToBinaryA(payload.c_str(), 0, CRYPT_STRING_BASE64, nullptr, &decoded_size, nullptr, nullptr)) {
             decoded.resize(decoded_size);
-            CryptStringToBinaryA(payload.c_str(), 0, CRYPT_STRING_BASE64,
-                                 reinterpret_cast<BYTE*>(decoded.data()), &decoded_size, nullptr, nullptr);
+            CryptStringToBinaryA(payload.c_str(), 0, CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(decoded.data()),
+                                 &decoded_size, nullptr, nullptr);
         }
         const auto duid = decoded.find("\"duid\":\"");
         check(issued && payload.find('=') == std::string::npos &&
-                  decoded.find("\"env_iss_id\":256") != std::string::npos &&
-                  duid != std::string::npos && decoded.find('"', duid + 8) == duid + 8 + 64 &&
+                  decoded.find("\"env_iss_id\":256") != std::string::npos && duid != std::string::npos &&
+                  decoded.find('"', duid + 8) == duid + 8 + 64 &&
                   decoded.find("\"online_id\":\"TestRacer\"") != std::string::npos,
               "sceNpAuthGetIdTokenA JWT-shaped local token");
     }
@@ -921,17 +1083,14 @@ int main(int argc, char** argv) {
         });
         auto web_init = bind<int(SYSV*)(int, std::uint64_t)>("G3AnLNdRBjE", "libSceNpWebApi");
         auto web_context = bind<int(SYSV*)(int, int)>("zk6c65xoyO0", "libSceNpWebApi");
-        auto web_request =
-            bind<int(SYSV*)(int, const char*, const char*, int, const void*, std::int64_t*)>(
-                "rdgs5Z1MyFw", "libSceNpWebApi");
-        auto web_header =
-            bind<int(SYSV*)(std::int64_t, const char*, const char*)>("joRjtRXTFoc", "libSceNpWebApi");
-        auto web_send = bind<int(SYSV*)(std::int64_t, const void*, std::uint64_t, void*)>(
-            "KjNeZ-29ysQ", "libSceNpWebApi");
-        auto web_read =
-            bind<int(SYSV*)(std::int64_t, void*, std::uint64_t)>("CQtPRSF6Ds8", "libSceNpWebApi");
-        auto web_header_value = bind<int(SYSV*)(std::int64_t, const char*, char*, std::uint64_t)>(
-            "VwJ5L0Higg0", "libSceNpWebApi");
+        auto web_request = bind<int(SYSV*)(int, const char*, const char*, int, const void*, std::int64_t*)>(
+            "rdgs5Z1MyFw", "libSceNpWebApi");
+        auto web_header = bind<int(SYSV*)(std::int64_t, const char*, const char*)>("joRjtRXTFoc", "libSceNpWebApi");
+        auto web_send =
+            bind<int(SYSV*)(std::int64_t, const void*, std::uint64_t, void*)>("KjNeZ-29ysQ", "libSceNpWebApi");
+        auto web_read = bind<int(SYSV*)(std::int64_t, void*, std::uint64_t)>("CQtPRSF6Ds8", "libSceNpWebApi");
+        auto web_header_value =
+            bind<int(SYSV*)(std::int64_t, const char*, char*, std::uint64_t)>("VwJ5L0Higg0", "libSceNpWebApi");
         auto web_delete = bind<int(SYSV*)(std::int64_t)>("noQgleu+KLE", "libSceNpWebApi");
         struct {
             std::int32_t status;
@@ -941,11 +1100,9 @@ int main(int argc, char** argv) {
         char error_object[64] = {};
         const int library_context = web_init(1, 0x10000);
         const int user_context = web_context(library_context, 1);
-        check(library_context > 0 && user_context == (library_context << 16 | 1),
-              "sceNpWebApiCreateContextA id");
+        check(library_context > 0 && user_context == (library_context << 16 | 1), "sceNpWebApiCreateContextA id");
         std::int64_t request = 0;
-        check(web_request(user_context, "userProfile", "/v1/users/me/profile2", 0, nullptr,
-                          &request) == 0 &&
+        check(web_request(user_context, "userProfile", "/v1/users/me/profile2", 0, nullptr, &request) == 0 &&
                   (request >> 32) == user_context,
               "sceNpWebApiCreateRequest id");
         web_header(request, "Accept", "application/json");
@@ -955,13 +1112,11 @@ int main(int argc, char** argv) {
         check(web_read(request, body, sizeof(body)) == 17 && !std::strcmp(body, "{\"profile\":\"ok\"}\n"),
               "sceNpWebApiReadData body");
         char value[8] = {};
-        check(web_header_value(request, "x-test", value, sizeof(value)) == 0 &&
-                  !std::strcmp(value, "yes"),
+        check(web_header_value(request, "x-test", value, sizeof(value)) == 0 && !std::strcmp(value, "yes"),
               "sceNpWebApiGetHttpResponseHeaderValue");
         check(web_delete(request) == 0, "sceNpWebApiDeleteRequest");
         std::int64_t missing = 0;
-        web_request(user_context, "sessionInvitation", "/v1/users/me/invitations", 1, nullptr,
-                    &missing);
+        web_request(user_context, "sessionInvitation", "/v1/users/me/invitations", 1, nullptr, &missing);
         information = {};
         information.error_object = error_object;
         information.error_size = sizeof(error_object);
@@ -970,13 +1125,11 @@ int main(int argc, char** argv) {
                   information.status == 404 && std::strstr(error_object, "2105858"),
               "sceNpWebApiSendRequest2 error object code");
         server.join();
-        check(seen_requests.find("GET /webapi/userProfile/v1/users/me/profile2 HTTP/1.1") !=
-                      std::string::npos &&
+        check(seen_requests.find("GET /webapi/userProfile/v1/users/me/profile2 HTTP/1.1") != std::string::npos &&
                   seen_requests.find("Accept: application/json") != std::string::npos &&
                   seen_requests.find("X-Ctr-Online-Id: TestRacer") != std::string::npos &&
                   seen_requests.find("X-Ctr-Wumpa-Multiplier: 1\r\n") != std::string::npos &&
-                  seen_requests.find("POST /webapi/sessionInvitation/v1/users/me/invitations") !=
-                      std::string::npos &&
+                  seen_requests.find("POST /webapi/sessionInvitation/v1/users/me/invitations") != std::string::npos &&
                   seen_requests.find("{\"x\":1}") != std::string::npos,
               "web API requests reach the project server");
         closesocket(listener);
@@ -1008,59 +1161,49 @@ int main(int argc, char** argv) {
             closesocket(client);
         });
         auto http_init = bind<int(SYSV*)(int, int, std::uint64_t)>("A9cVMUtEp4Y", "libSceHttp");
-        auto http_template =
-            bind<int(SYSV*)(int, const char*, int, int)>("0gYjPTR-6cY", "libSceHttp");
-        auto http_connection =
-            bind<int(SYSV*)(int, const char*, bool)>("qgxDBjorUxs", "libSceHttp");
-        auto http_request2 = bind<int(SYSV*)(int, const char*, const char*, std::uint64_t)>(
-            "Cnp77podkCU", "libSceHttp");
-        auto http_header =
-            bind<int(SYSV*)(int, const char*, const char*, int)>("EY28T2bkN7k", "libSceHttp");
-        auto http_send =
-            bind<int(SYSV*)(int, const void*, std::uint64_t)>("1e2BNwI-XzE", "libSceHttp");
+        auto http_template = bind<int(SYSV*)(int, const char*, int, int)>("0gYjPTR-6cY", "libSceHttp");
+        auto http_connection = bind<int(SYSV*)(int, const char*, bool)>("qgxDBjorUxs", "libSceHttp");
+        auto http_request2 =
+            bind<int(SYSV*)(int, const char*, const char*, std::uint64_t)>("Cnp77podkCU", "libSceHttp");
+        auto http_header = bind<int(SYSV*)(int, const char*, const char*, int)>("EY28T2bkN7k", "libSceHttp");
+        auto http_send = bind<int(SYSV*)(int, const void*, std::uint64_t)>("1e2BNwI-XzE", "libSceHttp");
         auto http_status = bind<int(SYSV*)(int, int*)>("0a2TBNfE3BU", "libSceHttp");
-        auto http_length =
-            bind<int(SYSV*)(int, int*, std::uint64_t*)>("yuO2H2Uvnos", "libSceHttp");
+        auto http_length = bind<int(SYSV*)(int, int*, std::uint64_t*)>("yuO2H2Uvnos", "libSceHttp");
         auto http_read = bind<int(SYSV*)(int, void*, std::uint64_t)>("P5pdoykPYTk", "libSceHttp");
-        auto http_all_headers =
-            bind<int(SYSV*)(int, char**, std::uint64_t*)>("aCYPMSUIaP8", "libSceHttp");
-        auto http_parse = bind<int(SYSV*)(const char*, std::uint64_t, const char*, const char**,
-                                          std::uint64_t*)>("hPTXo3bICzI", "libSceHttp");
-        auto http_escape = bind<int(SYSV*)(char*, std::uint64_t*, std::uint64_t, const char*)>(
-            "YuOW3dDAKYc", "libSceHttp");
+        auto http_all_headers = bind<int(SYSV*)(int, char**, std::uint64_t*)>("aCYPMSUIaP8", "libSceHttp");
+        auto http_parse = bind<int(SYSV*)(const char*, std::uint64_t, const char*, const char**, std::uint64_t*)>(
+            "hPTXo3bICzI", "libSceHttp");
+        auto http_escape =
+            bind<int(SYSV*)(char*, std::uint64_t*, std::uint64_t, const char*)>("YuOW3dDAKYc", "libSceHttp");
 
         const int context = http_init(0, 0, 0x10000);
         const int tmpl = http_template(context, "CTR-Test/1.0", 2, 0);
         http_header(tmpl, "X-From-Template", "t", 1);
-        const int connection =
-            http_connection(tmpl, "https://umbrella.live.demonware.net/v1.0/auth", true);
-        const int request =
-            http_request2(connection, "POST", "https://umbrella.live.demonware.net/v1.0/auth/x", 5);
+        const int connection = http_connection(tmpl, "https://umbrella.live.demonware.net/v1.0/auth", true);
+        const int request = http_request2(connection, "POST", "https://umbrella.live.demonware.net/v1.0/auth/x", 5);
         http_header(request, "X-From-Request", "r", 0);
         int status = 0;
         check(context > 0 && tmpl > 0 && connection > 0 && request > 0 &&
                   http_status(request, &status) == static_cast<int>(0x80431065u),
               "sceHttp objects, status before send");
         set_env("CTR_WUMPA_MULTIPLIER", "100");
-        check(http_send(request, "hello", 5) == 0 && http_status(request, &status) == 0 &&
-                  status == 200,
+        check(http_send(request, "hello", 5) == 0 && http_status(request, &status) == 0 && status == 200,
               "sceHttpSendRequest to project server");
         int length_result = -1;
         std::uint64_t length = 0;
         char data[16] = {};
-        check(http_length(request, &length_result, &length) == 0 && length_result == 0 &&
-                  length == 5 && http_read(request, data, sizeof(data)) == 5 &&
-                  !std::strcmp(data, "world") && http_read(request, data, sizeof(data)) == 0,
+        check(http_length(request, &length_result, &length) == 0 && length_result == 0 && length == 5 &&
+                  http_read(request, data, sizeof(data)) == 5 && !std::strcmp(data, "world") &&
+                  http_read(request, data, sizeof(data)) == 0,
               "sceHttp content length and read");
         char* block = nullptr;
         std::uint64_t block_size = 0;
         const char* value = nullptr;
         std::uint64_t value_length = 0;
         check(http_all_headers(request, &block, &block_size) == 0 && block &&
-                  http_parse(block, block_size, "x-dw", &value, &value_length) > 0 &&
-                  value_length == 2 && !std::strncmp(value, "v1", 2) &&
-                  http_parse(block, block_size, "x-none", &value, &value_length) ==
-                      static_cast<int>(0x80432025u),
+                  http_parse(block, block_size, "x-dw", &value, &value_length) > 0 && value_length == 2 &&
+                  !std::strncmp(value, "v1", 2) &&
+                  http_parse(block, block_size, "x-none", &value, &value_length) == static_cast<int>(0x80432025u),
               "sceHttpGetAllResponseHeaders and ParseResponseHeader");
         server.join();
         set_env("CTR_WUMPA_MULTIPLIER", "1");
@@ -1075,35 +1218,38 @@ int main(int argc, char** argv) {
               "sceHttp request reaches project server with inherited headers");
         const int sony_connection = http_connection(tmpl, "https://auth.api.playstation.com/", true);
         const int sony = http_request2(sony_connection, "GET", "https://auth.api.playstation.com/", 0);
-        check(http_send(sony, nullptr, 0) == static_cast<int>(0x80436007u),
-              "sceHttpSendRequest Sony host blocked");
+        check(http_send(sony, nullptr, 0) == static_cast<int>(0x80436007u), "sceHttpSendRequest Sony host blocked");
         char escaped[32] = {};
         std::uint64_t needed = 0;
-        check(http_escape(escaped, &needed, sizeof(escaped), "a b/c") == 0 &&
-                  !std::strcmp(escaped, "a%20b%2Fc") && needed == 10,
+        check(http_escape(escaped, &needed, sizeof(escaped), "a b/c") == 0 && !std::strcmp(escaped, "a%20b%2Fc") &&
+                  needed == 10,
               "sceHttpUriEscape");
         closesocket(listener);
     }
 
     {
-        auto copy = bind<void*(SYSV*)(void*,const void*,std::uint64_t)>("Q3VBxCXhUHs", "libSceLibcInternal");
+        auto copy = bind<void*(SYSV*)(void*, const void*, std::uint64_t)>("Q3VBxCXhUHs", "libSceLibcInternal");
         unsigned char source[4050]{}, target[4050]{};
-        for (unsigned i=0;i<4050;++i)source[i]=static_cast<unsigned char>(i*17);
-        target[0]=0xa5;target[4049]=0x5a;
-        check(copy(target+1,source+1,4048)==target+1 && !std::memcmp(target+1,source+1,4048) &&
-              target[0]==0xa5 && target[4049]==0x5a, "libc memcpy unaligned retail-size copy and boundaries");
-        check(copy(target,source,0)==target && target[0]==0xa5, "libc memcpy zero length preserves destination");
-        auto append = bind<char*(SYSV*)(char*,const char*,std::uint64_t)>("kHg45qPC6f0", "libSceLibcInternal");
-        char text[10] = "ab"; text[9] = 'Z';
-        check(append(text,"cdef",2)==text && !std::strcmp(text,"abcd") && text[9]=='Z',
+        for (unsigned i = 0; i < 4050; ++i) source[i] = static_cast<unsigned char>(i * 17);
+        target[0] = 0xa5;
+        target[4049] = 0x5a;
+        check(copy(target + 1, source + 1, 4048) == target + 1 && !std::memcmp(target + 1, source + 1, 4048) &&
+                  target[0] == 0xa5 && target[4049] == 0x5a,
+              "libc memcpy unaligned retail-size copy and boundaries");
+        check(copy(target, source, 0) == target && target[0] == 0xa5, "libc memcpy zero length preserves destination");
+        auto append = bind<char*(SYSV*)(char*, const char*, std::uint64_t)>("kHg45qPC6f0", "libSceLibcInternal");
+        char text[10] = "ab";
+        text[9] = 'Z';
+        check(append(text, "cdef", 2) == text && !std::strcmp(text, "abcd") && text[9] == 'Z',
               "libc strncat bounded append returns destination and terminates");
-        check(append(text,"e",4)==text && !std::strcmp(text,"abcde") && append(text,"xyz",0)==text &&
-              !std::strcmp(text,"abcde"), "libc strncat source terminator and zero count");
+        check(append(text, "e", 4) == text && !std::strcmp(text, "abcde") && append(text, "xyz", 0) == text &&
+                  !std::strcmp(text, "abcde"),
+              "libc strncat source terminator and zero count");
     }
     {
-        auto socket_fn = bind<int(SYSV*)(const char*,int,int,int)>("Q4qBuN-c0ZM", "libSceNet");
-        auto bind_fn = bind<int(SYSV*)(int,const void*,std::uint32_t)>("bErx49PgxyY", "libSceNet");
-        auto name_fn = bind<int(SYSV*)(int,void*,std::uint32_t*)>("hoOAofhhRvE", "libSceNet");
+        auto socket_fn = bind<int(SYSV*)(const char*, int, int, int)>("Q4qBuN-c0ZM", "libSceNet");
+        auto bind_fn = bind<int(SYSV*)(int, const void*, std::uint32_t)>("bErx49PgxyY", "libSceNet");
+        auto name_fn = bind<int(SYSV*)(int, void*, std::uint32_t*)>("hoOAofhhRvE", "libSceNet");
         auto close_fn = bind<int(SYSV*)(int)>("45ggEzakPJQ", "libSceNet");
         const int fd = socket_fn("instance-port", 2, 2, 0);
         auto local = loopback(3074);
@@ -1112,45 +1258,60 @@ int main(int argc, char** argv) {
         check(name_fn(fd, &local, &size) == 0 && ntohs(local.port) == 5074,
               "instance getsockname exposes reachable remapped port");
         SOCKET peer = socket(AF_INET, SOCK_DGRAM, 0);
-        sockaddr_in target{}; target.sin_family = AF_INET; target.sin_addr.s_addr = local.addr; target.sin_port = local.port;
+        sockaddr_in target{};
+        target.sin_family = AF_INET;
+        target.sin_addr.s_addr = local.addr;
+        target.sin_port = local.port;
         sendto(peer, "instance", 8, 0, reinterpret_cast<sockaddr*>(&target), sizeof(target));
-        auto recv_fn = bind<int(SYSV*)(int,void*,std::uint64_t,int,void*,std::uint32_t*)>("304ooNZxWDY", "libSceNet");
-        char data[16]{}; OrbisSockaddrIn from{}; size = sizeof(from);
+        auto recv_fn =
+            bind<int(SYSV*)(int, void*, std::uint64_t, int, void*, std::uint32_t*)>("304ooNZxWDY", "libSceNet");
+        char data[16]{};
+        OrbisSockaddrIn from{};
+        size = sizeof(from);
         check(recv_fn(fd, data, sizeof(data), 0, &from, &size) == 8 && !std::strcmp(data, "instance"),
               "instance recvfrom reaches remapped bind");
-        auto send_fn = bind<int(SYSV*)(int,const void*,std::uint64_t,int,const void*,std::uint32_t)>("gvD1greCu0A", "libSceNet");
-        check(send_fn(fd, "reply", 5, 0, &from, sizeof(from)) == 5,
-              "instance sendto preserves peer destination port");
-        char response[16]{}; int target_size = sizeof(target);
-        DWORD timeout = 2000; setsockopt(peer, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
-        check(recvfrom(peer, response, sizeof(response), 0, reinterpret_cast<sockaddr*>(&target), &target_size) == 5 && ntohs(target.sin_port) == 5074,
+        auto send_fn = bind<int(SYSV*)(int, const void*, std::uint64_t, int, const void*, std::uint32_t)>("gvD1greCu0A",
+                                                                                                          "libSceNet");
+        check(send_fn(fd, "reply", 5, 0, &from, sizeof(from)) == 5, "instance sendto preserves peer destination port");
+        char response[16]{};
+        int target_size = sizeof(target);
+        DWORD timeout = 2000;
+        setsockopt(peer, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+        check(recvfrom(peer, response, sizeof(response), 0, reinterpret_cast<sockaddr*>(&target), &target_size) == 5 &&
+                  ntohs(target.sin_port) == 5074,
               "instance reply has actual mapped source port");
-        closesocket(peer); close_fn(fd);
+        closesocket(peer);
+        close_fn(fd);
     }
     {
-        using Call = int (SYSV*)();
+        using Call = int(SYSV*)();
         auto init = bind<Call>("Lg+NCE6pTwQ", "libSceNpProfileDialog");
         auto state = bind<Call>("3BqoiFOjSsk", "libSceNpProfileDialog");
         auto update = bind<Call>("haVZE9FgKqE", "libSceNpProfileDialog");
         auto term = bind<Call>("0Sp9vJcB1-w", "libSceNpProfileDialog");
-        auto load = reinterpret_cast<int(*)(int(*)(int))>(GetProcAddress(library, "ctr_hle_profile_load"));
+        auto load = reinterpret_cast<int (*)(int (*)(int))>(GetProcAddress(library, "ctr_hle_profile_load"));
         check(load && load(common_operation) == 0, "profile lifecycle module loads");
         check(init() == static_cast<int>(0x80B80001u), "profile rejects absent CommonDialog initialization");
-        common_ready = true; common_used = true;
+        common_ready = true;
+        common_used = true;
         check(init() == static_cast<int>(0x80B80008u), "profile respects another dialog owner");
         common_used = false;
-        check(init() == 0 && common_used && state() == 1 && update() == 1, "profile claims CommonDialog and keeps initialized status");
+        check(init() == 0 && common_used && state() == 1 && update() == 1,
+              "profile claims CommonDialog and keeps initialized status");
         check(init() == static_cast<int>(0x80B80004u), "profile rejects double initialization");
         check(term() == 0 && !common_used && state() == 0, "profile termination releases CommonDialog");
         check(term() == static_cast<int>(0x80B80003u), "profile rejects termination before initialization");
         check(!resolve("uj9Cz7Tk0cc", "libSceNpProfileDialog"), "unimplemented profile UI remains missing");
         auto invitation_init = bind<Call>("XvA5KS56wcs", "libSceInvitationDialog");
         auto invitation_term = bind<Call>("B6HVJtDYxEE", "libSceInvitationDialog");
-        auto invitation_load = reinterpret_cast<int(*)(int(*)(int))>(GetProcAddress(library, "ctr_hle_invitation_load"));
-        check(invitation_load && invitation_load(common_operation)==0, "invitation lifecycle module loads");
-        check(init()==0 && invitation_init()==static_cast<int>(0x80B80008u), "profile owner excludes invitation initialization");
-        check(term()==0 && invitation_init()==0 && init()==static_cast<int>(0x80B80008u), "invitation owner excludes profile initialization");
-        check(invitation_term()==0 && !common_used, "invitation termination releases shared owner");
+        auto invitation_load =
+            reinterpret_cast<int (*)(int (*)(int))>(GetProcAddress(library, "ctr_hle_invitation_load"));
+        check(invitation_load && invitation_load(common_operation) == 0, "invitation lifecycle module loads");
+        check(init() == 0 && invitation_init() == static_cast<int>(0x80B80008u),
+              "profile owner excludes invitation initialization");
+        check(term() == 0 && invitation_init() == 0 && init() == static_cast<int>(0x80B80008u),
+              "invitation owner excludes profile initialization");
+        check(invitation_term() == 0 && !common_used, "invitation termination releases shared owner");
     }
 
     // --- Internet play: peers confirmed by the project server, discovery port mapping ---
@@ -1196,8 +1357,8 @@ int main(int argc, char** argv) {
                 } else if (path == "/ctr/v1/peer-allowed?ip=203.0.113.5") {
                     status = "200 OK";
                 }
-                const std::string answer = "HTTP/1.1 " + status + "\r\nContent-Length: " +
-                                           std::to_string(body.size()) + "\r\n\r\n" + body;
+                const std::string answer =
+                    "HTTP/1.1 " + status + "\r\nContent-Length: " + std::to_string(body.size()) + "\r\n\r\n" + body;
                 send(client, answer.data(), static_cast<int>(answer.size()), 0);
                 closesocket(client);
             }
@@ -1231,8 +1392,8 @@ int main(int argc, char** argv) {
         int client_length = sizeof(client_address);
         const DWORD wait = 2000;
         setsockopt(discovery, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&wait), sizeof(wait));
-        const int got = recvfrom(discovery, received, sizeof(received), 0,
-                                 reinterpret_cast<sockaddr*>(&client_address), &client_length);
+        const int got = recvfrom(discovery, received, sizeof(received), 0, reinterpret_cast<sockaddr*>(&client_address),
+                                 &client_length);
         check(got == 3 && !std::memcmp(received, discovery_request, 3),
               "datagram to server:3074 delivered to the announced discovery port");
         const char reply[] = {31, 3, 0};
@@ -1250,7 +1411,7 @@ int main(int argc, char** argv) {
         net_close(peer_socket);
     }
 
-    std::printf("{\"scope\":\"online_services_test\",\"passed\":%s,\"failures\":%d}\n",
-                failures ? "false" : "true", failures);
+    std::printf("{\"scope\":\"online_services_test\",\"passed\":%s,\"failures\":%d}\n", failures ? "false" : "true",
+                failures);
     return failures ? 1 : 0;
 }

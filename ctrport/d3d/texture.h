@@ -10,11 +10,11 @@
 struct TextureObject {
     Microsoft::WRL::ComPtr<ID3D11Texture2D> tex;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv, srv_array;
-    u64 mem_base = 0, mem_size = 0;  // guest memory the texture was built from
-    u64 checked_frame = 0;           // last frame the guest copy was checked for writes
+    u64 mem_base = 0, mem_size = 0; // guest memory the texture was built from
+    u64 checked_frame = 0;          // last frame the guest copy was checked for writes
     u32 levels = 1;
     DXGI_FORMAT fmt = DXGI_FORMAT_UNKNOWN;
-    bool button_atlas = false;  // the font's button glyphs (see glyphs.h)
+    bool button_atlas = false; // the font's button glyphs (see glyphs.h)
 };
 
 bool TextureSupported(const TSharp& t);

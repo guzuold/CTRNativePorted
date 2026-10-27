@@ -17,8 +17,8 @@ inline constexpr std::size_t aa_branch = aa_function + 0x28;
 // update body. Force only that existing skip branch; never force an inactive
 // pass on and never mutate scene-owned enable globals. Original restores the
 // original dump on the next process start. Installation is bootstrap-only.
-inline constexpr std::array<unsigned char, 9> aa_gate_original{0x80,0x3d,0x58,0xed,0x0f,0x02,0x00,0x74,0x47};
-inline constexpr std::array<unsigned char, 9> aa_gate_disabled{0x80,0x3d,0x58,0xed,0x0f,0x02,0x00,0xeb,0x47};
+inline constexpr std::array<unsigned char, 9> aa_gate_original{0x80, 0x3d, 0x58, 0xed, 0x0f, 0x02, 0x00, 0x74, 0x47};
+inline constexpr std::array<unsigned char, 9> aa_gate_disabled{0x80, 0x3d, 0x58, 0xed, 0x0f, 0x02, 0x00, 0xeb, 0x47};
 
 struct AAReadback {
     bool override_applied = false;

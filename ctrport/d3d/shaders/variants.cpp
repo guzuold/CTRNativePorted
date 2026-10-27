@@ -21,7 +21,7 @@ std::span<const uint32_t> prefix(const std::vector<uint8_t>& code, size_t words,
     std::memcpy(storage.data(), code.data(), words * 4);
     return storage;
 }
-}  // namespace
+} // namespace
 
 std::vector<ShaderVariant> shader_variants(const std::vector<uint8_t>& code) {
     std::vector<ShaderVariant> out;
@@ -31,7 +31,7 @@ std::vector<ShaderVariant> shader_variants(const std::vector<uint8_t>& code) {
         try {
             auto w = ctrport::settings::ao::override_code(d.hash, prefix(code, d.words, words), true);
             if (!w.empty()) out.push_back({"ao_off", patched(code, w)});
-        } catch (const std::exception&) {  // another shader of this size
+        } catch (const std::exception&) { // another shader of this size
         }
     }
     namespace hero = ctrport::settings::hero_shadows;
@@ -39,8 +39,7 @@ std::vector<ShaderVariant> shader_variants(const std::vector<uint8_t>& code) {
         try {
             auto w = hero::override_code(hero::shader_hash, prefix(code, 161, words), true);
             if (!w.empty()) out.push_back({"hero_off", patched(code, w)});
-        } catch (const std::exception&) {
-        }
+        } catch (const std::exception&) {}
     }
     return out;
 }

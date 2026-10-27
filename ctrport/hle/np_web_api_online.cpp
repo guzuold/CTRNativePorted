@@ -83,18 +83,45 @@ std::mutex mutex;
 std::map<int, std::uint64_t> libraries; // libCtxId -> pool size
 std::map<int, int> user_contexts;       // userCtxId -> user ID
 std::map<int, int> handles;             // handleId -> libCtxId
-struct PushType { char value[65]; };
-struct PushKey { char value[33]; };
-struct PushParameter { PushType type; const PushKey* keys; std::uint64_t count; };
-struct PushExtra { PushKey key; const char* data; std::uint64_t length; };
+struct PushType {
+    char value[65];
+};
+struct PushKey {
+    char value[33];
+};
+struct PushParameter {
+    PushType type;
+    const PushKey* keys;
+    std::uint64_t count;
+};
+struct PushExtra {
+    PushKey key;
+    const char* data;
+    std::uint64_t length;
+};
 static_assert(sizeof(PushExtra) == 56 && offsetof(PushExtra, data) == 40);
-struct PushPeer { std::uint64_t account; std::int32_t platform; char padding[4]; };
-struct PushName { char value[20]; };
-using PushCallback = void (CTR_SYSV *)(int, int, const char*, std::uint32_t,
-    const PushPeer*, const PushName*, const PushPeer*, const PushName*, const PushType*,
-    const char*, std::uint64_t, const void*, std::uint64_t, void*);
-struct PushFilter { int library; std::string service; std::uint32_t label; std::set<std::string> types; };
-struct PushRegistration { int context, filter; PushCallback callback; void* argument; };
+struct PushPeer {
+    std::uint64_t account;
+    std::int32_t platform;
+    char padding[4];
+};
+struct PushName {
+    char value[20];
+};
+using PushCallback = void(CTR_SYSV*)(int, int, const char*, std::uint32_t, const PushPeer*, const PushName*,
+                                     const PushPeer*, const PushName*, const PushType*, const char*, std::uint64_t,
+                                     const void*, std::uint64_t, void*);
+struct PushFilter {
+    int library;
+    std::string service;
+    std::uint32_t label;
+    std::set<std::string> types;
+};
+struct PushRegistration {
+    int context, filter;
+    PushCallback callback;
+    void* argument;
+};
 std::map<int, PushFilter> extd_filters;
 std::map<int, PushRegistration> extd_callbacks;
 std::recursive_mutex push_delivery_mutex;
@@ -102,12 +129,15 @@ std::mutex push_poll_mutex;
 std::future<ctr_online::Json> push_poll;
 std::chrono::steady_clock::time_point next_push_poll{};
 std::map<std::string, ctr_online::Json> previous_friends;
-struct FriendChange { std::string type; ctr_online::Json row; std::string action; };
+struct FriendChange {
+    std::string type;
+    ctr_online::Json row;
+    std::string action;
+};
 bool presence_seeded = false;
 std::deque<FriendChange> friend_changes;
 std::map<std::int64_t, std::shared_ptr<Request>> requests;
-int library_count = 0, user_context_count = 0, handle_count = 0, filter_count = 0,
-    callback_count = 0;
+int library_count = 0, user_context_count = 0, handle_count = 0, filter_count = 0, callback_count = 0;
 std::int64_t request_count = 0;
 
 const char* method_name(int method) {
@@ -128,9 +158,8 @@ bool exchange(Request& request, const std::string& body) {
         headers.emplace_back("Content-Type", request.content_type);
     }
     ctr_hle::online::HttpResponse response;
-    if (!ctr_hle::online::http_exchange(method_name(request.method),
-                                        "/webapi/" + request.api_group + request.path, headers,
-                                        body, &response)) {
+    if (!ctr_hle::online::http_exchange(method_name(request.method), "/webapi/" + request.api_group + request.path,
+                                        headers, body, &response)) {
         return false;
     }
     request.status = response.status;
@@ -249,9 +278,8 @@ CTR_SYSV int sceNpWebApiDeleteHandle(int library, int handle) {
 }
 CTR_HLE_REGISTER_ONLINE("5Mn7TYwpl30", "libSceNpWebApi", sceNpWebApiDeleteHandle);
 
-CTR_SYSV int sceNpWebApiCreateRequest(int user_context, const char* api_group, const char* path,
-                                      int method, const ContentParameter* content,
-                                      std::int64_t* request_id) {
+CTR_SYSV int sceNpWebApiCreateRequest(int user_context, const char* api_group, const char* path, int method,
+                                      const ContentParameter* content, std::int64_t* request_id) {
     if (!api_group || !path || !request_id || method < 0 || method > 4) {
         return kInvalidArgument;
     }
@@ -274,8 +302,8 @@ CTR_SYSV int sceNpWebApiCreateRequest(int user_context, const char* api_group, c
     }
     *request_id = id;
     log_webapi("sceNpWebApiCreateRequest", 0,
-               ",\"request\":" + std::to_string(id) + ",\"method\":\"" + method_name(method) +
-                   "\",\"api_group\":\"" + ctr_hle::online::json_escape(request->api_group) + "\",\"path\":\"" +
+               ",\"request\":" + std::to_string(id) + ",\"method\":\"" + method_name(method) + "\",\"api_group\":\"" +
+                   ctr_hle::online::json_escape(request->api_group) + "\",\"path\":\"" +
                    ctr_hle::online::json_escape(request->path) + "\"");
     return 0;
 }
@@ -330,9 +358,8 @@ CTR_SYSV int sceNpWebApiSendRequest2(std::int64_t id, const void* data, std::uin
         }
     }
     log_webapi("sceNpWebApiSendRequest2", result,
-               ",\"request\":" + std::to_string(id) + ",\"method\":\"" +
-                   method_name(request->method) + "\",\"api_group\":\"" +
-                   ctr_hle::online::json_escape(request->api_group) + "\",\"path\":\"" +
+               ",\"request\":" + std::to_string(id) + ",\"method\":\"" + method_name(request->method) +
+                   "\",\"api_group\":\"" + ctr_hle::online::json_escape(request->api_group) + "\",\"path\":\"" +
                    ctr_hle::online::json_escape(request->path) + "\",\"status\":" + std::to_string(request->status) +
                    ",\"request_body\":\"" + ctr_hle::online::json_escape(body.substr(0, 512)) +
                    "\",\"response_body\":\"" + ctr_hle::online::json_escape(request->body.substr(0, 512)) + "\"");
@@ -357,8 +384,7 @@ CTR_SYSV int sceNpWebApiReadData(std::int64_t id, void* data, std::uint64_t size
 }
 CTR_HLE_REGISTER_ONLINE("CQtPRSF6Ds8", "libSceNpWebApi", sceNpWebApiReadData);
 
-CTR_SYSV int sceNpWebApiGetHttpResponseHeaderValueLength(std::int64_t id, const char* name,
-                                                         std::uint64_t* length) {
+CTR_SYSV int sceNpWebApiGetHttpResponseHeaderValueLength(std::int64_t id, const char* name, std::uint64_t* length) {
     if (!name || !length) {
         return kInvalidArgument;
     }
@@ -372,11 +398,9 @@ CTR_SYSV int sceNpWebApiGetHttpResponseHeaderValueLength(std::int64_t id, const 
     *length = it == request->response_headers.end() ? 0 : it->second.size();
     return 0;
 }
-CTR_HLE_REGISTER_ONLINE("743ZzEBzlV8", "libSceNpWebApi",
-                        sceNpWebApiGetHttpResponseHeaderValueLength);
+CTR_HLE_REGISTER_ONLINE("743ZzEBzlV8", "libSceNpWebApi", sceNpWebApiGetHttpResponseHeaderValueLength);
 
-CTR_SYSV int sceNpWebApiGetHttpResponseHeaderValue(std::int64_t id, const char* name, char* value,
-                                                   std::uint64_t size) {
+CTR_SYSV int sceNpWebApiGetHttpResponseHeaderValue(std::int64_t id, const char* name, char* value, std::uint64_t size) {
     if (!name || !value || !size) {
         return kInvalidArgument;
     }
@@ -413,9 +437,8 @@ CTR_HLE_REGISTER_ONLINE("noQgleu+KLE", "libSceNpWebApi", sceNpWebApiDeleteReques
 
 // Push ingress: friend/presence snapshots from the project transport, dispatched on
 // sceNpCheckCallback, never on the HTTP worker. ABI follows the pinned WebAPI headers.
-CTR_SYSV int sceNpWebApiCreateExtdPushEventFilter(int library, int handle, const char* service,
-                                                  std::uint32_t label, const void* filters,
-                                                  std::uint64_t count) {
+CTR_SYSV int sceNpWebApiCreateExtdPushEventFilter(int library, int handle, const char* service, std::uint32_t label,
+                                                  const void* filters, std::uint64_t count) {
     if ((service && label == 0xFFFFFFFFu) || !filters || !count || count > 64) {
         return kInvalidArgument;
     }
@@ -434,7 +457,8 @@ CTR_SYSV int sceNpWebApiCreateExtdPushEventFilter(int library, int handle, const
         if (!length || length == 65 || parameters[i].count > 64 || (parameters[i].count && !parameters[i].keys))
             return kInvalidArgument;
         saved.types.insert(std::string(parameters[i].type.value, length));
-        log_webapi("push_filter_type", id, ",\"type\":\"" + ctr_hle::online::json_escape(parameters[i].type.value) + "\"");
+        log_webapi("push_filter_type", id,
+                   ",\"type\":\"" + ctr_hle::online::json_escape(parameters[i].type.value) + "\"");
     }
     extd_filters[id] = std::move(saved);
     log_webapi("sceNpWebApiCreateExtdPushEventFilter", id,
@@ -456,8 +480,8 @@ CTR_SYSV int sceNpWebApiDeleteExtdPushEventFilter(int library, int filter) {
 }
 CTR_HLE_REGISTER_ONLINE("pfaJtb7SQ80", "libSceNpWebApi", sceNpWebApiDeleteExtdPushEventFilter);
 
-CTR_SYSV int sceNpWebApiRegisterExtdPushEventCallbackA(int user_context, int filter,
-                                                       const void* callback, void* argument) {
+CTR_SYSV int sceNpWebApiRegisterExtdPushEventCallbackA(int user_context, int filter, const void* callback,
+                                                       void* argument) {
     if (!callback) {
         return kInvalidArgument;
     }
@@ -473,8 +497,7 @@ CTR_SYSV int sceNpWebApiRegisterExtdPushEventCallbackA(int user_context, int fil
     extd_callbacks[id] = {user_context, filter, reinterpret_cast<PushCallback>(const_cast<void*>(callback)), argument};
     return id;
 }
-CTR_HLE_REGISTER_ONLINE("jhXKGQJ4egI", "libSceNpWebApi",
-                        sceNpWebApiRegisterExtdPushEventCallbackA);
+CTR_HLE_REGISTER_ONLINE("jhXKGQJ4egI", "libSceNpWebApi", sceNpWebApiRegisterExtdPushEventCallbackA);
 
 CTR_SYSV int sceNpWebApiUnregisterExtdPushEventCallback(int user_context, int callback) {
     std::scoped_lock delivery{push_delivery_mutex};
@@ -486,16 +509,14 @@ CTR_SYSV int sceNpWebApiUnregisterExtdPushEventCallback(int user_context, int ca
     extd_callbacks.erase(it);
     return 0;
 }
-CTR_HLE_REGISTER_ONLINE("PqCY25FMzPs", "libSceNpWebApi",
-                        sceNpWebApiUnregisterExtdPushEventCallback);
+CTR_HLE_REGISTER_ONLINE("PqCY25FMzPs", "libSceNpWebApi", sceNpWebApiUnregisterExtdPushEventCallback);
 
 // Serialized NP ID: base64 of "<onlineId>@<opt segments>" (shadPS4 sceNpWebApiUtilityParseNpId).
 CTR_SYSV int sceNpWebApiUtilityParseNpId(const char* json, NpId* np_id) {
     if (!json) {
         return kNpInvalidArgument;
     }
-    static const std::string alphabet =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string decoded;
     int value = 0, bits = -8;
     for (const char* p = json; *p && *p != '='; ++p) {
@@ -536,8 +557,16 @@ void dispatch_webapi_push() {
     if (!poll_lock.owns_lock()) return;
     try {
         bool subscribed;
-        { std::scoped_lock lock{mutex}; subscribed = !extd_callbacks.empty(); }
-        if (!subscribed) { previous_friends.clear(); presence_seeded = false; friend_changes.clear(); return; }
+        {
+            std::scoped_lock lock{mutex};
+            subscribed = !extd_callbacks.empty();
+        }
+        if (!subscribed) {
+            previous_friends.clear();
+            presence_seeded = false;
+            friend_changes.clear();
+            return;
+        }
         if (push_poll.valid() && push_poll.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             const auto page = push_poll.get();
             const auto& rows = page.at("friendList");
@@ -547,24 +576,33 @@ void dispatch_webapi_push() {
                 const auto& user = row.at("user");
                 const auto account = user.at("accountId").text;
                 const auto name = user.at("onlineId").text;
-                if (account.empty() || account.size() > 20 || account.find_first_not_of("0123456789") != std::string::npos ||
-                    name.empty() || name.size() > 16 || !row.at("presence").is_object()) throw std::runtime_error("invalid presence identity");
+                if (account.empty() || account.size() > 20 ||
+                    account.find_first_not_of("0123456789") != std::string::npos || name.empty() || name.size() > 16 ||
+                    !row.at("presence").is_object())
+                    throw std::runtime_error("invalid presence identity");
                 if (!std::stoull(account)) throw std::runtime_error("zero presence account");
                 const auto& status = row.at("presence").at("onlineStatus");
-                if (!status.is_string() || (status.text != "online" && status.text != "offline" && status.text != "standby"))
+                if (!status.is_string() ||
+                    (status.text != "online" && status.text != "offline" && status.text != "standby"))
                     throw std::runtime_error("invalid online status");
                 if (const auto* list = row.at("presence").find("incontextInfoList")) {
                     if (!list->is_array()) throw std::runtime_error("invalid context list");
                     for (const auto& context : list->items) {
-                        if (const auto* text = context.find("gameStatus"); text && (!text->is_string() || text->text.size() > 191))
+                        if (const auto* text = context.find("gameStatus");
+                            text && (!text->is_string() || text->text.size() > 191))
                             throw std::runtime_error("invalid game status");
                         if (const auto* data = context.find("gameData")) {
                             if (!data->is_string() || data->text.size() > 172 ||
-                                data->text.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=") != std::string::npos)
+                                data->text.find_first_not_of(
+                                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=") !=
+                                    std::string::npos)
                                 throw std::runtime_error("invalid game data");
                             const auto length = data->text.size();
-                            const auto padding = length && data->text.back() == '=' ? (length > 1 && data->text[length-2] == '=' ? 2u : 1u) : 0u;
-                            if (length % 4 || length / 4 * 3 - padding > 128) throw std::runtime_error("oversize game data");
+                            const auto padding = length && data->text.back() == '='
+                                                     ? (length > 1 && data->text[length - 2] == '=' ? 2u : 1u)
+                                                     : 0u;
+                            if (length % 4 || length / 4 * 3 - padding > 128)
+                                throw std::runtime_error("oversize game data");
                         }
                     }
                 }
@@ -572,16 +610,19 @@ void dispatch_webapi_push() {
             }
             const auto context = [](const ctr_online::Json& row) {
                 const auto* values = row.at("presence").find("incontextInfoList");
-                return values && values->is_array() && !values->items.empty() ? values->items.front() : ctr_online::Json::object();
+                return values && values->is_array() && !values->items.empty() ? values->items.front()
+                                                                              : ctr_online::Json::object();
             };
             for (const auto& [account, row] : current) {
                 const auto old = previous_friends.find(account);
                 if (presence_seeded && old == previous_friends.end())
                     friend_changes.push_back({"np:service:friendlist:friend", row, "add"});
-                if (old == previous_friends.end() || row.at("presence").at("onlineStatus") != old->second.at("presence").at("onlineStatus"))
+                if (old == previous_friends.end() ||
+                    row.at("presence").at("onlineStatus") != old->second.at("presence").at("onlineStatus"))
                     friend_changes.push_back({"np:service:presence:onlineStatus", row, ""});
                 const auto now_context = context(row);
-                const auto old_context = old == previous_friends.end() ? ctr_online::Json::object() : context(old->second);
+                const auto old_context =
+                    old == previous_friends.end() ? ctr_online::Json::object() : context(old->second);
                 for (const char* field : {"gameTitleInfo", "gameStatus", "gameData"}) {
                     const auto* value = now_context.find(field);
                     const auto* before = old_context.find(field);
@@ -589,8 +630,10 @@ void dispatch_webapi_push() {
                         friend_changes.push_back({std::string("np:service:presence:") + field, row, ""});
                 }
             }
-            if (presence_seeded) for (const auto& [account, row] : previous_friends) if (!current.count(account))
-                friend_changes.push_back({"np:service:friendlist:friend", row, "remove"});
+            if (presence_seeded)
+                for (const auto& [account, row] : previous_friends)
+                    if (!current.count(account))
+                        friend_changes.push_back({"np:service:friendlist:friend", row, "remove"});
             presence_seeded = true;
             previous_friends = std::move(current);
         }
@@ -599,15 +642,19 @@ void dispatch_webapi_push() {
             next_push_poll = now + std::chrono::seconds(3);
             push_poll = std::async(std::launch::async, [] {
                 HttpResponse response;
-                if (!http_exchange("GET", "/webapi/sdk:userProfile/v1/users/" + std::to_string(identity().account_id) +
-                    "/friendList?offset=0&limit=500", {}, "", &response) || response.status != 200)
+                if (!http_exchange("GET",
+                                   "/webapi/sdk:userProfile/v1/users/" + std::to_string(identity().account_id) +
+                                       "/friendList?offset=0&limit=500",
+                                   {}, "", &response) ||
+                    response.status != 200)
                     throw std::runtime_error("presence poll failed");
                 return ctr_online::parse_json(response.body);
             });
         }
         // Bound work on the guest thread; pending changes are retained for the next check.
         for (int budget = 0; budget < 16 && !friend_changes.empty(); ++budget) {
-            const auto event = friend_changes.front(); friend_changes.pop_front();
+            const auto event = friend_changes.front();
+            friend_changes.pop_front();
             // Retail Toolkit callback 0x418c0: friend changes use pExtdData (trigger /
             // additionalTrigger); presence status uses peer identities; gameData/gameStatus
             // read their own top-level JSON key. Never pass a friend-page row as push data.
@@ -629,10 +676,14 @@ void dispatch_webapi_push() {
             }
             std::vector<PushExtra> extras;
             for (const auto& [key, value] : extended) {
-                PushExtra extra{}; std::memcpy(extra.key.value, key.data(), key.size());
-                extra.data = value.c_str(); extra.length = value.size(); extras.push_back(extra);
+                PushExtra extra{};
+                std::memcpy(extra.key.value, key.data(), key.size());
+                extra.data = value.c_str();
+                extra.length = value.size();
+                extras.push_back(extra);
             }
-            PushType type{}; std::memcpy(type.value, event.type.data(), event.type.size());
+            PushType type{};
+            std::memcpy(type.value, event.type.data(), event.type.size());
             PushName from{}, to{};
             const auto name = event.row.at("user").at("onlineId").text;
             std::memcpy(from.value, name.data(), name.size());
@@ -641,21 +692,29 @@ void dispatch_webapi_push() {
             const PushPeer target{identity().account_id, 3, {}};
             std::scoped_lock delivery{push_delivery_mutex};
             std::vector<int> ids;
-            { std::scoped_lock lock{mutex}; for (const auto& [id, cb] : extd_callbacks) ids.push_back(id); }
+            {
+                std::scoped_lock lock{mutex};
+                for (const auto& [id, cb] : extd_callbacks) ids.push_back(id);
+            }
             for (int id : ids) {
-                PushRegistration callback{}; PushFilter filter{};
+                PushRegistration callback{};
+                PushFilter filter{};
                 {
                     std::scoped_lock lock{mutex};
                     const auto cb = extd_callbacks.find(id);
                     if (cb == extd_callbacks.end() || !user_contexts.count(cb->second.context)) continue;
                     const auto f = extd_filters.find(cb->second.filter);
-                    if (f == extd_filters.end() || !libraries.count(f->second.library) || !f->second.types.count(event.type)) continue;
-                    callback = cb->second; filter = f->second;
+                    if (f == extd_filters.end() || !libraries.count(f->second.library) ||
+                        !f->second.types.count(event.type))
+                        continue;
+                    callback = cb->second;
+                    filter = f->second;
                 }
                 log_webapi("push_dispatch", id, ",\"type\":\"" + event.type + "\"");
-                callback.callback(callback.context, id, filter.service.empty() ? nullptr : filter.service.c_str(), filter.label,
-                    &target, &to, &source, &from, &type, payload.empty() ? nullptr : payload.c_str(), payload.size(),
-                    extras.empty() ? nullptr : extras.data(), extras.size(), callback.argument);
+                callback.callback(callback.context, id, filter.service.empty() ? nullptr : filter.service.c_str(),
+                                  filter.label, &target, &to, &source, &from, &type,
+                                  payload.empty() ? nullptr : payload.c_str(), payload.size(),
+                                  extras.empty() ? nullptr : extras.data(), extras.size(), callback.argument);
             }
         }
     } catch (const std::exception& error) {

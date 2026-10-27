@@ -6,6 +6,6 @@
    return value. On success written_dwords is the original service result.
    neo_mode comes from the runtime's pinned hardware profile. Owner/callback
    and memory authority remain live until the call returns. */
-typedef int (*CtrGnmInit350Transport)(const CtrGuestCopyApi* memory,
-    uint64_t destination,uint32_t capacity_dwords,int neo_mode,uint32_t* written_dwords);
+typedef int (*CtrGnmInit350Transport)(const CtrGuestCopyApi* memory, uint64_t destination, uint32_t capacity_dwords,
+                                      int neo_mode, uint32_t* written_dwords);
 #endif

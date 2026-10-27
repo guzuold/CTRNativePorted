@@ -30,19 +30,19 @@ struct Unsupported : std::runtime_error {
 // usage slot types (Gnm ShaderInputUsageType)
 constexpr int U_RES = 0x00, U_SAMP = 0x01, U_CB = 0x02, U_VB = 0x03;
 constexpr int U_FETCH = 0x12, U_RT = 0x13, U_ST = 0x15, U_CBT = 0x16, U_VBT = 0x17, U_EUD = 0x1B;
-constexpr int U_IGT = 0x1A;  // PtrInternalGlobalTable: ES->GS and GS->VS ring descriptors
-constexpr int ES_VECS = 8;   // ES->GS vertex: 32 dwords as float4 e[8]
-constexpr int GSO_LEN = 64;  // GS output vertex dwords (GSVS ring attributes)
-constexpr int GS_OUT_SCALARS = 4 * (1 + 10);  // D3D11: maxvertexcount * output scalars <= 1024
-constexpr int VARYING_FIRST = 15, VARYING_END = 25;  // interpolant semantics of VS exports / PS inputs
+constexpr int U_IGT = 0x1A;                         // PtrInternalGlobalTable: ES->GS and GS->VS ring descriptors
+constexpr int ES_VECS = 8;                          // ES->GS vertex: 32 dwords as float4 e[8]
+constexpr int GSO_LEN = 64;                         // GS output vertex dwords (GSVS ring attributes)
+constexpr int GS_OUT_SCALARS = 4 * (1 + 10);        // D3D11: maxvertexcount * output scalars <= 1024
+constexpr int VARYING_FIRST = 15, VARYING_END = 25; // interpolant semantics of VS exports / PS inputs
 
 // Gnm shader struct contents the translator reads (export_shaders.py parse_gnm).
 struct Slot {
     int usage, api, reg, flags;
 };
 struct Input {
-    int sem = 0, vgpr = 0, size = 0;                  // VS / ES
-    int def = 0, flat = 0, linear = 0, custom = 0;   // PS
+    int sem = 0, vgpr = 0, size = 0;               // VS / ES
+    int def = 0, flat = 0, linear = 0, custom = 0; // PS
 };
 struct ExportSlot {
     int sem, out;
@@ -53,32 +53,44 @@ struct GnmMeta {
     std::vector<Slot> slots;
     std::vector<Input> inputs;
     std::vector<ExportSlot> exports;
-    std::shared_ptr<GnmMeta> copy;  // GS: the embedded copy VS
+    std::shared_ptr<GnmMeta> copy; // GS: the embedded copy VS
 };
 
 struct Ring {
-    std::string role;  // "", "es", "gs", "copy"
+    std::string role; // "", "es", "gs", "copy"
     int64_t max_vert = 0;
     std::string copy_fn;
     int64_t out_verts = 0;
 };
 
-inline std::string u(int64_t v) { return std::to_string((uint64_t)(v & 0xFFFFFFFF)) + "u"; }
-inline std::string num(int64_t v) { return std::to_string(v); }
+inline std::string u(int64_t v) {
+    return std::to_string((uint64_t)(v & 0xFFFFFFFF)) + "u";
+}
+inline std::string num(int64_t v) {
+    return std::to_string(v);
+}
 inline std::string hex8(int64_t v) {
     char b[16];
     snprintf(b, sizeof(b), "%08x", (unsigned)(v & 0xFFFFFFFF));
     return b;
 }
-inline std::string f32(const std::string& x) { return "asfloat(" + x + ")"; }
+inline std::string f32(const std::string& x) {
+    return "asfloat(" + x + ")";
+}
 inline const char* XYZW = "xyzw";
-inline std::string comp(int64_t c) { return std::string(1, XYZW[c]); }
-inline bool starts(const std::string& s, const char* p) { return s.rfind(p, 0) == 0; }
+inline std::string comp(int64_t c) {
+    return std::string(1, XYZW[c]);
+}
+inline bool starts(const std::string& s, const char* p) {
+    return s.rfind(p, 0) == 0;
+}
 inline bool ends(const std::string& s, const char* p) {
     const size_t n = strlen(p);
     return s.size() >= n && s.compare(s.size() - n, n, p) == 0;
 }
-inline bool contains(const std::string& s, const char* p) { return s.find(p) != std::string::npos; }
+inline bool contains(const std::string& s, const char* p) {
+    return s.find(p) != std::string::npos;
+}
 inline std::vector<std::string> split(const std::string& s, char c) {
     std::vector<std::string> out;
     size_t a = 0;
@@ -156,13 +168,15 @@ inline std::string vsout_struct() {
     for (int v = VARYING_FIRST; v < VARYING_END; v++) s += "    float4 a" + num(v) + " : VARYING" + num(v) + ";\n";
     return s + "};";
 }
-inline std::string esout_struct() { return "struct ESOut {\n    float4 e[" + num(ES_VECS) + "] : ESGS0;\n};"; }
+inline std::string esout_struct() {
+    return "struct ESOut {\n    float4 e[" + num(ES_VECS) + "] : ESGS0;\n};";
+}
 
 struct Tag {
-    std::string kind;  // T, B, S, CB, V, P, RING
+    std::string kind; // T, B, S, CB, V, P, RING
     int64_t a = 0, b = 0;
 };
-constexpr int64_t kNone = INT64_MIN;  // Python None in lane-spill keys
+constexpr int64_t kNone = INT64_MIN; // Python None in lane-spill keys
 
 class Translator {
 public:
@@ -174,7 +188,7 @@ public:
     std::vector<std::string> lines;
     int ind = 1;
     std::set<int64_t> sregs, vregs, masks;
-    std::vector<std::pair<int64_t, std::pair<int, std::string>>> textures;  // slot -> (dims, use), insertion order
+    std::vector<std::pair<int64_t, std::pair<int, std::string>>> textures; // slot -> (dims, use), insertion order
     std::map<int64_t, std::string> samplers;
     std::set<int64_t> cbuffers;
     std::map<int64_t, std::string> inputs_used;
@@ -199,7 +213,7 @@ public:
             if (writes_exec(i)) exec_written = true;
         for (size_t k = 0; k < insts.size(); k++) idx[insts[k].pc] = k;
         for (const auto& s : meta.slots) {
-            if (s.reg >= 16) continue;  // lives in extended user data, loaded via SMRD
+            if (s.reg >= 16) continue; // lives in extended user data, loaded via SMRD
             tag_slot(s.usage, s.api, s.reg, s.flags);
         }
         find_masks();
@@ -212,8 +226,10 @@ public:
         return nullptr;
     }
     void set_texture(int64_t slot, int dims, const char* use) {
-        if (auto* t = texture(slot)) *t = {dims, use};
-        else textures.push_back({slot, {dims, use}});
+        if (auto* t = texture(slot))
+            *t = {dims, use};
+        else
+            textures.push_back({slot, {dims, use}});
     }
 
     // ------------------------------------------------------------ analysis
@@ -256,8 +272,9 @@ public:
                 } else if ((i.fmt == "SOP1" || i.fmt == "SOP2") && ends(i.name, "_b64") && i.I("sdst") < 104) {
                     for (const char* k : {"ssrc0", "ssrc1"}) {
                         const Operand* o = i.opt(k);
-                        if (o && ((o->kind == Operand::Special && (o->special == "exec_lo" || o->special == "vcc_lo")) ||
-                                  (o->kind == Operand::S && m.count(o->value))))
+                        if (o &&
+                            ((o->kind == Operand::Special && (o->special == "exec_lo" || o->special == "vcc_lo")) ||
+                             (o->kind == Operand::S && m.count(o->value))))
                             d = i.I("sdst");
                     }
                 }
@@ -275,7 +292,8 @@ public:
     void emit(const std::string& s) {
         lines.push_back(indent() + s);
         // VCC doubles as a plain scalar register: keep its 32-bit value in sync
-        if (word_match(s, "vcc = ") && !contains(s, "vccl = ")) lines.push_back(indent() + "vccl = vcc ? 0xFFFFFFFFu : 0u;");
+        if (word_match(s, "vcc = ") && !contains(s, "vccl = "))
+            lines.push_back(indent() + "vccl = vcc ? 0xFFFFFFFFu : 0u;");
     }
     std::string S(int64_t n) {
         if (n == 106) return "vcc_lo_";
@@ -334,16 +352,21 @@ public:
     void write_v(const Inst& i, int64_t d, std::string expr, bool is_float) {
         if (is_float && i.fmt == "VOP3") {
             const int64_t om = i.geti("omod").value_or(0);
-            if (om == 1) expr = "((" + expr + ") * 2.0f)";
-            else if (om == 2) expr = "((" + expr + ") * 4.0f)";
-            else if (om == 3) expr = "((" + expr + ") * 0.5f)";
+            if (om == 1)
+                expr = "((" + expr + ") * 2.0f)";
+            else if (om == 2)
+                expr = "((" + expr + ") * 4.0f)";
+            else if (om == 3)
+                expr = "((" + expr + ") * 0.5f)";
             if (i.geti("clamp").value_or(0)) expr = "saturate(" + expr + ")";
         }
         const std::string rhs = is_float ? "asuint(" + expr + ")" : expr;
         const std::string guard = exec_written ? "if (ex) " : "";
         emit(guard + V(d) + " = " + rhs + ";");
-        if (i.name == "v_cubeid_f32") cube_face_vgprs.insert(d);
-        else cube_face_vgprs.erase(d);
+        if (i.name == "v_cubeid_f32")
+            cube_face_vgprs.insert(d);
+        else
+            cube_face_vgprs.erase(d);
         // lane-id derived addresses (v_mbcnt, shifted): the shader keeps private spills in LDS
         std::vector<int64_t> srcs;
         for (const char* k : {"src0", "src1"})
@@ -353,21 +376,30 @@ public:
         if (!lane && (i.name == "v_lshlrev_b32" || i.name == "v_lshl_b32" || i.name == "v_mbcnt_hi_u32_b32"))
             for (int64_t r : srcs)
                 if (lane_addr_vgprs.count(r)) lane = true;
-        if (lane) lane_addr_vgprs.insert(d);
-        else lane_addr_vgprs.erase(d);
+        if (lane)
+            lane_addr_vgprs.insert(d);
+        else
+            lane_addr_vgprs.erase(d);
     }
     void write_s(int64_t d, const std::string& expr) {
-        if (d == 126) emit("ex = (" + expr + ") != 0u;");
-        else if (d == 106) emit("vccl = " + expr + "; vcc = vccl != 0u;");
-        else if (d == 107) emit("vcch = " + expr + ";");
+        if (d == 126)
+            emit("ex = (" + expr + ") != 0u;");
+        else if (d == 106)
+            emit("vccl = " + expr + "; vcc = vccl != 0u;");
+        else if (d == 107)
+            emit("vcch = " + expr + ";");
         else if (d == 127) {
-        } else emit(S(d) + " = " + expr + ";");
+        } else
+            emit(S(d) + " = " + expr + ";");
         if (d < 104) tags.erase(d);
     }
     void write_mask(int64_t d, const std::string& expr) {
-        if (d == 126) emit("ex = " + expr + ";");
-        else if (d == 106) emit("vcc = " + expr + ";");
-        else emit(M(d) + " = " + expr + ";");
+        if (d == 126)
+            emit("ex = " + expr + ";");
+        else if (d == 106)
+            emit("vcc = " + expr + ";");
+        else
+            emit(M(d) + " = " + expr + ";");
     }
     std::string mask_of(const Operand& o) {
         if (o.kind == Operand::Special) {
@@ -513,8 +545,10 @@ public:
             emit(c != "true" ? "if (" + c + ") return;" : "return;");
             return;
         }
-        if (kind == "ps") emit(c != "true" ? "if (" + c + ") { if (!ex) discard; return o; }" : "{ if (!ex) discard; return o; }");
-        else emit(c != "true" ? "if (" + c + ") return o;" : "return o;");
+        if (kind == "ps")
+            emit(c != "true" ? "if (" + c + ") { if (!ex) discard; return o; }" : "{ if (!ex) discard; return o; }");
+        else
+            emit(c != "true" ? "if (" + c + ") return o;" : "return o;");
     }
 
     // ------------------------------------------------------------ instructions
@@ -525,8 +559,8 @@ public:
         if (n == "s_cbranch_join") throw Unsupported("s_cbranch_join");
         if (i.fmt == "VOP1" || i.fmt == "VOP2" || i.fmt == "VOP3" || i.fmt == "VOPC") return valu(i, k);
         if (i.fmt == "SOP1" || i.fmt == "SOP2" || i.fmt == "SOPC" || i.fmt == "SOPK") return salu(i);
-        for (const char* q : {"s_waitcnt", "s_nop", "s_dcache_inv", "s_sendmsg", "s_setprio", "s_barrier", "s_icache_inv",
-                              "s_sleep", "s_trap"})
+        for (const char* q : {"s_waitcnt", "s_nop", "s_dcache_inv", "s_sendmsg", "s_setprio", "s_barrier",
+                              "s_icache_inv", "s_sleep", "s_trap"})
             if (n == q) return;
         if (n == "s_endpgm") {
             if (!insts.empty() && k != insts.size() - 1) emit_exit("true");
@@ -597,7 +631,8 @@ public:
             if (n == "s_bcnt1_i32_b32") return write_s(d, "countbits(" + a + ")");
             if (n == "s_ff1_i32_b32") return write_s(d, "firstbitlow(" + a + ")");
             if (n == "s_flbit_i32_b32")
-                return write_s(d, "(firstbithigh(" + a + ") == 0xFFFFFFFFu ? 0xFFFFFFFFu : 31u - firstbithigh(" + a + "))");
+                return write_s(d, "(firstbithigh(" + a + ") == 0xFFFFFFFFu ? 0xFFFFFFFFu : 31u - firstbithigh(" + a +
+                                      "))");
             if (n == "s_sext_i32_i8") return write_s(d, "uint(int(" + a + " << 24) >> 24)");
             if (n == "s_sext_i32_i16") return write_s(d, "uint(int(" + a + " << 16) >> 16)");
             if (n == "s_abs_i32") return write_s(d, "uint(abs(int(" + a + ")))");
@@ -608,7 +643,7 @@ public:
         struct OpDef {
             const char* name;
             const char* op;
-            int carry;  // 1 True, 0 False, -1 None
+            int carry; // 1 True, 0 False, -1 None
         };
         static const OpDef ops[] = {{"s_add_u32", "+", 1}, {"s_sub_u32", "-", 1}, {"s_add_i32", "+", 1},
                                     {"s_sub_i32", "-", 1}, {"s_and_b32", "&", 0}, {"s_or_b32", "|", 0},
@@ -616,8 +651,10 @@ public:
         for (const auto& o : ops) {
             if (n != o.name) continue;
             const std::string tmp = "(" + a + " " + o.op + " " + b + ")";
-            if (n == "s_add_u32") emit("scc = (" + a + " + " + b + ") < " + a + ";");
-            else if (n == "s_sub_u32") emit("scc = " + b + " > " + a + ";");
+            if (n == "s_add_u32")
+                emit("scc = (" + a + " + " + b + ") < " + a + ";");
+            else if (n == "s_sub_u32")
+                emit("scc = " + b + " > " + a + ";");
             write_s(d, tmp);
             if (o.carry == 0 && d < 104) emit("scc = " + S(d) + " != 0u;");
             return;
@@ -632,12 +669,14 @@ public:
         if (n == "s_orn2_b32") return write_s(d, "(" + a + " | ~" + b + ")");
         if (n == "s_cselect_b32") return write_s(d, "(scc ? " + a + " : " + b + ")");
         if (n == "s_min_u32" || n == "s_max_u32") return write_s(d, n.substr(2, 3) + "(" + a + ", " + b + ")");
-        if (n == "s_min_i32" || n == "s_max_i32") return write_s(d, "uint(" + n.substr(2, 3) + "(int(" + a + "), int(" + b + ")))");
+        if (n == "s_min_i32" || n == "s_max_i32")
+            return write_s(d, "uint(" + n.substr(2, 3) + "(int(" + a + "), int(" + b + ")))");
         if (n == "s_bfm_b32") return write_s(d, "(((1u << (" + a + " & 31u)) - 1u) << (" + b + " & 31u))");
-        if (n == "s_bfe_u32") return write_s(d, "((" + a + " >> (" + b + " & 31u)) & ((1u << ((" + b + " >> 16) & 127u)) - 1u))");
+        if (n == "s_bfe_u32")
+            return write_s(d, "((" + a + " >> (" + b + " & 31u)) & ((1u << ((" + b + " >> 16) & 127u)) - 1u))");
         if (n == "s_bfe_i32")
-            return write_s(d, "uint(int(" + a + " << (32u - ((" + b + " >> 16) & 127u) - (" + b + " & 31u))) >> (32u - ((" + b +
-                                  " >> 16) & 127u)))");
+            return write_s(d, "uint(int(" + a + " << (32u - ((" + b + " >> 16) & 127u) - (" + b +
+                                  " & 31u))) >> (32u - ((" + b + " >> 16) & 127u)))");
         throw Unsupported(n);
     }
     static std::string cmp_op(const std::string& c) {
@@ -668,22 +707,31 @@ public:
             return;
         }
         if (n == "s_wqm_b64") {
-            if (d == 126) return;  // whole quad mode: helper lanes, nothing to do per lane
+            if (d == 126) return; // whole quad mode: helper lanes, nothing to do per lane
             return write_mask(d, mask_of(i.O("ssrc0")));
         }
         if (ends(n, "saveexec_b64")) {
             const std::string a = mask_of(i.O("ssrc0"));
             const std::string op = n.substr(2, n.find("_saveexec") - 2);
             std::string expr;
-            if (op == "and") expr = a + " && ex";
-            else if (op == "or") expr = a + " || ex";
-            else if (op == "xor") expr = a + " != ex";
-            else if (op == "andn2") expr = a + " && !ex";
-            else if (op == "orn2") expr = a + " || !ex";
-            else if (op == "nand") expr = "!(" + a + " && ex)";
-            else if (op == "nor") expr = "!(" + a + " || ex)";
-            else if (op == "xnor") expr = a + " == ex";
-            else throw Unsupported(n);
+            if (op == "and")
+                expr = a + " && ex";
+            else if (op == "or")
+                expr = a + " || ex";
+            else if (op == "xor")
+                expr = a + " != ex";
+            else if (op == "andn2")
+                expr = a + " && !ex";
+            else if (op == "orn2")
+                expr = a + " || !ex";
+            else if (op == "nand")
+                expr = "!(" + a + " && ex)";
+            else if (op == "nor")
+                expr = "!(" + a + " || ex)";
+            else if (op == "xnor")
+                expr = a + " == ex";
+            else
+                throw Unsupported(n);
             emit("{ bool t_ = " + expr + "; " + M(d) + " = ex; ex = t_; scc = ex; }");
             return;
         }
@@ -692,16 +740,26 @@ public:
             const std::string a = mask_of(i.O("ssrc0")), b = mask_of(i.O("ssrc1"));
             const std::string op = n.substr(2, n.find("_b64") - 2);
             std::string expr;
-            if (op == "and") expr = "(" + a + " && " + b + ")";
-            else if (op == "or") expr = "(" + a + " || " + b + ")";
-            else if (op == "xor") expr = "(" + a + " != " + b + ")";
-            else if (op == "andn2") expr = "(" + a + " && !" + b + ")";
-            else if (op == "orn2") expr = "(" + a + " || !" + b + ")";
-            else if (op == "nand") expr = "!(" + a + " && " + b + ")";
-            else if (op == "nor") expr = "!(" + a + " || " + b + ")";
-            else if (op == "xnor") expr = "(" + a + " == " + b + ")";
-            else if (op == "cselect") expr = "(scc ? " + a + " : " + b + ")";
-            else throw Unsupported(n);
+            if (op == "and")
+                expr = "(" + a + " && " + b + ")";
+            else if (op == "or")
+                expr = "(" + a + " || " + b + ")";
+            else if (op == "xor")
+                expr = "(" + a + " != " + b + ")";
+            else if (op == "andn2")
+                expr = "(" + a + " && !" + b + ")";
+            else if (op == "orn2")
+                expr = "(" + a + " || !" + b + ")";
+            else if (op == "nand")
+                expr = "!(" + a + " && " + b + ")";
+            else if (op == "nor")
+                expr = "!(" + a + " || " + b + ")";
+            else if (op == "xnor")
+                expr = "(" + a + " == " + b + ")";
+            else if (op == "cselect")
+                expr = "(scc ? " + a + " : " + b + ")";
+            else
+                throw Unsupported(n);
             if (op != "cselect") {
                 const std::string target = d != 106 && d != 126 ? M(d) : (d == 106 ? "vcc" : "ex");
                 emit("{ bool t_ = " + expr + "; " + target + " = t_; scc = t_; }");
@@ -745,8 +803,10 @@ public:
         if (n == "v_sub_f32") return F(a + " - " + b);
         if (n == "v_subrev_f32") return F(b + " - " + a);
         if (n == "v_mul_f32") return F(a + " * " + b);
-        if (n == "v_mul_legacy_f32") return F("((" + a + ") == 0.0f || (" + b + ") == 0.0f ? 0.0f : " + a + " * " + b + ")");
-        if (n == "v_mac_f32" || n == "v_mac_legacy_f32" || n == "v_mad_f32" || n == "v_mad_legacy_f32" || n == "v_fma_f32")
+        if (n == "v_mul_legacy_f32")
+            return F("((" + a + ") == 0.0f || (" + b + ") == 0.0f ? 0.0f : " + a + " * " + b + ")");
+        if (n == "v_mac_f32" || n == "v_mac_legacy_f32" || n == "v_mad_f32" || n == "v_mad_legacy_f32" ||
+            n == "v_fma_f32")
             return F("mad(" + a + ", " + b + ", " + c + ")");
         if (n == "v_madmk_f32") return F("mad(" + a + ", asfloat(0x" + hex8(i.I("lit")) + "u), " + f32(vsrc1(i)) + ")");
         if (n == "v_madak_f32") return F("mad(" + a + ", " + f32(vsrc1(i)) + ", asfloat(0x" + hex8(i.I("lit")) + "u))");
@@ -812,23 +872,25 @@ public:
         if (n == "v_mul_u32_u24") return U("((" + ua + " & 0xFFFFFFu) * (" + ub + " & 0xFFFFFFu))");
         if (n == "v_mul_i32_i24") return U("uint((int(" + ua + " << 8) >> 8) * (int(" + ub + " << 8) >> 8))");
         if (n == "v_mad_u32_u24") return U("((" + ua + " & 0xFFFFFFu) * (" + ub + " & 0xFFFFFFu) + " + uc + ")");
-        if (n == "v_mad_i32_i24") return U("uint((int(" + ua + " << 8) >> 8) * (int(" + ub + " << 8) >> 8) + int(" + uc + "))");
+        if (n == "v_mad_i32_i24")
+            return U("uint((int(" + ua + " << 8) >> 8) * (int(" + ub + " << 8) >> 8) + int(" + uc + "))");
         if (n == "v_mul_lo_u32" || n == "v_mul_lo_i32") return U("(" + ua + " * " + ub + ")");
         if (n == "v_bfe_u32")
-            return U("((" + ua + " >> (" + ub + " & 31u)) & ((" + uc + " & 31u) == 0u ? 0u : (0xFFFFFFFFu >> (32u - (" + uc +
-                     " & 31u)))))");
+            return U("((" + ua + " >> (" + ub + " & 31u)) & ((" + uc + " & 31u) == 0u ? 0u : (0xFFFFFFFFu >> (32u - (" +
+                     uc + " & 31u)))))");
         if (n == "v_bfe_i32")
             return U("((" + uc + " & 31u) == 0u ? 0u : uint(int(" + ua + " << (32u - (" + uc + " & 31u) - (" + ub +
                      " & 31u))) >> (32u - (" + uc + " & 31u))))");
         if (n == "v_bfi_b32") return U("((" + ua + " & " + ub + ") | (~" + ua + " & " + uc + "))");
         if (n == "v_alignbit_b32")
-            return U("((" + uc + " & 31u) == 0u ? " + ub + " : ((" + ub + " >> (" + uc + " & 31u)) | (" + ua + " << (32u - (" + uc +
-                     " & 31u)))))");
+            return U("((" + uc + " & 31u) == 0u ? " + ub + " : ((" + ub + " >> (" + uc + " & 31u)) | (" + ua +
+                     " << (32u - (" + uc + " & 31u)))))");
         if (n == "v_min3_i32") return U("uint(min(min(int(" + ua + "), int(" + ub + ")), int(" + uc + ")))");
         if (n == "v_max3_i32") return U("uint(max(max(int(" + ua + "), int(" + ub + ")), int(" + uc + ")))");
         if (n == "v_min3_u32") return U("min(min(" + ua + ", " + ub + "), " + uc + ")");
         if (n == "v_max3_u32") return U("max(max(" + ua + ", " + ub + "), " + uc + ")");
-        if (n == "v_sad_u32") return U("((" + ua + " > " + ub + " ? " + ua + " - " + ub + " : " + ub + " - " + ua + ") + " + uc + ")");
+        if (n == "v_sad_u32")
+            return U("((" + ua + " > " + ub + " ? " + ua + " - " + ub + " : " + ub + " - " + ua + ") + " + uc + ")");
         if (n == "v_cubeid_f32") return F("cubeid(" + a + ", " + b + ", " + c + ")");
         if (n == "v_cubesc_f32") return F("cubesc(" + a + ", " + b + ", " + c + ")");
         if (n == "v_cubetc_f32") return F("cubetc(" + a + ", " + b + ", " + c + ")");
@@ -851,7 +913,8 @@ public:
             if (sd != 106 && sd != 126 && !mask_pairs.count(sd)) mask_pairs.insert(sd);
             const std::string vd = V(d);
             const std::string m = sd != 106 ? M(sd) : "vcc";
-            emit("{ bool c_ = " + carry + "; " + (exec_written ? "if (ex) " : "") + vd + " = " + res + "; " + m + " = c_; }");
+            emit("{ bool c_ = " + carry + "; " + (exec_written ? "if (ex) " : "") + vd + " = " + res + "; " + m +
+                 " = c_; }");
             return;
         }
         if (n == "v_readfirstlane_b32") return write_s(d, ua);
@@ -873,7 +936,7 @@ public:
 
     void vcmp(const Inst& i) {
         const std::string& n = i.name;
-        const auto parts = split(n, '_');  // v_cmp[x]_<op>_<type>
+        const auto parts = split(n, '_'); // v_cmp[x]_<op>_<type>
         if (parts.size() < 4) throw Unsupported(n);
         const bool x = ends(parts[1], "x");
         const std::string op = parts[2], ty = parts[3];
@@ -883,35 +946,62 @@ public:
         if (ty == "f32") {
             const std::string fa = fsrc(i, 0);
             const std::string fb = i.fmt == "VOP3" ? fsrc(i, 1) : f32(b);
-            if (op == "class") expr = "cmp_class(" + fa + ", " + b + ")";
-            else if (op == "f") expr = "false";
-            else if (op == "lt") expr = fa + " < " + fb;
-            else if (op == "eq") expr = fa + " == " + fb;
-            else if (op == "le") expr = fa + " <= " + fb;
-            else if (op == "gt") expr = fa + " > " + fb;
-            else if (op == "lg") expr = fa + " != " + fb;
-            else if (op == "ge") expr = fa + " >= " + fb;
-            else if (op == "o") expr = "!(isnan(" + fa + ") || isnan(" + fb + "))";
-            else if (op == "u") expr = "(isnan(" + fa + ") || isnan(" + fb + "))";
-            else if (op == "nge") expr = "!(" + fa + " >= " + fb + ")";
-            else if (op == "nlg") expr = "!(" + fa + " != " + fb + ")";
-            else if (op == "ngt") expr = "!(" + fa + " > " + fb + ")";
-            else if (op == "nle") expr = "!(" + fa + " <= " + fb + ")";
-            else if (op == "neq") expr = "!(" + fa + " == " + fb + ")";
-            else if (op == "nlt") expr = "!(" + fa + " < " + fb + ")";
-            else if (op == "tru") expr = "true";
-            else throw Unsupported(n);
+            if (op == "class")
+                expr = "cmp_class(" + fa + ", " + b + ")";
+            else if (op == "f")
+                expr = "false";
+            else if (op == "lt")
+                expr = fa + " < " + fb;
+            else if (op == "eq")
+                expr = fa + " == " + fb;
+            else if (op == "le")
+                expr = fa + " <= " + fb;
+            else if (op == "gt")
+                expr = fa + " > " + fb;
+            else if (op == "lg")
+                expr = fa + " != " + fb;
+            else if (op == "ge")
+                expr = fa + " >= " + fb;
+            else if (op == "o")
+                expr = "!(isnan(" + fa + ") || isnan(" + fb + "))";
+            else if (op == "u")
+                expr = "(isnan(" + fa + ") || isnan(" + fb + "))";
+            else if (op == "nge")
+                expr = "!(" + fa + " >= " + fb + ")";
+            else if (op == "nlg")
+                expr = "!(" + fa + " != " + fb + ")";
+            else if (op == "ngt")
+                expr = "!(" + fa + " > " + fb + ")";
+            else if (op == "nle")
+                expr = "!(" + fa + " <= " + fb + ")";
+            else if (op == "neq")
+                expr = "!(" + fa + " == " + fb + ")";
+            else if (op == "nlt")
+                expr = "!(" + fa + " < " + fb + ")";
+            else if (op == "tru")
+                expr = "true";
+            else
+                throw Unsupported(n);
         } else if (ty == "i32" || ty == "u32") {
             const std::string ca = ty == "i32" ? "int(" + a + ")" : a, cb = ty == "i32" ? "int(" + b + ")" : b;
-            if (op == "f") expr = "false";
-            else if (op == "lt") expr = ca + " < " + cb;
-            else if (op == "eq") expr = ca + " == " + cb;
-            else if (op == "le") expr = ca + " <= " + cb;
-            else if (op == "gt") expr = ca + " > " + cb;
-            else if (op == "ne") expr = ca + " != " + cb;
-            else if (op == "ge") expr = ca + " >= " + cb;
-            else if (op == "t") expr = "true";
-            else throw Unsupported(n);
+            if (op == "f")
+                expr = "false";
+            else if (op == "lt")
+                expr = ca + " < " + cb;
+            else if (op == "eq")
+                expr = ca + " == " + cb;
+            else if (op == "le")
+                expr = ca + " <= " + cb;
+            else if (op == "gt")
+                expr = ca + " > " + cb;
+            else if (op == "ne")
+                expr = ca + " != " + cb;
+            else if (op == "ge")
+                expr = ca + " >= " + cb;
+            else if (op == "t")
+                expr = "true";
+            else
+                throw Unsupported(n);
         } else {
             throw Unsupported(n);
         }
@@ -935,7 +1025,8 @@ public:
             if (ends(n, k)) cnt = c;
         const Tag* t = tag(base);
         if (starts(n, "s_buffer_load")) {
-            if (!t || (t->kind != "CB" && t->kind != "B" && t->kind != "V")) throw Unsupported("s_buffer_load from untracked");
+            if (!t || (t->kind != "CB" && t->kind != "B" && t->kind != "V"))
+                throw Unsupported("s_buffer_load from untracked");
             const int64_t slot = t->a;
             cbuffers.insert(slot);
             if (i.I("imm") || i.has("lit")) {
@@ -948,7 +1039,8 @@ public:
             } else {
                 // SGPR offsets are in bytes
                 const std::string o = S(i.I("offset"));
-                for (int k = 0; k < cnt; k++) write_s(d + k, "cbload" + num(slot) + "((" + o + " >> 2) + " + num(k) + "u)");
+                for (int k = 0; k < cnt; k++)
+                    write_s(d + k, "cbload" + num(slot) + "((" + o + " >> 2) + " + num(k) + "u)");
             }
             return;
         }
@@ -1001,24 +1093,24 @@ public:
                 return emit(guard + "o.e[" + num(k >> 2) + "]." + comp(k & 3) + " = asfloat(" + v + ");");
             }
             if (role == "gs")
-                return emit(guard + "gso[min(((" + va + " + " + num(imm) + "u) >> 2) / " + num(mv) + "u, " + num(GSO_LEN - 1) +
-                            "u)] = " + v + ";");
+                return emit(guard + "gso[min(((" + va + " + " + num(imm) + "u) >> 2) / " + num(mv) + "u, " +
+                            num(GSO_LEN - 1) + "u)] = " + v + ";");
             throw Unsupported("ring store outside ES/GS");
         }
         const std::string dd = V(i.I("vdata"));
         if (role == "gs")
-            return emit("{ uint vi_ = min(" + va + " >> 2, 2u), k_ = (" + soff + " + " + num(imm) + "u) >> 8; " + guard + dd +
-                        " = asuint(IN[vi_].e[k_ >> 2][k_ & 3u]); }");
+            return emit("{ uint vi_ = min(" + va + " >> 2, 2u), k_ = (" + soff + " + " + num(imm) + "u) >> 8; " +
+                        guard + dd + " = asuint(IN[vi_].e[k_ >> 2][k_ & 3u]); }");
         if (role == "copy")
-            return emit(guard + dd + " = gso[min((" + va + " + " + soff + " + " + num(imm) + "u) / " + num(64 * mv) + "u, " +
-                        num(GSO_LEN - 1) + "u)];");
+            return emit(guard + dd + " = gso[min((" + va + " + " + soff + " + " + num(imm) + "u) / " + num(64 * mv) +
+                        "u, " + num(GSO_LEN - 1) + "u)];");
         throw Unsupported("ring load outside GS/copy shader");
     }
 
     void op_s_sendmsg(const Inst& i) {
         const int64_t m = i.I("simm16");
         const int64_t msg = m & 0xF, op = (m >> 4) & 3;
-        if (msg != 2 || kind != "gs") return;  // GS_DONE, interrupts, ...
+        if (msg != 2 || kind != "gs") return; // GS_DONE, interrupts, ...
         const std::string guard = exec_written ? "if (ex) " : "";
         if (op == 2 || op == 3) emit(guard + "{ gsv = copyvs(gso); stream.Append(gsv); }");
         if (op == 1 || op == 3) emit(guard + "stream.RestartStrip();");
@@ -1045,11 +1137,16 @@ public:
                 throw Unsupported("tbuffer format");
             count = suffix(n);
         } else if (starts(n, "buffer_load_dword")) {
-            if (n == "buffer_load_dword") count = 1;
-            else if (n == "buffer_load_dwordx2") count = 2;
-            else if (n == "buffer_load_dwordx3") count = 3;
-            else if (n == "buffer_load_dwordx4") count = 4;
-            else throw Unsupported(n);
+            if (n == "buffer_load_dword")
+                count = 1;
+            else if (n == "buffer_load_dwordx2")
+                count = 2;
+            else if (n == "buffer_load_dwordx3")
+                count = 3;
+            else if (n == "buffer_load_dwordx4")
+                count = 4;
+            else
+                throw Unsupported(n);
         } else if (starts(n, "buffer_load_format")) {
             count = suffix(n);
         } else {
@@ -1060,7 +1157,7 @@ public:
         std::vector<std::string> parts = {num(i.I("offset")) + "u"};
         int64_t k = 0;
         if (i.I("idxen")) {
-            parts.push_back(V(i.I("vaddr")) + " * 16u");  // constant buffer records are 16 bytes
+            parts.push_back(V(i.I("vaddr")) + " * 16u"); // constant buffer records are 16 bytes
             k = 1;
         }
         if (i.I("offen")) parts.push_back(V(i.I("vaddr") + k));
@@ -1068,8 +1165,8 @@ public:
         if (!(so.kind == Operand::Int && so.value == 0)) parts.push_back(src(so));
         emit("{ uint b_ = (" + join(parts, " + ") + ") >> 2;");
         for (int c = 0; c < count; c++)
-            emit(std::string("    ") + (exec_written ? "if (ex) " : "") + V(i.I("vdata") + c) + " = cbload" + num(slot) + "(b_ + " +
-                 num(c) + "u);");
+            emit(std::string("    ") + (exec_written ? "if (ex) " : "") + V(i.I("vdata") + c) + " = cbload" +
+                 num(slot) + "(b_ + " + num(c) + "u);");
         emit("}");
     }
 
@@ -1094,7 +1191,8 @@ public:
             }
             emit("{ float4 r_ = " + expr + ";");
             for (size_t j = 0; j < comps.size(); j++)
-                emit(std::string("    ") + (exec_written ? "if (ex) " : "") + V(dst + (int64_t)j) + " = asuint(r_." + comp(comps[j]) + ");");
+                emit(std::string("    ") + (exec_written ? "if (ex) " : "") + V(dst + (int64_t)j) + " = asuint(r_." +
+                     comp(comps[j]) + ");");
             emit("}");
         };
         if (n == "image_load_mip" || n == "image_load") {
@@ -1127,11 +1225,14 @@ public:
         }
         if (!(starts(n, "image_sample") || starts(n, "image_gather4"))) throw Unsupported(n);
         std::optional<Tag> ss;
-        if (const Tag* t = tag(i.I("ssamp")); t && t->kind == "S") ss = *t;
-        else ss = loop_carried_sampler(i.I("ssamp"));
+        if (const Tag* t = tag(i.I("ssamp")); t && t->kind == "S")
+            ss = *t;
+        else
+            ss = loop_carried_sampler(i.I("ssamp"));
         if (!ss || ss->kind != "S") throw Unsupported(n + " with untracked sampler");
         const int64_t smp = ss->a;
-        std::string mods = starts(n, "image_sample") ? n.substr(n.rfind("image_sample") + 12) : n.substr(n.rfind("image_gather4") + 13);
+        std::string mods = starts(n, "image_sample") ? n.substr(n.rfind("image_sample") + 12)
+                                                     : n.substr(n.rfind("image_gather4") + 13);
         int64_t k = 0;
         std::optional<std::string> offset;
         if (ends(mods, "_o")) {
@@ -1180,11 +1281,13 @@ public:
         const std::string tex = "t" + num(slot);
         if (cmp_) {
             auto it = samplers.find(smp);
-            if (it != samplers.end() && it->second == "normal") throw Unsupported("sampler used as both compare and normal");
+            if (it != samplers.end() && it->second == "normal")
+                throw Unsupported("sampler used as both compare and normal");
             samplers[smp] = "cmp";
         } else {
             auto it = samplers.find(smp);
-            if (it != samplers.end() && it->second == "cmp") throw Unsupported("sampler used as both compare and normal");
+            if (it != samplers.end() && it->second == "cmp")
+                throw Unsupported("sampler used as both compare and normal");
             samplers[smp] = "normal";
         }
         const std::string sm = "sm" + num(smp);
@@ -1219,7 +1322,8 @@ public:
         const auto& ins = meta.inputs;
         if (attr >= (int64_t)ins.size()) throw Unsupported("interp attr out of range");
         const int sem = ins[attr].sem;
-        const std::string mode = (i.name == "v_interp_mov_f32" || ins[attr].flat) ? "flat" : (ins[attr].linear ? "linear" : "persp");
+        const std::string mode =
+            (i.name == "v_interp_mov_f32" || ins[attr].flat) ? "flat" : (ins[attr].linear ? "linear" : "persp");
         inputs_used[sem] = mode;
         if (i.name == "v_interp_p1_f32") return;
         write_v(i, i.I("vdst"), "IN.a" + num(sem) + "." + comp(i.I("chan")), true);
@@ -1227,16 +1331,17 @@ public:
     void exp(const Inst& i) {
         const int64_t tgt = i.I("tgt"), en = i.I("en");
         const auto& src_ = i.find("vsrc")->list;
-        if (tgt == 9) return;  // null export
+        if (tgt == 9) return; // null export
         if (kind == "es" || kind == "gs") throw Unsupported(kind + " export");
         if (kind == "vs") {
             if (tgt == 12) {
                 std::vector<std::string> vals;
-                for (int k = 0; k < 4; k++) vals.push_back((en >> k) & 1 ? f32(V(src_[k])) : (k == 3 ? "1.0f" : "0.0f"));
+                for (int k = 0; k < 4; k++)
+                    vals.push_back((en >> k) & 1 ? f32(V(src_[k])) : (k == 3 ? "1.0f" : "0.0f"));
                 emit("o.pos = float4(" + join(vals, ", ") + ");");
                 return;
             }
-            if (tgt >= 13 && tgt <= 15) return;  // misc / clip distances
+            if (tgt >= 13 && tgt <= 15) return; // misc / clip distances
             if (tgt >= 32 && tgt < 64) {
                 const int64_t p = tgt - 32;
                 std::optional<int> sem;
@@ -1266,8 +1371,8 @@ public:
             outputs.insert(tgt);
             if (i.I("compr")) {
                 const std::string v0 = V(src_[0]), v1 = V(src_[1]);
-                emit("o.c" + num(tgt) + " = float4(f16tof32(" + v0 + " & 0xFFFFu), f16tof32(" + v0 + " >> 16), f16tof32(" + v1 +
-                     " & 0xFFFFu), f16tof32(" + v1 + " >> 16));");
+                emit("o.c" + num(tgt) + " = float4(f16tof32(" + v0 + " & 0xFFFFu), f16tof32(" + v0 +
+                     " >> 16), f16tof32(" + v1 + " & 0xFFFFu), f16tof32(" + v1 + " >> 16));");
             } else {
                 std::vector<std::string> vals;
                 for (int k = 0; k < 4; k++) vals.push_back((en >> k) & 1 ? f32(V(src_[k])) : "0.0f");
@@ -1324,17 +1429,18 @@ public:
 
     std::string assemble(const std::vector<std::string>& body) {
         std::vector<std::string> pin;
-        if (kind == "ps") pin = ps_input_vgprs();  // sets uses_scale before the decls
+        if (kind == "ps") pin = ps_input_vgprs(); // sets uses_scale before the decls
         std::vector<std::string> out = {"// translated from PS4 GCN by tools/gcn2hlsl.py", COMMON_HLSL};
         for (int64_t slot : cbuffers) {
-            out.push_back("cbuffer CB" + num(slot) + " : register(b" + num(slot) + ") { uint4 cb" + num(slot) + "[4096]; };");
+            out.push_back("cbuffer CB" + num(slot) + " : register(b" + num(slot) + ") { uint4 cb" + num(slot) +
+                          "[4096]; };");
             out.push_back("uint cbload" + num(slot) + "(uint dw) { return cb" + num(slot) + "[dw >> 2][dw & 3u]; }");
         }
         auto sorted_textures = textures;
         std::sort(sorted_textures.begin(), sorted_textures.end(), [](auto& x, auto& y) { return x.first < y.first; });
         for (const auto& [slot, du] : sorted_textures)
-            out.push_back(std::string(du.first == 2 ? "Texture2D" : "Texture2DArray") + "<float4> t" + num(slot) + " : register(t" +
-                          num(slot) + ");");
+            out.push_back(std::string(du.first == 2 ? "Texture2D" : "Texture2DArray") + "<float4> t" + num(slot) +
+                          " : register(t" + num(slot) + ");");
         if (uses_swizzle || uses_vin || uses_scale)
             out.push_back("cbuffer CTRSwizzle : register(b13) { uint4 ctr_swz[8]; uint4 ctr_vin[8]; "
                           "float4 ctr_scale; float4 ctr_tscale[8]; };");
@@ -1347,8 +1453,8 @@ public:
                           "ctr_sel(v, (s >> 3) & 7u), ctr_sel(v, (s >> 6) & 7u), ctr_sel(v, (s >> 9) & 7u)); }");
         }
         for (const auto& [slot, k] : samplers)
-            out.push_back(std::string(k == "cmp" ? "SamplerComparisonState" : "SamplerState") + " sm" + num(slot) + " : register(s" +
-                          num(slot) + ");");
+            out.push_back(std::string(k == "cmp" ? "SamplerComparisonState" : "SamplerState") + " sm" + num(slot) +
+                          " : register(s" + num(slot) + ");");
         bool texinfo = false;
         for (const auto& l : body)
             for (const auto& t : textures)
@@ -1356,22 +1462,27 @@ public:
         if (texinfo) {
             for (const auto& [slot, du] : textures) {
                 std::string s = "float4 texinfo" + num(slot) + "(int mip) { uint w, h, d, l; ";
-                s += du.first == 2 ? "t" + num(slot) + ".GetDimensions(mip, w, h, l); d = 1;" : "t" + num(slot) + ".GetDimensions(mip, w, h, d, l);";
-                s += " float s_ = ctr_tscale[" + num(slot >> 2) + "][" + num(slot & 3) + "]; w = uint(w / s_ + 0.5f); "
+                s += du.first == 2 ? "t" + num(slot) + ".GetDimensions(mip, w, h, l); d = 1;"
+                                   : "t" + num(slot) + ".GetDimensions(mip, w, h, d, l);";
+                s += " float s_ = ctr_tscale[" + num(slot >> 2) + "][" + num(slot & 3) +
+                     "]; w = uint(w / s_ + 0.5f); "
                      "h = uint(h / s_ + 0.5f); return asfloat(uint4(w, h, d, l)); }";
                 out.push_back(s);
             }
         }
         for (int dd : {2, 3}) {
             const std::string arr = dd == 3 ? "Array" : "", dz = dd == 3 ? ", d" : "", z = dd == 3 ? ", 0" : "";
-            out.push_back("float" + num(dd) + " texoff" + num(dd) + "(Texture2D" + arr + "<float4> t, uint o) { uint w, h" + dz +
-                          ", l; t.GetDimensions(0, w, h" + dz + ", l); int2 off = int2(int(o << 26) >> 26, int(o << 18) >> 26); "
-                          "return float" + num(dd) + "(off.x / float(w), off.y / float(h)" + z + "); }");
+            out.push_back("float" + num(dd) + " texoff" + num(dd) + "(Texture2D" + arr +
+                          "<float4> t, uint o) { uint w, h" + dz + ", l; t.GetDimensions(0, w, h" + dz +
+                          ", l); int2 off = int2(int(o << 26) >> 26, int(o << 18) >> 26); "
+                          "return float" +
+                          num(dd) + "(off.x / float(w), off.y / float(h)" + z + "); }");
         }
         // I/O structs
         if (kind == "vs" || kind == "es") {
             out.push_back("struct VSIn {");
-            for (const auto& inp : meta.inputs) out.push_back("    float4 a" + num(inp.sem) + " : ATTRIB" + num(inp.sem) + ";");
+            for (const auto& inp : meta.inputs)
+                out.push_back("    float4 a" + num(inp.sem) + " : ATTRIB" + num(inp.sem) + ";");
             out.push_back("    uint vid : SV_VertexID;\n    uint iid : SV_InstanceID;\n};");
             if (kind == "vs") {
                 out.push_back(vsout_struct());
@@ -1385,10 +1496,12 @@ public:
             out.push_back(vsout_struct());
             out.push_back(ring.copy_fn);
             out.push_back("[maxvertexcount(" + num(ring.out_verts) + ")]");
-            out.push_back("void main(triangle ESOut IN[3], uint pid : SV_PrimitiveID, inout TriangleStream<VSOut> stream) {");
+            out.push_back(
+                "void main(triangle ESOut IN[3], uint pid : SV_PrimitiveID, inout TriangleStream<VSOut> stream) {");
             std::vector<std::string> zeros(GSO_LEN, "0u");
             out.push_back("    uint gso[" + num(GSO_LEN) + "] = { " + join(zeros, ", ") + " };");
-            out.push_back("    VSOut gsv = (VSOut)0;");  // fxc wants the emitted struct initialised on every path (X4580)
+            out.push_back(
+                "    VSOut gsv = (VSOut)0;"); // fxc wants the emitted struct initialised on every path (X4580)
         } else {
             out.push_back("struct PSIn {\n    float4 pos : SV_Position;");
             for (int s = VARYING_FIRST; s < VARYING_END; s++) {
@@ -1510,16 +1623,17 @@ public:
     // True if VGPR `d`, written by insts[k], is only read by float arithmetic before it is overwritten
     bool feeds_float_math_only(const Inst& i, size_t k, std::optional<int64_t> d) const {
         if (!d) return false;
-        static const std::set<std::string> float_math = {"v_add_f32", "v_sub_f32", "v_subrev_f32", "v_mul_f32",
-                                                         "v_mul_legacy_f32", "v_mac_f32", "v_mac_legacy_f32", "v_mad_f32",
-                                                         "v_mad_legacy_f32", "v_fma_f32", "v_madmk_f32", "v_madak_f32"};
+        static const std::set<std::string> float_math = {
+            "v_add_f32",        "v_sub_f32", "v_subrev_f32",     "v_mul_f32", "v_mul_legacy_f32", "v_mac_f32",
+            "v_mac_legacy_f32", "v_mad_f32", "v_mad_legacy_f32", "v_fma_f32", "v_madmk_f32",      "v_madak_f32"};
         for (size_t jx = k + 1; jx < insts.size() && jx < k + 200; jx++) {
             const Inst& j = insts[jx];
             std::set<int64_t> reads;
             for (const char* key : {"src0", "src1", "src2"})
                 if (const Operand* o = j.opt(key); o && o->kind == Operand::V) reads.insert(o->value);
             if (auto v1 = j.geti("vsrc1")) reads.insert(*v1);
-            if (j.fmt == "MIMG" || j.fmt == "MUBUF" || j.fmt == "MTBUF" || j.fmt == "DS" || j.fmt == "EXP" || j.fmt == "VINTRP") {
+            if (j.fmt == "MIMG" || j.fmt == "MUBUF" || j.fmt == "MTBUF" || j.fmt == "DS" || j.fmt == "EXP" ||
+                j.fmt == "VINTRP") {
                 std::set<std::string> ignore = {"op", "offset", "offset0", "offset1", "dmask", "en", "gds", "vdst"};
                 if (starts(j.name, "ds_read") || starts(j.name, "ds_swizzle")) ignore.insert({"data0", "data1"});
                 for (const auto& fld : j.f)
@@ -1564,7 +1678,7 @@ inline uint64_t fnv1a64(const uint8_t* p, size_t n) {
 // What the runtime needs besides the bytecode (renderer.cpp LoadShaderIndex).
 struct Translation {
     std::string hlsl;
-    std::vector<std::pair<int64_t, int>> textures;  // sorted: slot, dims
+    std::vector<std::pair<int64_t, int>> textures; // sorted: slot, dims
     std::map<int64_t, std::string> samplers;
     std::set<int64_t> cbuffers;
 };
@@ -1619,7 +1733,7 @@ inline Translation translate_one(const std::vector<uint8_t>& code, const std::st
     std::map<int64_t, int> mixed;
     for (auto& [slot, d] : t.dims_seen)
         if (d.size() > 1) mixed[slot] = 3;
-    if (!mixed.empty()) {  // a slot sampled both as 2D and as cube/array: declare it as an array
+    if (!mixed.empty()) { // a slot sampled both as 2D and as cube/array: declare it as an array
         Translator t2(kind, insts, meta, info->length, mixed, ring);
         std::string h2 = t2.translate();
         return finish(t2, std::move(h2));
@@ -1627,4 +1741,4 @@ inline Translation translate_one(const std::vector<uint8_t>& code, const std::st
     return finish(t, std::move(hlsl));
 }
 
-}  // namespace gcn
+} // namespace gcn

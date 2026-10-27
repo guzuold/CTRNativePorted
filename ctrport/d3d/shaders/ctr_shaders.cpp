@@ -40,8 +40,8 @@ using gcn::Bytes;
 
 namespace {
 
-using D3DCompileFn = HRESULT(WINAPI*)(const void*, SIZE_T, const char*, const void*, void*, const char*, const char*, UINT,
-                                      UINT, ID3DBlob**, ID3DBlob**);
+using D3DCompileFn = HRESULT(WINAPI*)(const void*, SIZE_T, const char*, const void*, void*, const char*, const char*,
+                                      UINT, UINT, ID3DBlob**, ID3DBlob**);
 D3DCompileFn g_compile;
 
 std::mutex g_out;
@@ -59,8 +59,10 @@ void say(const char* fmt, ...) {
 std::string entry_key(const std::string& prefix, const ctrport::settings::menu_assets::IgaEntry& e) {
     std::string rel = e.path.empty() ? e.full_path : e.path;
     for (char& c : rel)
-        if (c == '/') c = '\\';
-        else if (c == ':') c = '_';
+        if (c == '/')
+            c = '\\';
+        else if (c == ':')
+            c = '_';
     while (!rel.empty() && rel[0] == '\\') rel.erase(0, 1);
     return prefix + rel;
 }
@@ -102,12 +104,13 @@ int read_archive(const fs::path& pak, const std::string& prefix, bool only_shade
                 Bytes data;
                 try {
                     data = a.extract(e);
-                } catch (const std::exception&) {  // block formats the archive reader does not know
+                } catch (const std::exception&) { // block formats the archive reader does not know
                     state[k] = Unreadable;
                     continue;
                 }
                 static const char tag[] = "igShaderBuffer";
-                if (only_shaders && std::search(data.begin(), data.end(), tag, tag + sizeof(tag) - 1) == data.end()) continue;
+                if (only_shaders && std::search(data.begin(), data.end(), tag, tag + sizeof(tag) - 1) == data.end())
+                    continue;
                 const std::string key = entry_key(prefix, e);
                 std::string effect = key.substr(key.rfind('\\') + 1);
                 effect.resize(effect.size() - 4);
@@ -124,7 +127,7 @@ int read_archive(const fs::path& pak, const std::string& prefix, bool only_shade
         });
     for (auto& t : pool) t.join();
     int n = 0, unreadable = 0;
-    for (size_t k = 0; k < todo.size(); k++) {  // archive order: a later entry with the same path wins
+    for (size_t k = 0; k < todo.size(); k++) { // archive order: a later entry with the same path wins
         if (state[k] == Unreadable) unreadable++;
         if (state[k] != Used) continue;
         files[entry_key(prefix, directory.files[todo[k]])] = std::move(found[k]);
@@ -134,14 +137,16 @@ int read_archive(const fs::path& pak, const std::string& prefix, bool only_shade
     return n;
 }
 
-std::string blob_text(ID3DBlob* b) { return b ? std::string((const char*)b->GetBufferPointer(), b->GetBufferSize()) : ""; }
+std::string blob_text(ID3DBlob* b) {
+    return b ? std::string((const char*)b->GetBufferPointer(), b->GetBufferSize()) : "";
+}
 
 struct Result {
     enum { Compiled, Unsupported, CompileError } status = Unsupported;
     std::string reason;
     std::vector<std::string> lines;
     Bytes dxbc;
-    std::vector<std::pair<std::string, Bytes>> variants;  // packed name, DXBC
+    std::vector<std::pair<std::string, Bytes>> variants; // packed name, DXBC
 };
 
 // records read by ctrport/d3d/renderer.cpp LoadShaderIndex
@@ -154,19 +159,20 @@ std::vector<std::string> index_lines(const gcn::ShaderEntry& e, const gcn::Trans
     for (const auto& [slot, kind] : t.samplers) out.push_back("M " + std::to_string(slot) + " " + kind);
     for (int64_t slot : t.cbuffers) out.push_back("B " + std::to_string(slot));
     if (e.kind == "vs" || e.kind == "es")
-        for (const auto& in : e.gnm.inputs) out.push_back("I " + std::to_string(in.sem) + " " + std::to_string(in.size));
+        for (const auto& in : e.gnm.inputs)
+            out.push_back("I " + std::to_string(in.sem) + " " + std::to_string(in.size));
     return out;
 }
 
-std::atomic<uint64_t> g_translate_ms{0}, g_compile_ms{0}, g_cached{0}, g_variants{0};  // summed over the worker threads
-fs::path g_cache;  // <user>/dxbc_cache: compiled bytecode by HLSL hash, so a rebuild compiles only new shaders
+std::atomic<uint64_t> g_translate_ms{0}, g_compile_ms{0}, g_cached{0}, g_variants{0}; // summed over the worker threads
+fs::path g_cache; // <user>/dxbc_cache: compiled bytecode by HLSL hash, so a rebuild compiles only new shaders
 
 // HLSL -> DXBC through the cache; an empty result and the first error line when fxc refuses it
 Bytes compile(const std::string& hlsl, const char* target, std::string& error) {
     const ULONGLONG t1 = GetTickCount64();
     char leaf[64];
-    snprintf(leaf, sizeof(leaf), "%016llx_%s.dxbc", (unsigned long long)gcn::fnv1a64((const uint8_t*)hlsl.data(), hlsl.size()),
-             target);
+    snprintf(leaf, sizeof(leaf), "%016llx_%s.dxbc",
+             (unsigned long long)gcn::fnv1a64((const uint8_t*)hlsl.data(), hlsl.size()), target);
     const fs::path cached = g_cache / leaf;
     Bytes dxbc;
     if (std::ifstream f{cached, std::ios::binary}) {
@@ -177,8 +183,8 @@ Bytes compile(const std::string& hlsl, const char* target, std::string& error) {
         }
     }
     ID3DBlob *code = nullptr, *err = nullptr;
-    const HRESULT hr = g_compile(hlsl.data(), hlsl.size(), nullptr, nullptr, nullptr, "main", target, 1 << 14 | 1 << 11, 0,
-                                 &code, &err);
+    const HRESULT hr = g_compile(hlsl.data(), hlsl.size(), nullptr, nullptr, nullptr, "main", target, 1 << 14 | 1 << 11,
+                                 0, &code, &err);
     g_compile_ms += GetTickCount64() - t1;
     const std::string msg = blob_text(err);
     if (err) err->Release();
@@ -192,7 +198,8 @@ Bytes compile(const std::string& hlsl, const char* target, std::string& error) {
             }
         return {};
     }
-    dxbc.assign((const uint8_t*)code->GetBufferPointer(), (const uint8_t*)code->GetBufferPointer() + code->GetBufferSize());
+    dxbc.assign((const uint8_t*)code->GetBufferPointer(),
+                (const uint8_t*)code->GetBufferPointer() + code->GetBufferSize());
     code->Release();
     fs::path tmp = cached;
     tmp += ".tmp" + std::to_string(GetCurrentThreadId());
@@ -245,19 +252,27 @@ Result work(const gcn::ShaderEntry& e, const fs::path& hlsl_dir) {
     return r;
 }
 
-void put32(Bytes& b, uint32_t v) { b.insert(b.end(), (const uint8_t*)&v, (const uint8_t*)&v + 4); }
+void put32(Bytes& b, uint32_t v) {
+    b.insert(b.end(), (const uint8_t*)&v, (const uint8_t*)&v + 4);
+}
 
 int run(int argc, wchar_t** argv) {
     fs::path base, patch, user = "runtime/user/gpu_d3d", out, hlsl_dir;
     unsigned jobs = std::max(1u, std::thread::hardware_concurrency());
     for (int i = 1; i + 1 < argc; i += 2) {
         const std::wstring k = argv[i];
-        if (k == L"--base") base = argv[i + 1];
-        else if (k == L"--patch") patch = argv[i + 1];
-        else if (k == L"--user") user = argv[i + 1];
-        else if (k == L"--out") out = argv[i + 1];
-        else if (k == L"--hlsl") hlsl_dir = argv[i + 1];
-        else if (k == L"--jobs") jobs = std::max(1, _wtoi(argv[i + 1]));
+        if (k == L"--base")
+            base = argv[i + 1];
+        else if (k == L"--patch")
+            patch = argv[i + 1];
+        else if (k == L"--user")
+            user = argv[i + 1];
+        else if (k == L"--out")
+            out = argv[i + 1];
+        else if (k == L"--hlsl")
+            hlsl_dir = argv[i + 1];
+        else if (k == L"--jobs")
+            jobs = std::max(1, _wtoi(argv[i + 1]));
         else {
             say("unknown option %ls", k.c_str());
             return 2;
@@ -305,7 +320,8 @@ int run(int argc, wchar_t** argv) {
 
     say("step 2 4 shaders met at run time");
     std::vector<std::string> log;
-    const int added = fs::is_directory(user / "missing_shaders", ec) ? gcn::import_runtime(user / "missing_shaders", index, log) : 0;
+    const int added =
+        fs::is_directory(user / "missing_shaders", ec) ? gcn::import_runtime(user / "missing_shaders", index, log) : 0;
     for (const auto& l : log) say("     %s", l.c_str());
     say("     %d runtime shaders added", added);
 
@@ -330,8 +346,8 @@ int run(int argc, wchar_t** argv) {
         });
     for (auto& t : pool) t.join();
 
-    say("     %llu setting variants, %llu from the bytecode cache; thread time: translation %llu s, compilation %llu s", (unsigned long long)g_variants, (unsigned long long)g_cached,
-        g_translate_ms / 1000, g_compile_ms / 1000);
+    say("     %llu setting variants, %llu from the bytecode cache; thread time: translation %llu s, compilation %llu s",
+        (unsigned long long)g_variants, (unsigned long long)g_cached, g_translate_ms / 1000, g_compile_ms / 1000);
     say("step 4 4 packing");
     std::map<std::string, int> unsupported, compile_errors;
     std::string text;
@@ -378,16 +394,26 @@ int run(int argc, wchar_t** argv) {
         say("error: cannot replace %s: %s", out.string().c_str(), ec.message().c_str());
         return 4;
     }
-    say("%zu shaders: %d compiled, %d not translatable, %d not compiled", todo.size(), compiled,
-        int(todo.size()) - compiled - [&] { int n = 0; for (auto& [k, v] : compile_errors) n += v; return n; }(),
-        [&] { int n = 0; for (auto& [k, v] : compile_errors) n += v; return n; }());
+    say(
+        "%zu shaders: %d compiled, %d not translatable, %d not compiled", todo.size(), compiled,
+        int(todo.size()) - compiled -
+            [&] {
+                int n = 0;
+                for (auto& [k, v] : compile_errors) n += v;
+                return n;
+            }(),
+        [&] {
+            int n = 0;
+            for (auto& [k, v] : compile_errors) n += v;
+            return n;
+        }());
     for (const auto& [k, v] : unsupported) say("     not translatable %4d  %s", v, k.c_str());
     for (const auto& [k, v] : compile_errors) say("     not compiled     %4d  %s", v, k.c_str());
     say("done %s (%zu MiB, %llu s)", out.string().c_str(), pack.size() >> 20, (GetTickCount64() - start) / 1000);
     return 0;
 }
 
-}  // namespace
+} // namespace
 
 int wmain(int argc, wchar_t** argv) {
     try {

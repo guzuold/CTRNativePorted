@@ -14,8 +14,7 @@ inline std::filesystem::path backup_io_path(const std::filesystem::path& path) {
 }
 // Immutable, content-addressed snapshots. Publication is atomic; incomplete writes
 // never appear as completed snapshots. Existing copies are never overwritten.
-inline std::filesystem::path backup_blob(const std::filesystem::path& directory,
-                                         const std::string& content,
+inline std::filesystem::path backup_blob(const std::filesystem::path& directory, const std::string& content,
                                          const std::string& identity = "") {
     const auto normalized = backup_io_path(directory);
     std::filesystem::create_directories(normalized);
@@ -34,15 +33,20 @@ inline std::filesystem::path backup_blob(const std::filesystem::path& directory,
                 throw std::runtime_error("Local backup publication failed");
             std::filesystem::remove(temporary);
         }
-    } catch (...) { std::error_code error; std::filesystem::remove(temporary, error); throw; }
+    } catch (...) {
+        std::error_code error;
+        std::filesystem::remove(temporary, error);
+        throw;
+    }
     return target;
 }
 
 inline std::filesystem::path backup_savedata(const std::filesystem::path& root, const std::string& phase) {
     const auto source = backup_io_path(root / "runtime/user/savedata");
     if (!std::filesystem::exists(source)) return {};
-    const auto destination = backup_io_path(root / "runtime/user/savedata_backups" /
-        (phase + "_" + std::to_string(GetTickCount64()) + "_" + hex(random_bytes(8))));
+    const auto destination =
+        backup_io_path(root / "runtime/user/savedata_backups" /
+                       (phase + "_" + std::to_string(GetTickCount64()) + "_" + hex(random_bytes(8))));
     const auto temporary = std::filesystem::path(destination.wstring() + L".partial");
     std::filesystem::create_directories(temporary.parent_path());
     std::filesystem::copy(source, temporary, std::filesystem::copy_options::recursive);

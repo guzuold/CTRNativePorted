@@ -37,13 +37,14 @@ std::string peer_message_sender(const Json& packet);
 // Client side: signs the payload (adds nonce and "to"), posts it to ip:port and returns the
 // verified answer from target_code. Throws on transport, signature or nonce failure, and with
 // the remote "error" text when the service refuses the request.
-Json peer_request(const HostIdentity& self, const std::string& ip, std::uint16_t port,
-                  const std::string& target_code, Json payload, int timeout_ms = 3000);
+Json peer_request(const HostIdentity& self, const std::string& ip, std::uint16_t port, const std::string& target_code,
+                  Json payload, int timeout_ms = 3000);
 
 // Server-side replay guard for (sender, nonce) pairs, kept for 120 seconds.
 class PeerNonces {
 public:
     bool fresh(const std::string& sender, const std::string& nonce, std::uint64_t now);
+
 private:
     std::mutex mutex_;
     std::map<std::string, std::uint64_t> seen_;
@@ -52,15 +53,15 @@ private:
 // What a friend's service last reported.
 struct FriendState {
     std::string code;
-    std::string nickname;          // name saved in the rubrica
-    std::string name;              // online ID reported by the friend's service ("" until contact)
-    std::uint64_t account = 0;     // player_account(code, name), the account the game uses
-    bool online = false;           // the friend's service answered the last poll
-    bool in_game = false;          // its game is connected to it
+    std::string nickname;      // name saved in the rubrica
+    std::string name;          // online ID reported by the friend's service ("" until contact)
+    std::uint64_t account = 0; // player_account(code, name), the account the game uses
+    bool online = false;       // the friend's service answered the last poll
+    bool in_game = false;      // its game is connected to it
     std::string ip;
     std::uint16_t port = 8780;
-    std::uint64_t seen = 0;        // unix time of the last answer
-    Json report = Json::object();  // last presence answer (sessions, delta records)
+    std::uint64_t seen = 0;       // unix time of the last answer
+    Json report = Json::object(); // last presence answer (sessions, delta records)
 };
 
 // Keeps the presence of every friend of the rubrica current through the peer channel. The
@@ -77,11 +78,11 @@ public:
     FriendWatcher& operator=(const FriendWatcher&) = delete;
     void start();
     void stop();
-    void poll_now();                                 // one synchronous round
-    std::vector<FriendState> friends() const;        // rubrica order, also offline friends
+    void poll_now();                          // one synchronous round
+    std::vector<FriendState> friends() const; // rubrica order, also offline friends
     std::optional<FriendState> by_code(const std::string& code) const;
     std::optional<FriendState> by_account(std::uint64_t account) const;
-    bool is_friend(const std::string& code) const;   // in the rubrica now
+    bool is_friend(const std::string& code) const; // in the rubrica now
     // Hint from a signed, authorized request; never marks the sender online.
     void observe_endpoint(const std::string& code, const std::string& ip, std::uint16_t port);
     std::uint16_t contact_port = 8780;
@@ -93,6 +94,7 @@ public:
     // This service's player, sent with each presence request: the friend's service reports the
     // sessions that player may see.
     std::function<std::string()> local_name;
+
 private:
     std::optional<std::pair<std::string, std::uint16_t>> endpoint_of(const std::string& code);
     void run();

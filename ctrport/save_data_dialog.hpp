@@ -9,21 +9,28 @@ namespace ctrport {
 class SaveDataDialogLifecycle {
     CommonDialogLifecycle& common;
     std::mutex lock;
-    int status=0;
+    int status = 0;
+
 public:
-    explicit SaveDataDialogLifecycle(CommonDialogLifecycle& owner):common(owner) {}
+    explicit SaveDataDialogLifecycle(CommonDialogLifecycle& owner) : common(owner) {}
     int initialize() {
         std::lock_guard<std::mutex> guard(lock);
-        if(!common.ready()) return static_cast<int>(0x80B80001U);
-        if(status!=0) return static_cast<int>(0x80B80004U);
-        if(!common.claim()) return static_cast<int>(0x80B80008U);
-        status=1;return 0;
+        if (!common.ready()) return static_cast<int>(0x80B80001U);
+        if (status != 0) return static_cast<int>(0x80B80004U);
+        if (!common.claim()) return static_cast<int>(0x80B80008U);
+        status = 1;
+        return 0;
     }
-    int update_status() {std::lock_guard<std::mutex> guard(lock);return status;}
+    int update_status() {
+        std::lock_guard<std::mutex> guard(lock);
+        return status;
+    }
     int terminate() {
         std::lock_guard<std::mutex> guard(lock);
-        if(!status) return static_cast<int>(0x80B80003U);
-        status=0;common.release();return 0;
+        if (!status) return static_cast<int>(0x80B80003U);
+        status = 0;
+        common.release();
+        return 0;
     }
 };
 inline SaveDataDialogLifecycle save_data_dialog(common_dialog);

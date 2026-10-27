@@ -167,8 +167,12 @@ bool write_stored(const fs::path& dir, const Stored& stored) {
 bool adopt_sfo(const fs::path& dir) {
     std::ifstream in(dir / "sce_sys" / "param.sfo", std::ios::binary);
     std::vector<char> b((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    auto u32 = [&](std::size_t at) { std::uint32_t v = 0; if (at + 4 <= b.size()) std::memcpy(&v, b.data() + at, 4); return v; };
-    if (b.size() < 20 || u32(0) != 0x46535000) return false;  // "\0PSF"
+    auto u32 = [&](std::size_t at) {
+        std::uint32_t v = 0;
+        if (at + 4 <= b.size()) std::memcpy(&v, b.data() + at, 4);
+        return v;
+    };
+    if (b.size() < 20 || u32(0) != 0x46535000) return false; // "\0PSF"
     const std::uint32_t keys = u32(8), values = u32(12), count = u32(16);
     if (count > 64 || 20 + count * 16ull > b.size()) return false;
     Stored stored{};
@@ -181,19 +185,27 @@ bool adopt_sfo(const fs::path& dir) {
         if (key_at >= b.size() || value > b.size() || length > b.size() - value) return false;
         const std::string key(b.data() + key_at, strnlen(b.data() + key_at, b.size() - key_at));
         const char* data = b.data() + value;
-        auto text = [&](char* target, std::size_t size) { std::memcpy(target, data, std::min<std::size_t>(length, size - 1)); };
-        if (key == "MAINTITLE") text(stored.param.title, sizeof(stored.param.title));
-        else if (key == "SUBTITLE") text(stored.param.subTitle, sizeof(stored.param.subTitle));
-        else if (key == "DETAIL") text(stored.param.detail, sizeof(stored.param.detail));
-        else if (key == "SAVEDATA_LIST_PARAM" && length >= 4) std::memcpy(&stored.param.userParam, data, 4);
-        else if (key == "SAVEDATA_BLOCKS" && length >= 8) std::memcpy(&stored.blocks, data, 8);
+        auto text = [&](char* target, std::size_t size) {
+            std::memcpy(target, data, std::min<std::size_t>(length, size - 1));
+        };
+        if (key == "MAINTITLE")
+            text(stored.param.title, sizeof(stored.param.title));
+        else if (key == "SUBTITLE")
+            text(stored.param.subTitle, sizeof(stored.param.subTitle));
+        else if (key == "DETAIL")
+            text(stored.param.detail, sizeof(stored.param.detail));
+        else if (key == "SAVEDATA_LIST_PARAM" && length >= 4)
+            std::memcpy(&stored.param.userParam, data, 4);
+        else if (key == "SAVEDATA_BLOCKS" && length >= 8)
+            std::memcpy(&stored.blocks, data, 8);
     }
     stored.blocks = std::max<std::uint64_t>(stored.blocks, BLOCKS_MIN2);
     std::error_code ec;
     const auto time = fs::last_write_time(dir / "sce_sys" / "param.sfo", ec);
     stored.param.mtime = ec ? static_cast<std::int64_t>(std::time(nullptr))
                             : std::chrono::duration_cast<std::chrono::seconds>(
-                                  std::chrono::clock_cast<std::chrono::system_clock>(time).time_since_epoch()).count();
+                                  std::chrono::clock_cast<std::chrono::system_clock>(time).time_since_epoch())
+                                  .count();
     if (!write_stored(dir, stored)) return false;
     std::printf("{\"scope\":\"savedata_adopted_param_sfo\",\"dir\":\"%s\"}\n", dir.filename().string().c_str());
     std::fflush(stdout);
@@ -312,9 +324,11 @@ CTR_SYSV int sceSaveDataDirNameSearch(const SearchCond* cond, SearchResult* resu
         }
     };
     if (cond->key == 0) {
-        std::stable_sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) { return a.name < b.name; });
+        std::stable_sort(entries.begin(), entries.end(),
+                         [](const Entry& a, const Entry& b) { return a.name < b.name; });
     } else {
-        std::stable_sort(entries.begin(), entries.end(), [&](const Entry& a, const Entry& b) { return key(a) < key(b); });
+        std::stable_sort(entries.begin(), entries.end(),
+                         [&](const Entry& a, const Entry& b) { return key(a) < key(b); });
     }
     if (cond->order == 1) {
         std::reverse(entries.begin(), entries.end());
@@ -324,14 +338,16 @@ CTR_SYSV int sceSaveDataDirNameSearch(const SearchCond* cond, SearchResult* resu
     result->setNum = static_cast<std::uint32_t>(count);
     for (std::size_t i = 0; i < count; ++i) {
         std::memset(result->dirNames[i].data, 0, sizeof(result->dirNames[i].data));
-        std::memcpy(result->dirNames[i].data, entries[i].name.data(), std::min<std::size_t>(entries[i].name.size(), 31));
+        std::memcpy(result->dirNames[i].data, entries[i].name.data(),
+                    std::min<std::size_t>(entries[i].name.size(), 31));
         if (result->params) {
             result->params[i] = entries[i].stored.param;
         }
         if (result->infos) {
             result->infos[i] = SearchInfo{};
             result->infos[i].blocks = entries[i].stored.blocks;
-            result->infos[i].freeBlocks = entries[i].stored.blocks - std::min(entries[i].stored.blocks, entries[i].used_blocks);
+            result->infos[i].freeBlocks =
+                entries[i].stored.blocks - std::min(entries[i].stored.blocks, entries[i].used_blocks);
         }
     }
     return log("sceSaveDataDirNameSearch", OK,
@@ -400,10 +416,9 @@ CTR_SYSV int sceSaveDataMount2(const Mount2* mount, MountResult* result) {
     std::memset(result, 0, sizeof(*result));
     std::memcpy(result->mountPoint.data, slot.point.data(), slot.point.size());
     result->mountStatus = (create2 && created) ? 1 : 0;
-    const std::string extra = quoted("dir", dir) + quoted("mount_point", slot.point) +
-                              ",\"created\":" + (created ? "true" : "false") +
-                              ",\"read_only\":" + (read_only ? "true" : "false") +
-                              ",\"mode\":" + std::to_string(mount->mountMode);
+    const std::string extra =
+        quoted("dir", dir) + quoted("mount_point", slot.point) + ",\"created\":" + (created ? "true" : "false") +
+        ",\"read_only\":" + (read_only ? "true" : "false") + ",\"mode\":" + std::to_string(mount->mountMode);
     slots[free_slot] = std::move(slot);
     return log("sceSaveDataMount2", OK, extra);
 }
@@ -433,8 +448,8 @@ CTR_SYSV int sceSaveDataUmount(const MountPoint* point) {
 }
 CTR_HLE_REGISTER("BMR4F-Uek3E", "libSceSaveData", sceSaveDataUmount);
 
-CTR_SYSV int sceSaveDataGetParam(const MountPoint* point, std::uint32_t type, void* buffer,
-                                 std::size_t size, std::size_t* got) {
+CTR_SYSV int sceSaveDataGetParam(const MountPoint* point, std::uint32_t type, void* buffer, std::size_t size,
+                                 std::size_t* got) {
     std::scoped_lock lock{mutex};
     if (type > 5 || !buffer) {
         return log("sceSaveDataGetParam", PARAMETER);
@@ -483,8 +498,7 @@ CTR_SYSV int sceSaveDataGetParam(const MountPoint* point, std::uint32_t type, vo
 }
 CTR_HLE_REGISTER("XgvSuIdnMlw", "libSceSaveData", sceSaveDataGetParam);
 
-CTR_SYSV int sceSaveDataSetParam(const MountPoint* point, std::uint32_t type, const void* buffer,
-                                 std::size_t size) {
+CTR_SYSV int sceSaveDataSetParam(const MountPoint* point, std::uint32_t type, const void* buffer, std::size_t size) {
     std::scoped_lock lock{mutex};
     if (type > 4 || !point || !buffer) {
         return log("sceSaveDataSetParam", PARAMETER);
@@ -514,9 +528,7 @@ CTR_SYSV int sceSaveDataSetParam(const MountPoint* point, std::uint32_t type, co
         std::memcpy(text, source, std::min(strnlen(source, limit - 1), limit - 1));
         break;
     }
-    case 4:
-        std::memcpy(&p.userParam, buffer, sizeof(std::uint32_t));
-        break;
+    case 4: std::memcpy(&p.userParam, buffer, sizeof(std::uint32_t)); break;
     }
     if (!write_stored(slot->path, slot->stored)) {
         return log("sceSaveDataSetParam", INTERNAL);

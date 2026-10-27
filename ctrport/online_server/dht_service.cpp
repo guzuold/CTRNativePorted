@@ -29,7 +29,7 @@
 
 extern "C" {
 
-int dht_gettimeofday(struct timeval *tv, struct timezone *tz) {
+int dht_gettimeofday(struct timeval* tv, struct timezone* tz) {
     (void)tz;
     if (tv) {
         FILETIME ft;
@@ -50,39 +50,46 @@ int dht_gettimeofday(struct timeval *tv, struct timezone *tz) {
     return 0;
 }
 
-int dht_sendto(int sockfd, const void *buf, int len, int flags,
-               const struct sockaddr *to, int tolen) {
+int dht_sendto(int sockfd, const void* buf, int len, int flags, const struct sockaddr* to, int tolen) {
     return sendto(static_cast<SOCKET>(sockfd), reinterpret_cast<const char*>(buf), len, flags, to, tolen);
 }
 
-int dht_blacklisted(const struct sockaddr *sa, int salen) {
-    (void)sa; (void)salen;
+int dht_blacklisted(const struct sockaddr* sa, int salen) {
+    (void)sa;
+    (void)salen;
     return 0;
 }
 
-void dht_hash(void *hash_return, int hash_size,
-              const void *v1, int len1,
-              const void *v2, int len2,
-              const void *v3, int len3) {
+void dht_hash(void* hash_return, int hash_size, const void* v1, int len1, const void* v2, int len2, const void* v3,
+              int len3) {
     static BCRYPT_ALG_HANDLE alg = nullptr;
     if (!alg) BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA1_ALGORITHM, nullptr, 0);
     BCRYPT_HASH_HANDLE hash = nullptr;
     if (BCryptCreateHash(alg, &hash, nullptr, 0, nullptr, 0, 0) == 0) {
-        if (v1 && len1 > 0) BCryptHashData(hash, const_cast<PUCHAR>(reinterpret_cast<const unsigned char*>(v1)), static_cast<ULONG>(len1), 0);
-        if (v2 && len2 > 0) BCryptHashData(hash, const_cast<PUCHAR>(reinterpret_cast<const unsigned char*>(v2)), static_cast<ULONG>(len2), 0);
-        if (v3 && len3 > 0) BCryptHashData(hash, const_cast<PUCHAR>(reinterpret_cast<const unsigned char*>(v3)), static_cast<ULONG>(len3), 0);
+        if (v1 && len1 > 0)
+            BCryptHashData(hash, const_cast<PUCHAR>(reinterpret_cast<const unsigned char*>(v1)),
+                           static_cast<ULONG>(len1), 0);
+        if (v2 && len2 > 0)
+            BCryptHashData(hash, const_cast<PUCHAR>(reinterpret_cast<const unsigned char*>(v2)),
+                           static_cast<ULONG>(len2), 0);
+        if (v3 && len3 > 0)
+            BCryptHashData(hash, const_cast<PUCHAR>(reinterpret_cast<const unsigned char*>(v3)),
+                           static_cast<ULONG>(len3), 0);
         unsigned char digest[20] = {};
         BCryptFinishHash(hash, digest, 20, 0);
         BCryptDestroyHash(hash);
         const int copy_len = hash_size < 20 ? hash_size : 20;
         std::memcpy(hash_return, digest, static_cast<std::size_t>(copy_len));
-        if (hash_size > 20) std::memset(reinterpret_cast<char*>(hash_return) + 20, 0, static_cast<std::size_t>(hash_size - 20));
+        if (hash_size > 20)
+            std::memset(reinterpret_cast<char*>(hash_return) + 20, 0, static_cast<std::size_t>(hash_size - 20));
     }
 }
 
-int dht_random_bytes(void *buf, size_t size) {
-    return BCryptGenRandom(nullptr, reinterpret_cast<PUCHAR>(buf), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0
-        ? static_cast<int>(size) : -1;
+int dht_random_bytes(void* buf, size_t size) {
+    return BCryptGenRandom(nullptr, reinterpret_cast<PUCHAR>(buf), static_cast<ULONG>(size),
+                           BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0
+               ? static_cast<int>(size)
+               : -1;
 }
 
 } // extern "C"
@@ -93,16 +100,15 @@ namespace {
 std::atomic<bool> dht_owned{false};
 
 struct WsaInit {
-    WsaInit() { WSADATA d; WSAStartup(MAKEWORD(2, 2), &d); }
+    WsaInit() {
+        WSADATA d;
+        WSAStartup(MAKEWORD(2, 2), &d);
+    }
     ~WsaInit() { WSACleanup(); }
 };
 
-const char* const kDefaultBootstrapNodes[] = {
-    "router.bittorrent.com:6881",
-    "dht.transmissionbt.com:6881",
-    "router.utorrent.com:6881",
-    "dht.libtorrent.org:25401"
-};
+const char* const kDefaultBootstrapNodes[] = {"router.bittorrent.com:6881", "dht.transmissionbt.com:6881",
+                                              "router.utorrent.com:6881", "dht.libtorrent.org:25401"};
 
 std::string format_endpoint(const sockaddr_in& sin) {
     char ip[INET_ADDRSTRLEN] = {};
@@ -174,9 +180,12 @@ struct DhtService::Impl {
     Bytes announce_hash_;
     std::uint16_t announce_port_ = 0;
     std::chrono::steady_clock::time_point last_announce_{};
-    struct ExtraAnnounce { std::uint16_t port = 0; std::chrono::steady_clock::time_point last{}; bool due = true; };
+    struct ExtraAnnounce {
+        std::uint16_t port = 0;
+        std::chrono::steady_clock::time_point last{};
+        bool due = true;
+    };
     std::map<Bytes, ExtraAnnounce> extra_announces_;
-
 
     std::map<Bytes, std::shared_ptr<ActiveSearch>> searches_;
     std::shared_ptr<BootstrapContext> bootstrap_ctx_;
@@ -192,8 +201,8 @@ struct DhtService::Impl {
         }
     }
 
-    static void dht_callback(void* closure, int event, const unsigned char* info_hash,
-                             const void* data, size_t data_len) {
+    static void dht_callback(void* closure, int event, const unsigned char* info_hash, const void* data,
+                             size_t data_len) {
         auto* self = static_cast<Impl*>(closure);
         if (!self || !info_hash) return;
         std::shared_ptr<ActiveSearch> search;
@@ -344,7 +353,8 @@ struct DhtService::Impl {
             if (announce_now && announce_h.size() == 20) {
                 dht_search(announce_h.data(), static_cast<int>(announce_p), AF_INET, nullptr, nullptr);
             }
-            for (const auto& [hash, port] : extra_due) dht_search(hash.data(), static_cast<int>(port), AF_INET, nullptr, nullptr);
+            for (const auto& [hash, port] : extra_due)
+                dht_search(hash.data(), static_cast<int>(port), AF_INET, nullptr, nullptr);
 
             for (const auto& search_copy : search_commands) {
                 bool trigger = false;
@@ -356,12 +366,15 @@ struct DhtService::Impl {
                     }
                 }
                 if (trigger) {
-                                        // Looking up an announced key must not cancel its publication.
+                    // Looking up an announced key must not cancel its publication.
                     int port = 0;
                     {
                         std::lock_guard<std::mutex> lock(cmd_mutex_);
-                        if (have_announce_ && announce_hash_ == search_copy->info_hash) port = announce_port_;
-                        else if (const auto it = extra_announces_.find(search_copy->info_hash); it != extra_announces_.end()) port = it->second.port;
+                        if (have_announce_ && announce_hash_ == search_copy->info_hash)
+                            port = announce_port_;
+                        else if (const auto it = extra_announces_.find(search_copy->info_hash);
+                                 it != extra_announces_.end())
+                            port = it->second.port;
                     }
                     dht_search(search_copy->info_hash.data(), port, AF_INET, dht_callback, this);
                 }
@@ -369,8 +382,8 @@ struct DhtService::Impl {
 
             {
                 std::lock_guard<std::mutex> lock(cmd_mutex_);
-                dht_nodes(AF_INET, &cached_stats_.good_nodes, &cached_stats_.dubious_nodes,
-                          &cached_stats_.cached_nodes, &cached_stats_.incoming_nodes);
+                dht_nodes(AF_INET, &cached_stats_.good_nodes, &cached_stats_.dubious_nodes, &cached_stats_.cached_nodes,
+                          &cached_stats_.incoming_nodes);
             }
             fd_set readfds;
             FD_ZERO(&readfds);
@@ -391,15 +404,13 @@ struct DhtService::Impl {
                                        reinterpret_cast<sockaddr*>(&from), &fromlen);
                 if (n > 1) { // >1 byte to filter out internal 1-byte wakeups
                     buf[n] = '\0';
-                    dht_periodic(buf, static_cast<size_t>(n), reinterpret_cast<sockaddr*>(&from), fromlen,
-                                 &tosleep, dht_callback, this);
-                } else {
-                    dht_periodic(nullptr, 0, nullptr, 0, &tosleep,
+                    dht_periodic(buf, static_cast<size_t>(n), reinterpret_cast<sockaddr*>(&from), fromlen, &tosleep,
                                  dht_callback, this);
+                } else {
+                    dht_periodic(nullptr, 0, nullptr, 0, &tosleep, dht_callback, this);
                 }
             } else {
-                dht_periodic(nullptr, 0, nullptr, 0, &tosleep,
-                             dht_callback, this);
+                dht_periodic(nullptr, 0, nullptr, 0, &tosleep, dht_callback, this);
             }
         }
 
@@ -409,7 +420,9 @@ struct DhtService::Impl {
 };
 
 DhtService::DhtService() : impl_(std::make_unique<Impl>()) {}
-DhtService::~DhtService() { stop(); }
+DhtService::~DhtService() {
+    stop();
+}
 
 bool DhtService::start(std::uint16_t port, const std::filesystem::path& cache_path,
                        const std::vector<std::string>& extra_bootstrap_nodes) {
@@ -447,7 +460,10 @@ bool DhtService::start(std::uint16_t port, const std::filesystem::path& cache_pa
     int addrlen = sizeof(addr);
     getsockname(s, reinterpret_cast<sockaddr*>(&addr), &addrlen);
     bool expected = false;
-    if (!dht_owned.compare_exchange_strong(expected, true)) { closesocket(s); return false; }
+    if (!dht_owned.compare_exchange_strong(expected, true)) {
+        closesocket(s);
+        return false;
+    }
     impl_->owns_global_ = true;
     impl_->socket_ = s;
     impl_->bound_port_ = ntohs(addr.sin_port);
@@ -456,9 +472,7 @@ bool DhtService::start(std::uint16_t port, const std::filesystem::path& cache_pa
     impl_->running_ = true;
 
     impl_->bootstrap_ctx_ = std::make_shared<BootstrapContext>();
-    impl_->bootstrap_ctx_->on_node_resolved = [this](const sockaddr_in& sin) {
-        impl_->queue_ping(sin);
-    };
+    impl_->bootstrap_ctx_->on_node_resolved = [this](const sockaddr_in& sin) { impl_->queue_ping(sin); };
 
     impl_->worker_ = std::thread([this] { impl_->worker_loop(); });
     return true;
@@ -482,7 +496,10 @@ void DhtService::stop() {
         impl_->socket_ = INVALID_SOCKET;
     }
     impl_->bound_port_ = 0;
-    if (impl_->owns_global_) { impl_->owns_global_ = false; dht_owned = false; }
+    if (impl_->owns_global_) {
+        impl_->owns_global_ = false;
+        dht_owned = false;
+    }
 }
 
 bool DhtService::is_running() const {
@@ -563,9 +580,11 @@ std::vector<std::string> DhtService::search(const Bytes& info_hash_20, int timeo
         if (!impl_->searches_.count(info_hash_20) && impl_->searches_.size() >= 128)
             impl_->searches_.erase(impl_->searches_.begin());
         auto& slot = impl_->searches_[info_hash_20];
-        if (!slot) { slot = std::make_shared<ActiveSearch>(); slot->info_hash = info_hash_20; }
+        if (!slot) {
+            slot = std::make_shared<ActiveSearch>();
+            slot->info_hash = info_hash_20;
+        }
         active = slot;
-
     }
     // Timeout ends only the wait, not the search. Late results remain keyed by hash.
     impl_->wake();

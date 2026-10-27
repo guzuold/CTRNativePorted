@@ -10,7 +10,6 @@ typedef struct CtrWriteHostApi {
     uint32_t size;
     uint32_t version;
     void* context;
-    uint32_t (*write)(void* context,int32_t fd,const void* bytes,uint64_t count,
-        int64_t* result);
+    uint32_t (*write)(void* context, int32_t fd, const void* bytes, uint64_t count, int64_t* result);
 } CtrWriteHostApi;
 #endif

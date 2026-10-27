@@ -24,6 +24,7 @@ public:
     // Replacement writes (mode 0) with the observed four typed fields only.
     void write(const std::vector<Param>& params, std::uint64_t account);
     std::size_t size() const { return ratings_.size(); }
+
 private:
     void save() const;
     std::filesystem::path path_;
@@ -58,6 +59,7 @@ public:
     // Project rule: all end_race activities, track base x1/x100, common base32 if
     // unavailable. Unranked uses first-place base. Receipts prevent replay credit.
     void award_races(const std::vector<Param>& params, std::uint64_t account, unsigned multiplier = 1);
+
 private:
     void load();
     void save();
@@ -77,14 +79,15 @@ public:
     explicit AchievementStore(std::filesystem::path path);
     Json report_events(const std::vector<Param>& params, std::uint64_t account); // the stored events
     Bytes states_message(const std::vector<Param>& params, std::uint64_t account) const;
+
 private:
     std::filesystem::path path_;
 };
 
 // Replies of the Pit Stop and Wumpa Challenge tasks (80/165, 80/245, 125/1, 125/3), as
 // demonware_tasks.handle; nullopt for other tasks. Rejected requests get UNSERVED_ERROR.
-std::optional<Bytes> pitstop_task(const TaskRequest& request, std::uint64_t account,
-                                  MarketplaceStore& marketplace, AchievementStore& achievements, unsigned multiplier = 1);
+std::optional<Bytes> pitstop_task(const TaskRequest& request, std::uint64_t account, MarketplaceStore& marketplace,
+                                  AchievementStore& achievements, unsigned multiplier = 1);
 
 // Project friend graph: always empty (no social service). Nonempty pages are not served.
 Json friend_page(std::int64_t offset, std::int64_t limit);
@@ -114,22 +117,33 @@ public:
     // A readable session may be contacted before retail posts /members.
     void begin_connection(std::uint64_t account, const std::string& id, std::uint64_t now);
     std::set<std::uint64_t> connection_peers(std::uint64_t account, std::uint64_t now) const;
+
 private:
     struct Session {
-        std::uint64_t owner; Json metadata; std::vector<Part> parts;
+        std::uint64_t owner;
+        Json metadata;
+        std::vector<Part> parts;
         std::map<std::uint64_t, std::string> members;
         std::set<std::uint64_t> admitted;
         std::map<std::uint64_t, std::uint64_t> priorities;
     };
     std::map<std::string, Session> sessions_;
     std::map<std::pair<std::string, std::uint64_t>, std::uint64_t> connecting_;
-    struct Invitation { std::string session, sender; std::uint64_t account, recipient, expires; bool accepted = false; };
+    struct Invitation {
+        std::string session, sender;
+        std::uint64_t account, recipient, expires;
+        bool accepted = false;
+    };
     std::map<std::string, Invitation> invitations_;
     void expire_invitations(std::uint64_t now);
     const Session& readable(std::uint64_t account, const std::string& id) const;
 };
 
-struct PlanPlayer { std::uint64_t account; std::uint64_t search_id; Json search; };
+struct PlanPlayer {
+    std::uint64_t account;
+    std::uint64_t search_id;
+    Json search;
+};
 struct LobbyPlan {
     std::uint64_t lobby_id = 0;
     std::string selector;
@@ -137,7 +151,10 @@ struct LobbyPlan {
     std::vector<PlanPlayer> players;
     std::set<std::uint64_t> guests_notified;
 };
-struct LobbyDocuments { Json host, backend; std::uint64_t update_id = 0; };
+struct LobbyDocuments {
+    Json host, backend;
+    std::uint64_t update_id = 0;
+};
 
 class MatchmakingStore {
 public:
@@ -153,7 +170,11 @@ public:
     void delete_session(const std::vector<Param>& params, std::uint64_t account);
     // 138/14: the sessions that the given friends registered in a context (e.g. "Delta"),
     // other than the requester's own. Any room: friends may play public or private games.
-    struct FriendSession { Bytes address, id; std::uint32_t game_type, max_players, players; Bytes custom; };
+    struct FriendSession {
+        Bytes address, id;
+        std::uint32_t game_type, max_players, players;
+        Bytes custom;
+    };
     std::vector<FriendSession> friend_sessions(const std::string& context, const std::vector<std::uint64_t>& accounts,
                                                std::uint64_t requester) const;
     // The published (not reserved) sessions of one account, with their context, for the
@@ -170,12 +191,12 @@ public:
     bool sync_document(const std::vector<Param>& params, std::uint64_t account, const std::string& selector);
     // Preserve the existing race documents/keys while electing a connected member.
     std::vector<LobbyPlan> promote_disconnected(std::uint64_t lost,
-        const std::map<std::uint64_t, std::string>& connected);
+                                                const std::map<std::uint64_t, std::string>& connected);
     void cancel_pending(std::uint64_t account, const std::string& selector);
     // 145/10: `account` leaves `lobby`. When it was the host, the next connected member of the
     // lobby is promoted and returned (the remaining players must be told).
     std::optional<std::uint64_t> leave_lobby(std::uint64_t account, std::uint64_t lobby,
-        const std::map<std::uint64_t, std::string>& connected);
+                                             const std::map<std::uint64_t, std::string>& connected);
     // 145/8: `account` cancels its search `search_id` (the mm_id answered by 145/18).
     void cancel_search(std::uint64_t account, std::uint64_t search_id);
     bool departed(std::uint64_t lobby, std::uint64_t account) const;
@@ -187,21 +208,30 @@ private:
     std::string migration_routes(std::uint64_t lobby) const;
     struct Lobby;
     std::optional<std::uint64_t> promote(std::uint64_t id, Lobby& lobby, std::uint64_t lost,
-        const std::map<std::uint64_t, std::string>& connected);
-    struct MatchPlayer { Bytes address; std::uint32_t a, b; Bytes custom; };
+                                         const std::map<std::uint64_t, std::string>& connected);
+    struct MatchPlayer {
+        Bytes address;
+        std::uint32_t a, b;
+        Bytes custom;
+    };
     struct MatchSession {
         std::string selector, context;
         std::uint64_t owner;
-        MatchPlayer self;               // host address, game type (a), maximum players (b), attributes
+        MatchPlayer self; // host address, game type (a), maximum players (b), attributes
         std::uint32_t players = 1;
-        bool reserved = false;          // ID handed out by 138/19, no game published yet
+        bool reserved = false; // ID handed out by 138/19, no game published yet
     };
     struct Search {
         std::uint64_t id, account;
         std::string selector, compatibility, document, status;
         std::optional<std::uint64_t> lobby;
     };
-    struct Lobby { std::string selector; std::uint64_t host; std::vector<std::uint64_t> members; std::set<std::uint64_t> departed; };
+    struct Lobby {
+        std::string selector;
+        std::uint64_t host;
+        std::vector<std::uint64_t> members;
+        std::set<std::uint64_t> departed;
+    };
     std::map<std::uint64_t, std::string> player_info_, player_rooms_;
     std::map<std::uint64_t, std::uint64_t> player_tokens_;
     std::set<std::uint64_t> token_values_;

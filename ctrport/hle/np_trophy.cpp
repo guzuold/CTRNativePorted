@@ -68,7 +68,8 @@ void load_trophies() {
     trophies.tried = true;
     try {
         const int language = std::atoi(env("CTR_SYSTEM_LANGUAGE").c_str());
-        trophies.set = ctr_trophy::load({env("CTR_PATCH_DIR"), env("CTR_BASE_DIR")}, env("CTR_TROPHY_KEY"), language ? language : 1);
+        trophies.set = ctr_trophy::load({env("CTR_PATCH_DIR"), env("CTR_BASE_DIR")}, env("CTR_TROPHY_KEY"),
+                                        language ? language : 1);
         const std::filesystem::path user = "runtime/user";
         trophies.file = ctr_trophy::unlock_file(user, trophies.set.np_comm_id);
         ctr_trophy::import_jsonl(user, trophies.file);
@@ -81,10 +82,12 @@ void load_trophies() {
     std::snprintf(extra, sizeof(extra), ",\"trophies\":%zu,\"unlocked\":%zu,\"texts\":%s", trophies.set.trophies.size(),
                   trophies.unlocked.size(), trophies.set.texts ? "true" : "false");
     ctr_hle::log_call(LIB, "trophy_data", trophies.ok ? 0 : -1, extra);
-    if (!trophies.set.error.empty()) std::fprintf(stderr, "Trophies: texts unavailable: %s\n", trophies.set.error.c_str());
+    if (!trophies.set.error.empty())
+        std::fprintf(stderr, "Trophies: texts unavailable: %s\n", trophies.set.error.c_str());
 }
 const ctr_trophy::Trophy* find_trophy(int id) {
-    for (const auto& t : trophies.set.trophies) if (t.id == id) return &t;
+    for (const auto& t : trophies.set.trophies)
+        if (t.id == id) return &t;
     return nullptr;
 }
 void notify(const ctr_trophy::Trophy& t) {
@@ -97,7 +100,9 @@ void notify(const ctr_trophy::Trophy& t) {
         name = ctr_ui::ui_format(ctr_ui::Text::Trophy, std::to_wstring(t.id));
     }
     std::vector<unsigned char> png;
-    try { png = ctr_trophy::icon(trophies.set, t.id); } catch (const std::exception&) {}
+    try {
+        png = ctr_trophy::icon(trophies.set, t.id);
+    } catch (const std::exception&) {}
     ctr_hle::trophy::show_popup(std::move(png), ctr_ui::ui_text(ctr_ui::Text::TrophyUnlocked), std::move(name));
 }
 
@@ -139,8 +144,8 @@ int check(std::int32_t context, std::int32_t handle, Context** out = nullptr) {
 }
 } // namespace
 
-CTR_SYSV int sceNpTrophyCreateContext(std::int32_t* context, std::int32_t user_id,
-                                      std::uint32_t service_label, std::uint64_t options) {
+CTR_SYSV int sceNpTrophyCreateContext(std::int32_t* context, std::int32_t user_id, std::uint32_t service_label,
+                                      std::uint64_t options) {
     std::scoped_lock lock{mutex};
     if (!context || options) {
         return log("sceNpTrophyCreateContext", ERROR_INVALID_ARGUMENT);
@@ -163,8 +168,8 @@ CTR_SYSV int sceNpTrophyCreateContext(std::int32_t* context, std::int32_t user_i
     contexts[slot] = Context{true, false, user_id, service_label};
     *context = static_cast<std::int32_t>(slot + 1);
     char extra[96];
-    std::snprintf(extra, sizeof(extra), ",\"context\":%d,\"user_id\":%d,\"service_label\":%u",
-                  *context, user_id, service_label);
+    std::snprintf(extra, sizeof(extra), ",\"context\":%d,\"user_id\":%d,\"service_label\":%u", *context, user_id,
+                  service_label);
     return log("sceNpTrophyCreateContext", OK, extra);
 }
 CTR_HLE_REGISTER("XbkjbobZlCY", "libSceNpTrophy", sceNpTrophyCreateContext);
@@ -213,8 +218,7 @@ CTR_SYSV int sceNpTrophyDestroyHandle(std::int32_t handle) {
 }
 CTR_HLE_REGISTER("GNcF4oidY0Y", "libSceNpTrophy", sceNpTrophyDestroyHandle);
 
-CTR_SYSV int sceNpTrophyRegisterContext(std::int32_t context, std::int32_t handle,
-                                        std::uint64_t options) {
+CTR_SYSV int sceNpTrophyRegisterContext(std::int32_t context, std::int32_t handle, std::uint64_t options) {
     std::scoped_lock lock{mutex};
     if (options) {
         return log("sceNpTrophyRegisterContext", ERROR_INVALID_ARGUMENT);
@@ -241,8 +245,8 @@ CTR_SYSV int sceNpTrophyRegisterContext(std::int32_t context, std::int32_t handl
 }
 CTR_HLE_REGISTER("TJCAxto9SEU", "libSceNpTrophy", sceNpTrophyRegisterContext);
 
-CTR_SYSV int sceNpTrophyGetTrophyUnlockState(std::int32_t context, std::int32_t handle,
-                                             std::uint32_t* flags, std::uint32_t* count) {
+CTR_SYSV int sceNpTrophyGetTrophyUnlockState(std::int32_t context, std::int32_t handle, std::uint32_t* flags,
+                                             std::uint32_t* count) {
     std::scoped_lock lock{mutex};
     if (!flags || !count) {
         return log("sceNpTrophyGetTrophyUnlockState", ERROR_INVALID_ARGUMENT);
@@ -295,21 +299,30 @@ CTR_SYSV int sceNpTrophyUnlockTrophy(std::int32_t context, std::int32_t handle, 
         if (platinum_id >= 0 && !trophies.unlocked.count(platinum_id)) {
             platinum_now = true;
             for (const auto& t : trophies.set.trophies)
-                if (t.id != platinum_id && t.group == -1 && !trophies.unlocked.count(t.id)) { platinum_now = false; break; }
-            if (platinum_now) { trophies.unlocked[platinum_id] = now; *platinum = platinum_id; }
+                if (t.id != platinum_id && t.group == -1 && !trophies.unlocked.count(t.id)) {
+                    platinum_now = false;
+                    break;
+                }
+            if (platinum_now) {
+                trophies.unlocked[platinum_id] = now;
+                *platinum = platinum_id;
+            }
         }
-        try { ctr_trophy::write_unlocks(trophies.file, trophies.unlocked); }
-        catch (const std::exception& error) { std::fprintf(stderr, "Trophies: %s\n", error.what()); }
+        try {
+            ctr_trophy::write_unlocks(trophies.file, trophies.unlocked);
+        } catch (const std::exception& error) {
+            std::fprintf(stderr, "Trophies: %s\n", error.what());
+        }
         notify(*trophy_entry);
-        if (platinum_now) if (const auto* p = find_trophy(platinum_id)) notify(*p);
+        if (platinum_now)
+            if (const auto* p = find_trophy(platinum_id)) notify(*p);
         char extra[64];
         std::snprintf(extra, sizeof(extra), ",\"trophy\":%d,\"platinum\":%d", trophy, *platinum);
         return log("sceNpTrophyUnlockTrophy", OK, extra);
     }
     std::filesystem::create_directories("runtime/user/trophies");
     if (FILE* file = std::fopen("runtime/user/trophies/unlocks.jsonl", "ab")) {
-        std::fprintf(file, "{\"trophy\":%d,\"time\":%lld}\n", trophy,
-                     static_cast<long long>(std::time(nullptr)));
+        std::fprintf(file, "{\"trophy\":%d,\"time\":%lld}\n", trophy, static_cast<long long>(std::time(nullptr)));
         std::fclose(file);
     }
     char extra[48];
@@ -320,8 +333,7 @@ CTR_HLE_REGISTER("28xmRUFao68", "libSceNpTrophy", sceNpTrophyUnlockTrophy);
 
 // Info queries: with no trophy files shadPS4 returns ORBIS_OK after the checks and
 // writes no output.
-static int info(const char* name, std::int32_t context, std::int32_t handle, const void* a,
-                const void* b) {
+static int info(const char* name, std::int32_t context, std::int32_t handle, const void* a, const void* b) {
     std::scoped_lock lock{mutex};
     const int status = check(context, handle);
     if (status) {
@@ -332,18 +344,17 @@ static int info(const char* name, std::int32_t context, std::int32_t handle, con
     }
     return log(name, OK, ",\"trophy_data\":false,\"output_written\":false");
 }
-CTR_SYSV int sceNpTrophyGetGameInfo(std::int32_t context, std::int32_t handle, void* details,
-                                    void* data) {
+CTR_SYSV int sceNpTrophyGetGameInfo(std::int32_t context, std::int32_t handle, void* details, void* data) {
     return info("sceNpTrophyGetGameInfo", context, handle, details, data);
 }
 CTR_HLE_REGISTER("YYP3f2W09og", "libSceNpTrophy", sceNpTrophyGetGameInfo);
-CTR_SYSV int sceNpTrophyGetGroupInfo(std::int32_t context, std::int32_t handle, std::int32_t,
-                                     void* details, void* data) {
+CTR_SYSV int sceNpTrophyGetGroupInfo(std::int32_t context, std::int32_t handle, std::int32_t, void* details,
+                                     void* data) {
     return info("sceNpTrophyGetGroupInfo", context, handle, details, data);
 }
 CTR_HLE_REGISTER("wTUwGfspKic", "libSceNpTrophy", sceNpTrophyGetGroupInfo);
-CTR_SYSV int sceNpTrophyGetTrophyInfo(std::int32_t context, std::int32_t handle,
-                                      std::int32_t trophy, void* details, void* data) {
+CTR_SYSV int sceNpTrophyGetTrophyInfo(std::int32_t context, std::int32_t handle, std::int32_t trophy, void* details,
+                                      void* data) {
     if (trophy < 0 || trophy >= NUM_MAX) {
         return log("sceNpTrophyGetTrophyInfo", ERROR_INVALID_TROPHY_ID);
     }
@@ -360,13 +371,11 @@ CTR_SYSV int sceNpTrophyGetGameIcon(std::int32_t context, std::int32_t handle, v
     return icon("sceNpTrophyGetGameIcon", context, handle);
 }
 CTR_HLE_REGISTER("HLwz1fRIycA", "libSceNpTrophy", sceNpTrophyGetGameIcon);
-CTR_SYSV int sceNpTrophyGetGroupIcon(std::int32_t context, std::int32_t handle, std::int32_t, void*,
-                                     std::uint64_t*) {
+CTR_SYSV int sceNpTrophyGetGroupIcon(std::int32_t context, std::int32_t handle, std::int32_t, void*, std::uint64_t*) {
     return icon("sceNpTrophyGetGroupIcon", context, handle);
 }
 CTR_HLE_REGISTER("w4uMPmErD4I", "libSceNpTrophy", sceNpTrophyGetGroupIcon);
-CTR_SYSV int sceNpTrophyGetTrophyIcon(std::int32_t context, std::int32_t handle, std::int32_t, void*,
-                                      std::uint64_t*) {
+CTR_SYSV int sceNpTrophyGetTrophyIcon(std::int32_t context, std::int32_t handle, std::int32_t, void*, std::uint64_t*) {
     return icon("sceNpTrophyGetTrophyIcon", context, handle);
 }
 CTR_HLE_REGISTER("eBL+l6HG9xk", "libSceNpTrophy", sceNpTrophyGetTrophyIcon);

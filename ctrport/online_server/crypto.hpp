@@ -23,7 +23,7 @@ bool constant_time_equal(const unsigned char* a, const unsigned char* b, std::si
 std::string base64_encode(const Bytes& data);
 Bytes base64_decode(const std::string& text); // strict (validate=True); throws
 std::string hex(const Bytes& data);
-Bytes from_hex(const std::string& text);      // throws
+Bytes from_hex(const std::string& text); // throws
 Bytes bytes_of(const std::string& text);
 
 // RSA-2048 server key, kept as a CNG full private blob in `path` (created when missing).

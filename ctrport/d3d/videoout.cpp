@@ -32,7 +32,7 @@ HWND g_hwnd;
 std::atomic<u64> g_flips{0}, g_vblanks{0};
 std::atomic<s64> g_flip_arg{-1};
 std::atomic<int> g_current_buffer{-1};
-std::atomic<int> g_flip_rate{0};  // 0: 60 Hz, 1: 30 Hz, 2: 20 Hz
+std::atomic<int> g_flip_rate{0}; // 0: 60 Hz, 1: 30 Hz, 2: 20 Hz
 std::atomic<u64> g_flip_tsc{0};
 std::mutex g_mutex;
 std::condition_variable g_vblank_cv;
@@ -65,7 +65,7 @@ DisplayConfig g_display;
 LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_SYSKEYDOWN:
-        if (w == VK_RETURN && (l & (1 << 29)) && g_display.mode != DisplayConfig::Exclusive) {  // Alt+Enter
+        if (w == VK_RETURN && (l & (1 << 29)) && g_display.mode != DisplayConfig::Exclusive) { // Alt+Enter
             SetFullscreen(h, g_fullscreen = !g_fullscreen);
             return 0;
         }
@@ -75,7 +75,7 @@ LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             SetFullscreen(h, g_fullscreen = !g_fullscreen);
             return 0;
         }
-        if (w == VK_F12) {  // record 3 seconds of frames (flicker reports)
+        if (w == VK_F12) { // record 3 seconds of frames (flicker reports)
             GfxRecordFrames(180);
             return 0;
         }
@@ -149,7 +149,9 @@ SYSV int sceVideoOutOpen(int user, int bus, int index, const void*) {
     g_open = true;
     return kHandle;
 }
-SYSV int sceVideoOutClose(int handle) { return handle == kHandle ? 0 : kErrInvalidHandle; }
+SYSV int sceVideoOutClose(int handle) {
+    return handle == kHandle ? 0 : kErrInvalidHandle;
+}
 SYSV int sceVideoOutRegisterBuffers(int handle, int start, void* const* addrs, int num, const void*) {
     if (handle != kHandle) return kErrInvalidHandle;
     if (!addrs || start < 0 || num < 1 || start + num > 16) return kErrInvalidValue;
@@ -183,7 +185,7 @@ SYSV int sceVideoOutGetResolutionStatus(int handle, ResolutionStatus* s) {
     static const bool uhd = getenv("CTR_SCENE_HEIGHT") || (getenv("CTR_NEO_MODE") && getenv("CTR_NEO_MODE")[0] == '1');
     s->full_width = s->pane_width = uhd ? 3840 : 1920;
     s->full_height = s->pane_height = uhd ? 2160 : 1080;
-    s->refresh_rate = 3;  // 59.94 Hz
+    s->refresh_rate = 3; // 59.94 Hz
     s->screen_size_in_inch = 50;
     return 0;
 }
@@ -267,9 +269,12 @@ SYSV int sceVideoOutConfigureOutputMode_(int handle, u32 reserved, const Mode* m
     if (handle != kHandle) return kErrInvalidHandle;
     if (reserved || !mode) return kErrInvalidValue;
     bool hdr;
-    if (mode->colorimetry == 0xFF) hdr = false;
-    else if (mode->colorimetry == 12 && HdrOffered()) hdr = true;
-    else return kErrInvalidValue;
+    if (mode->colorimetry == 0xFF)
+        hdr = false;
+    else if (mode->colorimetry == 12 && HdrOffered())
+        hdr = true;
+    else
+        return kErrInvalidValue;
     if (g_hdr.exchange(hdr) != hdr) LOG("videoout: output mode %s", hdr ? "HDR10 (BT.2020 PQ)" : "SDR");
     return 0;
 }
@@ -316,7 +321,8 @@ void PaceFrame() {
     if (forced < 0 && !ctrport::settings::pacing::console_pacing()) return;
     const int limit = forced >= 0 ? forced : 60 / (g_flip_rate + 1);
     if (limit <= 0) return;
-    static HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    static HANDLE timer =
+        CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
     static const s64 freq = [] {
         LARGE_INTEGER f;
         QueryPerformanceFrequency(&f);
@@ -325,13 +331,13 @@ void PaceFrame() {
     static s64 next = 0;
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
-    const s64 period = freq * 1001 / (limit * 1000);  // 59.94 / 29.97 Hz like the display
-    if (next == 0 || now.QuadPart - next > period) next = now.QuadPart;  // fell behind: resync
+    const s64 period = freq * 1001 / (limit * 1000);                    // 59.94 / 29.97 Hz like the display
+    if (next == 0 || now.QuadPart - next > period) next = now.QuadPart; // fell behind: resync
     next += period;
     s64 wait = next - now.QuadPart;
     if (wait <= 0) return;
     s64 hns = wait * 10000000 / freq;
-    if (hns > 15000) {  // sleep, then spin the last ~1 ms
+    if (hns > 15000) { // sleep, then spin the last ~1 ms
         LARGE_INTEGER due;
         due.QuadPart = -(hns - 10000);
         SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE);
@@ -343,21 +349,29 @@ void PaceFrame() {
     } while (now.QuadPart < next);
 }
 
-}  // namespace
+} // namespace
 
 // PC settings window mode (same domain and rules as the GPU library's SDL window policy).
 DisplayConfig ResolveDisplay(int width, int height) {
-    const auto setting = [](const char* key) { const char* v = getenv(key); return std::string(v && v[0] ? v : "original"); };
+    const auto setting = [](const char* key) {
+        const char* v = getenv(key);
+        return std::string(v && v[0] ? v : "original");
+    };
     const std::string mode = setting("CTR_SETTINGS_WINDOW_MODE"), refresh = setting("CTR_SETTINGS_DISPLAY_REFRESH");
     const char* fs = getenv("CTR_GPU_FULLSCREEN");
     const bool launcher_fullscreen = fs && fs[0] == '1';
     DisplayConfig d;
     d.width = width, d.height = height;
-    if (mode == "original") d.mode = launcher_fullscreen ? DisplayConfig::Borderless : DisplayConfig::Windowed;
-    else if (mode == "windowed") d.mode = DisplayConfig::Windowed;
-    else if (mode == "borderless") d.mode = DisplayConfig::Borderless;
-    else if (mode == "exclusive") d.mode = DisplayConfig::Exclusive;
-    else Fatal("invalid window mode %s", mode.c_str());
+    if (mode == "original")
+        d.mode = launcher_fullscreen ? DisplayConfig::Borderless : DisplayConfig::Windowed;
+    else if (mode == "windowed")
+        d.mode = DisplayConfig::Windowed;
+    else if (mode == "borderless")
+        d.mode = DisplayConfig::Borderless;
+    else if (mode == "exclusive")
+        d.mode = DisplayConfig::Exclusive;
+    else
+        Fatal("invalid window mode %s", mode.c_str());
     if (refresh != "original") {
         if (d.mode != DisplayConfig::Exclusive) Fatal("display refresh requires exclusive fullscreen");
         bool allowed = false;
@@ -368,7 +382,8 @@ DisplayConfig ResolveDisplay(int width, int height) {
     // the launcher passes no window size in fullscreen: the display's own size
     if (d.mode == DisplayConfig::Exclusive && launcher_fullscreen && !getenv("CTR_GPU_WIDTH"))
         d.width = GetSystemMetrics(SM_CXSCREEN), d.height = GetSystemMetrics(SM_CYSCREEN);
-    LOG("videoout: window mode %s %dx%d refresh %s", mode == "original" ? (launcher_fullscreen ? "original (borderless)" : "original (windowed)") : mode.c_str(),
+    LOG("videoout: window mode %s %dx%d refresh %s",
+        mode == "original" ? (launcher_fullscreen ? "original (borderless)" : "original (windowed)") : mode.c_str(),
         d.width, d.height, refresh.c_str());
     return d;
 }
@@ -393,7 +408,7 @@ void VideoOutStartWindow(const char* title, int width, int height) {
         HWND h = CreateWindowA(wc.lpszClassName, name.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                                r.right - r.left, r.bottom - r.top, nullptr, nullptr, wc.hInstance, nullptr);
         ShowWindow(h, SW_SHOW);
-        SetForegroundWindow(h);  // exclusive fullscreen holds only while the window is in front
+        SetForegroundWindow(h); // exclusive fullscreen holds only while the window is in front
         // borderless covers the monitor; exclusive starts there and the swap chain takes the output
         if (g_display.mode != DisplayConfig::Windowed) SetFullscreen(h, g_fullscreen = true);
         {
@@ -412,18 +427,30 @@ void VideoOutStartWindow(const char* title, int width, int height) {
     cv.wait(lk, [&] { return ready; });
 }
 
-const DisplayConfig& VideoOutDisplay() { return g_display; }
-float VideoOutGamma() { return g_gamma; }
-bool VideoOutHdr() { return g_hdr; }
+const DisplayConfig& VideoOutDisplay() {
+    return g_display;
+}
+float VideoOutGamma() {
+    return g_gamma;
+}
+bool VideoOutHdr() {
+    return g_hdr;
+}
 bool VideoOutIsBuffer(u64 addr) {
     for (u64 b : g_buffers)
         if (b && b == addr) return true;
     return false;
 }
 
-bool VideoOutHasFocus() { return g_hwnd && GetForegroundWindow() == g_hwnd; }
-HWND__* VideoOutHwndRaw() { return g_hwnd; }
-u64 VideoOutFlipCount() { return g_flips; }
+bool VideoOutHasFocus() {
+    return g_hwnd && GetForegroundWindow() == g_hwnd;
+}
+HWND__* VideoOutHwndRaw() {
+    return g_hwnd;
+}
+u64 VideoOutFlipCount() {
+    return g_flips;
+}
 
 void VideoOutFlip(int, int index, s64 arg) {
     u64 addr = index >= 0 && index < 16 ? g_buffers[index] : 0;

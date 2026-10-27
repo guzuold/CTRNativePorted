@@ -35,28 +35,30 @@ enum : u32 {
     IT_DMA_DATA = 0x50,
 };
 // NOP payloads written by the Gnm library (prepareFlip and its variants)
-constexpr u32 kPrepareFlip = 0x68750777u, kPrepareFlipLabel = 0x68750778u,
-              kPrepareFlipInterrupt = 0x68750780u, kPrepareFlipInterruptLabel = 0x68750781u;
+constexpr u32 kPrepareFlip = 0x68750777u, kPrepareFlipLabel = 0x68750778u, kPrepareFlipInterrupt = 0x68750780u,
+              kPrepareFlipInterruptLabel = 0x68750781u;
 constexpr u64 kIrqGfxEop = 0x40;
 constexpr int kGnmErrFailure = (int)0x8EEE00FFu, kGnmErrRazorNotLoaded = (int)0x80D15001u,
               kGnmErrCaptureFailed = (int)0x80D1500Fu, kGnmErrInvalidPipe = (int)0x80D17000u,
               kGnmErrInvalidQueue = (int)0x80D17001u;
 
 std::mutex g_eq_mutex;
-std::vector<std::pair<Equeue*, u64>> g_gpu_events;  // (queue, interrupt id)
+std::vector<std::pair<Equeue*, u64>> g_gpu_events; // (queue, interrupt id)
 std::atomic<u64> g_submits{0};
 
-u64 Addr(u32 lo, u32 hi16) { return (u64)lo | ((u64)(hi16 & 0xFFFF) << 32); }
+u64 Addr(u32 lo, u32 hi16) {
+    return (u64)lo | ((u64)(hi16 & 0xFFFF) << 32);
+}
 
 void WriteData(u64 addr, u32 sel, u32 lo, u32 hi) {
     switch (sel) {
-    case 1:  // 32-bit data
+    case 1: // 32-bit data
         if (GuestReadable(addr, 4)) *(u32*)addr = lo;
         break;
-    case 2:  // 64-bit data
+    case 2: // 64-bit data
         if (GuestReadable(addr, 8)) *(u64*)addr = (u64)lo | ((u64)hi << 32);
         break;
-    case 3:  // 64-bit GPU clock
+    case 3: // 64-bit GPU clock
     case 4: {
         LARGE_INTEGER c;
         QueryPerformanceCounter(&c);
@@ -81,7 +83,7 @@ void Process(const u32* cmd, u64 dwords, int depth = 0, int compute_pipe = -1) {
     while (i < dwords) {
         u32 h = cmd[i];
         u32 type = h >> 30;
-        if (type == 2) {  // filler
+        if (type == 2) { // filler
             i++;
             continue;
         }
@@ -112,7 +114,7 @@ void Process(const u32* cmd, u64 dwords, int depth = 0, int compute_pipe = -1) {
         }
         case IT_WRITE_DATA: {
             u32 dst = (b[0] >> 8) & 0xF;
-            if (dst == 5 || dst == 2) {  // memory
+            if (dst == 5 || dst == 2) { // memory
                 u64 a = (u64)b[1] | ((u64)b[2] << 32);
                 u32 n = count - 4;
                 if (GuestReadable(a, n * 4ull)) memcpy((void*)a, b + 3, n * 4ull);
@@ -124,7 +126,7 @@ void Process(const u32* cmd, u64 dwords, int depth = 0, int compute_pipe = -1) {
             u32 bytes = b[5] & 0x1FFFFF;
             u64 dst = (u64)b[3] | ((u64)b[4] << 32);
             if (dst_sel == 0 && GuestReadable(dst, bytes)) {
-                if (src_sel == 2) {  // fill with immediate
+                if (src_sel == 2) { // fill with immediate
                     for (u32 k = 0; k + 4 <= bytes; k += 4) *(u32*)(dst + k) = b[1];
                 } else if (src_sel == 0) {
                     u64 src = (u64)b[1] | ((u64)b[2] << 32);
@@ -171,8 +173,8 @@ void CompleteFlipPacket(const u32* last, u32 bytes) {
 }
 
 // ---- submission
-SYSV int sceGnmSubmitCommandBuffers(u32 count, const u32* const* dcb, const u32* dcb_bytes,
-                                    const u32* const* ccb, const u32* ccb_bytes) {
+SYSV int sceGnmSubmitCommandBuffers(u32 count, const u32* const* dcb, const u32* dcb_bytes, const u32* const* ccb,
+                                    const u32* ccb_bytes) {
     ProcessSubmit(count, dcb, dcb_bytes, ccb, ccb_bytes);
     return 0;
 }
@@ -182,23 +184,28 @@ SYSV int sceGnmSubmitCommandBuffersForWorkload(u64, u32 count, const u32* const*
     return 0;
 }
 SYSV int sceGnmSubmitAndFlipCommandBuffers(u32 count, const u32* const* dcb, const u32* dcb_bytes,
-                                           const u32* const* ccb, const u32* ccb_bytes, int handle,
-                                           int index, int mode, s64 arg) {
+                                           const u32* const* ccb, const u32* ccb_bytes, int handle, int index, int mode,
+                                           s64 arg) {
     if (!count || !dcb || !dcb_bytes) return -1;
     ProcessSubmit(count, dcb, dcb_bytes, ccb, ccb_bytes);
     VideoOutFlip(handle, index, arg);
     CompleteFlipPacket(dcb[count - 1], dcb_bytes[count - 1]);
     return 0;
 }
-SYSV int sceGnmSubmitAndFlipCommandBuffersForWorkload(u64, u32 count, const u32* const* dcb,
-                                                      const u32* dcb_bytes, const u32* const* ccb,
-                                                      const u32* ccb_bytes, int handle, int index,
-                                                      int mode, s64 arg) {
+SYSV int sceGnmSubmitAndFlipCommandBuffersForWorkload(u64, u32 count, const u32* const* dcb, const u32* dcb_bytes,
+                                                      const u32* const* ccb, const u32* ccb_bytes, int handle,
+                                                      int index, int mode, s64 arg) {
     return sceGnmSubmitAndFlipCommandBuffers(count, dcb, dcb_bytes, ccb, ccb_bytes, handle, index, mode, arg);
 }
-SYSV int sceGnmSubmitDone() { return 0; }
-SYSV int sceGnmAreSubmitsAllowed() { return 1; }
-SYSV int sceGnmFlushGarlic() { return 0; }
+SYSV int sceGnmSubmitDone() {
+    return 0;
+}
+SYSV int sceGnmAreSubmitsAllowed() {
+    return 1;
+}
+SYSV int sceGnmFlushGarlic() {
+    return 0;
+}
 EXPORT("zwY0YV91TTI", "libSceGnmDriver", sceGnmSubmitCommandBuffers);
 EXPORT("jRcI8VcgTz4", "libSceGnmDriver", sceGnmSubmitCommandBuffersForWorkload);
 EXPORT("xbxNatawohc", "libSceGnmDriver", sceGnmSubmitAndFlipCommandBuffers);
@@ -233,7 +240,9 @@ SYSV int sceGnmDeleteEqEvent(u64 eqh, u64 id) {
     return 0;
 }
 // the event data is the interrupt id (EOP 0x40, compute pipes 0..6)
-SYSV int sceGnmGetEqEventType(const KEvent* ev) { return ev ? (int)ev->data : 0; }
+SYSV int sceGnmGetEqEventType(const KEvent* ev) {
+    return ev ? (int)ev->data : 0;
+}
 EXPORT("b0xyllnVY-I", "libSceGnmDriver", sceGnmAddEqEvent);
 EXPORT("PVT+fuoS9gU", "libSceGnmDriver", sceGnmDeleteEqEvent);
 EXPORT("UoYY0DWMC0U", "libSceGnmDriver", sceGnmGetEqEventType);
@@ -248,11 +257,11 @@ void Nop(u32* cmd, u32 dwords) {
     cmd[0] = 0xC0000000 | ((dwords - 2) << 16) | (IT_NOP << 8);
     memset(cmd + 1, 0, (dwords - 1) * 4ull);
 }
-#define GNM_NOP(nid, fn)                \
-    SYSV int fn(u32* cmd, u32 dwords) { \
-        Nop(cmd, dwords);               \
-        return 0;                       \
-    }                                   \
+#define GNM_NOP(nid, fn)                                                                                               \
+    SYSV int fn(u32* cmd, u32 dwords) {                                                                                \
+        Nop(cmd, dwords);                                                                                              \
+        return 0;                                                                                                      \
+    }                                                                                                                  \
     EXPORT(nid, "libSceGnmDriver", fn)
 
 // Draw / dispatch variants the renderer does not issue yet: each call is counted and logged
@@ -269,12 +278,12 @@ void Census(const char* fn, u64 caller) {
         LOG("gnm: %s not rendered by the D3D11 backend (call %llu, caller %llx)", fn, (unsigned long long)n,
             (unsigned long long)(caller - (u64)g_eboot.base));
 }
-#define GNM_NOT_RENDERED(nid, fn)            \
-    SYSV int fn(u32* cmd, u32 dwords) {      \
-        Census(#fn, CALLER());               \
-        Nop(cmd, dwords);                    \
-        return 0;                            \
-    }                                        \
+#define GNM_NOT_RENDERED(nid, fn)                                                                                      \
+    SYSV int fn(u32* cmd, u32 dwords) {                                                                                \
+        Census(#fn, CALLER());                                                                                         \
+        Nop(cmd, dwords);                                                                                              \
+        return 0;                                                                                                      \
+    }                                                                                                                  \
     EXPORT(nid, "libSceGnmDriver", fn)
 
 SYSV int sceGnmDrawIndex(u32* cmd, u32 dwords, u32 count, u64 addr, u32 flags, u32 type) {
@@ -378,7 +387,7 @@ struct ComputeQueue {
     u32* read_ptr = nullptr;
 };
 std::mutex g_cq_mutex;
-std::vector<ComputeQueue> g_compute_queues;  // vqid - 1
+std::vector<ComputeQueue> g_compute_queues; // vqid - 1
 SYSV int sceGnmMapComputeQueue(u32 pipe, u32 queue, u64 ring, u32 dwords, u32* read_ptr) {
     if (pipe >= 7) return kGnmErrInvalidPipe;
     if (queue >= 8) return kGnmErrInvalidQueue;
@@ -410,14 +419,16 @@ SYSV void sceGnmDingDong(u32 vqid, u32 next) {
     next %= q.dwords;
     if (next >= q.read) {
         Process(ring + q.read, next - q.read, 0, (int)q.pipe);
-    } else {  // wrapped
+    } else { // wrapped
         Process(ring + q.read, q.dwords - q.read, 0, (int)q.pipe);
         Process(ring, next, 0, (int)q.pipe);
     }
     q.read = next;
     if (q.read_ptr) *q.read_ptr = next;
 }
-SYSV void sceGnmDingDongForWorkload(u32 vqid, u32 next, u64) { sceGnmDingDong(vqid, next); }
+SYSV void sceGnmDingDongForWorkload(u32 vqid, u32 next, u64) {
+    sceGnmDingDong(vqid, next);
+}
 EXPORT("29oKvKXzEZo", "libSceGnmDriver", sceGnmMapComputeQueue);
 EXPORT("A+uGq+3KFtQ", "libSceGnmDriver", sceGnmMapComputeQueueWithPriority);
 EXPORT("ArSg-TGinhk", "libSceGnmDriver", sceGnmUnmapComputeQueue);
@@ -435,8 +446,12 @@ SYSV int sceGnmBeginWorkload(u32 stream, u64* workload) {
     *workload = stream < 0x10 ? 1 : 0;
     return stream > 0xf;
 }
-SYSV int sceGnmEndWorkload(u64 workload) { return workload ? (((workload >> 56) & 0xff) > 0xf) * 2 : 2; }
-SYSV int sceGnmDestroyWorkloadStream(u32) { return 0; }
+SYSV int sceGnmEndWorkload(u64 workload) {
+    return workload ? (((workload >> 56) & 0xff) > 0xf) * 2 : 2;
+}
+SYSV int sceGnmDestroyWorkloadStream(u32) {
+    return 0;
+}
 EXPORT("5udAm+6boVg", "libSceGnmDriver", sceGnmCreateWorkloadStream);
 EXPORT("ihxrbsoSKWc", "libSceGnmDriver", sceGnmBeginWorkload);
 EXPORT("Fa3x75OOLRA", "libSceGnmDriver", sceGnmEndWorkload);
@@ -444,32 +459,84 @@ EXPORT("UtObDRQiGbs", "libSceGnmDriver", sceGnmDestroyWorkloadStream);
 
 // ---- queries and development-kit services (retail behaviour: tools absent)
 u8 g_tess_ring[0x10000];
-SYSV void* sceGnmGetTheTessellationFactorRingBufferBaseAddress() { return g_tess_ring; }
-SYSV u32 sceGnmGetOffChipTessellationBufferSize() { return 0x800000; }
-SYSV int sceGnmIsUserPaEnabled() { return 0; }
-SYSV int sceGnmDriverCaptureInProgress() { return 0; }
-SYSV int sceGnmDriverTraceInProgress() { return 0; }
-SYSV int sceGnmDriverTriggerCapture() { return kGnmErrRazorNotLoaded; }
-SYSV int sceRazorIsLoaded() { return 0; }
-SYSV int sceRazorCaptureImmediate() { return kGnmErrCaptureFailed; }
-SYSV u32 sceGnmGetNumTcaUnits() { return 18; }
-SYSV int sceGnmGetGpuInfoStatus() { return 0; }
-SYSV int sceGnmGetShaderStatus() { return 0; }
-SYSV int sceGnmGetGpuBlockStatus() { return 0; }
-SYSV int sceGnmDebugHardwareStatus() { return 0; }
-SYSV int sceGnmGetLastWaitedAddress() { return 0; }
-SYSV u32 sceGnmGetProtectionFaultTimeStamp() { return 0; }
-SYSV u64 sceGnmGetEqTimeStamp() { return 0; }
-SYSV int sceGnmGetShaderProgramBaseAddress() { return 0; }
-SYSV int sceGnmGetPhysicalCounterFromVirtualized() { return kGnmErrFailure; }
-SYSV int sceGnmLogicalCuIndexToPhysicalCuIndex() { return 0; }
-SYSV s32 sceGnmLogicalCuMaskToPhysicalCuMask(s64, s32 mask) { return mask; }
-SYSV int sceGnmLogicalTcaUnitToPhysical() { return 0; }
-SYSV int sceGnmSetGsRingSizes() { return 0; }
-SYSV int sceGnmSetWaveLimitMultipliers() { return 0; }
-SYSV int sceGnmSetupMipStatsReport() { return 0; }
-SYSV int sceGnmRequestMipStatsReportAndReset() { return 0; }
-SYSV int sceGnmDisableMipStatsReport() { return 0; }
+SYSV void* sceGnmGetTheTessellationFactorRingBufferBaseAddress() {
+    return g_tess_ring;
+}
+SYSV u32 sceGnmGetOffChipTessellationBufferSize() {
+    return 0x800000;
+}
+SYSV int sceGnmIsUserPaEnabled() {
+    return 0;
+}
+SYSV int sceGnmDriverCaptureInProgress() {
+    return 0;
+}
+SYSV int sceGnmDriverTraceInProgress() {
+    return 0;
+}
+SYSV int sceGnmDriverTriggerCapture() {
+    return kGnmErrRazorNotLoaded;
+}
+SYSV int sceRazorIsLoaded() {
+    return 0;
+}
+SYSV int sceRazorCaptureImmediate() {
+    return kGnmErrCaptureFailed;
+}
+SYSV u32 sceGnmGetNumTcaUnits() {
+    return 18;
+}
+SYSV int sceGnmGetGpuInfoStatus() {
+    return 0;
+}
+SYSV int sceGnmGetShaderStatus() {
+    return 0;
+}
+SYSV int sceGnmGetGpuBlockStatus() {
+    return 0;
+}
+SYSV int sceGnmDebugHardwareStatus() {
+    return 0;
+}
+SYSV int sceGnmGetLastWaitedAddress() {
+    return 0;
+}
+SYSV u32 sceGnmGetProtectionFaultTimeStamp() {
+    return 0;
+}
+SYSV u64 sceGnmGetEqTimeStamp() {
+    return 0;
+}
+SYSV int sceGnmGetShaderProgramBaseAddress() {
+    return 0;
+}
+SYSV int sceGnmGetPhysicalCounterFromVirtualized() {
+    return kGnmErrFailure;
+}
+SYSV int sceGnmLogicalCuIndexToPhysicalCuIndex() {
+    return 0;
+}
+SYSV s32 sceGnmLogicalCuMaskToPhysicalCuMask(s64, s32 mask) {
+    return mask;
+}
+SYSV int sceGnmLogicalTcaUnitToPhysical() {
+    return 0;
+}
+SYSV int sceGnmSetGsRingSizes() {
+    return 0;
+}
+SYSV int sceGnmSetWaveLimitMultipliers() {
+    return 0;
+}
+SYSV int sceGnmSetupMipStatsReport() {
+    return 0;
+}
+SYSV int sceGnmRequestMipStatsReportAndReset() {
+    return 0;
+}
+SYSV int sceGnmDisableMipStatsReport() {
+    return 0;
+}
 EXPORT("ln33zjBrfjk", "libSceGnmDriver", sceGnmGetTheTessellationFactorRingBufferBaseAddress);
 EXPORT("FFVZcCu3zWU", "libSceGnmDriver", sceGnmGetOffChipTessellationBufferSize);
 EXPORT("jg33rEKLfVs", "libSceGnmDriver", sceGnmIsUserPaEnabled);
@@ -500,7 +567,8 @@ EXPORT("HHo1BAljZO8", "libSceGnmDriver", sceGnmDisableMipStatsReport);
 // sceGnmRequestFlipAndSubmitDone(ForWorkload): imported but its arguments are not known; a call
 // stops the process with its caller instead of guessing a flip.
 SYSV int sceGnmRequestFlipAndSubmitDone() {
-    Unsupported("libSceGnmDriver", "sceGnmRequestFlipAndSubmitDone", "gObODli-OH8", CALLER(), "argument layout unknown");
+    Unsupported("libSceGnmDriver", "sceGnmRequestFlipAndSubmitDone", "gObODli-OH8", CALLER(),
+                "argument layout unknown");
 }
 SYSV int sceGnmRequestFlipAndSubmitDoneForWorkload() {
     Unsupported("libSceGnmDriver", "sceGnmRequestFlipAndSubmitDoneForWorkload", "6YRHhh5mHCs", CALLER(),
@@ -509,6 +577,8 @@ SYSV int sceGnmRequestFlipAndSubmitDoneForWorkload() {
 EXPORT("gObODli-OH8", "libSceGnmDriver", sceGnmRequestFlipAndSubmitDone);
 EXPORT("6YRHhh5mHCs", "libSceGnmDriver", sceGnmRequestFlipAndSubmitDoneForWorkload);
 
-}  // namespace
+} // namespace
 
-u64 GnmSubmitCount() { return g_submits; }
+u64 GnmSubmitCount() {
+    return g_submits;
+}

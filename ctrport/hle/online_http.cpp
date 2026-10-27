@@ -47,9 +47,12 @@ std::string json_escape(const std::string& text) {
 }
 
 bool http_exchange(const std::string& method, const std::string& target,
-                   const std::vector<std::pair<std::string, std::string>>& headers,
-                   const std::string& body, HttpResponse* response) {
-    static const int startup = [] { WSADATA data{}; return WSAStartup(MAKEWORD(2, 2), &data); }();
+                   const std::vector<std::pair<std::string, std::string>>& headers, const std::string& body,
+                   HttpResponse* response) {
+    static const int startup = [] {
+        WSADATA data{};
+        return WSAStartup(MAKEWORD(2, 2), &data);
+    }();
     if (startup) return false;
     const SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (s == INVALID_SOCKET) {
@@ -81,7 +84,7 @@ bool http_exchange(const std::string& method, const std::string& target,
     }
     const char* multiplier = std::getenv("CTR_WUMPA_MULTIPLIER");
     message += std::string("X-Ctr-Wumpa-Multiplier: ") +
-        (multiplier && std::string(multiplier) == "100" ? "100" : "1") + "\r\n";
+               (multiplier && std::string(multiplier) == "100" ? "100" : "1") + "\r\n";
     message += "X-Ctr-Online-Id: " + identity().online_id + "\r\nConnection: close\r\n";
     if (!room_token().empty()) message += "X-Ctr-Room-Token: " + room_token() + "\r\n";
     message += "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n" + body;

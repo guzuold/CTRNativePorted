@@ -44,19 +44,19 @@ namespace {
 // ------------------------------------------------------------------ shader index
 struct ShaderInfo {
     std::string name;
-    std::string kind;  // vs, ps, es (VS feeding a GS), gs
+    std::string kind; // vs, ps, es (VS feeding a GS), gs
     bool vertex = false;
     std::vector<std::pair<int, int>> textures;  // slot, dims
-    std::vector<std::pair<int, bool>> samplers;  // slot, compare
+    std::vector<std::pair<int, bool>> samplers; // slot, compare
     std::vector<int> cbuffers;
-    std::vector<std::pair<int, int>> inputs;  // sem, size
-    std::vector<std::pair<std::string, std::string>> variants;  // PC setting, packed name (ctr_shaders)
+    std::vector<std::pair<int, int>> inputs;                   // sem, size
+    std::vector<std::pair<std::string, std::string>> variants; // PC setting, packed name (ctr_shaders)
     std::vector<u8> bytecode;
     ComPtr<ID3D11VertexShader> vs;
     ComPtr<ID3D11PixelShader> ps;
     ComPtr<ID3D11GeometryShader> gs;
     bool loaded = false;
-    bool video = false;  // Bink's YCbCr -> RGB pixel shader: a video is on screen
+    bool video = false; // Bink's YCbCr -> RGB pixel shader: a video is on screen
 };
 
 struct Surface {
@@ -68,7 +68,7 @@ struct Surface {
     DXGI_FORMAT fmt = DXGI_FORMAT_UNKNOWN;
     bool rendered = false;
     u32 comp_swap = 0;  // CB_COLOR_INFO.COMP_SWAP of the render target that produced the data
-    float scale = 1.0f;  // physical size = logical (w, h) * scale (RenderScale supersampling)
+    float scale = 1.0f; // physical size = logical (w, h) * scale (RenderScale supersampling)
 };
 
 // RenderScale setting (percent): screen-sized render targets are created that much larger
@@ -78,7 +78,9 @@ struct Surface {
 // ctrport: the game's frame size is the device's back buffer (Neo mode is ctrport's choice); render
 // scale 0 (default) keeps the game's own resolution.
 u32 g_backbuffer_w = 0;
-bool ProMode() { return g_backbuffer_w >= 2560; }
+bool ProMode() {
+    return g_backbuffer_w >= 2560;
+}
 float RenderScale() {
     static const int setting = ConfigInt("RenderScale", 0);
     return setting ? std::clamp(setting, 50, 400) / 100.0f * (ProMode() ? 0.75f : 1.0f) : 1.0f;
@@ -97,7 +99,9 @@ float SurfaceScale(u32 w, u32 h) {
     return wok && hok ? RenderScale() : 1.0f;
 }
 
-u32 Scaled(u32 v, float s) { return std::max<u32>(1, (u32)(v * s + 0.5f)); }
+u32 Scaled(u32 v, float s) {
+    return std::max<u32>(1, (u32)(v * s + 0.5f));
+}
 
 // Shadow maps (16-bit depth targets, the cascade atlas is 2048x8192) are created at this scale of
 // their PS4 size: setting ShadowQuality 0 / 1 / 2 = half / as on PS4 / double (sharper shadows).
@@ -112,7 +116,7 @@ float ShadowMapScale(u32 w, u32 h) {
         scale = kScales[std::clamp(ConfigInt("ShadowQuality", 1), 0, 2)];
         LOG("gfx: shadow maps at x%.2f", scale);
     }
-    return std::min(scale, 16384.0f / std::max(w, h));  // D3D11 texture size limit
+    return std::min(scale, 16384.0f / std::max(w, h)); // D3D11 texture size limit
 }
 
 struct Stats {
@@ -124,20 +128,20 @@ std::mutex g_mutex;
 bool g_init_failed = false;
 ComPtr<ID3D11Device> g_dev;
 ComPtr<ID3D11DeviceContext> g_ctx;
-ComPtr<ID3D11DeviceContext1> g_ctx1;  // constant buffer offsets (D3D11.1)
+ComPtr<ID3D11DeviceContext1> g_ctx1; // constant buffer offsets (D3D11.1)
 ComPtr<IDXGISwapChain> g_swap;
 ComPtr<ID3D11RenderTargetView> g_swap_rtv;
-DXGI_MODE_DESC g_exclusive_mode{};  // the display mode exclusive fullscreen asks for
-bool g_swap_hdr = false;  // back buffers are R10G10B10A2 in the HDR10 color space
+DXGI_MODE_DESC g_exclusive_mode{}; // the display mode exclusive fullscreen asks for
+bool g_swap_hdr = false;           // back buffers are R10G10B10A2 in the HDR10 color space
 fs::path g_shader_dir;
-std::atomic<u64> g_video_ms{0};  // last draw with a video shader
+std::atomic<u64> g_video_ms{0}; // last draw with a video shader
 // debugging aid: CTR_TRACE_DEPTH=<hex base>,<first frame> logs, for 12 frames, the draws per viewport
 // into that depth target and the clears on it
 u64 g_trace_depth = 0, g_trace_frame = 0;
 std::string g_trace;
-std::vector<std::pair<std::string, struct Surface>> g_after_shots;  // CTR_CAPTURE_AFTER
-std::atomic<float> g_picture[4] = {0.0f, 0.0f, 1.0f, 1.0f};  // game picture in the back buffer (0..1)
-std::unordered_map<u64, ShaderInfo> g_shaders;          // by content hash
+std::vector<std::pair<std::string, struct Surface>> g_after_shots; // CTR_CAPTURE_AFTER
+std::atomic<float> g_picture[4] = {0.0f, 0.0f, 1.0f, 1.0f};        // game picture in the back buffer (0..1)
+std::unordered_map<u64, ShaderInfo> g_shaders;                     // by content hash
 // by code address; ctrport: with the code size and first 16 bytes, because the engine uploads
 // the shaders the eboot embeds into reused memory (a VS and later a PS at the same address)
 struct CodeEntry {
@@ -146,15 +150,15 @@ struct CodeEntry {
     u64 head[2];
 };
 std::unordered_map<u64, CodeEntry> g_shader_by_code;
-std::unordered_map<u64, Surface> g_surfaces;            // by base address
-std::unordered_map<u64, TextureObject> g_textures;      // asset textures by T# hash
+std::unordered_map<u64, Surface> g_surfaces;       // by base address
+std::unordered_map<u64, TextureObject> g_textures; // asset textures by T# hash
 std::unordered_map<u64, ComPtr<ID3D11InputLayout>> g_layouts;
 std::unordered_map<u64, ComPtr<ID3D11BlendState>> g_blend;
 std::unordered_map<u64, ComPtr<ID3D11RasterizerState>> g_raster;
 std::unordered_map<u64, ComPtr<ID3D11DepthStencilState>> g_depth;
 ComPtr<ID3D11SamplerState> g_samp_linear, g_samp_cmp;
 ComPtr<ID3D11DepthStencilState> g_depth_off;
-ComPtr<ID3D11Buffer> g_cb[3][16];  // VS, PS, GS
+ComPtr<ID3D11Buffer> g_cb[3][16]; // VS, PS, GS
 ComPtr<ID3D11Buffer> g_swz_cb[2];
 ComPtr<ID3D11Buffer> g_vb_ring, g_ib_ring, g_zero_vb;
 u32 g_vb_pos = 0, g_ib_pos = 0;
@@ -172,19 +176,28 @@ bool g_tearing = false;
 ComPtr<ID3D11Buffer> g_copy_cb;
 Stats g_stats;
 u64 g_frame = 0;
-double g_present_ms = 0;  // time blocked in Present (GPU-bound when large)
+double g_present_ms = 0; // time blocked in Present (GPU-bound when large)
 bool g_capture = false;  // logging every draw of the captured frame
 u64 g_capture_frame = [] {
     char v[32] = {};
     return GetEnvironmentVariableA("CTR_CAPTURE", v, sizeof(v)) ? strtoull(v, nullptr, 10) : 0ull;
 }();
-double g_draw_ms = 0;  // time spent in GfxDraw since the last report
+double g_draw_ms = 0; // time spent in GfxDraw since the last report
 double g_map_ms = 0, g_cb_ms = 0, g_issue_ms = 0;
-double g_sec[8];  // per-section draw profile
-#define SECTION(n) do { double t_ = NowMs(); g_sec[n] += t_ - sec_t; sec_t = t_; } while (0)
+double g_sec[8]; // per-section draw profile
+#define SECTION(n)                                                                                                     \
+    do {                                                                                                               \
+        double t_ = NowMs();                                                                                           \
+        g_sec[n] += t_ - sec_t;                                                                                        \
+        sec_t = t_;                                                                                                    \
+    } while (0)
 
 double NowMs() {
-    static LARGE_INTEGER f = [] { LARGE_INTEGER v; QueryPerformanceFrequency(&v); return v; }();
+    static LARGE_INTEGER f = [] {
+        LARGE_INTEGER v;
+        QueryPerformanceFrequency(&v);
+        return v;
+    }();
     LARGE_INTEGER c;
     QueryPerformanceCounter(&c);
     return c.QuadPart * 1000.0 / f.QuadPart;
@@ -241,12 +254,13 @@ u64 EngineDevice() {
     const u64 first = recorded > window ? recorded - window : 0, last = std::min(recorded + window, g_eboot.size);
     for (u64 o = first & ~7ull; o + 8 <= last; o += 8) {
         if (!Readable(base + o, 8)) {
-            o = ((base + o + 0x1000) & ~0xfffull) - base - 8;  // next page
+            o = ((base + o + 0x1000) & ~0xfffull) - base - 8; // next page
             continue;
         }
         if (valid(Q(base + o))) {
             offset = o;
-            LOG("gfx: device global found at +%llx (recorded +%llx)", (unsigned long long)o, (unsigned long long)recorded);
+            LOG("gfx: device global found at +%llx (recorded +%llx)", (unsigned long long)o,
+                (unsigned long long)recorded);
             return Q(base + offset);
         }
     }
@@ -334,7 +348,7 @@ void LoadShaderIndex() {
             is >> hash >> name >> kind;
             u64 key = std::stoull(hash, nullptr, 16);
             if (g_shaders.count(key)) {
-                cur = nullptr;  // identical code listed under another effect
+                cur = nullptr; // identical code listed under another effect
                 continue;
             }
             cur = &g_shaders[key];
@@ -370,7 +384,8 @@ void LoadShaderIndex() {
         size_t n = 0;
         for (const auto& [key, info] : g_shaders)
             for (const auto& v : info.variants) n += v.first == setting;
-        LOG("gfx: PC setting %s: %zu shader versions%s", setting, n, n ? "" : " - shaders.bin predates them, rebuild it with ctr_shaders");
+        LOG("gfx: PC setting %s: %zu shader versions%s", setting, n,
+            n ? "" : " - shaders.bin predates them, rebuild it with ctr_shaders");
     }
 }
 
@@ -444,7 +459,8 @@ bool CreateSwapChain(HWND hwnd) {
     ComPtr<IDXGIDevice> xdev;
     ComPtr<IDXGIAdapter> adapter;
     ComPtr<IDXGIFactory1> factory;
-    if (FAILED(g_dev.As(&xdev)) || FAILED(xdev->GetAdapter(&adapter)) || FAILED(adapter->GetParent(IID_PPV_ARGS(&factory)))) {
+    if (FAILED(g_dev.As(&xdev)) || FAILED(xdev->GetAdapter(&adapter)) ||
+        FAILED(adapter->GetParent(IID_PPV_ARGS(&factory)))) {
         LOG("gfx: DXGI factory unavailable");
         return false;
     }
@@ -453,12 +469,16 @@ bool CreateSwapChain(HWND hwnd) {
     if (SUCCEEDED(factory.As(&f5)) &&
         FAILED(f5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
         tearing = FALSE;
-    g_tearing = tearing && !exclusive;  // exclusive fullscreen tears without the flag
+    g_tearing = tearing && !exclusive; // exclusive fullscreen tears without the flag
     const std::string mode = getenv("CTR_GPU_PRESENT_MODE") ? getenv("CTR_GPU_PRESENT_MODE") : "";
-    if (mode.empty() || mode == "Mailbox") g_present_mode = PresentMode::Mailbox;
-    else if (mode == "Fifo") g_present_mode = PresentMode::Fifo;
-    else if (mode == "Immediate") g_present_mode = PresentMode::Immediate;
-    else Fatal("invalid presentation mode %s", mode.c_str());
+    if (mode.empty() || mode == "Mailbox")
+        g_present_mode = PresentMode::Mailbox;
+    else if (mode == "Fifo")
+        g_present_mode = PresentMode::Fifo;
+    else if (mode == "Immediate")
+        g_present_mode = PresentMode::Immediate;
+    else
+        Fatal("invalid presentation mode %s", mode.c_str());
     if (g_present_mode == PresentMode::Immediate && !g_tearing && !exclusive) {
         LOG("gfx: Immediate presentation needs tearing support, which this display path lacks: FIFO");
         g_present_mode = PresentMode::Fifo;
@@ -475,23 +495,25 @@ bool CreateSwapChain(HWND hwnd) {
     sd.SampleDesc.Count = 1;
     sd.Windowed = TRUE;
     sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    sd.Flags = (g_tearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0) | (exclusive ? DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH : 0);
+    sd.Flags =
+        (g_tearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0) | (exclusive ? DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH : 0);
     HRESULT hr = factory->CreateSwapChain(g_dev.Get(), &sd, &g_swap);
     if (FAILED(hr)) {
         LOG("gfx: CreateSwapChain failed 0x%08lx", hr);
         return false;
     }
-    factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);  // the window handles Alt+Enter itself
+    factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER); // the window handles Alt+Enter itself
     if (exclusive) {
         ComPtr<IDXGIOutput> output;
-        if (FAILED(g_swap->GetContainingOutput(&output))) Fatal("exclusive fullscreen: no display output for the window");
+        if (FAILED(g_swap->GetContainingOutput(&output)))
+            Fatal("exclusive fullscreen: no display output for the window");
         DXGI_OUTPUT_DESC od{};
         output->GetDesc(&od);
         DEVMODEW desktop{};
         desktop.dmSize = sizeof(desktop);
         EnumDisplaySettingsW(od.DeviceName, ENUM_CURRENT_SETTINGS, &desktop);
         const float hz = dc.refresh ? dc.refresh : (float)desktop.dmDisplayFrequency;
-        const float tolerance = dc.refresh ? 0.1f : 0.6f;  // the desktop's rate is reported as an integer
+        const float tolerance = dc.refresh ? 0.1f : 0.6f; // the desktop's rate is reported as an integer
         UINT n = 0;
         output->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, 0, &n, nullptr);
         std::vector<DXGI_MODE_DESC> modes(n);
@@ -504,7 +526,8 @@ bool CreateSwapChain(HWND hwnd) {
                 break;
             }
         }
-        if (!chosen) Fatal("requested resolution/refresh %dx%d@%.3f is unavailable on this display", dc.width, dc.height, hz);
+        if (!chosen)
+            Fatal("requested resolution/refresh %dx%d@%.3f is unavailable on this display", dc.width, dc.height, hz);
         g_exclusive_mode = *chosen;
         if (FAILED(g_swap->ResizeTarget(chosen)) || FAILED(g_swap->SetFullscreenState(TRUE, output.Get())) ||
             FAILED(g_swap->ResizeBuffers(0, dc.width, dc.height, DXGI_FORMAT_UNKNOWN, sd.Flags)))
@@ -525,7 +548,9 @@ bool CreateSwapChain(HWND hwnd) {
     g_swap->GetBuffer(0, IID_PPV_ARGS(&bb));
     g_dev->CreateRenderTargetView(bb.Get(), nullptr, &g_swap_rtv);
     LOG("gfx: swap chain %ux%u, presentation %s%s", sd.BufferDesc.Width, sd.BufferDesc.Height,
-        g_present_mode == PresentMode::Fifo ? "FIFO" : g_present_mode == PresentMode::Immediate ? "Immediate" : "Mailbox",
+        g_present_mode == PresentMode::Fifo        ? "FIFO"
+        : g_present_mode == PresentMode::Immediate ? "Immediate"
+                                                   : "Mailbox",
         g_tearing ? " (tearing supported)" : "");
     return true;
 }
@@ -540,7 +565,8 @@ void ResizeSwapBuffers() {
     g_swap->GetDesc(&sd);
     g_ctx->OMSetRenderTargets(0, nullptr, nullptr);
     g_swap_rtv.Reset();
-    const HRESULT hr = g_swap->ResizeBuffers(0, sd.BufferDesc.Width, sd.BufferDesc.Height, DXGI_FORMAT_UNKNOWN, sd.Flags);
+    const HRESULT hr =
+        g_swap->ResizeBuffers(0, sd.BufferDesc.Width, sd.BufferDesc.Height, DXGI_FORMAT_UNKNOWN, sd.Flags);
     ComPtr<ID3D11Texture2D> bb;
     g_swap->GetBuffer(0, IID_PPV_ARGS(&bb));
     g_dev->CreateRenderTargetView(bb.Get(), nullptr, &g_swap_rtv);
@@ -580,11 +606,12 @@ void SetSwapHdr(bool hdr) {
     g_ctx->OMSetRenderTargets(0, nullptr, nullptr);
     g_swap_rtv.Reset();
     const DXGI_FORMAT format = hdr ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;
-    const DXGI_COLOR_SPACE_TYPE space = hdr ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+    const DXGI_COLOR_SPACE_TYPE space =
+        hdr ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
     UINT support = 0;
     if (FAILED(g_swap->ResizeBuffers(0, 0, 0, format, sd.Flags)) ||
-        FAILED(swap3->CheckColorSpaceSupport(space, &support)) || !(support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) ||
-        FAILED(swap3->SetColorSpace1(space)))
+        FAILED(swap3->CheckColorSpaceSupport(space, &support)) ||
+        !(support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) || FAILED(swap3->SetColorSpace1(space)))
         Fatal("HDR output: the swap chain refused %s", hdr ? "HDR10" : "SDR");
     ComPtr<ID3D11Texture2D> bb;
     g_swap->GetBuffer(0, IID_PPV_ARGS(&bb));
@@ -601,8 +628,8 @@ bool Init() {
     D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_11_0;
     char dbg[8] = {};
     UINT flags = GetEnvironmentVariableA("CTR_D3D_DEBUG", dbg, sizeof(dbg)) ? D3D11_CREATE_DEVICE_DEBUG : 0;
-    HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, &fl, 1, D3D11_SDK_VERSION,
-                                   &g_dev, nullptr, &g_ctx);
+    HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, &fl, 1, D3D11_SDK_VERSION, &g_dev,
+                                   nullptr, &g_ctx);
     if (FAILED(hr) && flags) {
         LOG("gfx: debug layer unavailable, continuing without it");
         hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, &fl, 1, D3D11_SDK_VERSION, &g_dev,
@@ -733,7 +760,7 @@ bool ShaderSettingActive(const std::string& setting) {
 // Saves a shader that has no ahead-of-time translation (code + Gnm struct) so that
 // tools/gcn2hlsl.py can translate it: missing_shaders/Rt_<hash>_<vs|ps>.bin/.gnm
 void DumpMissingShader(u64 handle, u64 code, u32 size, u64 hash, bool vertex) {
-    const fs::path dir = UserRoot() / "missing_shaders";  // collected for translation
+    const fs::path dir = UserRoot() / "missing_shaders"; // collected for translation
     std::error_code ec;
     fs::create_directories(dir, ec);
     char leaf[64];
@@ -765,8 +792,10 @@ ShaderInfo* GetShader(u64 handle, bool vertex) {
     if (size && Readable(code, size)) {
         u64 hash = Fnv((const u8*)code, size);
         auto f = g_shaders.find(hash);
-        if (f != g_shaders.end()) info = &f->second;
-        else DumpMissingShader(handle, code, size, hash, vertex);
+        if (f != g_shaders.end())
+            info = &f->second;
+        else
+            DumpMissingShader(handle, code, size, hash, vertex);
     }
     if (info && !info->loaded) {
         info->loaded = true;
@@ -778,9 +807,12 @@ ShaderInfo* GetShader(u64 handle, bool vertex) {
             std::string text((std::istreambuf_iterator<char>(src)), std::istreambuf_iterator<char>());
             ComPtr<ID3DBlob> blob, err;
             if (SUCCEEDED(D3DCompile(text.data(), text.size(), info->name.c_str(), nullptr, nullptr, "main",
-                                     info->kind == "gs" ? "gs_5_0" : info->vertex ? "vs_5_0" : "ps_5_0", 0, 0,
-                                     &blob, &err))) {
-                info->bytecode.assign((u8*)blob->GetBufferPointer(), (u8*)blob->GetBufferPointer() + blob->GetBufferSize());
+                                     info->kind == "gs" ? "gs_5_0"
+                                     : info->vertex     ? "vs_5_0"
+                                                        : "ps_5_0",
+                                     0, 0, &blob, &err))) {
+                info->bytecode.assign((u8*)blob->GetBufferPointer(),
+                                      (u8*)blob->GetBufferPointer() + blob->GetBufferSize());
                 LOG("gfx: using override %s", ov.string().c_str());
             } else {
                 LOG("gfx: override %s failed: %s", ov.string().c_str(), err ? (char*)err->GetBufferPointer() : "?");
@@ -802,14 +834,15 @@ ShaderInfo* GetShader(u64 handle, bool vertex) {
                 info->bytecode.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
             }
         }
-        HRESULT hr =
-            info->kind == "gs"
-                ? g_dev->CreateGeometryShader(info->bytecode.data(), info->bytecode.size(), nullptr, &info->gs)
-            : info->vertex
-                ? g_dev->CreateVertexShader(info->bytecode.data(), info->bytecode.size(), nullptr, &info->vs)
-                : g_dev->CreatePixelShader(info->bytecode.data(), info->bytecode.size(), nullptr, &info->ps);
-        if (FAILED(hr)) LOG("gfx: cannot create shader %s (0x%08lx)", info->name.c_str(), hr);
-        else LOG("gfx: shader %s first used at frame %llu", info->name.c_str(), (unsigned long long)g_frame);
+        HRESULT hr = info->kind == "gs"
+                         ? g_dev->CreateGeometryShader(info->bytecode.data(), info->bytecode.size(), nullptr, &info->gs)
+                     : info->vertex
+                         ? g_dev->CreateVertexShader(info->bytecode.data(), info->bytecode.size(), nullptr, &info->vs)
+                         : g_dev->CreatePixelShader(info->bytecode.data(), info->bytecode.size(), nullptr, &info->ps);
+        if (FAILED(hr))
+            LOG("gfx: cannot create shader %s (0x%08lx)", info->name.c_str(), hr);
+        else
+            LOG("gfx: shader %s first used at frame %llu", info->name.c_str(), (unsigned long long)g_frame);
     }
     if (!info) {
         LOG("gfx: no translated shader for code %llx size %u", (unsigned long long)code, size);
@@ -922,19 +955,19 @@ Surface* GetDepthTarget(u64 h) {
 }
 
 D3D11_COMPARISON_FUNC Cmp(u32 f) {
-    static const D3D11_COMPARISON_FUNC t[] = {
-        D3D11_COMPARISON_NEVER, D3D11_COMPARISON_LESS, D3D11_COMPARISON_EQUAL, D3D11_COMPARISON_LESS_EQUAL,
-        D3D11_COMPARISON_GREATER, D3D11_COMPARISON_NOT_EQUAL, D3D11_COMPARISON_GREATER_EQUAL,
-        D3D11_COMPARISON_ALWAYS};
+    static const D3D11_COMPARISON_FUNC t[] = {D3D11_COMPARISON_NEVER,         D3D11_COMPARISON_LESS,
+                                              D3D11_COMPARISON_EQUAL,         D3D11_COMPARISON_LESS_EQUAL,
+                                              D3D11_COMPARISON_GREATER,       D3D11_COMPARISON_NOT_EQUAL,
+                                              D3D11_COMPARISON_GREATER_EQUAL, D3D11_COMPARISON_ALWAYS};
     return t[f & 7];
 }
 
 D3D11_STENCIL_OP StencilOp(u32 op) {
     switch (op) {
     case 1: return D3D11_STENCIL_OP_ZERO;
-    case 2:  // ONES
-    case 3:  // REPLACE_TEST
-    case 4: return D3D11_STENCIL_OP_REPLACE;  // REPLACE_OP
+    case 2:                                  // ONES
+    case 3:                                  // REPLACE_TEST
+    case 4: return D3D11_STENCIL_OP_REPLACE; // REPLACE_OP
     case 5: return D3D11_STENCIL_OP_INCR_SAT;
     case 6: return D3D11_STENCIL_OP_DECR_SAT;
     case 7: return D3D11_STENCIL_OP_INVERT;
@@ -950,7 +983,8 @@ D3D11_STENCIL_OP StencilOp(u32 op) {
 // DB_STENCIL_CONTROL (ctx+0x118): FAIL [3:0] ZPASS [7:4] ZFAIL [11:8] and back-face copies
 ID3D11DepthStencilState* GetDepthState(u32 ctl, u32 refmask, u32 ops) {
     bool stencil = ctl & 1;
-    u64 key = (u64)(ctl & (stencil ? 0x7007F7 : 0x76)) | (stencil ? ((u64)(refmask & 0xFFFF00) << 24) | ((u64)(ops & 0xFFFFFF) << 48) : 0);
+    u64 key = (u64)(ctl & (stencil ? 0x7007F7 : 0x76)) |
+              (stencil ? ((u64)(refmask & 0xFFFF00) << 24) | ((u64)(ops & 0xFFFFFF) << 48) : 0);
     auto& d = g_depth[key];
     if (d) return d.Get();
     D3D11_DEPTH_STENCIL_DESC desc{};
@@ -962,9 +996,10 @@ ID3D11DepthStencilState* GetDepthState(u32 ctl, u32 refmask, u32 ops) {
     desc.StencilWriteMask = (refmask >> 16) & 0xFF;
     desc.FrontFace = {StencilOp(ops & 0xF), StencilOp((ops >> 8) & 0xF), StencilOp((ops >> 4) & 0xF),
                       Cmp((ctl >> 8) & 7)};
-    desc.BackFace = (ctl >> 7) & 1 ? D3D11_DEPTH_STENCILOP_DESC{StencilOp((ops >> 12) & 0xF), StencilOp((ops >> 20) & 0xF),
-                                                              StencilOp((ops >> 16) & 0xF), Cmp((ctl >> 20) & 7)}
-                                   : desc.FrontFace;
+    desc.BackFace = (ctl >> 7) & 1
+                        ? D3D11_DEPTH_STENCILOP_DESC{StencilOp((ops >> 12) & 0xF), StencilOp((ops >> 20) & 0xF),
+                                                     StencilOp((ops >> 16) & 0xF), Cmp((ctl >> 20) & 7)}
+                        : desc.FrontFace;
     g_dev->CreateDepthStencilState(&desc, &d);
     return d.Get();
 }
@@ -981,7 +1016,7 @@ ID3D11ShaderResourceView* GetTexture(const u32* tsharp, int dims) {
     if (tx == g_textures.end()) {
         TextureObject obj;
         if (!BuildTexture(g_dev.Get(), t, &obj)) {
-            static std::unordered_set<u64> warned;  // each texture once
+            static std::unordered_set<u64> warned; // each texture once
             if (warned.size() < 200 && warned.insert(t.base).second) {
                 // the nearest render / depth target below it (a view into a target?)
                 u64 below = 0;
@@ -996,8 +1031,7 @@ ID3D11ShaderResourceView* GetTexture(const u32* tsharp, int dims) {
         }
         obj.checked_frame = g_frame;
         tx = g_textures.emplace(key, std::move(obj)).first;
-    }
-    else if (tx->second.srv && tx->second.checked_frame != g_frame) {
+    } else if (tx->second.srv && tx->second.checked_frame != g_frame) {
         // CPU-written textures (video frames, runtime atlases): rebuild when the guest wrote them
         tx->second.checked_frame = g_frame;
         if (GuestWrittenSince(tx->second.mem_base, tx->second.mem_size, false) &&
@@ -1011,14 +1045,27 @@ ID3D11ShaderResourceView* GetTexture(const u32* tsharp, int dims) {
 
 // ------------------------------------------------------------------ fixed function state
 D3D11_BLEND Blend(u32 f) {
-    static const D3D11_BLEND t[] = {
-        D3D11_BLEND_ZERO, D3D11_BLEND_ONE, D3D11_BLEND_SRC_COLOR, D3D11_BLEND_INV_SRC_COLOR,
-        D3D11_BLEND_SRC_ALPHA, D3D11_BLEND_INV_SRC_ALPHA, D3D11_BLEND_DEST_ALPHA,
-        D3D11_BLEND_INV_DEST_ALPHA, D3D11_BLEND_DEST_COLOR, D3D11_BLEND_INV_DEST_COLOR,
-        D3D11_BLEND_SRC_ALPHA_SAT, D3D11_BLEND_ONE, D3D11_BLEND_ONE, D3D11_BLEND_BLEND_FACTOR,
-        D3D11_BLEND_INV_BLEND_FACTOR, D3D11_BLEND_SRC1_COLOR, D3D11_BLEND_INV_SRC1_COLOR,
-        D3D11_BLEND_SRC1_ALPHA, D3D11_BLEND_INV_SRC1_ALPHA, D3D11_BLEND_BLEND_FACTOR,
-        D3D11_BLEND_INV_BLEND_FACTOR};
+    static const D3D11_BLEND t[] = {D3D11_BLEND_ZERO,
+                                    D3D11_BLEND_ONE,
+                                    D3D11_BLEND_SRC_COLOR,
+                                    D3D11_BLEND_INV_SRC_COLOR,
+                                    D3D11_BLEND_SRC_ALPHA,
+                                    D3D11_BLEND_INV_SRC_ALPHA,
+                                    D3D11_BLEND_DEST_ALPHA,
+                                    D3D11_BLEND_INV_DEST_ALPHA,
+                                    D3D11_BLEND_DEST_COLOR,
+                                    D3D11_BLEND_INV_DEST_COLOR,
+                                    D3D11_BLEND_SRC_ALPHA_SAT,
+                                    D3D11_BLEND_ONE,
+                                    D3D11_BLEND_ONE,
+                                    D3D11_BLEND_BLEND_FACTOR,
+                                    D3D11_BLEND_INV_BLEND_FACTOR,
+                                    D3D11_BLEND_SRC1_COLOR,
+                                    D3D11_BLEND_INV_SRC1_COLOR,
+                                    D3D11_BLEND_SRC1_ALPHA,
+                                    D3D11_BLEND_INV_SRC1_ALPHA,
+                                    D3D11_BLEND_BLEND_FACTOR,
+                                    D3D11_BLEND_INV_BLEND_FACTOR};
     return f < 21 ? t[f] : D3D11_BLEND_ONE;
 }
 D3D11_BLEND_OP BlendOp(u32 f) {
@@ -1142,8 +1189,7 @@ u32 CbBytes(u64 shader) {
     if (!shader) return 0;
     u64 hdr = Q(shader + SH_HEADER);
     s32 n = R<s32>(hdr + HDR_CB_MEMORY);
-    u64 mem = Q(hdr + HDR_CB_MEMORY + 0x10), sizes = Q(hdr + HDR_CB_SIZE + 0x10),
-        idx = Q(hdr + HDR_CB_INDEX + 0x10);
+    u64 mem = Q(hdr + HDR_CB_MEMORY + 0x10), sizes = Q(hdr + HDR_CB_SIZE + 0x10), idx = Q(hdr + HDR_CB_INDEX + 0x10);
     u32 total = 0;
     for (s32 k = 0; k < n && k < 16; k++) {
         u32 size = (u32)R<u64>(sizes + k * 8);
@@ -1168,7 +1214,7 @@ bool CbRingBind(int stage, const CbPart* parts, int n) {
         bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         if (FAILED(g_dev->CreateBuffer(&bd, nullptr, &g_cb_ring))) {
-            g_ctx1.Reset();  // no large constant buffers: per-slot buffers
+            g_ctx1.Reset(); // no large constant buffers: per-slot buffers
             return false;
         }
     }
@@ -1195,15 +1241,21 @@ bool CbRingBind(int stage, const CbPart* parts, int n) {
     ID3D11Buffer* b = g_cb_ring.Get();
     for (int i = 0; i < n; i++) {
         UINT slot = parts[i].slot;
-        if (stage == 0) g_ctx1->VSSetConstantBuffers1(slot, 1, &b, &first[i], &num[i]);
-        else if (stage == 1) g_ctx1->PSSetConstantBuffers1(slot, 1, &b, &first[i], &num[i]);
-        else g_ctx1->GSSetConstantBuffers1(slot, 1, &b, &first[i], &num[i]);
+        if (stage == 0)
+            g_ctx1->VSSetConstantBuffers1(slot, 1, &b, &first[i], &num[i]);
+        else if (stage == 1)
+            g_ctx1->PSSetConstantBuffers1(slot, 1, &b, &first[i], &num[i]);
+        else
+            g_ctx1->GSSetConstantBuffers1(slot, 1, &b, &first[i], &num[i]);
     }
     return true;
 }
 
 void UpdateCBuffers(int stage, u64 shader, const ShaderInfo* si) {
-    struct T { double t0 = NowMs(); ~T() { g_cb_ms += NowMs() - t0; } } timer;
+    struct T {
+        double t0 = NowMs();
+        ~T() { g_cb_ms += NowMs() - t0; }
+    } timer;
     if (g_ctx1) {
         u64 hdr = Q(shader + SH_HEADER);
         s32 n = R<s32>(hdr + HDR_CB_MEMORY);
@@ -1248,8 +1300,7 @@ void UpdateCBuffers(int stage, u64 shader, const ShaderInfo* si) {
     }
     u64 hdr = Q(shader + SH_HEADER);
     s32 n = R<s32>(hdr + HDR_CB_MEMORY);
-    u64 mem = Q(hdr + HDR_CB_MEMORY + 0x10), sizes = Q(hdr + HDR_CB_SIZE + 0x10),
-        idx = Q(hdr + HDR_CB_INDEX + 0x10);
+    u64 mem = Q(hdr + HDR_CB_MEMORY + 0x10), sizes = Q(hdr + HDR_CB_SIZE + 0x10), idx = Q(hdr + HDR_CB_INDEX + 0x10);
     for (s32 k = 0; k < n && k < 16; k++) {
         u64 data = Q(mem + k * 8);
         u32 size = (u32)R<u64>(sizes + k * 8);
@@ -1272,9 +1323,12 @@ void UpdateCBuffers(int stage, u64 shader, const ShaderInfo* si) {
     }
     ID3D11Buffer* bufs[13];
     for (int i = 0; i < 13; i++) bufs[i] = g_cb[stage][i].Get();
-    if (stage == 0) g_ctx->VSSetConstantBuffers(0, 13, bufs);
-    else if (stage == 1) g_ctx->PSSetConstantBuffers(0, 13, bufs);
-    else g_ctx->GSSetConstantBuffers(0, 13, bufs);
+    if (stage == 0)
+        g_ctx->VSSetConstantBuffers(0, 13, bufs);
+    else if (stage == 1)
+        g_ctx->PSSetConstantBuffers(0, 13, bufs);
+    else
+        g_ctx->GSSetConstantBuffers(0, 13, bufs);
 }
 
 // Effective channel order seen by the shader: T# dst_sel applied to the memory order of the
@@ -1299,15 +1353,15 @@ u32 SwizzleCode(const u32* tsharp) {
 
 // b13 of every stage: per texture slot swizzle codes, then (VS) per input conversion modes
 struct InfoCB {
-    u32 swz[32];       // ctr_swz: texture channel order per slot
-    u32 vin[32];       // ctr_vin: VS input conversion per semantic
-    float scale[4];    // ctr_scale: x = 1 / scale of the bound render target, y = scale
-    float tscale[32];  // ctr_tscale: scale of the texture bound per slot
+    u32 swz[32];      // ctr_swz: texture channel order per slot
+    u32 vin[32];      // ctr_vin: VS input conversion per semantic
+    float scale[4];   // ctr_scale: x = 1 / scale of the bound render target, y = scale
+    float tscale[32]; // ctr_tscale: scale of the texture bound per slot
     u32 pad[28];
 };
 static_assert(sizeof(InfoCB) == 512);
-float g_draw_scale = 1.0f;  // scale of the render target of the current draw
-float g_tscale[2][32];      // per stage texture slot scales (BindTextures)
+float g_draw_scale = 1.0f; // scale of the render target of the current draw
+float g_tscale[2][32];     // per stage texture slot scales (BindTextures)
 
 void WriteInfoCB(int stage, const u32* swz, const u32* vin) {
     if (g_ctx1) {
@@ -1340,11 +1394,13 @@ void WriteInfoCB(int stage, const u32* swz, const u32* vin) {
         memcpy(m.pData, &info, sizeof(info));
         g_ctx->Unmap(cb.Get(), 0);
     }
-    if (stage == 0) g_ctx->VSSetConstantBuffers(13, 1, cb.GetAddressOf());
-    else g_ctx->PSSetConstantBuffers(13, 1, cb.GetAddressOf());
+    if (stage == 0)
+        g_ctx->VSSetConstantBuffers(13, 1, cb.GetAddressOf());
+    else
+        g_ctx->PSSetConstantBuffers(13, 1, cb.GetAddressOf());
 }
 
-u32 g_vs_swz[32];  // VS texture swizzles, written together with the input modes once the layout is known
+u32 g_vs_swz[32]; // VS texture swizzles, written together with the input modes once the layout is known
 
 // S# (GCN sampler descriptor) -> D3D11 sampler. PC extra: anisotropic filtering (setting
 // Anisotropy; ctrport default 1 = the game's own samplers, as the original) for filtered, mipmapped samplers.
@@ -1378,34 +1434,37 @@ ID3D11SamplerState* GetSampler(const u32* ss, bool cmp) {
     u32 mag = (ss[2] >> 20) & 3, min = (ss[2] >> 22) & 3, mipf = (ss[2] >> 26) & 3;
     bool lin_mag = mag == 1 || mag == 3, lin_min = min == 1 || min == 3, lin_mip = mipf == 2;
     bool aniso = mag >= 2 || min >= 2;
-    D3D11_FILTER_REDUCTION_TYPE red = cmp ? D3D11_FILTER_REDUCTION_TYPE_COMPARISON : D3D11_FILTER_REDUCTION_TYPE_STANDARD;
+    D3D11_FILTER_REDUCTION_TYPE red =
+        cmp ? D3D11_FILTER_REDUCTION_TYPE_COMPARISON : D3D11_FILTER_REDUCTION_TYPE_STANDARD;
     if (aniso && !cmp) {
         d.Filter = D3D11_FILTER_ANISOTROPIC;
-        const auto policy = ctrport::settings::renderer::sampler_policy(true, true, (float)max_aniso, 16.0f, aniso_request);
+        const auto policy =
+            ctrport::settings::renderer::sampler_policy(true, true, (float)max_aniso, 16.0f, aniso_request);
         d.MaxAnisotropy = (UINT)policy.maximum;
     } else {
         d.Filter = D3D11_ENCODE_BASIC_FILTER(lin_min ? D3D11_FILTER_TYPE_LINEAR : D3D11_FILTER_TYPE_POINT,
                                              lin_mag ? D3D11_FILTER_TYPE_LINEAR : D3D11_FILTER_TYPE_POINT,
                                              lin_mip ? D3D11_FILTER_TYPE_LINEAR : D3D11_FILTER_TYPE_POINT, red);
     }
-    static const D3D11_COMPARISON_FUNC funcs[] = {
-        D3D11_COMPARISON_NEVER,   D3D11_COMPARISON_LESS,      D3D11_COMPARISON_EQUAL,         D3D11_COMPARISON_LESS_EQUAL,
-        D3D11_COMPARISON_GREATER, D3D11_COMPARISON_NOT_EQUAL, D3D11_COMPARISON_GREATER_EQUAL, D3D11_COMPARISON_ALWAYS};
+    static const D3D11_COMPARISON_FUNC funcs[] = {D3D11_COMPARISON_NEVER,         D3D11_COMPARISON_LESS,
+                                                  D3D11_COMPARISON_EQUAL,         D3D11_COMPARISON_LESS_EQUAL,
+                                                  D3D11_COMPARISON_GREATER,       D3D11_COMPARISON_NOT_EQUAL,
+                                                  D3D11_COMPARISON_GREATER_EQUAL, D3D11_COMPARISON_ALWAYS};
     d.ComparisonFunc = cmp ? (depth_func ? funcs[depth_func] : D3D11_COMPARISON_LESS_EQUAL) : D3D11_COMPARISON_NEVER;
     d.MinLOD = (ss[1] & 0xFFF) / 256.0f;
     d.MaxLOD = mipf == 0 ? d.MinLOD : ((ss[1] >> 12) & 0xFFF) / 256.0f;
     if (d.MaxLOD >= 15.9f) d.MaxLOD = D3D11_FLOAT32_MAX;
-    static const int force_mip = ConfigInt("DebugForceMip", -1);  // debugging aid: sample one mip level
+    static const int force_mip = ConfigInt("DebugForceMip", -1); // debugging aid: sample one mip level
     if (force_mip >= 0) d.MinLOD = d.MaxLOD = (float)force_mip;
     d.MipLODBias = (float)((s32)((ss[2] & 0x3FFF) << 18) >> 18) / 256.0f;
-    u32 border = ss[3] >> 30;  // 0 transparent black, 1 opaque black, 2 opaque white
+    u32 border = ss[3] >> 30; // 0 transparent black, 1 opaque black, 2 opaque white
     d.BorderColor[3] = border == 0 ? 0.0f : 1.0f;
     d.BorderColor[0] = d.BorderColor[1] = d.BorderColor[2] = border == 2 ? 1.0f : 0.0f;
     ComPtr<ID3D11SamplerState> st;
     if (FAILED(g_dev->CreateSamplerState(&d, &st))) return cmp ? g_samp_cmp.Get() : g_samp_linear.Get();
     if (g_samplers.size() < 8)
-        LOG("gfx: sampler %08x %08x %08x %08x -> filter 0x%x addr %d/%d lod %.2f..%.2f bias %.2f cmp %d", ss[0],
-            ss[1], ss[2], ss[3], (int)d.Filter, (int)d.AddressU, (int)d.AddressV, d.MinLOD, d.MaxLOD, d.MipLODBias,
+        LOG("gfx: sampler %08x %08x %08x %08x -> filter 0x%x addr %d/%d lod %.2f..%.2f bias %.2f cmp %d", ss[0], ss[1],
+            ss[2], ss[3], (int)d.Filter, (int)d.AddressU, (int)d.AddressV, d.MinLOD, d.MaxLOD, d.MipLODBias,
             (int)d.ComparisonFunc);
     return (g_samplers[key] = st).Get();
 }
@@ -1418,9 +1477,9 @@ ID3D11SamplerState* GetSampler(const u32* ss, bool cmp) {
 // samples the FSR 1 (EASU + RCAS) upscale instead, before the HUD is drawn over it.
 struct SceneUpscale {
     bool enabled = false, gbuffer_seen = false, last_display = false, pending = false, done = false;
-    Surface* last_color = nullptr;  // color target 0 of the latest draw
-    Surface* source = nullptr;      // the finished scene of this frame
-    u32 out_w = 0, out_h = 0;       // the display target (physical pixels)
+    Surface* last_color = nullptr; // color target 0 of the latest draw
+    Surface* source = nullptr;     // the finished scene of this frame
+    u32 out_w = 0, out_h = 0;      // the display target (physical pixels)
     ComPtr<ID3D11ComputeShader> easu, rcas;
     ComPtr<ID3D11Buffer> cb;
     ComPtr<ID3D11SamplerState> sampler;
@@ -1582,8 +1641,10 @@ void BindTextures(int stage, u64 ctx, u64 dev, const ShaderInfo* si) {
             }
         }
     }
-    if (stage == 0) memcpy(g_vs_swz, swz, sizeof(swz));
-    else WriteInfoCB(stage, swz, nullptr);
+    if (stage == 0)
+        memcpy(g_vs_swz, swz, sizeof(swz));
+    else
+        WriteInfoCB(stage, swz, nullptr);
     // the engine keeps packed sampler keys; its commit code expands them into S# like this
     u64 samp_base = ctx + (stage == 0 ? CTX_VS_SAMPLERS : CTX_PS_SAMPLERS);
     for (auto [slot, cmp] : si->samplers) {
@@ -1612,9 +1673,9 @@ void BindTextures(int stage, u64 ctx, u64 dev, const ShaderInfo* si) {
 }
 
 struct VbBinding {
-    u64 addr = 0;      // first vertex (buffer base + context offset)
+    u64 addr = 0; // first vertex (buffer base + context offset)
     u32 stride = 0;
-    u64 base = 0;      // the engine buffer resource: address and size in bytes
+    u64 base = 0; // the engine buffer resource: address and size in bytes
     u32 size = 0;
 };
 
@@ -1625,7 +1686,7 @@ constexpr u32 kCacheMin = 16 << 10;
 struct GpuBuffer {
     ComPtr<ID3D11Buffer> buf;
     u64 checked_frame = 0, used_frame = 0;
-    bool volatile_data = false;  // rewritten by the guest after creation: not cached any more
+    bool volatile_data = false; // rewritten by the guest after creation: not cached any more
 };
 std::unordered_map<u64, GpuBuffer> g_gpu_buffers;
 
@@ -1670,8 +1731,7 @@ void EvictBuffers() {
 }
 
 // Builds the input layout for the VS from the engine's vertex formats.
-ID3D11InputLayout* GetLayout(u64 ctx, u64 vs, const ShaderInfo* si, VbBinding* vbs, bool* used_slots,
-                             u32* vin_modes) {
+ID3D11InputLayout* GetLayout(u64 ctx, u64 vs, const ShaderInfo* si, VbBinding* vbs, bool* used_slots, u32* vin_modes) {
     u64 hdr = Q(vs + SH_HEADER);
     s32 nin = R<s32>(hdr + HDR_INPUT_ELEMENTS);
     u64 ins = Q(hdr + HDR_INPUT_ELEMENTS + 0x10);
@@ -1685,8 +1745,8 @@ ID3D11InputLayout* GetLayout(u64 ctx, u64 vs, const ShaderInfo* si, VbBinding* v
                 uidx = R<u32>(ins + k * 12 + 4);
             }
         }
-        D3D11_INPUT_ELEMENT_DESC d{"ATTRIB", (UINT)sem, DXGI_FORMAT_R32G32B32A32_FLOAT, 15, 0,
-                                   D3D11_INPUT_PER_VERTEX_DATA, 0};
+        D3D11_INPUT_ELEMENT_DESC d{
+            "ATTRIB", (UINT)sem, DXGI_FORMAT_R32G32B32A32_FLOAT, 15, 0, D3D11_INPUT_PER_VERTEX_DATA, 0};
         for (int slot = 0; slot < 16 && usage != 0xFF; slot++) {
             u64 vf = Q(ctx + CTX_VERTEX_FORMATS + slot * 8);
             if (!vf) continue;
@@ -1720,8 +1780,8 @@ ID3D11InputLayout* GetLayout(u64 ctx, u64 vs, const ShaderInfo* si, VbBinding* v
     }
     auto& l = g_layouts[key];
     if (!l) {
-        HRESULT hr = g_dev->CreateInputLayout(descs.data(), (UINT)descs.size(), si->bytecode.data(),
-                                              si->bytecode.size(), &l);
+        HRESULT hr =
+            g_dev->CreateInputLayout(descs.data(), (UINT)descs.size(), si->bytecode.data(), si->bytecode.size(), &l);
         if (FAILED(hr)) {
             LOG("gfx: input layout for %s failed (0x%08lx)", si->name.c_str(), hr);
             for (auto& d : descs)
@@ -1773,7 +1833,7 @@ float Half(u16 h) {
 // Logs the raw value of pixel (x, y) of a surface (capture debugging).
 void ProbePixel(u64 base, Surface& s, u32 x, u32 y) {
     if (!s.tex || x >= s.w || y >= s.h) return;
-    x = (u32)(x * s.scale);  // logical -> physical (RenderScale)
+    x = (u32)(x * s.scale); // logical -> physical (RenderScale)
     y = (u32)(y * s.scale);
     D3D11_TEXTURE2D_DESC td;
     s.tex->GetDesc(&td);
@@ -1803,8 +1863,7 @@ void ProbePixel(u64 base, Surface& s, u32 x, u32 y) {
         snprintf(buf, sizeof(buf), "%g", f);
         break;
     }
-    default:
-        snprintf(buf, sizeof(buf), "raw %02x %02x %02x %02x", p[0], p[1], p[2], p[3]);
+    default: snprintf(buf, sizeof(buf), "raw %02x %02x %02x %02x", p[0], p[1], p[2], p[3]);
     }
     LOG("cap pixel %llx (%u,%u): %s", (unsigned long long)base, x, y, buf);
     g_ctx->Unmap(st.Get(), 0);
@@ -1828,8 +1887,10 @@ void SaveDepth(Surface& s, const char* path) {
     for (u32 y = 0; y < td.Height; y++)
         for (u32 x = 0; x < td.Width; x++) {
             const u8* px = (const u8*)m.pData + (size_t)y * m.RowPitch;
-            if (s.fmt == DXGI_FORMAT_D16_UNORM) z[(size_t)y * td.Width + x] = ((const u16*)px)[x] / 65535.0f;
-            else memcpy(&z[(size_t)y * td.Width + x], px + x * 8, 4);
+            if (s.fmt == DXGI_FORMAT_D16_UNORM)
+                z[(size_t)y * td.Width + x] = ((const u16*)px)[x] / 65535.0f;
+            else
+                memcpy(&z[(size_t)y * td.Width + x], px + x * 8, 4);
         }
     g_ctx->Unmap(st.Get(), 0);
     std::string f32 = std::string(path) + ".f32";
@@ -1867,7 +1928,7 @@ void SaveSurface(Surface& s, const char* path) {
     g_ctx->OMSetRenderTargets(1, rtv.GetAddressOf(), nullptr);
     D3D11_VIEWPORT v{0, 0, (float)s.w, (float)s.h, 0, 1};
     g_ctx->RSSetViewports(1, &v);
-    g_ctx->RSSetState(GetRaster(0, false));  // no scissor / culling left over from the game's draws
+    g_ctx->RSSetState(GetRaster(0, false)); // no scissor / culling left over from the game's draws
     g_ctx->OMSetDepthStencilState(g_depth_off.Get(), 0);
     g_ctx->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     g_ctx->IASetInputLayout(nullptr);
@@ -1943,7 +2004,7 @@ void SaveScreenshot(const char* path) {
     g_ctx->Unmap(st.Get(), 0);
 }
 
-}  // namespace
+} // namespace
 
 // Debug captures go to runtime/user/gpu_d3d/capture (ctrport: not the working directory).
 std::string CapturePath(const char* leaf) {
@@ -1991,14 +2052,15 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
         char v[128] = {};
         return GetEnvironmentVariableA("CTR_SKIP_SHADERS", v, sizeof(v)) ? std::string(v) : std::string();
     }();
-    if (!skip.empty() && ((vs && vs->name.find(skip) != std::string::npos) ||
-                          (ps && ps->name.find(skip) != std::string::npos) ||
-                          (gs && gs->name.find(skip) != std::string::npos)))
+    if (!skip.empty() &&
+        ((vs && vs->name.find(skip) != std::string::npos) || (ps && ps->name.find(skip) != std::string::npos) ||
+         (gs && gs->name.find(skip) != std::string::npos)))
         return;
     if (!vs || !vs->vs || (psh && (!ps || !ps->ps))) {
-        if (g_capture) LOG("cap draw skipped: missing shader vs %s ps %s", vs ? vs->name.c_str() : "?",
-                           ps ? ps->name.c_str() : (psh ? "?" : "-"));
-        static int reported = 0;  // ctrport: why, for the first few
+        if (g_capture)
+            LOG("cap draw skipped: missing shader vs %s ps %s", vs ? vs->name.c_str() : "?",
+                ps ? ps->name.c_str() : (psh ? "?" : "-"));
+        static int reported = 0; // ctrport: why, for the first few
         if (reported++ < 8)
             LOG("gfx: draw skipped: vs %s (%s, object %s) ps %s (%s, object %s) handles %llx %llx",
                 vs ? vs->name.c_str() : "none", vs ? vs->kind.c_str() : "-", vs && vs->vs ? "yes" : "no",
@@ -2042,7 +2104,8 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     if (depth && ps) {
         for (auto [slot, dims] : ps->textures) {
             u64 t = Q(ctx + CTX_PS_TEXTURES + slot * 8);
-            if (t && Readable(t, 32) && DecodeTSharp((const u32*)t).base == (u64)R<u32>(Q(ctx + CTX_DEPTH_TARGET) + 0x58) << 8)
+            if (t && Readable(t, 32) &&
+                DecodeTSharp((const u32*)t).base == (u64)R<u32>(Q(ctx + CTX_DEPTH_TARGET) + 0x58) << 8)
                 depth_sampled = true;
         }
     }
@@ -2050,7 +2113,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     if (g_trace_depth && g_frame >= g_trace_frame && (!g_trace_frame || g_frame < g_trace_frame + 12)) {
         u64 dh2 = Q(ctx + CTX_DEPTH_TARGET);
         u64 db = dh2 && Readable(dh2, 0x84) ? (u64)R<u32>(dh2 + 0x58) << 8 : 0;
-        if (db && (db == g_trace_depth || g_trace_depth == 1)) {  // 1: every depth target
+        if (db && (db == g_trace_depth || g_trace_depth == 1)) { // 1: every depth target
             auto tvp = R<ViewportI>(ctx + CTX_VIEWPORT);
             char b[64];
             if (g_trace_depth == 1)
@@ -2060,7 +2123,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
             g_trace += b;
         }
     }
-    if (depth_sampled && zwrite) dsv = nullptr;  // feedback loop: drop the depth target
+    if (depth_sampled && zwrite) dsv = nullptr; // feedback loop: drop the depth target
     if (depth) depth->rendered = true;
     // unbind our targets from the shader stages before using them as targets
     ID3D11ShaderResourceView* none[32] = {};
@@ -2084,8 +2147,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
         g_ctx->RSSetScissorRects(1, &r);
     }
     g_ctx->RSSetState(GetRaster(R<u32>(ctx + CTX_PRIM_SETUP), scissor, Q(ctx + CTX_RASTER_STATE), ds));
-    g_ctx->OMSetBlendState(GetBlend(R<u32>(ctx + CTX_BLEND_CONTROL), R<u32>(ctx + CTX_RT_MASK)), nullptr,
-                           0xFFFFFFFF);
+    g_ctx->OMSetBlendState(GetBlend(R<u32>(ctx + CTX_BLEND_CONTROL), R<u32>(ctx + CTX_RT_MASK)), nullptr, 0xFFFFFFFF);
     u32 refmask = R<u32>(ctx + CTX_STENCIL_CONTROL), sops = R<u32>(ctx + CTX_STENCIL_OP_CONTROL);
     bool uses_opval = ((sops & 0xF) == 4) || (((sops >> 4) & 0xF) == 4) || (((sops >> 8) & 0xF) == 4);
     g_ctx->OMSetDepthStencilState(dsv ? GetDepthState(dctl, refmask, sops) : g_depth_off.Get(),
@@ -2110,7 +2172,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     SECTION(3);
     // geometry
     u32 prim = R<u32>(ctx + CTX_PRIM_TYPE);
-    std::vector<u32> gen;  // generated indices for fans / quads
+    std::vector<u32> gen; // generated indices for fans / quads
     u32 isize = indexed ? R<u32>(ctx + CTX_INDEX_SIZE) : 4;
     u32 max_index = count ? count - 1 : 0;
     const u8* idata = nullptr;
@@ -2137,13 +2199,13 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     case 1: topo = D3D11_PRIMITIVE_TOPOLOGY_LINELIST; break;
     case 2: topo = D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP; break;
     case 4: topo = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP; break;
-    case 5:  // fan
+    case 5: // fan
         for (u32 i = 1; i + 1 < count; i++) gen.insert(gen.end(), {src_index(0), src_index(i), src_index(i + 1)});
         break;
-    case 6:  // quads
+    case 6: // quads
         for (u32 i = 0; i + 3 < count; i += 4)
-            gen.insert(gen.end(), {src_index(i), src_index(i + 1), src_index(i + 2), src_index(i),
-                                   src_index(i + 2), src_index(i + 3)});
+            gen.insert(gen.end(), {src_index(i), src_index(i + 1), src_index(i + 2), src_index(i), src_index(i + 2),
+                                   src_index(i + 3)});
         break;
     default: break;
     }
@@ -2191,7 +2253,10 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     SECTION(5);
     g_ctx->IASetPrimitiveTopology(topo);
     double ti = NowMs();
-    struct IssueT { double t0; ~IssueT() { g_issue_ms += NowMs() - t0; } } issue{ti};
+    struct IssueT {
+        double t0;
+        ~IssueT() { g_issue_ms += NowMs() - t0; }
+    } issue{ti};
     if (!gen.empty()) {
         u32 off;
         if (!Upload(g_ib_ring, g_ib_pos, kIbRing, gen.data(), (u32)(gen.size() * 4), &off)) return;
@@ -2219,7 +2284,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
         g_ctx->Draw(count, 0);
     }
     g_stats.drawn++;
-    if (g_capture) DrainDebugMessages(64);  // hazards next to the draw that caused them (CTR_D3D_DEBUG=1)
+    if (g_capture) DrainDebugMessages(64); // hazards next to the draw that caused them (CTR_D3D_DEBUG=1)
     // debugging aid: CTR_CAPTURE_AFTER=<shader name part> saves render target 0 right after each
     // matching draw of the captured frame
     static const std::string after = [] {
@@ -2228,7 +2293,7 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     }();
     if (g_capture && !after.empty() && ps && ps->name.find(after) != std::string::npos)
         if (u64 h = Q(ctx + CTX_COLOR_TARGETS); h && Readable(h, 0x50))
-            if (Surface* s0 = GetColorTarget(h)) {  // copy now (no state change), save at present
+            if (Surface* s0 = GetColorTarget(h)) { // copy now (no state change), save at present
                 Surface copy = *s0;
                 D3D11_TEXTURE2D_DESC td;
                 s0->tex->GetDesc(&td);
@@ -2239,7 +2304,8 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
                     SUCCEEDED(g_dev->CreateShaderResourceView(copy.tex.Get(), &sd, &copy.srv))) {
                     g_ctx->CopyResource(copy.tex.Get(), s0->tex.Get());
                     char path[96];
-                    snprintf(path, sizeof(path), "after_%llu_%s.bmp", (unsigned long long)g_stats.draws, ps->name.c_str());
+                    snprintf(path, sizeof(path), "after_%llu_%s.bmp", (unsigned long long)g_stats.draws,
+                             ps->name.c_str());
                     g_after_shots.emplace_back(CapturePath(path), copy);
                 }
             }
@@ -2249,12 +2315,13 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
             u64 t = Q(ctx + CTX_PS_TEXTURES + slot * 8);
             if (!t) continue;
             TSharp ts = DecodeTSharp((const u32*)t);
-            char kind = g_surfaces.count(ts.base) ? 'R' : (g_textures.count(Fnv((const u8*)t, 24)) &&
-                                                          g_textures[Fnv((const u8*)t, 24)].srv) ? 'A' : 'P';
+            char kind = g_surfaces.count(ts.base)                                                            ? 'R'
+                        : (g_textures.count(Fnv((const u8*)t, 24)) && g_textures[Fnv((const u8*)t, 24)].srv) ? 'A'
+                                                                                                             : 'P';
             char b[160];
-            snprintf(b, sizeof(b), " t%d=%llx(%ux%u f%u n%u m%u t%u %c sel%03x swz%x)", slot, (unsigned long long)ts.base,
-                     ts.width, ts.height, ts.dfmt, ts.nfmt, ts.tiling_index, ts.type, kind, ts.dst_sel,
-                     SwizzleCode((const u32*)t));
+            snprintf(b, sizeof(b), " t%d=%llx(%ux%u f%u n%u m%u t%u %c sel%03x swz%x)", slot,
+                     (unsigned long long)ts.base, ts.width, ts.height, ts.dfmt, ts.nfmt, ts.tiling_index, ts.type, kind,
+                     ts.dst_sel, SwizzleCode((const u32*)t));
             tx += b;
         }
         u64 rt0 = Q(ctx + CTX_COLOR_TARGETS);
@@ -2263,7 +2330,8 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
             LOG("cap draw %llu: geometry shader %s", (unsigned long long)g_stats.draws, gs->name.c_str());
             u64 hdr = Q(gsh + SH_HEADER);
             s32 n = R<s32>(hdr + HDR_CB_MEMORY);
-            u64 mem = Q(hdr + HDR_CB_MEMORY + 0x10), sizes = Q(hdr + HDR_CB_SIZE + 0x10), idx = Q(hdr + HDR_CB_INDEX + 0x10);
+            u64 mem = Q(hdr + HDR_CB_MEMORY + 0x10), sizes = Q(hdr + HDR_CB_SIZE + 0x10),
+                idx = Q(hdr + HDR_CB_INDEX + 0x10);
             for (s32 k = 0; k < n && k < 4; k++) {
                 u64 data = Q(mem + k * 8);
                 std::string w;
@@ -2272,8 +2340,8 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
                     snprintf(b, sizeof(b), " %08x", R<u32>(data + i * 4));
                     w += b;
                 }
-                LOG("    gs cb slot %u size %llu dw28..39:%s", R<u32>(idx + k * 4), (unsigned long long)R<u64>(sizes + k * 8),
-                    w.c_str());
+                LOG("    gs cb slot %u size %llu dw28..39:%s", R<u32>(idx + k * 4),
+                    (unsigned long long)R<u64>(sizes + k * 8), w.c_str());
             }
         }
         u64 dh = Q(ctx + CTX_DEPTH_TARGET);
@@ -2282,9 +2350,9 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
             (unsigned long long)g_stats.draws, vs->name.c_str(), ps ? ps->name.c_str() : "-",
             (unsigned long long)(rt0 ? (u64)R<u32>(rt0 + 0x10) << 8 : 0), nrt,
             dsv ? (dsv == (depth ? depth->dsv_ro.Get() : nullptr) ? "ro" : "rw") : "-", (unsigned long long)dbase, vp.x,
-            vp.y, vp.w, vp.h, prim, count,
-            indexed ? " indexed" : "", R<u32>(ctx + CTX_BLEND_CONTROL), R<u32>(ctx + CTX_RT_MASK), dctl,
-            R<u32>(ctx + CTX_PRIM_SETUP), (unsigned long long)Q(ctx + CTX_RASTER_STATE), tx.c_str());
+            vp.y, vp.w, vp.h, prim, count, indexed ? " indexed" : "", R<u32>(ctx + CTX_BLEND_CONTROL),
+            R<u32>(ctx + CTX_RT_MASK), dctl, R<u32>(ctx + CTX_PRIM_SETUP),
+            (unsigned long long)Q(ctx + CTX_RASTER_STATE), tx.c_str());
         {
             // RE aid: vertex buffer 0 and index buffer resource objects
             u64 rs = Q(ctx + CTX_VERTEX_BUFFERS), sm = Q(ctx + CTX_INDEX_BUFFER);
@@ -2331,10 +2399,9 @@ SYSV void ClearHook(u64 ctx, u32 flags, const float* color, u32 stencil, float d
         auto sc = R<ViewportI>(ctx + CTX_SCISSOR);
         u64 dh = Q(ctx + CTX_DEPTH_TARGET);
         LOG("cap clear: flags %x color %.3f %.3f %.3f %.3f depth %f stencil %u rt0 %llx depth %llx vp %d,%d %dx%d "
-            "scissor %d %d,%d %dx%d", flags,
-            (flags & 1) ? color[0] : 0, (flags & 1) ? color[1] : 0, (flags & 1) ? color[2] : 0,
-            (flags & 1) ? color[3] : 0, z, stencil,
-            (unsigned long long)(rt0 ? (u64)R<u32>(rt0 + 0x10) << 8 : 0),
+            "scissor %d %d,%d %dx%d",
+            flags, (flags & 1) ? color[0] : 0, (flags & 1) ? color[1] : 0, (flags & 1) ? color[2] : 0,
+            (flags & 1) ? color[3] : 0, z, stencil, (unsigned long long)(rt0 ? (u64)R<u32>(rt0 + 0x10) << 8 : 0),
             (unsigned long long)(dh && Readable(dh, 0x84) ? (u64)R<u32>(dh + 0x58) << 8 : 0), vp.x, vp.y, vp.w, vp.h,
             R<u8>(ctx + CTX_SCISSOR_ENABLED), sc.x, sc.y, sc.w, sc.h);
     }
@@ -2404,7 +2471,8 @@ SYSV u64 CopyTextureHook(u64 ctx, const u32* src, const u32* dst, const s32* p) 
     if (it != g_surfaces.end() && it->second.tex && it->second.srv) {
         stex = it->second.tex.Get(), ssrv = it->second.srv.Get(), sfmt = it->second.fmt;
         ks = it->second.scale, swap = it->second.comp_swap;
-    } else if (ID3D11ShaderResourceView* v = GetTexture(src, 2); v && v != g_placeholder.srv.Get() && v != g_unwritten.srv.Get()) {
+    } else if (ID3D11ShaderResourceView* v = GetTexture(src, 2);
+               v && v != g_placeholder.srv.Get() && v != g_unwritten.srv.Get()) {
         auto tx = g_textures.find(Fnv((const u8*)src, 24));
         if (tx != g_textures.end() && tx->second.tex) stex = tx->second.tex.Get(), ssrv = v, sfmt = tx->second.fmt;
     }
@@ -2414,13 +2482,14 @@ SYSV u64 CopyTextureHook(u64 ctx, const u32* src, const u32* dst, const s32* p) 
     if (!stex || p[6] || p[7] || dfmt == DXGI_FORMAT_UNKNOWN || !g_copy_ps) {
         if (log) {
             LOG("gfx: copy %llx (%ux%u mip %d%s) -> %llx (%ux%u mip %d format %d) not done", (unsigned long long)s.base,
-                s.width, s.height, p[6], stex ? "" : ", no data", (unsigned long long)d.base, d.width, d.height,
-                p[7], (int)dfmt);
+                s.width, s.height, p[6], stex ? "" : ", no data", (unsigned long long)d.base, d.width, d.height, p[7],
+                (int)dfmt);
             logged++;
         }
         return 0;
     }
-    const float kd = d.width == level(s.width, 0) && d.height == level(s.height, 0) ? ks : SurfaceScale(d.width, d.height);
+    const float kd =
+        d.width == level(s.width, 0) && d.height == level(s.height, 0) ? ks : SurfaceScale(d.width, d.height);
     Surface* ds = MakeColorSurface(d.base, d.width, d.height, dfmt, kd, swap, "copy target");
     if (!ds || ds->tex.Get() == stex) return 0;
     g_stats.copies++;
@@ -2435,7 +2504,7 @@ SYSV u64 CopyTextureHook(u64 ctx, const u32* src, const u32* dst, const s32* p) 
         box.right = std::min<UINT>(box.left + ow, sd.Width), box.bottom = std::min<UINT>(box.top + oh, sd.Height);
         if (box.right > box.left && box.bottom > box.top)
             g_ctx->CopySubresourceRegion(ds->tex.Get(), 0, ox, oy, 0, stex, 0, &box);
-    } else if (ow && oh) {  // depth into a color surface, or a different scale: texel copy shader
+    } else if (ow && oh) { // depth into a color surface, or a different scale: texel copy shader
         const float ratio = ks / ds->scale;
         const float cb[4] = {ratio, ratio, sx * ks - ox * ratio, s_top * ks - oy * ratio};
         D3D11_MAPPED_SUBRESOURCE m;
@@ -2469,7 +2538,7 @@ SYSV u64 CopyTextureHook(u64 ctx, const u32* src, const u32* dst, const s32* p) 
     ds->rendered = true;
     return 0;
 }
-}  // namespace
+} // namespace
 
 bool GfxInstallHooks() {
     // mov rax, imm64 ; jmp rax, over a prologue checked against the recorded bytes
@@ -2499,7 +2568,9 @@ void GfxPictureRect(float r[4]) {
     for (int i = 0; i < 4; i++) r[i] = g_picture[i];
 }
 
-bool GfxVideoPlaying() { return (u64)GetTickCount64() - g_video_ms < 300; }
+bool GfxVideoPlaying() {
+    return (u64)GetTickCount64() - g_video_ms < 300;
+}
 
 namespace {
 // ------------------------------------------------------------------ F12 recording
@@ -2537,7 +2608,7 @@ void RecordFrame(ID3D11ShaderResourceView* picture) {
     static int ring_frame[4] = {-1, -1, -1, -1};
     static float last_dark = 0;
     static std::vector<u8> prev_px;
-    auto drain = [&](int slot) {  // the slot's frame to the writer
+    auto drain = [&](int slot) { // the slot's frame to the writer
         if (ring_frame[slot] < 0) return;
         D3D11_MAPPED_SUBRESOURCE m;
         if (SUCCEEDED(g_ctx->Map(ring[slot].Get(), 0, D3D11_MAP_READ, 0, &m))) {
@@ -2545,7 +2616,7 @@ void RecordFrame(ID3D11ShaderResourceView* picture) {
             for (u32 y = 0; y < kRecordH; y++)
                 memcpy(&px[(size_t)y * kRecordW * 4], (const u8*)m.pData + (size_t)y * m.RowPitch, kRecordW * 4);
             g_ctx->Unmap(ring[slot].Get(), 0);
-            if (g_glitch_trap) {  // only frames much darker than the one before, with that one
+            if (g_glitch_trap) { // only frames much darker than the one before, with that one
                 u32 dark = 0, total = 0;
                 for (size_t i = 0; i < px.size(); i += 4 * 7, total++)
                     if (px[i] + px[i + 1] + px[i + 2] < 18) dark++;
@@ -2573,7 +2644,7 @@ void RecordFrame(ID3D11ShaderResourceView* picture) {
         }
         ring_frame[slot] = -1;
     };
-    static const u64 record_at = [] {  // test hook: CTR_RECORD_AT=<frame> (as F12 there)
+    static const u64 record_at = [] { // test hook: CTR_RECORD_AT=<frame> (as F12 there)
         char v[32] = {};
         return GetEnvironmentVariableA("CTR_RECORD_AT", v, sizeof(v)) ? strtoull(v, nullptr, 10) : 0ull;
     }();
@@ -2610,11 +2681,11 @@ void RecordFrame(ID3D11ShaderResourceView* picture) {
         LOG("gfx: recording %d frames into %s", frames, dir.string().c_str());
     }
     if (left <= 0) {
-        for (int s = 0; s < 4; s++) drain(s);  // the last few after the recording
+        for (int s = 0; s < 4; s++) drain(s); // the last few after the recording
         return;
     }
     const int slot = n % 4;
-    drain(slot);  // four frames old: the GPU is done with it
+    drain(slot); // four frames old: the GPU is done with it
     ID3D11ShaderResourceView* none[1] = {};
     g_ctx->PSSetShaderResources(0, 1, none);
     g_ctx->OMSetRenderTargets(1, rtv.GetAddressOf(), nullptr);
@@ -2627,7 +2698,7 @@ void RecordFrame(ID3D11ShaderResourceView* picture) {
     ring_frame[slot] = n++;
     left--;
 }
-}  // namespace
+} // namespace
 
 bool GfxPresent(u64 addr) {
     std::lock_guard lk(g_mutex);
@@ -2639,12 +2710,15 @@ bool GfxPresent(u64 addr) {
         return true;
     }();
     (void)trace_init;
-    if (!g_trace.empty()) {  // compress "d0,2048 d0,2048 ..." runs
+    if (!g_trace.empty()) { // compress "d0,2048 d0,2048 ..." runs
         std::string out, last;
         int n = 0;
         std::istringstream in(g_trace);
         for (std::string w; in >> w;) {
-            if (w == last) { n++; continue; }
+            if (w == last) {
+                n++;
+                continue;
+            }
             if (!last.empty()) out += " " + last + "x" + std::to_string(n);
             last = w, n = 1;
         }
@@ -2668,12 +2742,12 @@ bool GfxPresent(u64 addr) {
         u64 nf = std::max<u64>(1, g_frame - last_frame);
         LOG("gfx: %.1f fps, %.0f draws/frame, %.1f ms/frame in GfxDraw (cb %.1f, vb/ib map %.1f, issue %.1f), "
             "present %.1f",
-            (g_frame - last_frame) / secs, double(g_stats.draws - last_draws) / nf, g_draw_ms / nf,
-            g_cb_ms / nf, g_map_ms / nf, g_issue_ms / nf, g_present_ms / nf);
+            (g_frame - last_frame) / secs, double(g_stats.draws - last_draws) / nf, g_draw_ms / nf, g_cb_ms / nf,
+            g_map_ms / nf, g_issue_ms / nf, g_present_ms / nf);
         g_present_ms = 0;
         LOG("gfx: sections ms/frame: shader %.1f targets %.1f state %.1f shaders+cb+tex %.1f geometry %.1f layout+vb %.1f setshader %.1f cb+tex %.1f",
-            g_sec[0] / nf, g_sec[1] / nf, g_sec[2] / nf, g_sec[3] / nf, g_sec[4] / nf, g_sec[5] / nf,
-            g_sec[6] / nf, g_sec[7] / nf);
+            g_sec[0] / nf, g_sec[1] / nf, g_sec[2] / nf, g_sec[3] / nf, g_sec[4] / nf, g_sec[5] / nf, g_sec[6] / nf,
+            g_sec[7] / nf);
         memset(g_sec, 0, sizeof(g_sec));
         g_cb_ms = g_map_ms = g_issue_ms = 0;
         last = now;
@@ -2688,7 +2762,8 @@ bool GfxPresent(u64 addr) {
             (unsigned long long)g_stats.no_shader, (unsigned long long)g_stats.no_target,
             (unsigned long long)g_stats.no_layout, (unsigned long long)g_stats.clears,
             (unsigned long long)g_stats.copies, (unsigned long long)g_stats.texture_refresh,
-            (unsigned long long)g_stats.buffer_create, (unsigned long long)g_stats.buffer_refresh, g_gpu_buffers.size());
+            (unsigned long long)g_stats.buffer_create, (unsigned long long)g_stats.buffer_refresh,
+            g_gpu_buffers.size());
         EvictBuffers();
         EvictTextures();
     }
@@ -2701,8 +2776,10 @@ bool GfxPresent(u64 addr) {
             char path[96];
             snprintf(path, sizeof(path), "cap_%05llu_%llx_%ux%u.bmp", (unsigned long long)g_frame - 1,
                      (unsigned long long)base, surf.w, surf.h);
-            if (surf.dsv) SaveDepth(surf, CapturePath(path).c_str());
-            else SaveSurface(surf, CapturePath(path).c_str());
+            if (surf.dsv)
+                SaveDepth(surf, CapturePath(path).c_str());
+            else
+                SaveSurface(surf, CapturePath(path).c_str());
             for (auto& [p, copy] : g_after_shots) SaveSurface(copy, p.c_str());
             g_after_shots.clear();
             static const std::pair<u32, u32> probe = [] {
@@ -2758,8 +2835,10 @@ bool GfxPresent(u64 addr) {
                 g_ctx->Unmap(g_present_cb.Get(), 0);
                 last_gamma = gamma;
                 last_hdr = g_swap_hdr;
-                if (g_swap_hdr) LOG("gfx: HDR10 calibration peak %.0f nits exposure %.2f", calibration.peak, calibration.exposure);
-                else LOG("gfx: display gamma %.3f (%s)", gamma, calibration.gamma != 0 ? "PC settings" : "game");
+                if (g_swap_hdr)
+                    LOG("gfx: HDR10 calibration peak %.0f nits exposure %.2f", calibration.peak, calibration.exposure);
+                else
+                    LOG("gfx: display gamma %.3f (%s)", gamma, calibration.gamma != 0 ? "PC settings" : "game");
             }
         }
         g_ctx->PSSetShader(g_present_ps ? g_present_ps.Get() : g_blit_ps.Get(), nullptr, 0);
@@ -2805,8 +2884,9 @@ bool GfxPresent(u64 addr) {
     // PC settings presentation limit (startup value or live revision), then the presentation mode
     ctrport::settings::pacing::wait_before_present();
     double tp = NowMs();
-    const HRESULT presented = g_swap->Present(g_present_mode == PresentMode::Fifo ? 1 : 0,
-                    g_present_mode == PresentMode::Immediate && g_tearing ? DXGI_PRESENT_ALLOW_TEARING : 0);
+    const HRESULT presented =
+        g_swap->Present(g_present_mode == PresentMode::Fifo ? 1 : 0,
+                        g_present_mode == PresentMode::Immediate && g_tearing ? DXGI_PRESENT_ALLOW_TEARING : 0);
     g_present_ms += NowMs() - tp;
     if (presented != last_present && presented != DXGI_STATUS_OCCLUDED)
         LOG("gfx: Present 0x%08lx at frame %llu", (unsigned long)presented, (unsigned long long)g_frame);
@@ -2814,7 +2894,9 @@ bool GfxPresent(u64 addr) {
     return true;
 }
 
-void GfxRecordFrames(int frames) { g_record_request = frames; }
+void GfxRecordFrames(int frames) {
+    g_record_request = frames;
+}
 
 // The output showing the window advertises the HDR10 color space (Windows HDR on for that display).
 bool GfxHdrDisplay() {
@@ -2829,7 +2911,8 @@ bool GfxHdrDisplay() {
             ComPtr<IDXGIOutput6> output6;
             DXGI_OUTPUT_DESC1 desc{};
             if (SUCCEEDED(output.As(&output6)) && SUCCEEDED(output6->GetDesc1(&desc)) && desc.Monitor == monitor) {
-                LOG("gfx: display %ls color space %d, peak %.0f nits", desc.DeviceName, (int)desc.ColorSpace, desc.MaxLuminance);
+                LOG("gfx: display %ls color space %d, peak %.0f nits", desc.DeviceName, (int)desc.ColorSpace,
+                    desc.MaxLuminance);
                 return desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
             }
         }
@@ -2867,10 +2950,12 @@ void GfxDispatch(u64 program, const u32* regs, u32 x, u32 y, u32 z, u64 caller) 
     u64& n = seen[program];
     if (n++ != 0) return;
     LOG("gfx: compute program %llx (threads %ux%ux%u) dispatched %ux%ux%u from %llx: not run by the D3D11 backend",
-        (unsigned long long)program, regs[4], regs[5], regs[6], x, y, z, (unsigned long long)(caller - (u64)g_eboot.base));
+        (unsigned long long)program, regs[4], regs[5], regs[6], x, y, z,
+        (unsigned long long)(caller - (u64)g_eboot.base));
     // the program up to s_endpgm and its stage registers, for translation (missing_shaders/Cs_*)
     u32 dwords = 0;
-    while (dwords < 16384 && Readable(program + dwords * 4ull, 4) && R<u32>(program + dwords * 4ull) != 0xBF810000u) dwords++;
+    while (dwords < 16384 && Readable(program + dwords * 4ull, 4) && R<u32>(program + dwords * 4ull) != 0xBF810000u)
+        dwords++;
     if (dwords == 16384 || !Readable(program, (dwords + 1) * 4ull)) return;
     const u64 hash = Fnv((const u8*)program, (dwords + 1) * 4ull);
     const fs::path dir = UserRoot() / "missing_shaders";
@@ -2888,4 +2973,6 @@ void GfxDispatch(u64 program, const u32* regs, u32 x, u32 y, u32 z, u64 caller) 
     }
 }
 
-u64 GfxDrawCount() { return g_stats.draws; }
+u64 GfxDrawCount() {
+    return g_stats.draws;
+}

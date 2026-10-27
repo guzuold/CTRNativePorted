@@ -33,18 +33,27 @@ struct Segment {
 struct View {
     fs::path host;                 // the file this view belongs to
     std::uint64_t source_size = 0; // bytes served from the file (0: whole replacement)
-    std::vector<std::pair<std::uint64_t, std::array<std::uint8_t, 16>>> patches;  // later ones win
-    std::vector<Segment> tail;     // served after source_size, in order
+    std::vector<std::pair<std::uint64_t, std::array<std::uint8_t, 16>>> patches; // later ones win
+    std::vector<Segment> tail;                                                   // served after source_size, in order
     std::uint64_t tail_size = 0;
     std::uint64_t size() const { return source_size + tail_size; }
-    void append(Bytes bytes) { const auto n = bytes.size(); tail.push_back({std::move(bytes), {}, n}); tail_size += n; }
-    void append_file(const fs::path& file, std::uint64_t n) { tail.push_back({{}, file, n}); tail_size += n; }
+    void append(Bytes bytes) {
+        const auto n = bytes.size();
+        tail.push_back({std::move(bytes), {}, n});
+        tail_size += n;
+    }
+    void append_file(const fs::path& file, std::uint64_t n) {
+        tail.push_back({{}, file, n});
+        tail_size += n;
+    }
 };
 
-constexpr const char* kArchives[] = {"archives/juicedomain_permanent.pak", "archives/update.pak", "archives/update2.pak"};
+constexpr const char* kArchives[] = {"archives/juicedomain_permanent.pak", "archives/update.pak",
+                                     "archives/update2.pak"};
 
 inline std::string lower(std::string s) {
-    for (auto& c : s) if (c >= 'A' && c <= 'Z') c = char(c + 32);
+    for (auto& c : s)
+        if (c >= 'A' && c <= 'Z') c = char(c + 32);
     return s;
 }
 
@@ -54,25 +63,32 @@ inline std::string lower(std::string s) {
 inline void append_entry(View& view, const menu_assets::Iga& archive, const menu_assets::IgaEntry& entry, Bytes blob,
                          const fs::path& file = {}, std::uint64_t file_size = 0) {
     const std::uint64_t end = view.size();
-    if (const auto pad = (archive.sector_size - end % archive.sector_size) % archive.sector_size) view.append(Bytes(size_t(pad), 0));
+    if (const auto pad = (archive.sector_size - end % archive.sector_size) % archive.sector_size)
+        view.append(Bytes(size_t(pad), 0));
     const std::uint64_t offset = view.size(), size = file.empty() ? blob.size() : file_size;
     if (offset >= (1ull << 40)) menu_assets::fail("IGA offset exceeds 40-bit field");
     if (size > 0xffffffffull) menu_assets::fail("IGA entry larger than 4 GB");
-    if (file.empty()) view.append(std::move(blob)); else view.append_file(file, size);
+    if (file.empty())
+        view.append(std::move(blob));
+    else
+        view.append_file(file, size);
     Bytes descriptor(16);
     menu_assets::put32(descriptor, 0, offset & 0xffffffffu);
     menu_assets::put32(descriptor, 4, (std::uint32_t(entry.ordinal) & 0xffffff00u) | std::uint32_t(offset >> 32));
     menu_assets::put32(descriptor, 8, std::uint32_t(size));
     menu_assets::put32(descriptor, 12, 0xffffffffu);
-    std::array<std::uint8_t, 16> bytes{}; std::copy(descriptor.begin(), descriptor.end(), bytes.begin());
+    std::array<std::uint8_t, 16> bytes{};
+    std::copy(descriptor.begin(), descriptor.end(), bytes.begin());
     view.patches.emplace_back(56 + std::uint64_t(archive.file_count) * 4 + std::uint64_t(entry.index) * 16, bytes);
 }
 // Entry replacements by path; `base` (the octr-mod view of the same file) is continued.
-inline std::shared_ptr<View> append_entries(const fs::path& host, const std::vector<std::pair<std::string, Bytes>>& replacements,
+inline std::shared_ptr<View> append_entries(const fs::path& host,
+                                            const std::vector<std::pair<std::string, Bytes>>& replacements,
                                             const std::shared_ptr<const View>& base = nullptr) {
     menu_assets::Iga archive(host, false);
     auto view = base ? std::make_shared<View>(*base) : std::make_shared<View>();
-    view->host = host; view->source_size = archive.size();
+    view->host = host;
+    view->source_size = archive.size();
     for (const auto& [path, blob] : replacements) append_entry(*view, archive, archive.entry(path), blob);
     return view;
 }
@@ -102,20 +118,26 @@ public:
 private:
     void build(const Resolve& resolve) {
         if (menu_disabled_) {
-            std::fprintf(stderr, "ctrport: PC Settings menu off: not available for this eboot\n"); std::fflush(stderr); return;
+            std::fprintf(stderr, "ctrport: PC Settings menu off: not available for this eboot\n");
+            std::fflush(stderr);
+            return;
         }
         char value[4]{};
         if (GetEnvironmentVariableA("CTR_PC_MENU", value, sizeof(value)) == 1 && value[0] == '0') {
-            std::fprintf(stderr, "ctrport: PC Settings menu off (CTR_PC_MENU=0)\n"); std::fflush(stderr); return;
+            std::fprintf(stderr, "ctrport: PC Settings menu off (CTR_PC_MENU=0)\n");
+            std::fflush(stderr);
+            return;
         }
         try {
             const auto start = std::chrono::steady_clock::now();
             std::array<fs::path, 3> hosts;
             for (size_t i = 0; i < hosts.size(); ++i) hosts[i] = resolve(kArchives[i]);
-            if (mod_views_.count(kArchives[0])) menu_assets::fail("a mod changes assets inside juicedomain_permanent.pak");
+            if (mod_views_.count(kArchives[0]))
+                menu_assets::fail("a mod changes assets inside juicedomain_permanent.pak");
             const auto generated = menu_assets::generate(hosts[0], hosts[1], hosts[2]);
             auto whole = std::make_shared<View>();
-            whole->host = hosts[0]; whole->append(generated.juicedomain);
+            whole->host = hosts[0];
+            whole->append(generated.juicedomain);
             const auto mod_view = [&](const char* key) -> std::shared_ptr<const View> {
                 const auto it = mod_views_.find(key);
                 return it == mod_views_.end() ? nullptr : it->second;
@@ -125,7 +147,8 @@ private:
             views[kArchives[1]] = append_entries(hosts[1], generated.update, mod_view(kArchives[1]));
             views[kArchives[2]] = append_entries(hosts[2], generated.update2, mod_view(kArchives[2]));
             views_ = std::move(views);
-            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+            const auto ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
             std::fprintf(stderr, "ctrport: PC Settings menu ready: %zu pages, %zu resources, %lld ms\n",
                          generated.projects.size(), generated.files.size(), static_cast<long long>(ms));
         } catch (const std::exception& e) {
@@ -142,13 +165,15 @@ inline Overlay overlay;
 
 // Reads [offset, offset+count) of the virtual file; read_source reads the original file.
 template <class ReadSource>
-inline std::uint64_t read(const View& view, std::uint64_t offset, std::uint8_t* target, std::uint64_t count, ReadSource&& read_source) {
+inline std::uint64_t read(const View& view, std::uint64_t offset, std::uint8_t* target, std::uint64_t count,
+                          ReadSource&& read_source) {
     std::uint64_t done = 0;
     if (offset < view.source_size) {
         const std::uint64_t wanted = (std::min<std::uint64_t>)(count, view.source_size - offset);
         done = read_source(offset, target, wanted);
         for (const auto& [at, bytes] : view.patches) {
-            const std::uint64_t lo = (std::max<std::uint64_t>)(at, offset), hi = (std::min<std::uint64_t>)(at + 16, offset + done);
+            const std::uint64_t lo = (std::max<std::uint64_t>)(at, offset),
+                                hi = (std::min<std::uint64_t>)(at + 16, offset + done);
             if (lo < hi) std::memcpy(target + (lo - offset), bytes.data() + (lo - at), size_t(hi - lo));
         }
         if (done < wanted) return done;
@@ -158,7 +183,8 @@ inline std::uint64_t read(const View& view, std::uint64_t offset, std::uint8_t* 
         if (done >= count) break;
         const std::uint64_t at = offset + done;
         if (at >= segment_at && at < segment_at + segment.size) {
-            const std::uint64_t from = at - segment_at, n = (std::min<std::uint64_t>)(count - done, segment.size - from);
+            const std::uint64_t from = at - segment_at,
+                                n = (std::min<std::uint64_t>)(count - done, segment.size - from);
             if (segment.file.empty()) {
                 std::memcpy(target + done, segment.bytes.data() + from, size_t(n));
             } else {
@@ -173,4 +199,4 @@ inline std::uint64_t read(const View& view, std::uint64_t offset, std::uint8_t* 
     }
     return done;
 }
-}  // namespace ctrport::settings::menu_overlay
+} // namespace ctrport::settings::menu_overlay

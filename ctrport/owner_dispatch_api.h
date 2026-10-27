@@ -10,8 +10,8 @@
    destroying the dispatcher or unloading a service. Owner must pump regularly. */
 typedef int (*CtrOwnerAction)(void* user);
 typedef struct CtrOwnerDispatchApi {
- uint32_t size,version;
- void* context;
- int (*invoke)(void*,CtrOwnerAction,void* user,int* action_result);
+    uint32_t size, version;
+    void* context;
+    int (*invoke)(void*, CtrOwnerAction, void* user, int* action_result);
 } CtrOwnerDispatchApi;
 #endif

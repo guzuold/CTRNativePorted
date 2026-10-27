@@ -7,33 +7,74 @@
 #include <cstdlib>
 #include <string>
 namespace ctr_ui {
-enum class Text { NoFriends, Send, InvitationFrom, NoInvitations, Accept, JoinQuestion, AcceptFailed,
-                  DeclineFailed, RetryHint, ErrorTitle, SelectRecipients, Cancel, TrophyUnlocked, Trophy,
-                  ExitTitle, ExitQuestion, ExitConfirm, ExitCancel, Count };
+enum class Text {
+    NoFriends,
+    Send,
+    InvitationFrom,
+    NoInvitations,
+    Accept,
+    JoinQuestion,
+    AcceptFailed,
+    DeclineFailed,
+    RetryHint,
+    ErrorTitle,
+    SelectRecipients,
+    Cancel,
+    TrophyUnlocked,
+    Trophy,
+    ExitTitle,
+    ExitQuestion,
+    ExitConfirm,
+    ExitCancel,
+    Count
+};
 // The picker window is found by this title (invitation_dialog.cpp), so it is not translated.
 inline constexpr const wchar_t* kInvitationTitle = L"CTR - Invitation";
 inline int ui_language() {
     char value[8]{};
     const DWORD n = GetEnvironmentVariableA("CTR_SYSTEM_LANGUAGE", value, sizeof(value));
     const int id = n && n < sizeof(value) ? std::atoi(value) : 1;
-    switch (id) { case 2: return 1; case 3: return 4; case 4: return 3; case 5: return 2; default: return 0; }
+    switch (id) {
+    case 2: return 1;
+    case 3: return 4;
+    case 4: return 3;
+    case 5: return 2;
+    default: return 0;
+    }
 }
 inline const wchar_t* ui_text(Text text) {
     // English, French, Italian, German, Spanish
     static constexpr const wchar_t* table[static_cast<int>(Text::Count)][5] = {
-        {L"No friends available.", L"Aucun ami disponible.", L"Nessun amico disponibile.", L"Keine Freunde verfügbar.", L"No hay amigos disponibles."},
+        {L"No friends available.", L"Aucun ami disponible.", L"Nessun amico disponibile.", L"Keine Freunde verfügbar.",
+         L"No hay amigos disponibles."},
         {L"Send", L"Envoyer", L"Invia", L"Senden", L"Enviar"},
         {L"Invitation from {0}", L"Invitation de {0}", L"Invito da {0}", L"Einladung von {0}", L"Invitación de {0}"},
-        {L"No pending invitations.", L"Aucune invitation en attente.", L"Nessun invito in attesa.", L"Keine ausstehenden Einladungen.", L"No hay invitaciones pendientes."},
+        {L"No pending invitations.", L"Aucune invitation en attente.", L"Nessun invito in attesa.",
+         L"Keine ausstehenden Einladungen.", L"No hay invitaciones pendientes."},
         {L"Accept", L"Accepter", L"Accetta", L"Annehmen", L"Aceptar"},
-        {L"Invitation from {0}. Join the session?", L"Invitation de {0}. Rejoindre la session ?", L"Invito da {0}. Entrare nella sessione?", L"Einladung von {0}. Der Sitzung beitreten?", L"Invitación de {0}. ¿Unirse a la sesión?"},
-        {L"Could not accept the invitation. You did not join the session.", L"Impossible d'accepter l'invitation. Vous n'avez pas rejoint la session.", L"Impossibile accettare l'invito. Non sei entrato nella sessione.", L"Die Einladung konnte nicht angenommen werden. Du bist der Sitzung nicht beigetreten.", L"No se pudo aceptar la invitación. No te has unido a la sesión."},
-        {L"Could not decline the invitation.", L"Impossible de refuser l'invitation.", L"Impossibile rifiutare l'invito.", L"Die Einladung konnte nicht abgelehnt werden.", L"No se pudo rechazar la invitación."},
-        {L"Retry repeats the operation. Cancel stops the notices for this invitation.", L"Réessayer répète l'opération. Annuler arrête les avis pour cette invitation.", L"Riprova ripete l'operazione. Annulla interrompe gli avvisi per questo invito.", L"Wiederholen führt den Vorgang erneut aus. Abbrechen beendet die Hinweise zu dieser Einladung.", L"Reintentar repite la operación. Cancelar detiene los avisos de esta invitación."},
-        {L"CTR - Invitation error", L"CTR - Erreur d'invitation", L"CTR - Errore invito", L"CTR - Einladungsfehler", L"CTR - Error de invitación"},
-        {L"Select 1 to {0} recipients.", L"Sélectionnez de 1 à {0} destinataires.", L"Seleziona da 1 a {0} destinatari.", L"Wähle 1 bis {0} Empfänger.", L"Selecciona de 1 a {0} destinatarios."},
+        {L"Invitation from {0}. Join the session?", L"Invitation de {0}. Rejoindre la session ?",
+         L"Invito da {0}. Entrare nella sessione?", L"Einladung von {0}. Der Sitzung beitreten?",
+         L"Invitación de {0}. ¿Unirse a la sesión?"},
+        {L"Could not accept the invitation. You did not join the session.",
+         L"Impossible d'accepter l'invitation. Vous n'avez pas rejoint la session.",
+         L"Impossibile accettare l'invito. Non sei entrato nella sessione.",
+         L"Die Einladung konnte nicht angenommen werden. Du bist der Sitzung nicht beigetreten.",
+         L"No se pudo aceptar la invitación. No te has unido a la sesión."},
+        {L"Could not decline the invitation.", L"Impossible de refuser l'invitation.",
+         L"Impossibile rifiutare l'invito.", L"Die Einladung konnte nicht abgelehnt werden.",
+         L"No se pudo rechazar la invitación."},
+        {L"Retry repeats the operation. Cancel stops the notices for this invitation.",
+         L"Réessayer répète l'opération. Annuler arrête les avis pour cette invitation.",
+         L"Riprova ripete l'operazione. Annulla interrompe gli avvisi per questo invito.",
+         L"Wiederholen führt den Vorgang erneut aus. Abbrechen beendet die Hinweise zu dieser Einladung.",
+         L"Reintentar repite la operación. Cancelar detiene los avisos de esta invitación."},
+        {L"CTR - Invitation error", L"CTR - Erreur d'invitation", L"CTR - Errore invito", L"CTR - Einladungsfehler",
+         L"CTR - Error de invitación"},
+        {L"Select 1 to {0} recipients.", L"Sélectionnez de 1 à {0} destinataires.",
+         L"Seleziona da 1 a {0} destinatari.", L"Wähle 1 bis {0} Empfänger.", L"Selecciona de 1 a {0} destinatarios."},
         {L"Cancel", L"Annuler", L"Annulla", L"Abbrechen", L"Cancelar"},
-        {L"Trophy unlocked", L"Trophée débloqué", L"Trofeo sbloccato", L"Trophäe freigeschaltet", L"Trofeo desbloqueado"},
+        {L"Trophy unlocked", L"Trophée débloqué", L"Trofeo sbloccato", L"Trophäe freigeschaltet",
+         L"Trofeo desbloqueado"},
         {L"Trophy {0}", L"Trophée {0}", L"Trofeo {0}", L"Trophäe {0}", L"Trofeo {0}"},
         {L"Quit the game", L"Quitter le jeu", L"Esci dal gioco", L"Spiel beenden", L"Salir del juego"},
         {L"Close the game?\nWait for any saving to finish.\nRelease the buttons, then press A to quit or B to cancel.",

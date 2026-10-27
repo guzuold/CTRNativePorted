@@ -36,8 +36,7 @@ struct ToolkitEntry {
 std::mutex toolkit_mutex;
 std::array<ToolkitEntry, 8> toolkit_callbacks{};
 
-void log_netctl(const char* library, const char* function, long long result,
-                const std::string& extra = "") {
+void log_netctl(const char* library, const char* function, long long result, const std::string& extra = "") {
     ctr_hle::log_call(library, function, result, extra.c_str());
 }
 
@@ -78,7 +77,7 @@ CTR_SYSV int sceNetCtlGetInfo(int code, void* info) {
     int result = 0;
     switch (code) {
     case 1: write_u32(0); break; // device: wired
-    case 2: {                     // ether address: locally administered, fixed
+    case 2: {                    // ether address: locally administered, fixed
         const unsigned char mac[6] = {0x02, 0x43, 0x54, 0x52, 0x00, 0x01};
         std::memcpy(bytes, mac, 6);
         break;
@@ -91,9 +90,7 @@ CTR_SYSV int sceNetCtlGetInfo(int code, void* info) {
     case 15: copy_text(bytes, 16, "255.255.255.0"); break;
     case 16: copy_text(bytes, 16, local); break;
     case 17:
-    case 18: copy_text(bytes, 16, ctr_hle::online::format_address(
-                                         ctr_hle::online::server_address()));
-        break;
+    case 18: copy_text(bytes, 16, ctr_hle::online::format_address(ctr_hle::online::server_address())); break;
     case 19: write_u32(0); break; // http proxy off
     case 20: copy_text(bytes, 256, ""); break;
     case 21: std::memset(bytes, 0, 2); break;
@@ -134,8 +131,7 @@ CTR_SYSV int sceNetCtlGetNatInfo(NatInfo* info) {
 }
 CTR_HLE_REGISTER_ONLINE("JO4yuTuMoKI", "libSceNetCtl", sceNetCtlGetNatInfo);
 
-CTR_SYSV int sceNetCtlRegisterCallbackForNpToolkit(ToolkitCallback function, void* argument,
-                                                   int* id) {
+CTR_SYSV int sceNetCtlRegisterCallbackForNpToolkit(ToolkitCallback function, void* argument, int* id) {
     if (!function || !id) {
         return kInvalidAddr;
     }
@@ -151,23 +147,19 @@ CTR_SYSV int sceNetCtlRegisterCallbackForNpToolkit(ToolkitCallback function, voi
     }
     return kCallbackMax;
 }
-CTR_HLE_REGISTER_ONLINE("wIsKy+TfeLs", "libSceNetCtlForNpToolkit",
-                        sceNetCtlRegisterCallbackForNpToolkit);
+CTR_HLE_REGISTER_ONLINE("wIsKy+TfeLs", "libSceNetCtlForNpToolkit", sceNetCtlRegisterCallbackForNpToolkit);
 
 CTR_SYSV int sceNetCtlUnregisterCallbackForNpToolkit(int id) {
     std::scoped_lock lock{toolkit_mutex};
-    if (id < 0 || id >= static_cast<int>(toolkit_callbacks.size()) ||
-        !toolkit_callbacks[id].function) {
+    if (id < 0 || id >= static_cast<int>(toolkit_callbacks.size()) || !toolkit_callbacks[id].function) {
         return kInvalidId;
     }
     toolkit_callbacks[id] = {};
     return 0;
 }
-CTR_HLE_REGISTER_ONLINE("2oUqKR5odGc", "libSceNetCtlForNpToolkit",
-                        sceNetCtlUnregisterCallbackForNpToolkit);
+CTR_HLE_REGISTER_ONLINE("2oUqKR5odGc", "libSceNetCtlForNpToolkit", sceNetCtlUnregisterCallbackForNpToolkit);
 
 CTR_SYSV int sceNetCtlCheckCallbackForNpToolkit() {
     return 0; // the connection state never changes while the runtime is online
 }
-CTR_HLE_REGISTER_ONLINE("u5oqtlIP+Fw", "libSceNetCtlForNpToolkit",
-                        sceNetCtlCheckCallbackForNpToolkit);
+CTR_HLE_REGISTER_ONLINE("u5oqtlIP+Fw", "libSceNetCtlForNpToolkit", sceNetCtlCheckCallbackForNpToolkit);

@@ -9,12 +9,19 @@ namespace ctrport {
 class CommonDialogLifecycle {
     std::atomic<bool> initialized{false};
     std::atomic<bool> used{false};
+
 public:
-    int initialize() {bool expected=false;return initialized.compare_exchange_strong(expected,true)?0:static_cast<int>(0x80B80002U);}
-    bool claim() {bool expected=false;return used.compare_exchange_strong(expected,true);}
-    void release() {used=false;}
-    bool in_use() const {return used.load();}
-    bool ready() const {return initialized.load();}
+    int initialize() {
+        bool expected = false;
+        return initialized.compare_exchange_strong(expected, true) ? 0 : static_cast<int>(0x80B80002U);
+    }
+    bool claim() {
+        bool expected = false;
+        return used.compare_exchange_strong(expected, true);
+    }
+    void release() { used = false; }
+    bool in_use() const { return used.load(); }
+    bool ready() const { return initialized.load(); }
 };
 inline CommonDialogLifecycle common_dialog;
 }

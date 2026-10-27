@@ -24,27 +24,31 @@
 
 namespace {
 
-u32 Align(u32 v, u32 a) { return (v + a - 1) / a * a; }
+u32 Align(u32 v, u32 a) {
+    return (v + a - 1) / a * a;
+}
 
 u32 MortonInTile(u32 x, u32 y) {
     return (x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3);
 }
 
-bool IsMicroTiled1D(u32 mode) { return mode == 5 || mode == 9 || mode == 13; }
+bool IsMicroTiled1D(u32 mode) {
+    return mode == 5 || mode == 9 || mode == 13;
+}
 
 struct Mip {
-    u32 ew, eh;        // elements to copy (texels or 4x4 blocks)
-    u32 row_e;         // tiled pitch in elements
-    u64 offset;        // byte offset of the level (all slices)
-    u64 slice_bytes;   // bytes per slice of this level
+    u32 ew, eh;      // elements to copy (texels or 4x4 blocks)
+    u32 row_e;       // tiled pitch in elements
+    u64 offset;      // byte offset of the level (all slices)
+    u64 slice_bytes; // bytes per slice of this level
 };
 
 struct Layout {
     DXGI_FORMAT fmt;
-    u32 eb, bw;  // element bytes, block width (1 or 4)
+    u32 eb, bw; // element bytes, block width (1 or 4)
     u32 slices, levels;
     bool cube;
-    u32 width0, height0;  // D3D level 0 size
+    u32 width0, height0; // D3D level 0 size
     Mip mips[16];
     u64 total;
 };
@@ -58,7 +62,7 @@ bool GetLayout(const TSharp& t, Layout* l) {
     l->cube = t.type == 11;
     bool array = t.type == 12 || t.type == 13 || l->cube;
     l->slices = l->cube ? 6 : array ? (t.last_array - t.base_array + 1) : 1;
-    if (t.type == 10) l->slices = 1;  // 3D textures: only the first slice for now
+    if (t.type == 10) l->slices = 1; // 3D textures: only the first slice for now
     l->levels = std::min<u32>(t.last_level + 1, 16);
     l->width0 = bc ? Align(t.width, 4) : t.width;
     l->height0 = bc ? Align(t.height, 4) : t.height;
@@ -157,7 +161,7 @@ void DumpTexture(const TSharp& t, const Layout& l, const std::vector<D3D11_SUBRE
     put32(10, 54);
     put32(14, 40);
     put32(18, w);
-    put32(22, (u32)-(s32)h);  // top-down
+    put32(22, (u32) - (s32)h); // top-down
     hdr[26] = 1;
     hdr[28] = 32;
     put32(34, size);
@@ -165,7 +169,7 @@ void DumpTexture(const TSharp& t, const Layout& l, const std::vector<D3D11_SUBRE
     const u8* src = (const u8*)init[0].pSysMem;
     std::vector<u8> row(w * 4);
     for (u32 y = 0; y < h; y++) {
-        for (u32 x = 0; x < w; x++) {  // RGBA -> BGRA
+        for (u32 x = 0; x < w; x++) { // RGBA -> BGRA
             const u8* p = src + ((size_t)y * w + x) * 4;
             row[x * 4 + 0] = p[2], row[x * 4 + 1] = p[1], row[x * 4 + 2] = p[0], row[x * 4 + 3] = p[3];
         }
@@ -174,7 +178,7 @@ void DumpTexture(const TSharp& t, const Layout& l, const std::vector<D3D11_SUBRE
     fclose(f);
 }
 
-}  // namespace
+} // namespace
 
 bool TextureSupported(const TSharp& t) {
     return t.tiling_index == 8 || IsMicroTiled1D(t.tiling_index);
@@ -185,7 +189,7 @@ bool BuildTexture(ID3D11Device* dev, const TSharp& t, TextureObject* out) {
     if (!GetLayout(t, &l)) return false;
     out->mem_base = t.base;
     out->mem_size = l.total;
-    GuestResetWritten(out->mem_base, out->mem_size);  // later guest writes mark the copy stale
+    GuestResetWritten(out->mem_base, out->mem_size); // later guest writes mark the copy stale
     std::vector<u8> linear;
     std::vector<D3D11_SUBRESOURCE_DATA> init;
     Detile(t, l, linear, init);

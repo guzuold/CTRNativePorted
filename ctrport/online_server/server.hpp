@@ -47,14 +47,14 @@ struct ServerConfig {
     std::uint16_t discovery_port = 0; // 0: 3078 with public_host
     // UDP relay between players of the same room (relay.hpp); 0 turns it off.
     std::uint16_t relay_port = 3082;
-    std::filesystem::path state_dir;  // runtime/user/online
-    std::filesystem::path log_path;   // runtime/user/logs/online_server_<time>.jsonl
-    bool party_enabled = false; // launcher-managed membership and admission
+    std::filesystem::path state_dir;     // runtime/user/online
+    std::filesystem::path log_path;      // runtime/user/logs/online_server_<time>.jsonl
+    bool party_enabled = false;          // launcher-managed membership and admission
     std::filesystem::path identity_path; // optional custom path for host_identity.json
     // Friend network (phase 2): answer the signed POST /ctr/v1/peer of the friends in
     // state_dir/friends.json and poll their services for presence (friend_network.hpp).
     bool friend_network = false;
-    std::string local_name; // online ID of this PC's player; else the first connected game
+    std::string local_name;                  // online ID of this PC's player; else the first connected game
     FriendWatcher::Resolver friend_resolver; // empty: the rubrica's last verified endpoint
     std::chrono::milliseconds friend_poll_period{5000};
     // Public matchmaking across PCs: the hub to use, asked when a player of this service starts

@@ -15,7 +15,10 @@ CTR_HLE_REGISTER("Q3VBxCXhUHs", "libSceLibcInternal", sceLibcInternalMemcpy);
 char* CTR_SYSV sceLibcInternalStrncat(char* destination, const char* source, std::uint64_t limit) {
     char* end = destination + std::strlen(destination);
     std::uint64_t count = 0;
-    while (count < limit && source[count]) { end[count] = source[count]; ++count; }
+    while (count < limit && source[count]) {
+        end[count] = source[count];
+        ++count;
+    }
     end[count] = 0;
     ctr_hle::log_call("libSceLibcInternal", "strncat", 0);
     return destination;

@@ -20,8 +20,10 @@ void classic_paint_window(HDC target) {
         // Render contents based on active tab
         if (g.current_tab == TAB_HOME) {
             // Action cluster bottom-right: STATUS badge
-            draw_slanted_box(gr, rect(kWidth - 184, kHeight - 150, 140, 30), 0.176f, 4.0f, SolidBrush(Color(kArcadeDark)), kArcadeGold, 2.0f);
-            text(gr, tr(g.can_launch ? L"READY" : L"SETUP REQUIRED"), 1, 11.5f, FontStyleBold, rect(kWidth - 184, kHeight - 150, 140, 30), kArcadeGold, StringAlignmentCenter);
+            draw_slanted_box(gr, rect(kWidth - 184, kHeight - 150, 140, 30), 0.176f, 4.0f,
+                             SolidBrush(Color(kArcadeDark)), kArcadeGold, 2.0f);
+            text(gr, tr(g.can_launch ? L"READY" : L"SETUP REQUIRED"), 1, 11.5f, FontStyleBold,
+                 rect(kWidth - 184, kHeight - 150, 140, 30), kArcadeGold, StringAlignmentCenter);
 
             fill_round(gr, rect(280, kHeight - 37, 720, 26), 8, SolidBrush(Color(kArcadeDark)));
             // Small version summary line in bottom corner
@@ -31,29 +33,41 @@ void classic_paint_window(HDC target) {
             // 3a/3b/3c share the uninterrupted purple Pit Lane shell.
 
             if (g.current_tab == TAB_MODS) {
-                mods_list_paint(gr);  // launcher_mods.hpp
+                mods_list_paint(gr); // launcher_mods.hpp
             } else if (g.current_tab == TAB_TROPHIES) {
                 text(gr, tr(L"TROPHIES"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
                 const auto total = g.trophy_set.trophies.size();
-                draw_slanted_box(gr, rect(870, 84, 120, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard, 2.0f);
-                text(gr, std::to_wstring(g.trophy_unlocked.size()) + L" / " + std::to_wstring(total), 1, 11.0f, FontStyleBold,
-                     rect(870, 84, 120, 26), g.trophy_unlocked.empty() ? kTextMuted : kArcadeLime, StringAlignmentCenter);
-                ColorMatrix gray = {{{0.2f, 0.2f, 0.2f, 0, 0}, {0.4f, 0.4f, 0.4f, 0, 0}, {0.1f, 0.1f, 0.1f, 0, 0}, {0, 0, 0, 0.35f, 0}, {0, 0, 0, 0, 1}}};
+                draw_slanted_box(gr, rect(870, 84, 120, 26), 0.14f, 3.0f, SolidBrush(Color(kArcadeDark)), kArcadeCard,
+                                 2.0f);
+                text(gr, std::to_wstring(g.trophy_unlocked.size()) + L" / " + std::to_wstring(total), 1, 11.0f,
+                     FontStyleBold, rect(870, 84, 120, 26), g.trophy_unlocked.empty() ? kTextMuted : kArcadeLime,
+                     StringAlignmentCenter);
+                ColorMatrix gray = {{{0.2f, 0.2f, 0.2f, 0, 0},
+                                     {0.4f, 0.4f, 0.4f, 0, 0},
+                                     {0.1f, 0.1f, 0.1f, 0, 0},
+                                     {0, 0, 0, 0.35f, 0},
+                                     {0, 0, 0, 0, 1}}};
                 ImageAttributes locked;
                 locked.SetColorMatrix(&gray);
                 for (std::size_t i = 0; i < total && i < g.trophy_icons.size(); ++i) {
-                    const float x = kTrophyLeft + (i % kTrophyColumns) * kTrophyCell, y = kTrophyTop + (i / kTrophyColumns) * kTrophyCell;
+                    const float x = kTrophyLeft + (i % kTrophyColumns) * kTrophyCell,
+                                y = kTrophyTop + (i / kTrophyColumns) * kTrophyCell;
                     const bool unlocked = g.trophy_unlocked.count(g.trophy_set.trophies[i].id) > 0;
-                    if (static_cast<int>(i) == g.trophy_hot) fill_round(gr, rect(x - 3, y - 3, kTrophyIcon + 6, kTrophyIcon + 6), 8, SolidBrush(Color(kArcadeGold)));
+                    if (static_cast<int>(i) == g.trophy_hot)
+                        fill_round(gr, rect(x - 3, y - 3, kTrophyIcon + 6, kTrophyIcon + 6), 8,
+                                   SolidBrush(Color(kArcadeGold)));
                     if (Bitmap* icon = g.trophy_icons[i].get()) {
                         const RectF r = rect(x, y, kTrophyIcon, kTrophyIcon);
-                        if (unlocked) gr.DrawImage(icon, r);
-                        else gr.DrawImage(icon, r, 0, 0, static_cast<REAL>(icon->GetWidth()), static_cast<REAL>(icon->GetHeight()), UnitPixel, &locked);
+                        if (unlocked)
+                            gr.DrawImage(icon, r);
+                        else
+                            gr.DrawImage(icon, r, 0, 0, static_cast<REAL>(icon->GetWidth()),
+                                         static_cast<REAL>(icon->GetHeight()), UnitPixel, &locked);
                     } else {
                         fill_round(gr, rect(x, y, kTrophyIcon, kTrophyIcon), 8, SolidBrush(Color(kArcadeCard)));
                     }
                 }
-                trophy_card_paint(gr);  // launcher_trophies.hpp
+                trophy_card_paint(gr); // launcher_trophies.hpp
             } else if (g.current_tab == TAB_SETTINGS) {
                 // the tab scrolls (mouse wheel): clipped to the page, shifted by the scroll position
                 const GraphicsState unscrolled = gr.Save();
@@ -86,7 +100,8 @@ void classic_paint_window(HDC target) {
                 text(gr, tr(L"Player name:"), 1, 11.5f, FontStyleBold, rect(548, 230, 190, 18), kTextMuted);
                 draw_field(gr, rect(548, 252, 190, 32), g.online_id_edit);
 
-                text(gr,g.cfg.online ? L"ONLINE" : L"OFFLINE",0,18,FontStyleBold,rect(548,490,190,28),g.cfg.online ? kArcadeLime : kTextMuted);
+                text(gr, g.cfg.online ? L"ONLINE" : L"OFFLINE", 0, 18, FontStyleBold, rect(548, 490, 190, 28),
+                     g.cfg.online ? kArcadeLime : kTextMuted);
 
                 // Card 3: CONTROLLER & AUDIO
                 const RectF c_card = rect(768, 126, 222, 300);
@@ -94,7 +109,8 @@ void classic_paint_window(HDC target) {
                 stroke_round(gr, c_card, 18, kArcadeDark, 3.0f);
                 text(gr, tr(L"CONTROLLER"), 0, 18.0f, FontStyleBold, rect(784, 142, 190, 24), kArcadePink);
                 for (int player = 0; player < 4; ++player)
-                    text(gr, trf(L"Player {0}", std::to_wstring(player + 1)), 1, 10.5f, FontStyleBold, rect(784, 168.f + player * 46.f, 190, 16), kTextMuted);
+                    text(gr, trf(L"Player {0}", std::to_wstring(player + 1)), 1, 10.5f, FontStyleBold,
+                         rect(784, 168.f + player * 46.f, 190, 16), kTextMuted);
 
                 fill_round(gr, rect(768, 436, 222, 140), 18, SolidBrush(Color(kArcadeCard)));
                 stroke_round(gr, rect(768, 436, 222, 140), 18, kArcadeDark, 3);
@@ -111,11 +127,13 @@ void classic_paint_window(HDC target) {
                 gr.TranslateTransform(0, -settings_scroll);
                 text(gr, tr(L"ADVANCED"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
 
-                text(gr, tr(L"Base game folder (v01.00, CUSA14876 or CUSA13795):"), 1, 11.5f, FontStyleBold, rect(296, 122, 600, 18), kTextMuted);
+                text(gr, tr(L"Base game folder (v01.00, CUSA14876 or CUSA13795):"), 1, 11.5f, FontStyleBold,
+                     rect(296, 122, 600, 18), kTextMuted);
                 draw_field(gr, rect(296, 144, 580, 34), g.base_edit);
                 draw_status(gr, g.base_status, 296, 182, 580);
 
-                text(gr, tr(L"Update folder (v01.21, CUSA14876-patch or CUSA13795-patch):"), 1, 11.5f, FontStyleBold, rect(296, 208, 600, 18), kTextMuted);
+                text(gr, tr(L"Update folder (v01.21, CUSA14876-patch or CUSA13795-patch):"), 1, 11.5f, FontStyleBold,
+                     rect(296, 208, 600, 18), kTextMuted);
                 draw_field(gr, rect(296, 230, 580, 34), g.patch_edit);
                 draw_status(gr, g.patch_status, 296, 268, 580);
 

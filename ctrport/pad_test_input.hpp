@@ -7,14 +7,23 @@
 #include <fstream>
 namespace ctrport {
 inline void apply_pad_test_input(XINPUT_GAMEPAD& gamepad) {
-    static const bool enabled=[] {char value[8]{};return GetEnvironmentVariableA("CTR_PAD_TEST_INPUT",value,sizeof(value))==1 && value[0]=='1';}();
-    if(!enabled)return;
-    unsigned mask=0;unsigned long long deadline=0;
+    static const bool enabled = [] {
+        char value[8]{};
+        return GetEnvironmentVariableA("CTR_PAD_TEST_INPUT", value, sizeof(value)) == 1 && value[0] == '1';
+    }();
+    if (!enabled) return;
+    unsigned mask = 0;
+    unsigned long long deadline = 0;
     std::ifstream command("runtime/user/input/pad.txt");
-    const auto now=GetTickCount64();
-    if(!(command>>mask>>deadline) || mask>65535 || now>deadline || deadline-now>2000)mask=0;
-    static unsigned previous=0;
-    if(mask!=previous){std::printf("{\"scope\":\"diagnostic_pad_input\",\"xinput_buttons\":%u,\"physical_connection_required\":true}\n",mask);std::fflush(stdout);previous=mask;}
-    gamepad.wButtons=static_cast<WORD>(gamepad.wButtons|mask);
+    const auto now = GetTickCount64();
+    if (!(command >> mask >> deadline) || mask > 65535 || now > deadline || deadline - now > 2000) mask = 0;
+    static unsigned previous = 0;
+    if (mask != previous) {
+        std::printf(
+            "{\"scope\":\"diagnostic_pad_input\",\"xinput_buttons\":%u,\"physical_connection_required\":true}\n", mask);
+        std::fflush(stdout);
+        previous = mask;
+    }
+    gamepad.wButtons = static_cast<WORD>(gamepad.wButtons | mask);
 }
 }

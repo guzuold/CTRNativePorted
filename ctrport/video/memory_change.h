@@ -8,7 +8,7 @@ extern "C" {
 // Does not invalidate or flush overlapping resources: returns88 for overlap.
 // Caller must keep owner serialization through actual mapping/type mutation.
 // 60 zero/overflow/malformed,91 failed session. No GPU/CPU coherence asserted.
-int ctr_video_admit_memory_change_v1(void* session,uint64_t address,uint64_t bytes);
+int ctr_video_admit_memory_change_v1(void* session, uint64_t address, uint64_t bytes);
 #ifdef __cplusplus
 }
 #endif

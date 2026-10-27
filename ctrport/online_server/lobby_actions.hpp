@@ -6,5 +6,10 @@
 namespace ctr_online {
 // Blocking room operations; the drawer executes these off the UI thread.
 // 110: share, 111: join, 109: leave and return to local hosting.
-struct LobbyActionResult {int action=0;bool ok=false;std::string detail;PartySelection party;};
+struct LobbyActionResult {
+    int action = 0;
+    bool ok = false;
+    std::string detail;
+    PartySelection party;
+};
 } // namespace ctr_online

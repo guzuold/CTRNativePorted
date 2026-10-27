@@ -16,15 +16,23 @@ public:
     bool admits(const std::string& room, const std::string& name);
     std::map<std::string, std::size_t> expected_players();
     Json recovery_checkpoint(const std::string& caller);
+
 private:
-    struct Member { std::string name; std::uint64_t seen; std::string endpoint; };
+    struct Member {
+        std::string name;
+        std::uint64_t seen;
+        std::string endpoint;
+    };
     std::mutex mutex_;
     std::string owner_, room_, destination_;
     std::string share_token_;
     std::uint64_t share_created_ = 0;
     std::uint64_t generation_ = 0;
     std::map<std::string, Member> members_;
-    struct Invitation { std::string sender; std::uint64_t created; };
+    struct Invitation {
+        std::string sender;
+        std::uint64_t created;
+    };
     std::map<std::string, Invitation> invited_;
     std::map<std::string, std::string> inbox_;
     std::map<std::string, std::uint64_t> inbox_seen_;

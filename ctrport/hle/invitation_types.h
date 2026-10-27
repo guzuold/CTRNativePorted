@@ -6,17 +6,32 @@
 #include <cstddef>
 #include <cstdint>
 namespace ctr_hle::invitation {
-struct Base { std::size_t size; std::uint8_t reserved[36]; std::uint32_t magic; };
-struct SessionId { char data[45]; char term; char padding[2]; };
+struct Base {
+    std::size_t size;
+    std::uint8_t reserved[36];
+    std::uint32_t magic;
+};
+struct SessionId {
+    char data[45];
+    char term;
+    char padding[2];
+};
 struct Address {
     std::int32_t type, padding;
     union {
-        struct { const std::uint64_t* accounts; std::uint32_t count, padding; } fixed;
+        struct {
+            const std::uint64_t* accounts;
+            std::uint32_t count, padding;
+        } fixed;
         std::uint32_t maximum;
     } info;
 };
 union Data {
-    struct { const char* message; const SessionId* session; Address address; } send;
+    struct {
+        const char* message;
+        const SessionId* session;
+        Address address;
+    } send;
     std::uint8_t reserved[64];
 };
 struct Param {
@@ -27,8 +42,14 @@ struct Param {
     const Data* data;
     std::uint8_t reserved[64];
 };
-struct User { char online_id[20]; std::uint64_t account; };
-struct Users { std::uint32_t count; User users[16]; };
+struct User {
+    char online_id[20];
+    std::uint64_t account;
+};
+struct Users {
+    std::uint32_t count;
+    User users[16];
+};
 struct Result {
     void* callback;
     std::int32_t error, result;

@@ -64,17 +64,14 @@ public:
 private:
     void* algorithm_ = nullptr;
     void* key_ = nullptr;
-    Bytes public_key_;      // 64 bytes (X, Y)
-    Bytes private_blob_;    // CNG export blob
+    Bytes public_key_;   // 64 bytes (X, Y)
+    Bytes private_blob_; // CNG export blob
     std::string friend_code_;
-    Bytes dht_info_hash_;   // 20 bytes
+    Bytes dht_info_hash_; // 20 bytes
 };
 
 // Verifies an authentication response using a friend's public key (64 bytes).
-bool verify_friend_response(const Bytes& public_key_64,
-                            const std::string& nonce_hex,
-                            const Bytes& traffic_key_spki,
-                            std::uint64_t timestamp,
-                            const Bytes& signature_64);
+bool verify_friend_response(const Bytes& public_key_64, const std::string& nonce_hex, const Bytes& traffic_key_spki,
+                            std::uint64_t timestamp, const Bytes& signature_64);
 
 } // namespace ctr_online

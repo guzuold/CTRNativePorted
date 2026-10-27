@@ -12,13 +12,20 @@ namespace ctr_online {
 namespace {
 struct Wsa {
     bool ok;
-    Wsa() { WSADATA d; ok = WSAStartup(MAKEWORD(2, 2), &d) == 0; }
-    ~Wsa() { if (ok) WSACleanup(); }
+    Wsa() {
+        WSADATA d;
+        ok = WSAStartup(MAKEWORD(2, 2), &d) == 0;
+    }
+    ~Wsa() {
+        if (ok) WSACleanup();
+    }
 };
 struct Socket {
     SOCKET s = INVALID_SOCKET;
     explicit Socket(SOCKET v) : s(v) {}
-    ~Socket() { if (s != INVALID_SOCKET) closesocket(s); }
+    ~Socket() {
+        if (s != INVALID_SOCKET) closesocket(s);
+    }
 };
 std::string lower(std::string s) {
     for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -32,12 +39,20 @@ std::string trim(const std::string& s) {
 std::string xml_escape(const std::string& s) {
     std::string out;
     for (const char c : s) {
-        if (c == '&') out += "&amp;"; else if (c == '<') out += "&lt;"; else if (c == '>') out += "&gt;"; else out += c;
+        if (c == '&')
+            out += "&amp;";
+        else if (c == '<')
+            out += "&lt;";
+        else if (c == '>')
+            out += "&gt;";
+        else
+            out += c;
     }
     return out;
 }
 // Text of the first <tag>...</tag> (any namespace prefix) after `from`.
-std::optional<std::string> xml_value(const std::string& xml, const std::string& tag, std::size_t from = 0, std::size_t to = std::string::npos) {
+std::optional<std::string> xml_value(const std::string& xml, const std::string& tag, std::size_t from = 0,
+                                     std::size_t to = std::string::npos) {
     const std::string lx = lower(xml.substr(0, std::min(to, xml.size()))), lt = lower(tag);
     for (std::size_t open = lx.find('<', from); open != std::string::npos; open = lx.find('<', open + 1)) {
         const std::size_t close = lx.find('>', open);
@@ -51,7 +66,11 @@ std::optional<std::string> xml_value(const std::string& xml, const std::string& 
     }
     return std::nullopt;
 }
-struct Url { std::string host; std::uint16_t port = 80; std::string path = "/"; };
+struct Url {
+    std::string host;
+    std::uint16_t port = 80;
+    std::string path = "/";
+};
 std::optional<Url> parse_url(const std::string& text) {
     if (lower(text.substr(0, 7)) != "http://") return std::nullopt;
     const std::string rest = text.substr(7);
@@ -62,7 +81,11 @@ std::optional<Url> parse_url(const std::string& text) {
     const std::size_t colon = authority.rfind(':');
     url.host = authority.substr(0, colon);
     if (colon != std::string::npos) {
-        try { url.port = static_cast<std::uint16_t>(std::stoi(authority.substr(colon + 1))); } catch (...) { return std::nullopt; }
+        try {
+            url.port = static_cast<std::uint16_t>(std::stoi(authority.substr(colon + 1)));
+        } catch (...) {
+            return std::nullopt;
+        }
     }
     return url;
 }
@@ -78,15 +101,21 @@ bool connect_timeout(SOCKET s, const sockaddr_in& a, int ms) {
     ioctlsocket(s, FIONBIO, &nonblocking);
     connect(s, reinterpret_cast<const sockaddr*>(&a), sizeof(a));
     fd_set write_set, error_set;
-    FD_ZERO(&write_set); FD_SET(s, &write_set);
-    FD_ZERO(&error_set); FD_SET(s, &error_set);
+    FD_ZERO(&write_set);
+    FD_SET(s, &write_set);
+    FD_ZERO(&error_set);
+    FD_SET(s, &error_set);
     timeval tv{ms / 1000, (ms % 1000) * 1000};
     const int ready = select(0, nullptr, &write_set, &error_set, &tv);
     nonblocking = 0;
     ioctlsocket(s, FIONBIO, &nonblocking);
     return ready > 0 && FD_ISSET(s, &write_set);
 }
-struct HttpResult { int status = 0; std::string body; std::string local_ip; };
+struct HttpResult {
+    int status = 0;
+    std::string body;
+    std::string local_ip;
+};
 std::optional<HttpResult> http_request(const Url& url, const std::string& request) {
     const auto address = resolve(url.host, url.port);
     if (!address) return std::nullopt;
@@ -95,7 +124,8 @@ std::optional<HttpResult> http_request(const Url& url, const std::string& reques
     DWORD timeout = 5000;
     setsockopt(s.s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
     setsockopt(s.s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
-    if (send(s.s, request.data(), static_cast<int>(request.size()), 0) != static_cast<int>(request.size())) return std::nullopt;
+    if (send(s.s, request.data(), static_cast<int>(request.size()), 0) != static_cast<int>(request.size()))
+        return std::nullopt;
     HttpResult result;
     sockaddr_in local{};
     int local_size = sizeof(local);
@@ -115,7 +145,8 @@ std::optional<HttpResult> http_request(const Url& url, const std::string& reques
         if (end != std::string::npos) {
             const std::string head = lower(raw.substr(0, end));
             const std::size_t cl = head.find("\r\ncontent-length:");
-            if (cl != std::string::npos && raw.size() >= end + 4 + std::strtoull(head.c_str() + cl + 17, nullptr, 10)) break;
+            if (cl != std::string::npos && raw.size() >= end + 4 + std::strtoull(head.c_str() + cl + 17, nullptr, 10))
+                break;
         }
     }
     const std::size_t end = raw.find("\r\n\r\n");
@@ -124,7 +155,8 @@ std::optional<HttpResult> http_request(const Url& url, const std::string& reques
     result.status = std::atoi(raw.c_str() + space + 1);
     const std::string head = lower(raw.substr(0, end));
     std::string body = raw.substr(end + 4);
-    if (head.find("transfer-encoding: chunked") != std::string::npos || head.find("transfer-encoding:chunked") != std::string::npos) {
+    if (head.find("transfer-encoding: chunked") != std::string::npos ||
+        head.find("transfer-encoding:chunked") != std::string::npos) {
         std::string decoded;
         std::size_t p = 0;
         while (p < body.size()) {
@@ -142,24 +174,40 @@ std::optional<HttpResult> http_request(const Url& url, const std::string& reques
     result.body = body;
     return result;
 }
-struct Service { std::string type; Url control; };
-struct SoapReply { bool ok = false; int error_code = 0; std::string error, body; };
-SoapReply soap(const Service& service, const std::string& action, const std::vector<std::pair<std::string, std::string>>& args) {
+struct Service {
+    std::string type;
+    Url control;
+};
+struct SoapReply {
+    bool ok = false;
+    int error_code = 0;
+    std::string error, body;
+};
+SoapReply soap(const Service& service, const std::string& action,
+               const std::vector<std::pair<std::string, std::string>>& args) {
     std::string inner;
     for (const auto& [name, value] : args) inner += "<" + name + ">" + xml_escape(value) + "</" + name + ">";
     const std::string body =
         "<?xml version=\"1.0\"?>\r\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" "
-        "s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:" + action + " xmlns:u=\"" + service.type + "\">" +
-        inner + "</u:" + action + "></s:Body></s:Envelope>\r\n";
+        "s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:" +
+        action + " xmlns:u=\"" + service.type + "\">" + inner + "</u:" + action + "></s:Body></s:Envelope>\r\n";
     const std::string request = "POST " + service.control.path + " HTTP/1.1\r\nHost: " + service.control.host + ":" +
-                                std::to_string(service.control.port) + "\r\nContent-Type: text/xml; charset=\"utf-8\"\r\n"
-                                "SOAPAction: \"" + service.type + "#" + action + "\"\r\nContent-Length: " + std::to_string(body.size()) +
+                                std::to_string(service.control.port) +
+                                "\r\nContent-Type: text/xml; charset=\"utf-8\"\r\n"
+                                "SOAPAction: \"" +
+                                service.type + "#" + action + "\"\r\nContent-Length: " + std::to_string(body.size()) +
                                 "\r\nConnection: close\r\n\r\n" + body;
     SoapReply reply;
     const auto result = http_request(service.control, request);
-    if (!result) { reply.error = "router did not answer"; return reply; }
+    if (!result) {
+        reply.error = "router did not answer";
+        return reply;
+    }
     reply.body = result->body;
-    if (result->status == 200) { reply.ok = true; return reply; }
+    if (result->status == 200) {
+        reply.ok = true;
+        return reply;
+    }
     reply.error_code = std::atoi(xml_value(result->body, "errorCode").value_or("0").c_str());
     reply.error = "HTTP " + std::to_string(result->status) + " UPnP error " + std::to_string(reply.error_code) + " " +
                   xml_value(result->body, "errorDescription").value_or("");
@@ -185,20 +233,26 @@ std::vector<std::string> ssdp_locations(const std::string& interface_ip) {
     group.sin_family = AF_INET;
     group.sin_port = htons(1900);
     inet_pton(AF_INET, "239.255.255.250", &group.sin_addr);
-    const char* targets[] = {"urn:schemas-upnp-org:device:InternetGatewayDevice:1", "urn:schemas-upnp-org:device:InternetGatewayDevice:2",
-                             "urn:schemas-upnp-org:service:WANIPConnection:1", "urn:schemas-upnp-org:service:WANIPConnection:2",
-                             "urn:schemas-upnp-org:service:WANPPPConnection:1",
-                             // Any UPnP device: tells "router without port forwarding" from "no answer".
-                             "upnp:rootdevice"};
+    const char* targets[] = {
+        "urn:schemas-upnp-org:device:InternetGatewayDevice:1", "urn:schemas-upnp-org:device:InternetGatewayDevice:2",
+        "urn:schemas-upnp-org:service:WANIPConnection:1", "urn:schemas-upnp-org:service:WANIPConnection:2",
+        "urn:schemas-upnp-org:service:WANPPPConnection:1",
+        // Any UPnP device: tells "router without port forwarding" from "no answer".
+        "upnp:rootdevice"};
     for (int round = 0; round < 2; ++round)
         for (const char* st : targets) {
-            const std::string m = std::string("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: ") + st + "\r\n\r\n";
-            sendto(s.s, m.data(), static_cast<int>(m.size()), 0, reinterpret_cast<const sockaddr*>(&group), sizeof(group));
+            const std::string m =
+                std::string(
+                    "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: ") +
+                st + "\r\n\r\n";
+            sendto(s.s, m.data(), static_cast<int>(m.size()), 0, reinterpret_cast<const sockaddr*>(&group),
+                   sizeof(group));
         }
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
     char buffer[2048];
     while (true) {
-        const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()).count();
+        const auto left =
+            std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()).count();
         if (left <= 0) break;
         fd_set set;
         FD_ZERO(&set);
@@ -221,13 +275,14 @@ std::vector<Service> gateway_services(const std::string& location) {
     std::vector<Service> services;
     const auto url = parse_url(location);
     if (!url) return services;
-    const auto result = http_request(*url, "GET " + url->path + " HTTP/1.1\r\nHost: " + url->host + ":" + std::to_string(url->port) +
-                                               "\r\nConnection: close\r\n\r\n");
+    const auto result = http_request(*url, "GET " + url->path + " HTTP/1.1\r\nHost: " + url->host + ":" +
+                                               std::to_string(url->port) + "\r\nConnection: close\r\n\r\n");
     if (!result || result->status != 200) return services;
     const std::string& xml = result->body;
     std::string base = "http://" + url->host + ":" + std::to_string(url->port);
     if (const auto url_base = xml_value(xml, "URLBase"); url_base && !url_base->empty()) {
-        if (const auto parsed = parse_url(*url_base)) base = "http://" + parsed->host + ":" + std::to_string(parsed->port);
+        if (const auto parsed = parse_url(*url_base))
+            base = "http://" + parsed->host + ":" + std::to_string(parsed->port);
     }
     const std::string lx = lower(xml);
     for (std::size_t open = lx.find("<service>"); open != std::string::npos; open = lx.find("<service>", open + 1)) {
@@ -236,14 +291,17 @@ std::vector<Service> gateway_services(const std::string& location) {
         const auto type = xml_value(xml, "serviceType", open, close);
         const auto control = xml_value(xml, "controlURL", open, close);
         if (!type || !control) continue;
-        if (type->find(":service:WANIPConnection:") == std::string::npos && type->find(":service:WANPPPConnection:") == std::string::npos) continue;
+        if (type->find(":service:WANIPConnection:") == std::string::npos &&
+            type->find(":service:WANPPPConnection:") == std::string::npos)
+            continue;
         std::string full = *control;
         if (lower(full.substr(0, 7)) != "http://") full = base + (full.empty() || full[0] != '/' ? "/" : "") + full;
         if (const auto parsed = parse_url(full)) services.push_back({*type, *parsed});
     }
     // WAN IP connections first.
     std::stable_sort(services.begin(), services.end(), [](const Service& a, const Service& b) {
-        return (a.type.find("WANIPConnection") != std::string::npos) > (b.type.find("WANIPConnection") != std::string::npos);
+        return (a.type.find("WANIPConnection") != std::string::npos) >
+               (b.type.find("WANIPConnection") != std::string::npos);
     });
     return services;
 }
@@ -280,15 +338,22 @@ std::string local_lan_address() {
 }
 
 PortMapper::PortMapper(Log log) : log_(std::move(log)) {}
-PortMapper::~PortMapper() { close(); }
+PortMapper::~PortMapper() {
+    close();
+}
 
 bool PortMapper::add(const PortRequest& port, std::string& error) {
     const Service service{service_type_, *parse_url(control_url_)};
     auto attempt = [&] {
         return soap(service, "AddPortMapping",
-                    {{"NewRemoteHost", ""}, {"NewExternalPort", std::to_string(port.port)}, {"NewProtocol", port.protocol},
-                     {"NewInternalPort", std::to_string(port.port)}, {"NewInternalClient", local_ip_}, {"NewEnabled", "1"},
-                     {"NewPortMappingDescription", description_ + " " + port.purpose}, {"NewLeaseDuration", std::to_string(lease_)}});
+                    {{"NewRemoteHost", ""},
+                     {"NewExternalPort", std::to_string(port.port)},
+                     {"NewProtocol", port.protocol},
+                     {"NewInternalPort", std::to_string(port.port)},
+                     {"NewInternalClient", local_ip_},
+                     {"NewEnabled", "1"},
+                     {"NewPortMappingDescription", description_ + " " + port.purpose},
+                     {"NewLeaseDuration", std::to_string(lease_)}});
     };
     SoapReply reply = attempt();
     if (!reply.ok && reply.error_code == 725 && lease_) { // OnlyPermanentLeasesSupported
@@ -296,11 +361,15 @@ bool PortMapper::add(const PortRequest& port, std::string& error) {
         reply = attempt();
     }
     if (!reply.ok && reply.error_code == 718) { // ConflictInMappingEntry: ours from a previous run?
-        const SoapReply entry = soap(service, "GetSpecificPortMappingEntry",
-                                     {{"NewRemoteHost", ""}, {"NewExternalPort", std::to_string(port.port)}, {"NewProtocol", port.protocol}});
+        const SoapReply entry = soap(
+            service, "GetSpecificPortMappingEntry",
+            {{"NewRemoteHost", ""}, {"NewExternalPort", std::to_string(port.port)}, {"NewProtocol", port.protocol}});
         const std::string owner = entry.ok ? xml_value(entry.body, "NewInternalClient").value_or("") : "";
         if (owner == local_ip_) {
-            soap(service, "DeletePortMapping", {{"NewRemoteHost", ""}, {"NewExternalPort", std::to_string(port.port)}, {"NewProtocol", port.protocol}});
+            soap(service, "DeletePortMapping",
+                 {{"NewRemoteHost", ""},
+                  {"NewExternalPort", std::to_string(port.port)},
+                  {"NewProtocol", port.protocol}});
             reply = attempt();
         } else if (!owner.empty()) {
             error = "port already forwarded to another device (" + owner + ")";
@@ -311,45 +380,56 @@ bool PortMapper::add(const PortRequest& port, std::string& error) {
     return reply.ok;
 }
 
-bool PortMapper::open(const std::vector<PortRequest>& ports, const std::string& description, const std::string& location_override) {
+bool PortMapper::open(const std::vector<PortRequest>& ports, const std::string& description,
+                      const std::string& location_override) {
     close();
     closing_ = false;
     Wsa wsa;
     description_ = description;
     results_.clear();
     const std::string lan = local_lan_address();
-    const std::vector<std::string> locations = location_override.empty() ? ssdp_locations(lan) : std::vector<std::string>{location_override};
-    if (log_) log_("upnp: " + std::to_string(locations.size()) + " dispositivi UPnP " + (location_override.empty() ? "hanno risposto da " + (lan.empty() ? std::string("?") : lan) : "indicati"));
+    const std::vector<std::string> locations =
+        location_override.empty() ? ssdp_locations(lan) : std::vector<std::string>{location_override};
+    if (log_)
+        log_("upnp: " + std::to_string(locations.size()) + " dispositivi UPnP " +
+             (location_override.empty() ? "hanno risposto da " + (lan.empty() ? std::string("?") : lan) : "indicati"));
     for (const std::string& location : locations) {
         for (const Service& service : gateway_services(location)) {
             const SoapReply ip = soap(service, "GetExternalIPAddress", {});
             const std::string external = ip.ok ? xml_value(ip.body, "NewExternalIPAddress").value_or("") : "";
             if (!ip.ok || external.empty() || external == "0.0.0.0") {
-                if (log_) log_("upnp: " + service.type + " at " + location + " has no external address (" + ip.error + ")");
+                if (log_)
+                    log_("upnp: " + service.type + " at " + location + " has no external address (" + ip.error + ")");
                 continue;
             }
-            control_url_ = "http://" + service.control.host + ":" + std::to_string(service.control.port) + service.control.path;
+            control_url_ =
+                "http://" + service.control.host + ":" + std::to_string(service.control.port) + service.control.path;
             service_type_ = service.type;
             external_ip_ = external;
             // The LAN address the router sees for this PC.
-            const auto probe = http_request(service.control, "GET / HTTP/1.1\r\nHost: " + service.control.host + "\r\nConnection: close\r\n\r\n");
+            const auto probe = http_request(service.control, "GET / HTTP/1.1\r\nHost: " + service.control.host +
+                                                                 "\r\nConnection: close\r\n\r\n");
             local_ip_ = probe && !probe->local_ip.empty() ? probe->local_ip : lan;
-            if (log_) log_("upnp: router " + control_url_ + " (" + service_type_ + "), external address " + external_ip_ + ", this PC " + local_ip_);
+            if (log_)
+                log_("upnp: router " + control_url_ + " (" + service_type_ + "), external address " + external_ip_ +
+                     ", this PC " + local_ip_);
             for (const PortRequest& port : ports) {
                 PortResult result{port};
                 result.ok = add(port, result.error);
-                if (log_) log_("upnp: " + port.protocol + " " + std::to_string(port.port) + " (" + port.purpose + "): " +
-                               (result.ok ? "opened" : "not opened: " + result.error));
+                if (log_)
+                    log_("upnp: " + port.protocol + " " + std::to_string(port.port) + " (" + port.purpose +
+                         "): " + (result.ok ? "opened" : "not opened: " + result.error));
                 results_.push_back(result);
             }
             if (lease_) renewer_ = std::thread([this] { renew_loop(); });
             return true;
         }
     }
-    error_ = locations.empty() ? "no UPnP device responded (UPnP disabled on the router or blocked by the network)"
-                               : "none of the " + std::to_string(locations.size()) +
-                                     " UPnP devices on the network offers port forwarding (UPnP IGD / "
-                                     "\"automatic port forwarding\"): enable it on the router or forward ports manually";
+    error_ = locations.empty()
+                 ? "no UPnP device responded (UPnP disabled on the router or blocked by the network)"
+                 : "none of the " + std::to_string(locations.size()) +
+                       " UPnP devices on the network offers port forwarding (UPnP IGD / "
+                       "\"automatic port forwarding\"): enable it on the router or forward ports manually";
     if (log_) log_("upnp: " + error_);
     return false;
 }
@@ -362,7 +442,9 @@ void PortMapper::renew_loop() {
         for (PortResult& result : results_) {
             if (!result.ok) continue;
             std::string error;
-            if (!add(result.request, error) && log_) log_("upnp: renewal " + result.request.protocol + " " + std::to_string(result.request.port) + " failed: " + error);
+            if (!add(result.request, error) && log_)
+                log_("upnp: renewal " + result.request.protocol + " " + std::to_string(result.request.port) +
+                     " failed: " + error);
         }
         lock.lock();
     }
@@ -381,8 +463,12 @@ void PortMapper::close() {
     for (const PortResult& result : results_) {
         if (!result.ok) continue;
         const SoapReply reply = soap(service, "DeletePortMapping",
-                                     {{"NewRemoteHost", ""}, {"NewExternalPort", std::to_string(result.request.port)}, {"NewProtocol", result.request.protocol}});
-        if (log_) log_("upnp: " + result.request.protocol + " " + std::to_string(result.request.port) + " chiusa" + (reply.ok ? "" : " (" + reply.error + ")"));
+                                     {{"NewRemoteHost", ""},
+                                      {"NewExternalPort", std::to_string(result.request.port)},
+                                      {"NewProtocol", result.request.protocol}});
+        if (log_)
+            log_("upnp: " + result.request.protocol + " " + std::to_string(result.request.port) + " chiusa" +
+                 (reply.ok ? "" : " (" + reply.error + ")"));
     }
     results_.clear();
     control_url_.clear();

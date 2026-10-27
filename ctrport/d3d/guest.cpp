@@ -69,8 +69,10 @@ u64 Fnv(const u8* p, u64 n) {
     for (; i < n; i++) h = (h ^ p[i]) * 0x100000001B3ull;
     return h;
 }
-u64 Key(u64 addr, u64 size) { return addr * 0x9E3779B97F4A7C15ull ^ size; }
-}  // namespace
+u64 Key(u64 addr, u64 size) {
+    return addr * 0x9E3779B97F4A7C15ull ^ size;
+}
+} // namespace
 
 void GuestAddRange(u64 addr, u64 size) {
     if (!size) return;

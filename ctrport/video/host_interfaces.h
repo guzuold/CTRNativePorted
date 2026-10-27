@@ -19,16 +19,15 @@ typedef struct CtrVideoHostV2 {
     void* context;
     // Validate [guest_address,guest_address+size), including overflow, permissions
     // and live ownership. Pin backing until release, including through GPU fences.
-    int (*acquire_memory)(void*, uint64_t guest_address, uint64_t size,
-                          uint32_t write_access, CtrVideoMemoryLease* out);
+    int (*acquire_memory)(void*, uint64_t guest_address, uint64_t size, uint32_t write_access,
+                          CtrVideoMemoryLease* out);
     // Validate token and exact lease identity; reject stale/double release.
     // Failed release does not transfer ownership or silently unpin backing.
     int (*release_memory)(void*, const CtrVideoMemoryLease*);
     // Notify actual GPU writes only after completion and before release. Validate
     // live token, write permission, and subrange within the acquired guest range.
     // Reject stale tokens even if the same guest range has since been reused.
-    int (*publish_gpu_write)(void*, const CtrVideoMemoryLease*,
-                             uint64_t guest_address, uint64_t size);
+    int (*publish_gpu_write)(void*, const CtrVideoMemoryLease*, uint64_t guest_address, uint64_t size);
     // Runtime owns worker creation/TLS and joins before teardown. Entry is Win64.
     int (*start_worker)(void*, void (*entry)(void*), void* argument, uint64_t* out_token);
     int (*join_worker)(void*, uint64_t token);

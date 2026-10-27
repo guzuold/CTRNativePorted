@@ -18,7 +18,9 @@
 #include "ctr_hle.h"
 #include "online_config.h"
 
-namespace ctr_hle::online { void dispatch_webapi_push(); }
+namespace ctr_hle::online {
+void dispatch_webapi_push();
+}
 namespace {
 constexpr int kLocalUser = 1;
 constexpr int kInvalidArgument = static_cast<int>(0x80550003u);
@@ -123,15 +125,13 @@ struct RequestTable {
     }
     Request* find(int id) {
         const int index = id - offset - 1;
-        if (index < 0 || index >= static_cast<int>(requests.size()) ||
-            requests[index].state == RequestState::None) {
+        if (index < 0 || index >= static_cast<int>(requests.size()) || requests[index].state == RequestState::None) {
             return nullptr;
         }
         return &requests[index];
     }
     // Runs an operation on a Ready request; returns the call result.
-    template <typename Operation>
-    int run(int id, Operation operation) {
+    template <typename Operation> int run(int id, Operation operation) {
         std::scoped_lock lock{mutex};
         Request* request = find(id);
         if (!request) {
@@ -183,10 +183,8 @@ struct RequestTable {
         return 0;
     }
 };
-RequestTable manager_requests{0x20000000, kRequestNotFound, kInvalidArgument, kAborted,
-                              kInvalidId};
-RequestTable auth_requests{0x10000000, kAuthRequestNotFound, kAuthInvalidArgument, kAuthAborted,
-                           kAuthInvalidId};
+RequestTable manager_requests{0x20000000, kRequestNotFound, kInvalidArgument, kAborted, kInvalidId};
+RequestTable auth_requests{0x10000000, kAuthRequestNotFound, kAuthInvalidArgument, kAuthAborted, kAuthInvalidId};
 
 // State callback of the NpToolkit module: a SignedIn event is queued when it registers and
 // delivered by the next sceNpCheckCallback / sceNpCheckCallbackForLib (shadPS4 delivers the
@@ -228,14 +226,12 @@ std::string local_token() {
 }
 
 std::string base64(const std::string& data) {
-    static const char alphabet[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string out;
     for (std::size_t i = 0; i < data.size(); i += 3) {
-        const std::uint32_t chunk =
-            static_cast<unsigned char>(data[i]) << 16 |
-            (i + 1 < data.size() ? static_cast<unsigned char>(data[i + 1]) << 8 : 0) |
-            (i + 2 < data.size() ? static_cast<unsigned char>(data[i + 2]) : 0);
+        const std::uint32_t chunk = static_cast<unsigned char>(data[i]) << 16 |
+                                    (i + 1 < data.size() ? static_cast<unsigned char>(data[i + 1]) << 8 : 0) |
+                                    (i + 2 < data.size() ? static_cast<unsigned char>(data[i + 2]) : 0);
         out.push_back(alphabet[chunk >> 18 & 63]);
         out.push_back(alphabet[chunk >> 12 & 63]);
         out.push_back(i + 1 < data.size() ? alphabet[chunk >> 6 & 63] : '=');
@@ -265,15 +261,13 @@ std::string local_id_token() {
         return base64(json);
     };
     return part("{\"alg\":\"none\",\"typ\":\"JWT\"}") + "." +
-           part("{\"sub\":\"" + std::to_string(identity.account_id) + "\",\"online_id\":\"" +
-                identity.online_id + "\",\"env_iss_id\":256,\"duid\":\"" + duid +
-                "\",\"iat\":" + std::to_string(now) + ",\"exp\":" + std::to_string(now + 3600) +
-                "}") +
+           part("{\"sub\":\"" + std::to_string(identity.account_id) + "\",\"online_id\":\"" + identity.online_id +
+                "\",\"env_iss_id\":256,\"duid\":\"" + duid + "\",\"iat\":" + std::to_string(now) +
+                ",\"exp\":" + std::to_string(now + 3600) + "}") +
            ".ctrlocal";
 }
 
-void log_np(const char* library, const char* function, long long result,
-            const std::string& extra = "") {
+void log_np(const char* library, const char* function, long long result, const std::string& extra = "") {
     ctr_hle::log_call(library, function, result, extra.c_str());
 }
 } // namespace
@@ -312,8 +306,7 @@ CTR_SYSV int sceNpGetNpId(int user_id, NpId* np_id) {
     }
     std::memset(np_id, 0, sizeof(*np_id));
     fill_online_id(&np_id->handle);
-    log_np("libSceNpManager", "sceNpGetNpId", 0,
-           ",\"online_id\":\"" + ctr_hle::online::identity().online_id + "\"");
+    log_np("libSceNpManager", "sceNpGetNpId", 0, ",\"online_id\":\"" + ctr_hle::online::identity().online_id + "\"");
     return 0;
 }
 CTR_HLE_REGISTER_ONLINE("p-o74CnoNzY", "libSceNpManager", sceNpGetNpId);
@@ -327,8 +320,7 @@ CTR_SYSV int sceNpGetAccountIdA(int user_id, std::uint64_t* account_id) {
         return kUserNotFound;
     }
     *account_id = ctr_hle::online::identity().account_id;
-    log_np("libSceNpManager", "sceNpGetAccountIdA", 0,
-           ",\"account_id\":" + std::to_string(*account_id));
+    log_np("libSceNpManager", "sceNpGetAccountIdA", 0, ",\"account_id\":" + std::to_string(*account_id));
     return 0;
 }
 CTR_HLE_REGISTER_ONLINE("rbknaUjpqWo", "libSceNpManager", sceNpGetAccountIdA);
@@ -383,8 +375,7 @@ CTR_SYSV int sceNpCheckNpAvailabilityA(int id, int user_id) {
     if (user_id == -1) {
         return kInvalidArgument;
     }
-    const int result =
-        manager_requests.run(id, [&] { return user_id == kLocalUser ? 0 : kUserNotFound; });
+    const int result = manager_requests.run(id, [&] { return user_id == kLocalUser ? 0 : kUserNotFound; });
     log_np("libSceNpManager", "sceNpCheckNpAvailabilityA", result);
     return result;
 }
@@ -409,8 +400,7 @@ CTR_SYSV int sceNpCheckPlus(int id, const CheckPlusParameter* parameter, CheckPl
         output->authorized = true;
         return 0;
     });
-    log_np("libSceNpManager", "sceNpCheckPlus", result,
-           ",\"features\":" + std::to_string(parameter->features));
+    log_np("libSceNpManager", "sceNpCheckPlus", result, ",\"features\":" + std::to_string(parameter->features));
     return result;
 }
 CTR_HLE_REGISTER_ONLINE("r6MyYJkryz8", "libSceNpManager", sceNpCheckPlus);
@@ -420,14 +410,12 @@ CTR_SYSV int sceNpNotifyPlusFeature(const CheckPlusParameter* parameter) {
     if (!parameter) {
         return kInvalidArgument;
     }
-    log_np("libSceNpManager", "sceNpNotifyPlusFeature", 0,
-           ",\"features\":" + std::to_string(parameter->features));
+    log_np("libSceNpManager", "sceNpNotifyPlusFeature", 0, ",\"features\":" + std::to_string(parameter->features));
     return 0;
 }
 CTR_HLE_REGISTER_ONLINE("Gaxrp3EWY-M", "libSceNpManager", sceNpNotifyPlusFeature);
 
-CTR_SYSV int sceNpGetParentalControlInfoA(int id, int user_id, signed char* age,
-                                          ParentalControlInfo* info) {
+CTR_SYSV int sceNpGetParentalControlInfoA(int id, int user_id, signed char* age, ParentalControlInfo* info) {
     if (!age || !info || user_id == -1) {
         return kInvalidArgument;
     }
@@ -507,8 +495,7 @@ CTR_SYSV int sceNpRegisterStateCallbackForToolkit(ToolkitStateCallback callback,
     log_np("libSceNpManagerForToolkit", "sceNpRegisterStateCallbackForToolkit", 0);
     return 0;
 }
-CTR_HLE_REGISTER_ONLINE("0c7HbXRKUt4", "libSceNpManagerForToolkit",
-                        sceNpRegisterStateCallbackForToolkit);
+CTR_HLE_REGISTER_ONLINE("0c7HbXRKUt4", "libSceNpManagerForToolkit", sceNpRegisterStateCallbackForToolkit);
 
 CTR_SYSV int sceNpUnregisterStateCallbackForToolkit() {
     std::scoped_lock lock{state_mutex};
@@ -519,8 +506,7 @@ CTR_SYSV int sceNpUnregisterStateCallbackForToolkit() {
     toolkit_userdata = nullptr;
     return 0;
 }
-CTR_HLE_REGISTER_ONLINE("YIvqqvJyjEc", "libSceNpManagerForToolkit",
-                        sceNpUnregisterStateCallbackForToolkit);
+CTR_HLE_REGISTER_ONLINE("YIvqqvJyjEc", "libSceNpManagerForToolkit", sceNpUnregisterStateCallbackForToolkit);
 
 // --- libSceNpAuth ---
 
@@ -558,8 +544,8 @@ CTR_SYSV int sceNpAuthPollAsync(int id, int* result) {
 }
 CTR_HLE_REGISTER_ONLINE("gjSyfzSsDcE", "libSceNpAuth", sceNpAuthPollAsync);
 
-CTR_SYSV int sceNpAuthGetAuthorizationCodeA(int id, const AuthCodeParameterA* parameter,
-                                            AuthorizationCode* code, int* issuer_id) {
+CTR_SYSV int sceNpAuthGetAuthorizationCodeA(int id, const AuthCodeParameterA* parameter, AuthorizationCode* code,
+                                            int* issuer_id) {
     if (!parameter || !code) {
         return kAuthInvalidArgument;
     }
@@ -582,8 +568,8 @@ CTR_SYSV int sceNpAuthGetAuthorizationCodeA(int id, const AuthCodeParameterA* pa
         return 0;
     });
     log_np("libSceNpAuth", "sceNpAuthGetAuthorizationCodeA", result,
-           ",\"client_id\":\"" + std::string(static_cast<const char*>(parameter->client_id)) +
-               "\",\"scope\":\"" + parameter->scope + "\"");
+           ",\"client_id\":\"" + std::string(static_cast<const char*>(parameter->client_id)) + "\",\"scope\":\"" +
+               parameter->scope + "\"");
     return result;
 }
 CTR_HLE_REGISTER_ONLINE("qAUXQ9GdWp8", "libSceNpAuth", sceNpAuthGetAuthorizationCodeA);
@@ -595,8 +581,7 @@ CTR_SYSV int sceNpAuthGetIdTokenA(int id, const IdTokenParameterA* parameter, Id
     if (parameter->size != sizeof(IdTokenParameterA)) {
         return kAuthInvalidSize;
     }
-    if (parameter->user_id == -1 || !parameter->client_id || !parameter->client_secret ||
-        !parameter->scope) {
+    if (parameter->user_id == -1 || !parameter->client_id || !parameter->client_secret || !parameter->scope) {
         return kAuthInvalidArgument;
     }
     const int result = auth_requests.run(id, [&] {
@@ -609,8 +594,8 @@ CTR_SYSV int sceNpAuthGetIdTokenA(int id, const IdTokenParameterA* parameter, Id
         return 0;
     });
     log_np("libSceNpAuth", "sceNpAuthGetIdTokenA", result,
-           ",\"client_id\":\"" + std::string(static_cast<const char*>(parameter->client_id)) +
-               "\",\"scope\":\"" + parameter->scope + "\"");
+           ",\"client_id\":\"" + std::string(static_cast<const char*>(parameter->client_id)) + "\",\"scope\":\"" +
+               parameter->scope + "\"");
     return result;
 }
 CTR_HLE_REGISTER_ONLINE("CocbHVIKPE8", "libSceNpAuth", sceNpAuthGetIdTokenA);

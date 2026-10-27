@@ -26,24 +26,29 @@
 
 namespace {
 std::atomic<bool> g_stop{false};
-BOOL WINAPI on_console(DWORD) { g_stop = true; return TRUE; }
+BOOL WINAPI on_console(DWORD) {
+    g_stop = true;
+    return TRUE;
+}
 std::vector<std::uint16_t> port_list(const std::string& text) {
     std::vector<std::uint16_t> ports;
     std::stringstream in(text);
     std::string item;
-    while (std::getline(in, item, ',')) if (!item.empty()) ports.push_back(static_cast<std::uint16_t>(std::stoi(item)));
+    while (std::getline(in, item, ','))
+        if (!item.empty()) ports.push_back(static_cast<std::uint16_t>(std::stoi(item)));
     return ports;
 }
 void usage() {
-    std::puts("usage: ctr_online_server [--host 0.0.0.0] [--http 8780] [--tcp 3075] [--udp 3075,3478,3479]\n"
-              "                         [--peer-host 127.0.0.2] [--stun-secondary-host 127.0.0.3] [--stun-alternate-port 3076]\n"
-              "                         [--public-host IPv4 | --auto-public] [--discovery-port 3078] [--relay-port 3082 (0: off)]\n"
-              "                         [--upnp] [--upnp-probe] [--upnp-check]\n"
-              "                         [--upnp-location URL] [--root DIR] [--match-hub CODE@IPv4[:PORT]]\n"
-              "                         [--friend-network [--local-name ONLINE_ID]]\n"
-              "       ctr_online_server --set-balance <account|online ID> <currency> <amount> [--root DIR]\n"
-              "       ctr_online_server --friend-code [--root DIR]\n"
-              "       ctr_online_server --add-friend <code> <IPv4:port> [--root DIR]");
+    std::puts(
+        "usage: ctr_online_server [--host 0.0.0.0] [--http 8780] [--tcp 3075] [--udp 3075,3478,3479]\n"
+        "                         [--peer-host 127.0.0.2] [--stun-secondary-host 127.0.0.3] [--stun-alternate-port 3076]\n"
+        "                         [--public-host IPv4 | --auto-public] [--discovery-port 3078] [--relay-port 3082 (0: off)]\n"
+        "                         [--upnp] [--upnp-probe] [--upnp-check]\n"
+        "                         [--upnp-location URL] [--root DIR] [--match-hub CODE@IPv4[:PORT]]\n"
+        "                         [--friend-network [--local-name ONLINE_ID]]\n"
+        "       ctr_online_server --set-balance <account|online ID> <currency> <amount> [--root DIR]\n"
+        "       ctr_online_server --friend-code [--root DIR]\n"
+        "       ctr_online_server --add-friend <code> <IPv4:port> [--root DIR]");
 }
 } // namespace
 
@@ -52,7 +57,7 @@ int main(int argc, char** argv) {
     ServerConfig config;
     bool upnp = false, auto_public = false, probe = false, check = false;
     std::string location;
-    std::vector<std::string> balance; // --set-balance account currency amount
+    std::vector<std::string> balance;    // --set-balance account currency amount
     std::vector<std::string> add_friend; // --add-friend code endpoint
     bool show_code = false;              // --friend-code
     std::filesystem::path root;
@@ -65,38 +70,65 @@ int main(int argc, char** argv) {
             };
             if (arg == "--host") config.host = next();
             // Friends of runtime/user/online/friends.json, reached at their saved endpoints.
-            else if (arg == "--friend-network") config.friend_network = true;
-            else if (arg == "--local-name") config.local_name = next();
+            else if (arg == "--friend-network")
+                config.friend_network = true;
+            else if (arg == "--local-name")
+                config.local_name = next();
             else if (arg == "--match-hub") {
                 // Public matchmaking on another service (CODE@IPv4[:PORT]), as the launcher's
                 // hub election would choose it.
                 const std::string value = next();
                 const auto at = value.find('@'), colon = value.find(':', value.find('@'));
                 if (at == std::string::npos) throw std::invalid_argument("--match-hub expects CODE@IPv4[:PORT]");
-                MatchHub hub{value.substr(0, at), value.substr(at + 1, colon == std::string::npos ? std::string::npos : colon - at - 1)};
-                if (colon != std::string::npos) hub.port = static_cast<std::uint16_t>(std::stoi(value.substr(colon + 1)));
+                MatchHub hub{value.substr(0, at),
+                             value.substr(at + 1, colon == std::string::npos ? std::string::npos : colon - at - 1)};
+                if (colon != std::string::npos)
+                    hub.port = static_cast<std::uint16_t>(std::stoi(value.substr(colon + 1)));
                 config.match_hub = [hub] { return std::optional<MatchHub>(hub); };
-            }
-            else if (arg == "--http") config.http_port = static_cast<std::uint16_t>(std::stoi(next()));
-            else if (arg == "--tcp") config.tcp_record_ports = port_list(next());
-            else if (arg == "--udp") config.udp_record_ports = port_list(next());
-            else if (arg == "--peer-host") config.peer_host = next();
-            else if (arg == "--stun-secondary-host") config.stun_secondary_host = next();
-            else if (arg == "--stun-alternate-port") config.stun_alternate_port = static_cast<std::uint16_t>(std::stoi(next()));
-            else if (arg == "--public-host") config.public_host = next();
-            else if (arg == "--discovery-port") config.discovery_port = static_cast<std::uint16_t>(std::stoi(next()));
-            else if (arg == "--relay-port") config.relay_port = static_cast<std::uint16_t>(std::stoi(next()));
-            else if (arg == "--upnp") upnp = true;
-            else if (arg == "--auto-public") auto_public = true;
-            else if (arg == "--upnp-probe") probe = true;
-            else if (arg == "--upnp-check") check = true;
-            else if (arg == "--upnp-location") location = next();
-            else if (arg == "--root") root = next();
-            else if (arg == "--set-balance") { balance.push_back(next()); balance.push_back(next()); balance.push_back(next()); }
-            else if (arg == "--friend-code") show_code = true;
-            else if (arg == "--add-friend") { add_friend.push_back(next()); add_friend.push_back(next()); }
-            else if (arg == "--help" || arg == "-h") { usage(); return 0; }
-            else throw std::invalid_argument("unknown option " + arg);
+            } else if (arg == "--http")
+                config.http_port = static_cast<std::uint16_t>(std::stoi(next()));
+            else if (arg == "--tcp")
+                config.tcp_record_ports = port_list(next());
+            else if (arg == "--udp")
+                config.udp_record_ports = port_list(next());
+            else if (arg == "--peer-host")
+                config.peer_host = next();
+            else if (arg == "--stun-secondary-host")
+                config.stun_secondary_host = next();
+            else if (arg == "--stun-alternate-port")
+                config.stun_alternate_port = static_cast<std::uint16_t>(std::stoi(next()));
+            else if (arg == "--public-host")
+                config.public_host = next();
+            else if (arg == "--discovery-port")
+                config.discovery_port = static_cast<std::uint16_t>(std::stoi(next()));
+            else if (arg == "--relay-port")
+                config.relay_port = static_cast<std::uint16_t>(std::stoi(next()));
+            else if (arg == "--upnp")
+                upnp = true;
+            else if (arg == "--auto-public")
+                auto_public = true;
+            else if (arg == "--upnp-probe")
+                probe = true;
+            else if (arg == "--upnp-check")
+                check = true;
+            else if (arg == "--upnp-location")
+                location = next();
+            else if (arg == "--root")
+                root = next();
+            else if (arg == "--set-balance") {
+                balance.push_back(next());
+                balance.push_back(next());
+                balance.push_back(next());
+            } else if (arg == "--friend-code")
+                show_code = true;
+            else if (arg == "--add-friend") {
+                add_friend.push_back(next());
+                add_friend.push_back(next());
+            } else if (arg == "--help" || arg == "-h") {
+                usage();
+                return 0;
+            } else
+                throw std::invalid_argument("unknown option " + arg);
         }
     } catch (const std::exception& error) {
         std::fprintf(stderr, "%s\n", error.what());
@@ -119,7 +151,8 @@ int main(int argc, char** argv) {
             const std::int64_t amount = std::stoll(balance[2]);
             MarketplaceStore(config.state_dir / "marketplace.txt").set_balance(account, currency, amount);
             std::printf("{\"event\": \"balance_set\", \"account\": %llu, \"currency\": %llu, \"amount\": %lld}\n",
-                        static_cast<unsigned long long>(account), static_cast<unsigned long long>(currency), static_cast<long long>(amount));
+                        static_cast<unsigned long long>(account), static_cast<unsigned long long>(currency),
+                        static_cast<long long>(amount));
             return 0;
         } catch (const std::exception& error) {
             std::fprintf(stderr, "set-balance: %s\n", error.what());
@@ -137,7 +170,8 @@ int main(int argc, char** argv) {
         std::string error;
         FriendStore store(config.state_dir / "friends.json");
         FriendCodeInfo info;
-        if (parse_friend_code(add_friend[0], info) != CodeParseError::Ok || !store.add_or_update(info.code, "", &error) ||
+        if (parse_friend_code(add_friend[0], info) != CodeParseError::Ok ||
+            !store.add_or_update(info.code, "", &error) ||
             !store.update_endpoint(info.code, add_friend[1], "Added from the command line")) {
             std::fprintf(stderr, "add-friend: %s\n", error.empty() ? "invalid friend code" : error.c_str());
             return 2;
@@ -180,9 +214,13 @@ int main(int argc, char** argv) {
         const std::uint16_t discovery = config.discovery_port ? config.discovery_port : 3078;
         std::vector<PortRequest> ports;
         if (upnp)
-            ports = {{"TCP", config.http_port, "server HTTP"}, {"TCP", 3074, "lobby"}, {"UDP", 3074, "game"},
-                     {"UDP", discovery, "discovery"}, {"UDP", static_cast<std::uint16_t>(discovery + 1), "discovery"},
-                     {"UDP", static_cast<std::uint16_t>(discovery + 2), "discovery"}, {"UDP", static_cast<std::uint16_t>(discovery + 3), "discovery"}};
+            ports = {{"TCP", config.http_port, "server HTTP"},
+                     {"TCP", 3074, "lobby"},
+                     {"UDP", 3074, "game"},
+                     {"UDP", discovery, "discovery"},
+                     {"UDP", static_cast<std::uint16_t>(discovery + 1), "discovery"},
+                     {"UDP", static_cast<std::uint16_t>(discovery + 2), "discovery"},
+                     {"UDP", static_cast<std::uint16_t>(discovery + 3), "discovery"}};
         if (mapper.open(ports, "CTR Native Port", location) && auto_public && config.public_host.empty()) {
             const std::string scope = ipv4_scope(mapper.external_ip());
             if (scope != "public")

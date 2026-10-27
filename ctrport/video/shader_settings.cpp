@@ -12,13 +12,12 @@ std::mutex initialization;
 }
 void InitializeShaderSettings(ShaderSettings settings) {
     std::lock_guard lock(initialization);
-    if (published.load(std::memory_order_acquire))
-        throw std::logic_error("Shader settings already initialized");
-    auto owned=std::make_unique<const ShaderSettings>(settings);
-    published.store(owned.release(),std::memory_order_release);
+    if (published.load(std::memory_order_acquire)) throw std::logic_error("Shader settings already initialized");
+    auto owned = std::make_unique<const ShaderSettings>(settings);
+    published.store(owned.release(), std::memory_order_release);
 }
 const ShaderSettings& GetShaderSettings() {
-    auto* settings=published.load(std::memory_order_acquire);
+    auto* settings = published.load(std::memory_order_acquire);
     if (!settings) throw std::logic_error("Shader settings missing explicit initialization");
     return *settings;
 }

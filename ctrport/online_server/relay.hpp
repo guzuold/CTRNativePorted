@@ -65,14 +65,19 @@ public:
     // A new token for HELLO; replaces the account's earlier token and binding.
     Bytes issue(std::uint64_t account, const std::string& room);
     void forget(std::uint64_t account);
-    struct Output { Endpoint to; Bytes data; };
+    struct Output {
+        Endpoint to;
+        Bytes data;
+    };
     struct Outcome {
         std::vector<Output> out;
         std::string event; // empty: nothing to log (ordinary forwarding)
         Json fields = Json::object();
     };
     Outcome handle(const Bytes& datagram, const Endpoint& from, double now, const RelayRoster& roster);
-    struct Stats { std::uint64_t forwarded = 0, forwarded_bytes = 0, refused = 0; };
+    struct Stats {
+        std::uint64_t forwarded = 0, forwarded_bytes = 0, refused = 0;
+    };
     Stats stats() const;
     const RelayLimits& limits() const { return limits_; }
 
@@ -83,16 +88,19 @@ private:
         double last = 0, tokens = 0, refill = 0, last_refusal_log = -1e9;
         std::uint64_t forwarded = 0, bytes = 0;
     };
-    struct Grant { std::uint64_t account; std::string room; };
+    struct Grant {
+        std::uint64_t account;
+        std::string room;
+    };
     Outcome refuse(const Endpoint& to, const Endpoint& address, unsigned char reason);
     void drop_binding(std::uint64_t account);
 
     RelayLimits limits_;
     mutable std::mutex mutex_;
-    std::map<std::string, Grant> tokens_;               // token hex -> grant
-    std::map<std::uint64_t, std::string> token_of_;     // account -> token hex
-    std::map<std::uint64_t, Binding> bindings_;         // account -> binding
-    std::map<std::string, std::uint64_t> by_endpoint_;  // endpoint text -> account
+    std::map<std::string, Grant> tokens_;              // token hex -> grant
+    std::map<std::uint64_t, std::string> token_of_;    // account -> token hex
+    std::map<std::uint64_t, Binding> bindings_;        // account -> binding
+    std::map<std::string, std::uint64_t> by_endpoint_; // endpoint text -> account
     // (sender, peer) -> the address the sender's game used for the peer.
     std::map<std::pair<std::uint64_t, std::uint64_t>, Endpoint> aliases_;
     Stats stats_;

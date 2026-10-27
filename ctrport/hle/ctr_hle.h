@@ -37,8 +37,7 @@ struct Registration {
     const void* function;
     bool online_only;
     Registration* next;
-    Registration(const char* nid_, const char* library_, const void* function_,
-                 bool online_only_ = false);
+    Registration(const char* nid_, const char* library_, const void* function_, bool online_only_ = false);
 };
 // CTR_ONLINE=1 enables the online services (R8). Without it ctr_hle resolves none of the
 // online-only registrations, so the offline runtime keeps its existing bindings.
@@ -47,16 +46,18 @@ bool online_enabled();
 inline void log_call(const char* library, const char* function, long long result, const char* extra = "") {
     static std::mutex mutex;
     std::scoped_lock lock{mutex};
-    std::printf("{\"scope\":\"hle_call\",\"library\":\"%s\",\"function\":\"%s\",\"result\":%lld%s}\n",
-                library, function, result, extra);
+    std::printf("{\"scope\":\"hle_call\",\"library\":\"%s\",\"function\":\"%s\",\"result\":%lld%s}\n", library,
+                function, result, extra);
     std::fflush(stdout);
 }
 } // namespace ctr_hle
 
-#define CTR_HLE_REGISTER(nid, library, function)                                                 \
-    static ctr_hle::Registration registration_##function{nid, library,                          \
-                                                         reinterpret_cast<const void*>(&function)}
+#define CTR_HLE_REGISTER(nid, library, function)                                                                       \
+    static ctr_hle::Registration registration_##function {                                                             \
+        nid, library, reinterpret_cast<const void*>(&function)                                                         \
+    }
 // Bound only when CTR_ONLINE=1 (see ctr_hle::online_enabled).
-#define CTR_HLE_REGISTER_ONLINE(nid, library, function)                                          \
-    static ctr_hle::Registration registration_online_##function{                               \
-        nid, library, reinterpret_cast<const void*>(&function), true}
+#define CTR_HLE_REGISTER_ONLINE(nid, library, function)                                                                \
+    static ctr_hle::Registration registration_online_##function {                                                      \
+        nid, library, reinterpret_cast<const void*>(&function), true                                                   \
+    }

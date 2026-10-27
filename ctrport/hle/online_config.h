@@ -17,7 +17,7 @@
 
 namespace ctr_hle::online {
 struct Identity {
-    std::string online_id;   // up to 16 characters
+    std::string online_id;    // up to 16 characters
     std::uint64_t account_id; // nonzero: CTR_ONLINE_ACCOUNT, else derived from online_id
 };
 const Identity& identity();

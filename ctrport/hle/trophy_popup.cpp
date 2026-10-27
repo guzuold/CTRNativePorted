@@ -13,20 +13,30 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-namespace Gdiplus { using std::min; using std::max; }
+namespace Gdiplus {
+using std::min;
+using std::max;
+}
 #include <gdiplus.h>
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "shlwapi.lib")
 
 namespace ctr_hle::trophy {
 namespace {
-struct Notice { std::vector<unsigned char> png; std::wstring title, name; };
+struct Notice {
+    std::vector<unsigned char> png;
+    std::wstring title, name;
+};
 std::mutex mutex;
 std::condition_variable wake;
 std::deque<Notice> queue;
 bool worker_started = false;
 
-struct Search { DWORD pid; HWND best = nullptr; long area = 0; };
+struct Search {
+    DWORD pid;
+    HWND best = nullptr;
+    long area = 0;
+};
 BOOL CALLBACK find_game_window(HWND window, LPARAM raw) {
     auto& s = *reinterpret_cast<Search*>(raw);
     DWORD pid = 0;
@@ -34,7 +44,10 @@ BOOL CALLBACK find_game_window(HWND window, LPARAM raw) {
     RECT r{};
     if (pid != s.pid || !IsWindowVisible(window) || IsIconic(window) || !GetClientRect(window, &r)) return TRUE;
     const long area = (r.right - r.left) * (r.bottom - r.top);
-    if (area > s.area) { s.area = area; s.best = window; }
+    if (area > s.area) {
+        s.area = area;
+        s.best = window;
+    }
     return TRUE;
 }
 
@@ -48,7 +61,8 @@ void present(const Notice& notice) {
     POINT corner{client.right, client.top};
     ClientToScreen(search.best, &corner);
     const float scale = std::max(1.0f, (client.bottom - client.top) / 720.0f);
-    const int width = static_cast<int>(380 * scale), height = static_cast<int>(88 * scale), margin = static_cast<int>(24 * scale);
+    const int width = static_cast<int>(380 * scale), height = static_cast<int>(88 * scale),
+              margin = static_cast<int>(24 * scale);
 
     BITMAPINFO info{};
     info.bmiHeader.biSize = sizeof(info.bmiHeader);
@@ -61,7 +75,10 @@ void present(const Notice& notice) {
     HDC dc = CreateCompatibleDC(screen);
     HBITMAP dib = CreateDIBSection(screen, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
     ReleaseDC(nullptr, screen);
-    if (!dib) { DeleteDC(dc); return; }
+    if (!dib) {
+        DeleteDC(dc);
+        return;
+    }
     const HGDIOBJ previous = SelectObject(dc, dib);
     {
         Bitmap canvas(width, height, width * 4, PixelFormat32bppPARGB, static_cast<BYTE*>(bits));
@@ -96,9 +113,10 @@ void present(const Notice& notice) {
         g.DrawString(notice.title.c_str(), -1, &title, RectF(88, 14, 280, 18), &format, &gold);
         g.DrawString(notice.name.c_str(), -1, &name, RectF(88, 34, 280, 44), &format, &light);
     }
-    HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
-                                  L"STATIC", L"", WS_POPUP, corner.x - width - margin, corner.y + margin, width, height,
-                                  nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+    HWND window =
+        CreateWindowExW(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
+                        L"STATIC", L"", WS_POPUP, corner.x - width - margin, corner.y + margin, width, height, nullptr,
+                        nullptr, GetModuleHandleW(nullptr), nullptr);
     if (window) {
         POINT origin{corner.x - width - margin, corner.y + margin}, source{0, 0};
         SIZE size{width, height};
@@ -114,7 +132,10 @@ void present(const Notice& notice) {
                 UpdateLayeredWindow(window, nullptr, nullptr, nullptr, nullptr, nullptr, 0, &blend, ULW_ALPHA);
             }
             MSG msg;
-            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
             Sleep(30);
         }
         DestroyWindow(window);

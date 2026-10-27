@@ -8,21 +8,26 @@
 namespace ctrport {
 class ThreadDestructorRegistry {
     std::mutex lock;
-    void* callback=nullptr;
+    void* callback = nullptr;
+
 public:
     void set(void* value) {
-        if(value) {
+        if (value) {
             MEMORY_BASIC_INFORMATION info{};
-            if(!VirtualQuery(value,&info,sizeof(info)) || info.State!=MEM_COMMIT ||
-               (info.Protect!=PAGE_EXECUTE_READ && info.Protect!=PAGE_EXECUTE_READWRITE))
+            if (!VirtualQuery(value, &info, sizeof(info)) || info.State != MEM_COMMIT ||
+                (info.Protect != PAGE_EXECUTE_READ && info.Protect != PAGE_EXECUTE_READWRITE))
                 throw std::runtime_error("Thread destructor callback not executable");
         }
-        std::lock_guard<std::mutex> guard(lock);callback=value;
+        std::lock_guard<std::mutex> guard(lock);
+        callback = value;
     }
     void on_owned_thread_exit() {
-        void* value=nullptr;
-        {std::lock_guard<std::mutex> guard(lock);value=callback;}
-        if(value) (void)ctr_call_original_integer3(value,0,0,0);
+        void* value = nullptr;
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            value = callback;
+        }
+        if (value) (void)ctr_call_original_integer3(value, 0, 0, 0);
     }
 };
 inline ThreadDestructorRegistry thread_destructors;

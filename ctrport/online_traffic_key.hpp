@@ -24,8 +24,8 @@ inline std::string online_sha256_hex(const unsigned char* data, std::size_t size
     unsigned char digest[32]{};
     if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0)
         throw std::runtime_error("SHA256 provider missing");
-    const auto status = BCryptHash(algorithm, nullptr, 0, const_cast<unsigned char*>(data),
-                                   static_cast<ULONG>(size), digest, 32);
+    const auto status =
+        BCryptHash(algorithm, nullptr, 0, const_cast<unsigned char*>(data), static_cast<ULONG>(size), digest, 32);
     BCryptCloseAlgorithmProvider(algorithm, 0);
     if (status < 0) throw std::runtime_error("SHA256 failed");
     static const char hex[] = "0123456789abcdef";
@@ -43,8 +43,7 @@ inline void apply_online_traffic_key(unsigned char* image, const std::string& pi
     char online[2]{};
     if (GetEnvironmentVariableA("CTR_ONLINE", online, sizeof(online)) != 1 || online[0] != '1') return;
     constexpr std::size_t key_size = 0x126;
-    constexpr char original_sha256[] =
-        "356c4bc39a664dd9a14964a3a44258d898a0dbf54cfb10835cbdd63000c9a6b2";
+    constexpr char original_sha256[] = "356c4bc39a664dd9a14964a3a44258d898a0dbf54cfb10835cbdd63000c9a6b2";
     const RetailProfile* profile = retail_profile(pin);
     const std::uint64_t offset = profile ? profile->online_key : 0ULL;
     if (!offset) throw std::runtime_error("Online traffic key has no binding for this eboot");
@@ -67,9 +66,9 @@ inline void apply_online_traffic_key(unsigned char* image, const std::string& pi
     std::memcpy(site, key.data(), key_size);
     DWORD restored = 0;
     VirtualProtect(site, key_size, old, &restored);
-    std::printf("{\"scope\":\"guest_online_traffic_key_applied\",\"target\":%llu,\"bytes\":%zu,\"key_sha256\":\"%s\"}\n",
-                static_cast<unsigned long long>(offset), key_size,
-                online_sha256_hex(key.data(), key.size()).c_str());
+    std::printf(
+        "{\"scope\":\"guest_online_traffic_key_applied\",\"target\":%llu,\"bytes\":%zu,\"key_sha256\":\"%s\"}\n",
+        static_cast<unsigned long long>(offset), key_size, online_sha256_hex(key.data(), key.size()).c_str());
     std::fflush(stdout);
 }
 } // namespace ctrport

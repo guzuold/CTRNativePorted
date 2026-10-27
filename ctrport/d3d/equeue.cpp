@@ -42,7 +42,7 @@ struct KEvent {
     void* udata;
 };
 static_assert(sizeof(KEvent) == 32);
-}  // namespace
+} // namespace
 
 Equeue* EqueueFromHandle(u64 handle) {
     std::lock_guard lk(g_queues_mutex);
@@ -53,7 +53,7 @@ Equeue* EqueueFromHandle(u64 handle) {
 void EqueueAdd(Equeue* eq, u64 ident, s16 filter, u16 flags, u64 data, void* udata) {
     std::lock_guard lk(eq->m);
     for (auto& r : eq->regs) {
-        if (r.ident == ident && r.filter == filter) {  // EV_ADD on an existing one modifies it
+        if (r.ident == ident && r.filter == filter) { // EV_ADD on an existing one modifies it
             r.flags = flags;
             r.udata = udata;
             return;
@@ -148,7 +148,7 @@ SYSV int sceKernelWaitEqueue(u64 handle, KEvent* ev, int num, int* out, const u3
         ev[n++] = {r.ident, r.filter, r.flags, r.fflags, r.data, r.udata};
         if (r.flags & kEvClear) {
             r.triggered = false;
-            if (r.filter == kFilterVideoOut) r.data &= ~0xF000ull;  // the count restarts
+            if (r.filter == kFilterVideoOut) r.data &= ~0xF000ull; // the count restarts
         }
     }
     if (out) *out = n;
@@ -190,10 +190,18 @@ SYSV int sceKernelDeleteUserEvent(u64 handle, int id) {
     if (!eq) return SceErr(EBADF_);
     return EqueueDelete(eq, (u64)id, kFilterUser) ? 0 : SceErr(ENOENT_);
 }
-SYSV void* sceKernelGetEventUserData(const KEvent* ev) { return ev ? ev->udata : nullptr; }
-SYSV u64 sceKernelGetEventId(const KEvent* ev) { return ev ? ev->ident : 0; }
-SYSV int sceKernelGetEventFilter(const KEvent* ev) { return ev ? ev->filter : 0; }
-SYSV u64 sceKernelGetEventData(const KEvent* ev) { return ev ? ev->data : 0; }
+SYSV void* sceKernelGetEventUserData(const KEvent* ev) {
+    return ev ? ev->udata : nullptr;
+}
+SYSV u64 sceKernelGetEventId(const KEvent* ev) {
+    return ev ? ev->ident : 0;
+}
+SYSV int sceKernelGetEventFilter(const KEvent* ev) {
+    return ev ? ev->filter : 0;
+}
+SYSV u64 sceKernelGetEventData(const KEvent* ev) {
+    return ev ? ev->data : 0;
+}
 
 EXPORT("D0OdFMjp46I", "libkernel", sceKernelCreateEqueue);
 EXPORT("jpFjmgAC5AE", "libkernel", sceKernelDeleteEqueue);
@@ -206,4 +214,4 @@ EXPORT("vz+pg2zdopI", "libkernel", sceKernelGetEventUserData);
 EXPORT("mJ7aghmgvfc", "libkernel", sceKernelGetEventId);
 EXPORT("23CPPI1tyBY", "libkernel", sceKernelGetEventFilter);
 EXPORT("kwGyyjohI50", "libkernel", sceKernelGetEventData);
-}  // namespace
+} // namespace

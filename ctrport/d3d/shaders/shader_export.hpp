@@ -20,7 +20,9 @@ namespace gcn {
 
 using Bytes = std::vector<uint8_t>;
 
-[[noreturn]] inline void export_fail(const std::string& what) { throw std::runtime_error(what); }
+[[noreturn]] inline void export_fail(const std::string& what) {
+    throw std::runtime_error(what);
+}
 inline uint32_t rd32(const Bytes& b, uint64_t at) {
     if (at + 4 > b.size()) export_fail("read outside data");
     uint32_t v;
@@ -59,8 +61,10 @@ public:
             if (p + length > b.size() || start > length) export_fail("IGZ fixup outside file");
             const uint8_t* data = b.data() + p + start;
             const size_t size = length - start;
-            if (tag == "TMET") types = cstrings(data, size, count);
-            else if (tag == "RVTB") vtables = offsets(data, size, count);
+            if (tag == "TMET")
+                types = cstrings(data, size, count);
+            else if (tag == "RVTB")
+                vtables = offsets(data, size, count);
             p += length;
         }
     }
@@ -111,11 +115,11 @@ private:
             const size_t e = static_cast<const uint8_t*>(z) - d;
             out.emplace_back(reinterpret_cast<const char*>(d + p), e - p);
             p = e + 1;
-            if (p & 1) p++;  // strings are 2-byte aligned
+            if (p & 1) p++; // strings are 2-byte aligned
         }
         return out;
     }
-    std::vector<std::pair<uint32_t, uint32_t>> sections;  // file offset, length
+    std::vector<std::pair<uint32_t, uint32_t>> sections; // file offset, length
     std::vector<std::string> types;
     std::vector<uint32_t> vtables;
 };
@@ -155,7 +159,8 @@ inline GnmMeta parse_gnm(const std::string& kind, const Bytes& b) {
         for (int k = 0; k < n_in; k++, o += 2) {
             const uint32_t v = rd8(b, o) | (rd8(b, o + 1) << 8);
             Input in;
-            in.sem = v & 0xFF, in.def = (v >> 8) & 3, in.flat = (v >> 10) & 1, in.linear = (v >> 11) & 1, in.custom = (v >> 12) & 1;
+            in.sem = v & 0xFF, in.def = (v >> 8) & 3, in.flat = (v >> 10) & 1, in.linear = (v >> 11) & 1,
+            in.custom = (v >> 12) & 1;
             m.inputs.push_back(in);
         }
     } else if (kind == "es") {
@@ -190,7 +195,7 @@ inline std::string kind_name(int32_t stype) {
     case 0: return "ps";
     case 1: return "vs";
     case 2: return "gs";
-    case 3: return "es";  // export half of a VS->GS pipeline
+    case 3: return "es"; // export half of a VS->GS pipeline
     default: return "t" + std::to_string(stype);
     }
 }
@@ -223,7 +228,8 @@ inline void export_igz(const IgzFile& z, const std::string& effect, std::vector<
 
 // shaders dumped by ctr_d3d (missing_shaders/Rt_<fnv>_<kind>.bin + .gnm), e.g. the Bink video
 // shaders the eboot embeds; skipped when the same program is already in the archives
-inline int import_runtime(const std::filesystem::path& dir, std::vector<ShaderEntry>& index, std::vector<std::string>& log) {
+inline int import_runtime(const std::filesystem::path& dir, std::vector<ShaderEntry>& index,
+                          std::vector<std::string>& log) {
     namespace fs = std::filesystem;
     std::set<uint64_t> known;
     for (const auto& e : index)
@@ -247,7 +253,7 @@ inline int import_runtime(const std::filesystem::path& dir, std::vector<ShaderEn
         ShaderEntry e;
         e.name = base, e.effect = "Runtime", e.kind = parts[2];
         e.code = slurp(p);
-        if (known.count(fnv1a64(e.code.data(), e.code.size()))) continue;  // translated from the pak meanwhile
+        if (known.count(fnv1a64(e.code.data(), e.code.size()))) continue; // translated from the pak meanwhile
         fs::path gnm = p;
         gnm.replace_extension(".gnm");
         if (!fs::exists(gnm)) {
@@ -267,4 +273,4 @@ inline int import_runtime(const std::filesystem::path& dir, std::vector<ShaderEn
     return added;
 }
 
-}  // namespace gcn
+} // namespace gcn

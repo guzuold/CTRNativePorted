@@ -25,7 +25,8 @@ using ctr_online::Json;
 inline constexpr char version[] = CTR_LAUNCHER_VERSION;
 inline std::wstring wide(const std::string& value) {
     if (value.empty()) return {};
-    const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
+    const int size =
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
     if (!size) throw std::runtime_error("Invalid UTF-8 in update response.");
     std::wstring out(static_cast<size_t>(size), L'\0');
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), out.data(), size);
@@ -35,9 +36,13 @@ inline std::wstring quote(const std::wstring& value) {
     std::wstring out = L"\"";
     size_t slashes = 0;
     for (const auto c : value) {
-        if (c == L'\\') { ++slashes; continue; }
+        if (c == L'\\') {
+            ++slashes;
+            continue;
+        }
         out.append(c == L'"' ? slashes * 2 + 1 : slashes, L'\\');
-        slashes = 0; out += c;
+        slashes = 0;
+        out += c;
     }
     out.append(slashes * 2, L'\\');
     return out + L'"';
@@ -50,11 +55,12 @@ inline fs::path system_powershell() {
 inline HANDLE start(const fs::path& script, const std::wstring& args) {
     const auto exe = system_powershell();
     std::wstring command = quote(exe.wstring()) +
-        L" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File " + quote(script.wstring()) + args;
+                           L" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File " +
+                           quote(script.wstring()) + args;
     STARTUPINFOW startup{sizeof(startup)};
     PROCESS_INFORMATION process{};
-    if (!CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-                        nullptr, nullptr, &startup, &process))
+    if (!CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr,
+                        &startup, &process))
         throw std::runtime_error("Cannot start the Windows update helper.");
     CloseHandle(process.hThread);
     return process.hProcess;
@@ -68,9 +74,9 @@ inline Json read(const fs::path& path) {
 }
 inline Json run(const fs::path& root, const fs::path& script, const fs::path& result, bool prepare) {
     try {
-        const std::wstring args = std::wstring(L" -Mode ") + (prepare ? L"Prepare" : L"Check") +
-            L" -Root " + quote(root.wstring()) + L" -CurrentVersion " + quote(wide(version)) +
-            L" -Result " + quote(result.wstring());
+        const std::wstring args = std::wstring(L" -Mode ") + (prepare ? L"Prepare" : L"Check") + L" -Root " +
+                                  quote(root.wstring()) + L" -CurrentVersion " + quote(wide(version)) + L" -Result " +
+                                  quote(result.wstring());
         HANDLE process = start(script, args);
         // Network operations have their own timeout. Only this worker waits.
         const DWORD waited = WaitForSingleObject(process, prepare ? 600000 : 60000);
@@ -94,17 +100,16 @@ inline Json run(const fs::path& root, const fs::path& script, const fs::path& re
     }
 }
 inline void launch_apply(const fs::path& root, const fs::path& script, const fs::path& txn, bool recover = false) {
-    const auto args = std::wstring(L" -Mode ") + (recover ? L"Recover" : L"Apply") +
-        L" -Root " + quote(root.wstring()) + L" -Transaction " + quote(txn.wstring()) +
-        L" -ParentId " + std::to_wstring(GetCurrentProcessId());
+    const auto args = std::wstring(L" -Mode ") + (recover ? L"Recover" : L"Apply") + L" -Root " +
+                      quote(root.wstring()) + L" -Transaction " + quote(txn.wstring()) + L" -ParentId " +
+                      std::to_wstring(GetCurrentProcessId());
     HANDLE process = start(script, args);
     CloseHandle(process);
 }
 inline bool portable(const fs::path& root, const fs::path& exe_dir) {
     std::error_code ec;
-    return !root.empty() && fs::equivalent(root, exe_dir, ec) && !ec &&
-        !fs::exists(root / ".git") && fs::exists(root / "launcher.exe") &&
-        fs::exists(root / "launcher_update.ps1");
+    return !root.empty() && fs::equivalent(root, exe_dir, ec) && !ec && !fs::exists(root / ".git") &&
+           fs::exists(root / "launcher.exe") && fs::exists(root / "launcher_update.ps1");
 }
 inline void assert_plain_path(fs::path path) {
     for (; !path.empty(); path = path.parent_path()) {
@@ -122,6 +127,7 @@ inline HANDLE acquire_install_lock(const fs::path& root) {
     fs::create_directories(dir);
     const auto file = dir / "install.lock";
     assert_plain_path(file);
-    return CreateFileW(file.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    return CreateFileW(file.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                       nullptr);
 }
 }

@@ -20,7 +20,7 @@
 #include "videoout.h"
 
 Eboot g_eboot;
-void StartPads();  // pads.cpp
+void StartPads(); // pads.cpp
 
 namespace {
 struct Export {
@@ -46,13 +46,15 @@ void LogV(const char* fmt, va_list ap) {
         fflush(g_log);
     }
 }
-}  // namespace
+} // namespace
 
 void RegisterExport(const char* nid, const char* library, const char* name, void* function) {
     Exports().push_back({nid, library, name, function});
 }
 
-void LogInit(const char* path) { g_log = fopen(path, "w"); }
+void LogInit(const char* path) {
+    g_log = fopen(path, "w");
+}
 void Log(const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -83,17 +85,22 @@ int ConfigInt(const char* name, int def) {
     snprintf(key, sizeof(key), "CTR_D3D_%s", name);
     return GetEnvironmentVariableA(key, v, sizeof(v)) ? atoi(v) : def;
 }
-std::filesystem::path UserRoot() { return g_user_root; }
-const eng::Version* eng::CurrentVersion() { return g_version; }
+std::filesystem::path UserRoot() {
+    return g_user_root;
+}
+const eng::Version* eng::CurrentVersion() {
+    return g_version;
+}
 
 // ctrport's settings startup writes the process environment after the C runtime copied it
 // (SetEnvironmentVariable); getenv, used by the shared settings policies, reads the copy. The
 // variables this backend consumes are copied into it, removed ones included.
 void SyncSettingsEnvironment() {
-    for (const char* key : {"CTR_GPU_PRESENT_MODE", "CTR_SETTINGS_ANISOTROPY", "CTR_SETTINGS_FSR1_SHARPEN",
-                            "CTR_SETTINGS_HDR", "CTR_SETTINGS_GAMMA", "CTR_SETTINGS_HDR_PEAK", "CTR_SETTINGS_HDR_EXPOSURE",
-                            "CTR_SETTINGS_PRESENTATION_LIMIT", "CTR_SETTINGS_WINDOW_MODE", "CTR_SETTINGS_DISPLAY_REFRESH",
-                            "CTR_UPSCALER", "CTR_SCENE_HEIGHT", "CTR_GPU_AO", "CTR_GPU_HERO_SHADOWS", "CTR_GPU_WIDTH", "CTR_GPU_HEIGHT", "CTR_GPU_FULLSCREEN"}) {
+    for (const char* key :
+         {"CTR_GPU_PRESENT_MODE", "CTR_SETTINGS_ANISOTROPY", "CTR_SETTINGS_FSR1_SHARPEN", "CTR_SETTINGS_HDR",
+          "CTR_SETTINGS_GAMMA", "CTR_SETTINGS_HDR_PEAK", "CTR_SETTINGS_HDR_EXPOSURE", "CTR_SETTINGS_PRESENTATION_LIMIT",
+          "CTR_SETTINGS_WINDOW_MODE", "CTR_SETTINGS_DISPLAY_REFRESH", "CTR_UPSCALER", "CTR_SCENE_HEIGHT", "CTR_GPU_AO",
+          "CTR_GPU_HERO_SHADOWS", "CTR_GPU_WIDTH", "CTR_GPU_HEIGHT", "CTR_GPU_FULLSCREEN"}) {
         char value[256];
         const DWORD n = GetEnvironmentVariableA(key, value, sizeof(value));
         _putenv_s(key, n && n < sizeof(value) ? value : "");
@@ -111,7 +118,7 @@ extern "C" CTR_GPU_API int ctr_gpu_init(const CtrGpuConfig* config) {
     LOG("engine-state D3D11 backend, %zu exports, data in %s", Exports().size(), g_user_root.string().c_str());
     // Invalid PC settings values are refused here, not ignored. The temporal scene upscalers (FSR 3,
     // DLSS) are reported by the renderer: the game's own Neo scaling then shows the scene.
-    try {  // HDR selection and calibration values, checked as the GPU library checks them
+    try { // HDR selection and calibration values, checked as the GPU library checks them
         (void)ctrport::settings::display::native_hdr();
         (void)ctrport::settings::display::calibration();
     } catch (const std::exception& e) {
@@ -126,14 +133,28 @@ extern "C" CTR_GPU_API int ctr_gpu_init(const CtrGpuConfig* config) {
 // Renderer: presentation mode, anisotropy, FSR 1 sharpness (live). Display: gamma, native HDR10 with peak / exposure. Pacing:
 // presentation limit, window mode, exclusive refresh. AO and hero shadows: the "off" versions of
 // the recognised shaders that ctr_shaders translates next to the originals (renderer.cpp).
-extern "C" __declspec(dllexport) unsigned ctr_gpu_settings_abi() { return 1; }
-extern "C" __declspec(dllexport) unsigned ctr_gpu_display_abi() { return 1; }
-extern "C" __declspec(dllexport) unsigned ctr_gpu_pacing_abi() { return 1; }
-extern "C" __declspec(dllexport) unsigned ctr_gpu_live_settings_abi() { return 1; }
-extern "C" __declspec(dllexport) unsigned ctr_gpu_ao_abi() { return 1; }
-extern "C" __declspec(dllexport) unsigned ctr_gpu_hero_abi() { return 1; }
+extern "C" __declspec(dllexport) unsigned ctr_gpu_settings_abi() {
+    return 1;
+}
+extern "C" __declspec(dllexport) unsigned ctr_gpu_display_abi() {
+    return 1;
+}
+extern "C" __declspec(dllexport) unsigned ctr_gpu_pacing_abi() {
+    return 1;
+}
+extern "C" __declspec(dllexport) unsigned ctr_gpu_live_settings_abi() {
+    return 1;
+}
+extern "C" __declspec(dllexport) unsigned ctr_gpu_ao_abi() {
+    return 1;
+}
+extern "C" __declspec(dllexport) unsigned ctr_gpu_hero_abi() {
+    return 1;
+}
 // Settings only this renderer provides: shadow map detail (CTR_D3D_ShadowQuality).
-extern "C" __declspec(dllexport) unsigned ctr_gpu_d3d_abi() { return 1; }
+extern "C" __declspec(dllexport) unsigned ctr_gpu_d3d_abi() {
+    return 1;
+}
 extern "C" __declspec(dllexport) unsigned ctr_gpu_live_settings_set(unsigned key, unsigned value) {
     return ctrport::settings::live_gpu::set(key, value);
 }
@@ -155,11 +176,14 @@ extern "C" __declspec(dllexport) int ctr_d3d_set_eboot(void* base, uint64_t size
     if (!GfxShadersAvailable())
         LOG("no translated shaders in %s (tools/gpu_d3d/build_shaders.py): nothing will be drawn",
             g_user_root.string().c_str());
-    LOG("eboot %s at %p: device global +%llx", g_eboot.sha256.c_str(), base, (unsigned long long)g_version->device_global);
+    LOG("eboot %s at %p: device global +%llx", g_eboot.sha256.c_str(), base,
+        (unsigned long long)g_version->device_global);
     return 0;
 }
 
-extern "C" CTR_GPU_API int ctr_gpu_handle_fault(void*) { return 0; }
+extern "C" CTR_GPU_API int ctr_gpu_handle_fault(void*) {
+    return 0;
+}
 
 extern "C" CTR_GPU_API uintptr_t ctr_gpu_resolve(const char* nid, const char* library) {
     for (const auto& e : Exports())
@@ -167,13 +191,23 @@ extern "C" CTR_GPU_API uintptr_t ctr_gpu_resolve(const char* nid, const char* li
     return 0;
 }
 
-extern "C" CTR_GPU_API void ctr_gpu_map_memory(uint64_t address, uint64_t size) { GuestAddRange(address, size); }
-extern "C" CTR_GPU_API void ctr_gpu_unmap_memory(uint64_t address, uint64_t size) { GuestRemoveRange(address, size); }
+extern "C" CTR_GPU_API void ctr_gpu_map_memory(uint64_t address, uint64_t size) {
+    GuestAddRange(address, size);
+}
+extern "C" CTR_GPU_API void ctr_gpu_unmap_memory(uint64_t address, uint64_t size) {
+    GuestRemoveRange(address, size);
+}
 // CPU writes outside the guest's own code (file reads) are seen by write watch or content hash.
 extern "C" CTR_GPU_API void ctr_gpu_invalidate_memory(uint64_t, uint64_t) {}
 
-extern "C" CTR_GPU_API unsigned ctr_gpu_symbol_count(void) { return (unsigned)Exports().size(); }
-extern "C" CTR_GPU_API uint64_t ctr_gpu_flip_count(void) { return VideoOutFlipCount(); }
-extern "C" CTR_GPU_API uint64_t ctr_gpu_submit_count(void) { return GnmSubmitCount(); }
+extern "C" CTR_GPU_API unsigned ctr_gpu_symbol_count(void) {
+    return (unsigned)Exports().size();
+}
+extern "C" CTR_GPU_API uint64_t ctr_gpu_flip_count(void) {
+    return VideoOutFlipCount();
+}
+extern "C" CTR_GPU_API uint64_t ctr_gpu_submit_count(void) {
+    return GnmSubmitCount();
+}
 // PlayStation controllers through SDL and the exit confirmation (ctr_gpu_input_captured): pads.cpp;
 // XInput pads are read by the runtime.

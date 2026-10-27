@@ -35,7 +35,10 @@
 #include <string>
 #include <thread>
 #include <vector>
-namespace Gdiplus { using std::min; using std::max; }
+namespace Gdiplus {
+using std::min;
+using std::max;
+}
 #include <gdiplus.h>
 #include "xbox_prepare.hpp"
 #include "launcher_font.hpp"
@@ -64,7 +67,9 @@ namespace Gdiplus { using std::min; using std::max; }
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "hid.lib")
-#pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#pragma comment(                                                                                                       \
+    linker,                                                                                                            \
+    "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 namespace fs = std::filesystem;
 using namespace Gdiplus;
@@ -87,37 +92,25 @@ constexpr UINT WM_APP_GB_DONE = WM_APP + 8;
 constexpr UINT WM_APP_TROPHY_WIKI = WM_APP + 9;
 
 // Design 2a Pit Lane Palette (from Claude Design token specification)
-ARGB kArcadeBg      = 0xFF10152C;  // Deep arcade purple/indigo
-ARGB kArcadeDark    = 0xFF0A1025;  // Dark ink outline & hard drop shadow
-ARGB kArcadeCard    = 0xFF1B233D;  // Card surface
-ARGB kArcadeCardSub = 0xFF10152C;  // Inset card surface
-constexpr ARGB kArcadeGold    = 0xFFFFC93C;  // Trophy gold
-constexpr ARGB kArcadeCyan    = 0xFF2FD3FF;  // Nitro cyan
-constexpr ARGB kArcadeLime    = 0xFF8BE83A;  // Speed green
-constexpr ARGB kArcadePink    = 0xFFFF3D8B;  // Accent pink
-constexpr ARGB kArcadeOrange  = 0xFFFF7A1A;  // Warning orange
-constexpr ARGB kTextLight     = 0xFFFFF8EC;  // Warm light text
-ARGB kTextMuted     = 0xFFB9C2DA;  // Indigo muted text
-ARGB kTextOff       = 0xFF56617D;  // Disabled / toggle off
+ARGB kArcadeBg = 0xFF10152C;               // Deep arcade purple/indigo
+ARGB kArcadeDark = 0xFF0A1025;             // Dark ink outline & hard drop shadow
+ARGB kArcadeCard = 0xFF1B233D;             // Card surface
+ARGB kArcadeCardSub = 0xFF10152C;          // Inset card surface
+constexpr ARGB kArcadeGold = 0xFFFFC93C;   // Trophy gold
+constexpr ARGB kArcadeCyan = 0xFF2FD3FF;   // Nitro cyan
+constexpr ARGB kArcadeLime = 0xFF8BE83A;   // Speed green
+constexpr ARGB kArcadePink = 0xFFFF3D8B;   // Accent pink
+constexpr ARGB kArcadeOrange = 0xFFFF7A1A; // Warning orange
+constexpr ARGB kTextLight = 0xFFFFF8EC;    // Warm light text
+ARGB kTextMuted = 0xFFB9C2DA;              // Indigo muted text
+ARGB kTextOff = 0xFF56617D;                // Disabled / toggle off
 
-enum Tab : int {
-    TAB_HOME = 0,
-    TAB_MODS,
-    TAB_TROPHIES,
-    TAB_SETTINGS,
-    TAB_ADVANCED,
-    TAB_COUNT
-};
+enum Tab : int { TAB_HOME = 0, TAB_MODS, TAB_TROPHIES, TAB_SETTINGS, TAB_ADVANCED, TAB_COUNT };
 
-const wchar_t* const kTabNames[TAB_COUNT] = {
-    L"HOME",
-    L"MODS",
-    L"TROPHIES",
-    L"SETTINGS",
-    L"ADVANCED"
-};
+const wchar_t* const kTabNames[TAB_COUNT] = {L"HOME", L"MODS", L"TROPHIES", L"SETTINGS", L"ADVANCED"};
 
-const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)", L"3840x2160 (4K)", L"Custom"};
+const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)",
+                                       L"3840x2160 (4K)", L"Custom"};
 // Upscaling mode: the share of the output resolution the 3D scene is rendered at
 // (ctrport/settings/store.hpp upscaling_scale); used only with an upscaling method.
 const wchar_t* const kModes[] = {L"native", L"quality", L"balanced", L"performance", L"ultra_performance"};
@@ -128,15 +121,19 @@ const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3", L"
 constexpr int ID_RENDERER = 910;
 const wchar_t* const kRenderers[] = {L"vulkan", L"d3d11"};
 const wchar_t* const kRendererLabels[] = {L"Vulkan (shadPS4)", L"Direct3D 11 (native)"};
-const wchar_t* const kModeLabels[] = {L"Native (100%)", L"Quality (67%)", L"Balanced (58%)", L"Performance (50%)", L"Ultra performance (33%)"};
+const wchar_t* const kModeLabels[] = {L"Native (100%)", L"Quality (67%)", L"Balanced (58%)", L"Performance (50%)",
+                                      L"Ultra performance (33%)"};
 const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
 
-struct GameLanguage { const wchar_t* code; const wchar_t* label; int system_id; };
+struct GameLanguage {
+    const wchar_t* code;
+    const wchar_t* label;
+    int system_id;
+};
 constexpr GameLanguage kGameLanguages[] = {
     {L"en", L"English", 1}, {L"fr", L"Fran\u00e7ais", 2}, {L"it", L"Italiano", 5},
-    {L"de", L"Deutsch", 4}, {L"es", L"Espa\u00f1ol", 3}, {L"ar", L"\u0627\u0644\u0639\u0631\u0628\u064a\u0629", 21}
-};
+    {L"de", L"Deutsch", 4}, {L"es", L"Espa\u00f1ol", 3},  {L"ar", L"\u0627\u0644\u0639\u0631\u0628\u064a\u0629", 21}};
 int game_language_index(const std::wstring& code) {
     for (int i = 0; i < static_cast<int>(std::size(kGameLanguages)); ++i)
         if (code == kGameLanguages[i].code) return i;
@@ -144,26 +141,57 @@ int game_language_index(const std::wstring& code) {
 }
 
 enum : int {
-    ID_GAME_LANGUAGE = 193, ID_SPLIT_SCREEN = 194,
-    ID_MINIMIZE = 191, ID_CLOSE,
+    ID_GAME_LANGUAGE = 193,
+    ID_SPLIT_SCREEN = 194,
+    ID_MINIMIZE = 191,
+    ID_CLOSE,
     ID_XBOX_PROMPTS = 190,
-    ID_BASE_EDIT = 101, ID_BASE_BROWSE, ID_PATCH_EDIT, ID_PATCH_BROWSE,
-    ID_PILL = 110, ID_WIDTH = 120, ID_HEIGHT, ID_FULLSCREEN, ID_FPS60, ID_PRO, ID_NATIVE_4K, ID_SCENE_RES, ID_UNLOCK, ID_LAUNCH,
+    ID_BASE_EDIT = 101,
+    ID_BASE_BROWSE,
+    ID_PATCH_EDIT,
+    ID_PATCH_BROWSE,
+    ID_PILL = 110,
+    ID_WIDTH = 120,
+    ID_HEIGHT,
+    ID_FULLSCREEN,
+    ID_FPS60,
+    ID_PRO,
+    ID_NATIVE_4K,
+    ID_SCENE_RES,
+    ID_UNLOCK,
+    ID_LAUNCH,
     ID_TAB_BASE = 130, // 130..133 for 4 tabs
     ID_OPEN_MODS = 150,
-    ID_SAVE_BACKUP = 160, ID_OPEN_SAVES, ID_OPEN_DUMP, ID_OPEN_LOGS, ID_AUDIO_TEST,
-    ID_ONLINE_TOGGLE = 170, ID_ONLINE_ID_EDIT, ID_ONLINE_SERVER_EDIT, ID_ONLINE_PASSWORD_EDIT, ID_ONLINE_HOST, ID_ONLINE_FRIENDS, ID_WUMPA_X100
+    ID_SAVE_BACKUP = 160,
+    ID_OPEN_SAVES,
+    ID_OPEN_DUMP,
+    ID_OPEN_LOGS,
+    ID_AUDIO_TEST,
+    ID_ONLINE_TOGGLE = 170,
+    ID_ONLINE_ID_EDIT,
+    ID_ONLINE_SERVER_EDIT,
+    ID_ONLINE_PASSWORD_EDIT,
+    ID_ONLINE_HOST,
+    ID_ONLINE_FRIENDS,
+    ID_WUMPA_X100
 };
 
 // MODS tab: a scrolling list (launcher_mods.hpp) drawn with a pool of kModRows row slots, each
 // with a toggle and move buttons (installed mods, patches) or page and install buttons (GameBanana).
 constexpr int kModRows = 9;
 enum : int {
-    ID_MODS_FILES = 200, ID_MODS_PATCHES, ID_MODS_MASTER, ID_MODS_REFRESH,
-    ID_MOD_ROW_TOGGLE = 210, ID_MOD_ROW_UP = 220, ID_MOD_ROW_DOWN = 230,
-    ID_TROPHY_KEY_EDIT = 240, ID_TROPHY_IMPORT,
-    ID_PLAYER_PAD = 250,  // 250..253: the controller of players 1..4
-    ID_GB_ROW_PAGE = 260, ID_GB_ROW_GET = 270  // GameBanana rows: open the mod's page, install or remove
+    ID_MODS_FILES = 200,
+    ID_MODS_PATCHES,
+    ID_MODS_MASTER,
+    ID_MODS_REFRESH,
+    ID_MOD_ROW_TOGGLE = 210,
+    ID_MOD_ROW_UP = 220,
+    ID_MOD_ROW_DOWN = 230,
+    ID_TROPHY_KEY_EDIT = 240,
+    ID_TROPHY_IMPORT,
+    ID_PLAYER_PAD = 250, // 250..253: the controller of players 1..4
+    ID_GB_ROW_PAGE = 260,
+    ID_GB_ROW_GET = 270 // GameBanana rows: open the mod's page, install or remove
 };
 // TROPHIES tab: a grid of the game's trophy icons.
 constexpr int kTrophyColumns = 12;
@@ -174,14 +202,14 @@ struct Config {
     std::wstring game_language = L"en";
     std::wstring upscaling_mode = L"native";
     std::wstring upscaler = L"off";
-    std::wstring renderer = L"d3d11";  // v0.7.1: Direct3D 11 is the default renderer
+    std::wstring renderer = L"d3d11"; // v0.7.1: Direct3D 11 is the default renderer
     bool use_patch = true, fps_60 = true, ps4_pro = true, native_4k = false, unlock_all = false, fullscreen = false;
     bool online = false;
     bool wumpa_x100 = false;
     bool xbox_prompts = true;
     bool split_screen = false;
     bool mods_enabled = true;
-    std::wstring trophy_key;  // the user's PS4 trophy key (32 hex digits), optional
+    std::wstring trophy_key; // the user's PS4 trophy key (32 hex digits), optional
     // Controller of each player: "auto", "none", "keyboard", "xinput:N" or "hid:<device path>".
     std::wstring player_pad[4] = {L"auto", L"auto", L"auto", L"auto"};
     std::wstring online_id = L"CTRPlayer";
@@ -205,7 +233,8 @@ std::wstring widen(const std::string& text) {
 }
 std::string narrow(const std::wstring& text) {
     if (text.empty()) return {};
-    const int n = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    const int n =
+        WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
     std::string out(static_cast<std::size_t>(n), '\0');
     WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), n, nullptr, nullptr);
     return out;
@@ -214,11 +243,17 @@ std::string json_string(const std::wstring& value) {
     std::string out = "\"";
     char buffer[8];
     for (wchar_t c : value) {
-        if (c == L'"') out += "\\\"";
-        else if (c == L'\\') out += "\\\\";
-        else if (c == L'\n') out += "\\n";
-        else if (c < 0x20 || c > 0x7e) { std::snprintf(buffer, sizeof(buffer), "\\u%04x", static_cast<unsigned>(c)); out += buffer; }
-        else out += static_cast<char>(c);
+        if (c == L'"')
+            out += "\\\"";
+        else if (c == L'\\')
+            out += "\\\\";
+        else if (c == L'\n')
+            out += "\\n";
+        else if (c < 0x20 || c > 0x7e) {
+            std::snprintf(buffer, sizeof(buffer), "\\u%04x", static_cast<unsigned>(c));
+            out += buffer;
+        } else
+            out += static_cast<char>(c);
     }
     return out + "\"";
 }
@@ -229,7 +264,10 @@ std::wstring quote_argument(const std::wstring& arg) {
     std::wstring out = L"\"";
     std::size_t slashes = 0;
     for (wchar_t c : arg) {
-        if (c == L'\\') { ++slashes; continue; }
+        if (c == L'\\') {
+            ++slashes;
+            continue;
+        }
         out.append(c == L'"' ? slashes * 2 + 1 : slashes, L'\\');
         slashes = 0;
         out += c;
@@ -261,8 +299,18 @@ std::string read_tail(const fs::path& path, std::size_t limit) {
 }
 
 enum class Kind { Browse, Toggle, Pill, Launch, TabBtn, ActionBtn, Segment };
-struct Control { Kind kind; const wchar_t* label; bool* value; int pill; RectF box; int tab = -1; };
-struct Status { std::wstring text; int kind = 0; };  // 0 neutral, 1 ok, 2 error
+struct Control {
+    Kind kind;
+    const wchar_t* label;
+    bool* value;
+    int pill;
+    RectF box;
+    int tab = -1;
+};
+struct Status {
+    std::wstring text;
+    int kind = 0;
+}; // 0 neutral, 1 ok, 2 error
 
 struct App {
     HWND window = nullptr, base_edit = nullptr, patch_edit = nullptr, width_edit = nullptr, height_edit = nullptr;
@@ -286,11 +334,11 @@ struct App {
     int lobby_wheel_delta = 0;
     std::vector<ctr_online::FriendState> friends;
     ctr_online::Host host;
-    bool host_busy = false;           // server starting or stopping in the background
-    bool xbox_busy = false;           // Xbox prompt archives being prepared in the background
-    bool xbox_ready = false;          // prepared for the launch that requested them
-    bool shaders_busy = false;        // Direct3D 11 shaders being translated by ctr_shaders.exe
-    bool shaders_ready = false;       // translated for the launch that requested them
+    bool host_busy = false;     // server starting or stopping in the background
+    bool xbox_busy = false;     // Xbox prompt archives being prepared in the background
+    bool xbox_ready = false;    // prepared for the launch that requested them
+    bool shaders_busy = false;  // Direct3D 11 shaders being translated by ctr_shaders.exe
+    bool shaders_ready = false; // translated for the launch that requested them
     int shaders_percent = 0;
     ctr_online::HostStatus host_status;
     std::vector<HWND> pills;
@@ -307,9 +355,9 @@ struct App {
     ctrport::guest_patches::Selection patch_selection;
     std::wstring mods_notice, mods_game;
     bool mods_notice_error = false;
-    int mods_view = 0;  // view 0: file mods (installed, then GameBanana), 1: patches
-    float mods_scroll = 0;  // list scroll position (page coordinates)
-    int mod_slot_item[kModRows]{};  // the list item each row slot shows, -1 when unused
+    int mods_view = 0;             // view 0: file mods (installed, then GameBanana), 1: patches
+    float mods_scroll = 0;         // list scroll position (page coordinates)
+    int mod_slot_item[kModRows]{}; // the list item each row slot shows, -1 when unused
     bool mod_row_on[kModRows]{};
     HWND mod_row_toggle[kModRows]{}, mod_row_up[kModRows]{}, mod_row_down[kModRows]{};
     // GameBanana rows (gamebanana.hpp): the online catalog and what was installed from it.
@@ -320,8 +368,8 @@ struct App {
     HWND gb_row_page[kModRows]{}, gb_row_get[kModRows]{};
     // The install in progress (a download or a dropped file): one at a time.
     bool mods_busy = false;
-    std::uint64_t mods_busy_id = 0;  // GameBanana id, 0 for a dropped file
-    int mods_busy_percent = -1;      // download progress, -1 while extracting and installing
+    std::uint64_t mods_busy_id = 0; // GameBanana id, 0 for a dropped file
+    int mods_busy_percent = -1;     // download progress, -1 while extracting and installing
     std::wstring mods_busy_name;
     // TROPHIES tab (trophy_data.hpp)
     ctr_trophy::Set trophy_set;
@@ -335,10 +383,12 @@ struct App {
     std::wstring trophy_wiki_error;
     HWND trophy_key_edit = nullptr;
     // Controllers found on this PC, and the four player menus.
-    struct PadOption { std::wstring value, label; };
+    struct PadOption {
+        std::wstring value, label;
+    };
     std::vector<PadOption> pads;
     HWND player_combo[4]{};
-    std::vector<std::wstring> pad_values[4];  // the choice behind each menu entry
+    std::vector<std::wstring> pad_values[4]; // the choice behind each menu entry
     float scale = 1.0f;
     fs::path exe_dir, root, runtime_exe;
     Config cfg;
@@ -381,7 +431,9 @@ void check_launcher_update(bool manual) {
     if (update_job.valid()) return;
     const auto script = g.exe_dir / "launcher_update.ps1";
     if (!fs::exists(script)) {
-        if (manual) MessageBoxW(g.window, tr(L"launcher_update.ps1 is missing next to the launcher."), tr(L"Updates"), MB_ICONERROR);
+        if (manual)
+            MessageBoxW(g.window, tr(L"launcher_update.ps1 is missing next to the launcher."), tr(L"Updates"),
+                        MB_ICONERROR);
         return;
     }
     try {
@@ -396,7 +448,7 @@ void check_launcher_update(bool manual) {
         update_preparing = false;
         set_update_label(L"Checking...");
         EnableWindow(update_button, FALSE);
-        update_job = std::async(std::launch::async, [root=g.root, script, result=update_result] {
+        update_job = std::async(std::launch::async, [root = g.root, script, result = update_result] {
             return ctr_update::run(root, script, result, false);
         });
     } catch (const std::exception& e) {
@@ -408,27 +460,37 @@ void check_launcher_update(bool manual) {
 void offer_launcher_update() {
     if (update_job.valid() || !update_offer.is_object()) return;
     if (!ctr_update::portable(g.root, g.exe_dir)) {
-        MessageBoxW(g.window, tr(L"Automatic installation works only in the release folder."), tr(L"Updates"), MB_ICONINFORMATION); return;
+        MessageBoxW(g.window, tr(L"Automatic installation works only in the release folder."), tr(L"Updates"),
+                    MB_ICONINFORMATION);
+        return;
     }
     if (update_session_busy()) {
-        MessageBoxW(g.window, tr(L"Close the game and turn off Multiplayer Online first."), tr(L"Updates"), MB_ICONINFORMATION); return;
+        MessageBoxW(g.window, tr(L"Close the game and turn off Multiplayer Online first."), tr(L"Updates"),
+                    MB_ICONINFORMATION);
+        return;
     }
     const auto error = update_offer.at("error").text;
     if (!error.empty()) {
         MessageBoxW(g.window, ctr_update::wide(error).c_str(), tr(L"Release cannot be installed"), MB_ICONERROR);
-        update_offer = {}; set_update_label(L"Check updates"); return;
+        update_offer = {};
+        set_update_label(L"Check updates");
+        return;
     }
     const std::wstring prompt = trf(L"Installed version: {0}\nNew version: {1}", ctr_update::wide(ctr_update::version),
-            ctr_update::wide(update_offer.at("version").text) + (update_offer.at("prerelease").boolean ? L" (prerelease)" : L"")) +
-        L"\n\n" + ctr_update::wide(update_offer.at("notes").text).substr(0, 1800) +
-        L"\n\n" + tr(L"Download and install? The launcher restarts; saves, settings and dump are kept.");
-    if (MessageBoxW(g.window, prompt.c_str(), tr(L"Update available"), MB_YESNO | MB_ICONINFORMATION | MB_DEFBUTTON2) != IDYES) return;
+                                    ctr_update::wide(update_offer.at("version").text) +
+                                        (update_offer.at("prerelease").boolean ? L" (prerelease)" : L"")) +
+                                L"\n\n" + ctr_update::wide(update_offer.at("notes").text).substr(0, 1800) + L"\n\n" +
+                                tr(L"Download and install? The launcher restarts; saves, settings and dump are kept.");
+    if (MessageBoxW(g.window, prompt.c_str(), tr(L"Update available"), MB_YESNO | MB_ICONINFORMATION | MB_DEFBUTTON2) !=
+        IDYES)
+        return;
     update_preparing = true;
     set_update_label(L"Downloading...");
     EnableWindow(g.window, FALSE);
-    update_job = std::async(std::launch::async, [root=g.root, script=g.exe_dir / "launcher_update.ps1", result=update_result] {
-        return ctr_update::run(root, script, result, true);
-    });
+    update_job = std::async(std::launch::async,
+                            [root = g.root, script = g.exe_dir / "launcher_update.ps1", result = update_result] {
+                                return ctr_update::run(root, script, result, true);
+                            });
 }
 void poll_launcher_update() {
     if (!update_job.valid() || update_job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
@@ -442,7 +504,8 @@ void poll_launcher_update() {
             set_update_label(L"Check updates");
             update_offer = {};
             if (preparing || update_manual)
-                MessageBoxW(g.window, ctr_update::wide(response.at("error").text).c_str(), tr(L"Update failed"), MB_ICONERROR);
+                MessageBoxW(g.window, ctr_update::wide(response.at("error").text).c_str(), tr(L"Update failed"),
+                            MB_ICONERROR);
             return;
         }
         if (preparing) {
@@ -455,7 +518,8 @@ void poll_launcher_update() {
         }
         if (!response.at("available").boolean) {
             set_update_label(L"Check updates");
-            if (update_manual) MessageBoxW(g.window, tr(L"No newer version available."), tr(L"Updates"), MB_ICONINFORMATION);
+            if (update_manual)
+                MessageBoxW(g.window, tr(L"No newer version available."), tr(L"Updates"), MB_ICONINFORMATION);
             return;
         }
         update_offer = response.at("offer");
@@ -470,10 +534,16 @@ void poll_launcher_update() {
 
 #include "nitro_state.hpp"
 
-int px(float logical) { return static_cast<int>(std::lround(logical * g.scale)); }
-RectF rect(float x, float y, float w, float h) { return RectF(x, y, w, h); }
+int px(float logical) {
+    return static_cast<int>(std::lround(logical * g.scale));
+}
+RectF rect(float x, float y, float w, float h) {
+    return RectF(x, y, w, h);
+}
 
-fs::path config_path() { return (g.root.empty() ? g.exe_dir : g.root / "runtime/user") / "launcher_config.json"; }
+fs::path config_path() {
+    return (g.root.empty() ? g.exe_dir : g.root / "runtime/user") / "launcher_config.json";
+}
 
 fs::path resolve(const std::wstring& folder) {
     fs::path path(folder);
@@ -493,16 +563,27 @@ void load_config() {
     std::error_code ec;
     // EU CUSA14876 or US CUSA13795, each with its own update folder.
     for (const fs::path candidate : {fs::path(L"dump\\CUSA14876"), fs::path(L"dump\\CUSA13795")})
-        if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.base_dir = candidate.wstring(); break; }
-    const std::wstring title = fs::path(g.cfg.base_dir).filename().wstring() == L"CUSA13795" ? L"CUSA13795" : L"CUSA14876";
-    for (const fs::path candidate : {fs::path(L"dump") / (title + L"-patch"),
-                                     resolve(g.cfg.base_dir).parent_path() / (title + L"-patch")})
-        if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.patch_dir = candidate.wstring(); g.cfg.use_patch = true; break; }
+        if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) {
+            g.cfg.base_dir = candidate.wstring();
+            break;
+        }
+    const std::wstring title =
+        fs::path(g.cfg.base_dir).filename().wstring() == L"CUSA13795" ? L"CUSA13795" : L"CUSA14876";
+    for (const fs::path candidate :
+         {fs::path(L"dump") / (title + L"-patch"), resolve(g.cfg.base_dir).parent_path() / (title + L"-patch")})
+        if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) {
+            g.cfg.patch_dir = candidate.wstring();
+            g.cfg.use_patch = true;
+            break;
+        }
     ctr_online::Json document = ctr_online::Json::object();
-    try { document = ctrport::settings::Store(config_path()).read(); }
-    catch (const std::exception& error) {
-        const std::wstring message = tr(L"Settings could not be loaded. The file has been preserved.") + std::wstring(L"\n") + widen(error.what()) +
-            L"\n\n" + tr(L"Restore the previous settings? The current file will be preserved separately.");
+    try {
+        document = ctrport::settings::Store(config_path()).read();
+    } catch (const std::exception& error) {
+        const std::wstring message =
+            tr(L"Settings could not be loaded. The file has been preserved.") + std::wstring(L"\n") +
+            widen(error.what()) + L"\n\n" +
+            tr(L"Restore the previous settings? The current file will be preserved separately.");
         if (MessageBoxW(nullptr, message.c_str(), tr(L"Settings recovery"), MB_YESNO | MB_ICONWARNING) == IDYES) {
             try {
                 ctrport::settings::Store(config_path()).restore_backup();
@@ -516,35 +597,60 @@ void load_config() {
         std::map<std::wstring, std::wstring> strings;
         std::map<std::wstring, bool> bools;
         for (const auto& item : document.members) {
-            if (item.second.is_string()) strings.emplace(widen(item.first), widen(item.second.text));
-            else if (item.second.is_bool()) bools.emplace(widen(item.first), item.second.boolean);
+            if (item.second.is_string())
+                strings.emplace(widen(item.first), widen(item.second.text));
+            else if (item.second.is_bool())
+                bools.emplace(widen(item.first), item.second.boolean);
         }
         const bool parsed = true;
         if (parsed) {
-            auto text = [&](const wchar_t* key, std::wstring& out) { if (strings.count(key)) out = strings[key]; };
-            auto flag = [&](const wchar_t* key, bool& out) { if (bools.count(key)) out = bools[key]; };
-            text(L"base_dir", g.cfg.base_dir); text(L"patch_dir", g.cfg.patch_dir); text(L"resolution", g.cfg.resolution);
+            auto text = [&](const wchar_t* key, std::wstring& out) {
+                if (strings.count(key)) out = strings[key];
+            };
+            auto flag = [&](const wchar_t* key, bool& out) {
+                if (bools.count(key)) out = bools[key];
+            };
+            text(L"base_dir", g.cfg.base_dir);
+            text(L"patch_dir", g.cfg.patch_dir);
+            text(L"resolution", g.cfg.resolution);
             text(L"game_language", g.cfg.game_language);
-            text(L"custom_w", g.cfg.custom_w); text(L"custom_h", g.cfg.custom_h);
-            text(L"online_id", g.cfg.online_id); text(L"online_server", g.cfg.online_server); text(L"online_friend_code", g.cfg.online_friend_code);
-            text(L"online_public_ip", g.cfg.online_public_ip); flag(L"online_host", g.cfg.online_host);
+            text(L"custom_w", g.cfg.custom_w);
+            text(L"custom_h", g.cfg.custom_h);
+            text(L"online_id", g.cfg.online_id);
+            text(L"online_server", g.cfg.online_server);
+            text(L"online_friend_code", g.cfg.online_friend_code);
+            text(L"online_public_ip", g.cfg.online_public_ip);
+            flag(L"online_host", g.cfg.online_host);
             text(L"public_server", g.cfg.public_server);
-            flag(L"use_patch", g.cfg.use_patch); flag(L"fps_60", g.cfg.fps_60); flag(L"ps4_pro", g.cfg.ps4_pro);
-            flag(L"split_screen", g.cfg.split_screen); flag(L"mods_enabled", g.cfg.mods_enabled); flag(L"xbox_prompts", g.cfg.xbox_prompts); flag(L"native_4k", g.cfg.native_4k); flag(L"unlock_all", g.cfg.unlock_all); flag(L"fullscreen", g.cfg.fullscreen);
+            flag(L"use_patch", g.cfg.use_patch);
+            flag(L"fps_60", g.cfg.fps_60);
+            flag(L"ps4_pro", g.cfg.ps4_pro);
+            flag(L"split_screen", g.cfg.split_screen);
+            flag(L"mods_enabled", g.cfg.mods_enabled);
+            flag(L"xbox_prompts", g.cfg.xbox_prompts);
+            flag(L"native_4k", g.cfg.native_4k);
+            flag(L"unlock_all", g.cfg.unlock_all);
+            flag(L"fullscreen", g.cfg.fullscreen);
             // older files: the mode nearest to their internal 3D resolution
             const auto migrated = ctrport::settings::effective(document);
             if (const auto* mode = migrated.find("upscaling_mode")) g.cfg.upscaling_mode = widen(mode->text);
             text(L"upscaler", g.cfg.upscaler);
             text(L"renderer", g.cfg.renderer);
             text(L"trophy_key", g.cfg.trophy_key);
-            text(L"player1_pad", g.cfg.player_pad[0]); text(L"player2_pad", g.cfg.player_pad[1]);
-            text(L"player3_pad", g.cfg.player_pad[2]); text(L"player4_pad", g.cfg.player_pad[3]);
-            flag(L"online", g.cfg.online); flag(L"wumpa_x100", g.cfg.wumpa_x100);
+            text(L"player1_pad", g.cfg.player_pad[0]);
+            text(L"player2_pad", g.cfg.player_pad[1]);
+            text(L"player3_pad", g.cfg.player_pad[2]);
+            text(L"player4_pad", g.cfg.player_pad[3]);
+            flag(L"online", g.cfg.online);
+            flag(L"wumpa_x100", g.cfg.wumpa_x100);
         }
     }
-    if (std::find(std::begin(kModes), std::end(kModes), g.cfg.upscaling_mode) == std::end(kModes)) g.cfg.upscaling_mode = L"native";
-    if (std::find(std::begin(kUpscalers), std::end(kUpscalers), g.cfg.upscaler) == std::end(kUpscalers)) g.cfg.upscaler = L"off";
-    if (std::find(std::begin(kRenderers), std::end(kRenderers), g.cfg.renderer) == std::end(kRenderers)) g.cfg.renderer = L"d3d11";
+    if (std::find(std::begin(kModes), std::end(kModes), g.cfg.upscaling_mode) == std::end(kModes))
+        g.cfg.upscaling_mode = L"native";
+    if (std::find(std::begin(kUpscalers), std::end(kUpscalers), g.cfg.upscaler) == std::end(kUpscalers))
+        g.cfg.upscaler = L"off";
+    if (std::find(std::begin(kRenderers), std::end(kRenderers), g.cfg.renderer) == std::end(kRenderers))
+        g.cfg.renderer = L"d3d11";
     // v0.7.1 makes Direct3D 11 the default. The v0.7.0 launcher saved its renderer (Vulkan unless
     // changed) in every file, so each file switches once; renderer_default records it, and a
     // later choice of Vulkan stays. A package without ctr_d3d.dll keeps Vulkan (validate).
@@ -578,22 +684,28 @@ std::wstring window_text(HWND control) {
 
 ctr_online::Json settings_ui_snapshot() {
     const auto flag = [](bool v) { return std::string(v ? "true" : "false"); };
-    const std::string json = "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"renderer\": " + json_string(g.cfg.renderer) + ",\n  \"upscaling_mode\": " + json_string(g.cfg.upscaling_mode) + ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
-        ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) + ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) +
-        ",\n  \"native_4k\": " + flag(g.cfg.native_4k) + ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) + ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) + ",\n  \"mods_enabled\": " + flag(g.cfg.mods_enabled) +
-        ",\n  \"resolution\": " + json_string(g.cfg.resolution) + ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) +
-        ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) + ",\n  \"game_language\": " + json_string(g.cfg.game_language) +
-        ",\n  \"online\": " + flag(g.cfg.online) +
-        ",\n  \"wumpa_x100\": " + flag(g.cfg.wumpa_x100) +
-        ",\n  \"online_id\": " + json_string(g.cfg.online_id) +
+    const std::string json =
+        "{\n  \"upscaler\": " + json_string(g.cfg.upscaler) + ",\n  \"renderer\": " + json_string(g.cfg.renderer) +
+        ",\n  \"upscaling_mode\": " + json_string(g.cfg.upscaling_mode) +
+        ",\n  \"base_dir\": " + json_string(g.cfg.base_dir) + ",\n  \"patch_dir\": " + json_string(g.cfg.patch_dir) +
+        ",\n  \"use_patch\": " + flag(g.cfg.use_patch) + ",\n  \"fps_60\": " + flag(g.cfg.fps_60) +
+        ",\n  \"ps4_pro\": " + flag(g.cfg.ps4_pro) + ",\n  \"native_4k\": " + flag(g.cfg.native_4k) +
+        ",\n  \"unlock_all\": " + flag(g.cfg.unlock_all) + ",\n  \"fullscreen\": " + flag(g.cfg.fullscreen) +
+        ",\n  \"xbox_prompts\": " + flag(g.cfg.xbox_prompts) + ",\n  \"split_screen\": " + flag(g.cfg.split_screen) +
+        ",\n  \"mods_enabled\": " + flag(g.cfg.mods_enabled) + ",\n  \"resolution\": " + json_string(g.cfg.resolution) +
+        ",\n  \"custom_w\": " + json_string(g.cfg.custom_w) + ",\n  \"custom_h\": " + json_string(g.cfg.custom_h) +
+        ",\n  \"game_language\": " + json_string(g.cfg.game_language) + ",\n  \"online\": " + flag(g.cfg.online) +
+        ",\n  \"wumpa_x100\": " + flag(g.cfg.wumpa_x100) + ",\n  \"online_id\": " + json_string(g.cfg.online_id) +
         ",\n  \"online_server\": " + json_string(g.cfg.online_server) +
         ",\n  \"online_friend_code\": " + json_string(g.cfg.online_friend_code) +
         ",\n  \"public_server\": " + json_string(g.cfg.public_server) +
         ",\n  \"online_host\": " + flag(g.cfg.online_host) +
         ",\n  \"online_public_ip\": " + json_string(g.cfg.online_public_ip) +
         ",\n  \"trophy_key\": " + json_string(g.cfg.trophy_key) +
-        ",\n  \"player1_pad\": " + json_string(g.cfg.player_pad[0]) + ",\n  \"player2_pad\": " + json_string(g.cfg.player_pad[1]) +
-        ",\n  \"player3_pad\": " + json_string(g.cfg.player_pad[2]) + ",\n  \"player4_pad\": " + json_string(g.cfg.player_pad[3]) + "\n}";
+        ",\n  \"player1_pad\": " + json_string(g.cfg.player_pad[0]) +
+        ",\n  \"player2_pad\": " + json_string(g.cfg.player_pad[1]) +
+        ",\n  \"player3_pad\": " + json_string(g.cfg.player_pad[2]) +
+        ",\n  \"player4_pad\": " + json_string(g.cfg.player_pad[3]) + "\n}";
     return ctr_online::parse_json(json);
 }
 
@@ -601,7 +713,10 @@ bool save_config() {
     g.cfg.base_dir = window_text(g.base_edit);
     g.cfg.patch_dir = window_text(g.patch_edit);
     g.cfg.resolution = kResolutions[g.resolution];
-    if (g.resolution == 4) { g.cfg.custom_w = window_text(g.width_edit); g.cfg.custom_h = window_text(g.height_edit); }
+    if (g.resolution == 4) {
+        g.cfg.custom_w = window_text(g.width_edit);
+        g.cfg.custom_h = window_text(g.height_edit);
+    }
     if (g.online_id_edit) g.cfg.online_id = window_text(g.online_id_edit);
     const auto json = ctr_online::dump_json(settings_ui_snapshot());
     try {
@@ -641,7 +756,8 @@ ARGB fade(ARGB color, float alpha) {
 }
 
 // Slanted box with hard drop shadow (the core motif of Option 2a)
-void draw_slanted_box(Graphics& gr, const RectF& r, float skew_x, float shadow_d, const Brush& fill, ARGB border, float border_w) {
+void draw_slanted_box(Graphics& gr, const RectF& r, float skew_x, float shadow_d, const Brush& fill, ARGB border,
+                      float border_w) {
     GraphicsPath body;
     round_rect(body, rect(0, 0, r.Width, r.Height), std::min(12.f, r.Height / 3));
     Matrix skew(1, 0, -skew_x, 1, r.X + r.Height * skew_x, r.Y);
@@ -675,7 +791,10 @@ const FontFamily& family(int which) {
     if (!cached) {
         for (const wchar_t* name : names[which]) {
             auto candidate = std::make_unique<FontFamily>(name);
-            if (candidate->IsAvailable()) { cached = std::move(candidate); break; }
+            if (candidate->IsAvailable()) {
+                cached = std::move(candidate);
+                break;
+            }
         }
         if (!cached) cached = std::unique_ptr<FontFamily>(FontFamily::GenericSansSerif()->Clone());
     }
@@ -708,13 +827,15 @@ void text(Graphics& gr, const std::wstring& value, int which, float size, int st
     SolidBrush brush{Color(color)};
     gr.DrawString(value.c_str(), -1, &font, r, &format, &brush);
 }
-void nitro_resolve(HDC target,HBITMAP high,int w,int h) {
+void nitro_resolve(HDC target, HBITMAP high, int w, int h) {
     // Resolve via GDI+ rather than display-driver-dependent GDI HALFTONE.
-    Bitmap image(high,nullptr);Graphics output(target);
+    Bitmap image(high, nullptr);
+    Graphics output(target);
     output.SetInterpolationMode(InterpolationModeHighQualityBicubic);
     output.SetPixelOffsetMode(PixelOffsetModeHalf);
-    ImageAttributes attr;attr.SetWrapMode(WrapModeTileFlipXY);
-    output.DrawImage(&image,Rect(0,0,w,h),0,0,w*nitro::samples,h*nitro::samples,UnitPixel,&attr);
+    ImageAttributes attr;
+    attr.SetWrapMode(WrapModeTileFlipXY);
+    output.DrawImage(&image, Rect(0, 0, w, h), 0, 0, w * nitro::samples, h * nitro::samples, UnitPixel, &attr);
 }
 void draw_cover(Graphics& gr, Bitmap& image, const RectF& dest) {
     const float iw = static_cast<float>(image.GetWidth()), ih = static_cast<float>(image.GetHeight());
@@ -750,7 +871,9 @@ void draw_status(Graphics& gr, const Status& status, float x, float y, float w) 
     if (status.kind) draw_check(gr, x, y + 2, status.kind);
     const float offset = status.kind ? 22.f : 0.f;
     text(gr, status.text, 1, 12.0f, FontStyleRegular, rect(x + offset, y, w - offset, 20),
-         status.kind == 1 ? kArcadeLime : status.kind == 2 ? kArcadeOrange : kTextMuted);
+         status.kind == 1   ? kArcadeLime
+         : status.kind == 2 ? kArcadeOrange
+                            : kTextMuted);
 }
 void draw_field(Graphics& gr, const RectF& r, HWND edit) {
     const bool enabled = IsWindowEnabled(edit) != FALSE, focused = GetFocus() == edit;
@@ -760,7 +883,9 @@ void draw_field(Graphics& gr, const RectF& r, HWND edit) {
 
 // Right-edge friends drawer: every friend of the rubrica, with the presence the local service
 // last received from that friend's own service (offline while Online is off).
-fs::path friends_path() { return g.root / "runtime/user/online/friends.json"; }
+fs::path friends_path() {
+    return g.root / "runtime/user/online/friends.json";
+}
 void reload_friends() {
     const auto live = g.host.friends();
     // The last name each friend's service reported, kept by the service (friend_names.json):
@@ -775,9 +900,11 @@ void reload_friends() {
     std::vector<ctr_online::FriendState> rows;
     for (const auto& entry : ctr_online::FriendStore(friends_path()).entries()) {
         ctr_online::FriendState row;
-        for (const auto& state : live) if (state.code == entry.friend_code) row = state;
+        for (const auto& state : live)
+            if (state.code == entry.friend_code) row = state;
         if (row.name.empty() && saved_names.is_object())
-            if (const auto* name = saved_names.find(entry.friend_code); name && name->is_string()) row.name = name->text;
+            if (const auto* name = saved_names.find(entry.friend_code); name && name->is_string())
+                row.name = name->text;
         row.code = entry.friend_code;
         row.nickname = entry.nickname;
         rows.push_back(std::move(row));
@@ -787,10 +914,12 @@ void reload_friends() {
         return rank(a) < rank(b);
     });
     const std::string selected = g.friends_selected >= 0 && g.friends_selected < static_cast<int>(g.friends.size())
-        ? g.friends[g.friends_selected].code : std::string();
+                                     ? g.friends[g.friends_selected].code
+                                     : std::string();
     g.friends = std::move(rows);
     g.friends_selected = -1;
-    for (int i = 0; i < static_cast<int>(g.friends.size()); ++i) if (g.friends[i].code == selected) g.friends_selected = i;
+    for (int i = 0; i < static_cast<int>(g.friends.size()); ++i)
+        if (g.friends[i].code == selected) g.friends_selected = i;
     g.friends_scroll = std::clamp(g.friends_scroll, 0, std::max(0, static_cast<int>(g.friends.size()) - 4));
 }
 std::wstring friend_label(const ctr_online::FriendState& row) {
@@ -803,18 +932,19 @@ void friend_action(int action);
 void update_friend_controls();
 
 RectF lobby_scroll_thumb() {
-    const auto count=static_cast<int>(g.friends.size());
-    const float height=count>4 ? 164.f*4.f/static_cast<float>(count) : 164.f;
-    const float offset=count>4 ? (164.f-height)*static_cast<float>(g.friends_scroll)/static_cast<float>(count-4) : 0.f;
-    return rect(329,78+offset,10,height);
+    const auto count = static_cast<int>(g.friends.size());
+    const float height = count > 4 ? 164.f * 4.f / static_cast<float>(count) : 164.f;
+    const float offset =
+        count > 4 ? (164.f - height) * static_cast<float>(g.friends_scroll) / static_cast<float>(count - 4) : 0.f;
+    return rect(329, 78 + offset, 10, height);
 }
-void drag_lobby_scroll(HWND window,float y) {
-    const auto thumb=lobby_scroll_thumb();
-    const int maximum=std::max(0,static_cast<int>(g.friends.size())-4);
-    if(maximum && thumb.Height<164.f) {
-        const float progress=std::clamp((y-78.f-g.lobby_scroll_grab)/(164.f-thumb.Height),0.f,1.f);
-        g.friends_scroll=static_cast<int>(std::lround(progress*static_cast<float>(maximum)));
-        InvalidateRect(window,nullptr,FALSE);
+void drag_lobby_scroll(HWND window, float y) {
+    const auto thumb = lobby_scroll_thumb();
+    const int maximum = std::max(0, static_cast<int>(g.friends.size()) - 4);
+    if (maximum && thumb.Height < 164.f) {
+        const float progress = std::clamp((y - 78.f - g.lobby_scroll_grab) / (164.f - thumb.Height), 0.f, 1.f);
+        g.friends_scroll = static_cast<int>(std::lround(progress * static_cast<float>(maximum)));
+        InvalidateRect(window, nullptr, FALSE);
     }
 }
 
@@ -827,35 +957,47 @@ void update_friend_controls() {
 constexpr float kFriendsDuration = 320.f;
 
 // Match Brief2's CSS cubic-bezier(.3,1.4,.5,1), including its gentle overshoot.
-float friends_ease(float progress) { return nitro::ease(progress); }
+float friends_ease(float progress) {
+    return nitro::ease(progress);
+}
 void position_friends() {
     // Keep a full-size surface while translating it; the parent clips its right
     // edge. No binary HRGN cuts through the antialiased rounded outlines.
-    SetWindowPos(g.friends_drawer, HWND_TOP, px(kWidth - (classic_skin?38.f:0.f) - g.friends_reveal), px(classic_skin?62.f:100.f),
-                 px(370), px(530), SWP_NOACTIVATE | SWP_NOCOPYBITS);
+    SetWindowPos(g.friends_drawer, HWND_TOP, px(kWidth - (classic_skin ? 38.f : 0.f) - g.friends_reveal),
+                 px(classic_skin ? 62.f : 100.f), px(370), px(530), SWP_NOACTIVATE | SWP_NOCOPYBITS);
     ShowWindow(g.friends_drawer, g.current_tab == TAB_HOME ? SW_SHOWNA : SW_HIDE);
-    const bool show=g.current_tab==TAB_HOME && g.friends_open && !g.friends_animating;
-    for(HWND control:{g.friends_manage,g.friend_code_edit,g.friend_add,g.friend_remove})
-        ShowWindow(control,show ? SW_SHOWNA : SW_HIDE);
+    const bool show = g.current_tab == TAB_HOME && g.friends_open && !g.friends_animating;
+    for (HWND control : {g.friends_manage, g.friend_code_edit, g.friend_add, g.friend_remove})
+        ShowWindow(control, show ? SW_SHOWNA : SW_HIDE);
     update_friend_controls();
-    RECT damage{px(kWidth-kFriendsTravel-38),px(classic_skin?62.f:100.f),px(kWidth),px(classic_skin?592.f:630.f)};
-    InvalidateRect(g.window,&damage,FALSE);
-    InvalidateRect(g.friends_drawer,nullptr,FALSE);
+    RECT damage{px(kWidth - kFriendsTravel - 38), px(classic_skin ? 62.f : 100.f), px(kWidth),
+                px(classic_skin ? 592.f : 630.f)};
+    InvalidateRect(g.window, &damage, FALSE);
+    InvalidateRect(g.friends_drawer, nullptr, FALSE);
 }
 void animate_friends(bool open) {
     if (g.current_tab != TAB_HOME) return;
-    if(g.lobby_scroll_drag){g.lobby_scroll_drag=false;ReleaseCapture();}
+    if (g.lobby_scroll_drag) {
+        g.lobby_scroll_drag = false;
+        ReleaseCapture();
+    }
     g.friends_open = open;
     g.friends_from = g.friends_reveal;
     g.friends_started = GetTickCount64();
     g.friends_animating = true;
     reload_friends();
-    if(!nitro_motion) {g.friends_reveal=open?kFriendsTravel:0;g.friends_animating=false;}
-    else SetTimer(g.friends_drawer, kFriendsTimer, 15, nullptr);
+    if (!nitro_motion) {
+        g.friends_reveal = open ? kFriendsTravel : 0;
+        g.friends_animating = false;
+    } else
+        SetTimer(g.friends_drawer, kFriendsTimer, 15, nullptr);
     position_friends();
 }
 void reset_friends() {
-    if(g.lobby_scroll_drag){g.lobby_scroll_drag=false;ReleaseCapture();}
+    if (g.lobby_scroll_drag) {
+        g.lobby_scroll_drag = false;
+        ReleaseCapture();
+    }
     KillTimer(g.friends_drawer, kFriendsTimer);
     g.friends_open = g.friends_animating = false;
     g.friends_reveal = 0;
@@ -863,45 +1005,50 @@ void reset_friends() {
 LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARAM lp) {
     switch (message) {
     case WM_CREATE: {
-        auto button=[&](int id,const wchar_t* title,float x,float y,float w) {
-            return CreateWindowExW(0,L"BUTTON",title,WS_CHILD|WS_TABSTOP|BS_OWNERDRAW,
-                px(x),px(y),px(w),px(32),window,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),nullptr,nullptr);
+        auto button = [&](int id, const wchar_t* title, float x, float y, float w) {
+            return CreateWindowExW(0, L"BUTTON", title, WS_CHILD | WS_TABSTOP | BS_OWNERDRAW, px(x), px(y), px(w),
+                                   px(32), window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
         };
-        g.friends_manage=button(110,tr(L"COPY MY CODE"),50,256,290);
-        g.friend_code_edit=CreateWindowExW(0,L"EDIT",L"",WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL,
-            px(60),px(330),px(270),px(20),window,reinterpret_cast<HMENU>(113),nullptr,nullptr);
-        SendMessageW(g.friend_code_edit,WM_SETFONT,reinterpret_cast<WPARAM>(g.edit_font),FALSE);
-        SendMessageW(g.friend_code_edit,EM_SETLIMITTEXT,512,0);
-        SendMessageW(g.friend_code_edit,EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(tr(L"Paste a friend's code")));
-        g.friend_add=button(111,tr(L"ADD"),50,366,140);
-        g.friend_remove=button(109,tr(L"REMOVE"),200,366,140);
+        g.friends_manage = button(110, tr(L"COPY MY CODE"), 50, 256, 290);
+        g.friend_code_edit = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL, px(60), px(330),
+                                             px(270), px(20), window, reinterpret_cast<HMENU>(113), nullptr, nullptr);
+        SendMessageW(g.friend_code_edit, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
+        SendMessageW(g.friend_code_edit, EM_SETLIMITTEXT, 512, 0);
+        SendMessageW(g.friend_code_edit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(tr(L"Paste a friend's code")));
+        g.friend_add = button(111, tr(L"ADD"), 50, 366, 140);
+        g.friend_remove = button(109, tr(L"REMOVE"), 200, 366, 140);
         return 0;
     }
     case WM_COMMAND:
-        if(HIWORD(wp)==BN_CLICKED && (LOWORD(wp)==110 || LOWORD(wp)==111 || LOWORD(wp)==109))
+        if (HIWORD(wp) == BN_CLICKED && (LOWORD(wp) == 110 || LOWORD(wp) == 111 || LOWORD(wp) == 109))
             friend_action(LOWORD(wp));
-        if(HIWORD(wp)==EN_SETFOCUS || HIWORD(wp)==EN_KILLFOCUS)InvalidateRect(window,nullptr,FALSE);
+        if (HIWORD(wp) == EN_SETFOCUS || HIWORD(wp) == EN_KILLFOCUS) InvalidateRect(window, nullptr, FALSE);
         return 0;
     case WM_CTLCOLOREDIT: {
-        const auto dc=reinterpret_cast<HDC>(wp);
-        SetTextColor(dc,RGB(255,248,236));SetBkColor(dc,RGB(27,20,70));
+        const auto dc = reinterpret_cast<HDC>(wp);
+        SetTextColor(dc, RGB(255, 248, 236));
+        SetBkColor(dc, RGB(27, 20, 70));
         return reinterpret_cast<LRESULT>(g.field_brush);
     }
     case WM_DRAWITEM: {
-        const auto* item=reinterpret_cast<DRAWITEMSTRUCT*>(lp);
-        Graphics gr(item->hDC);gr.Clear(Color(kArcadeCard));gr.ScaleTransform(g.scale,g.scale);
-        gr.SetSmoothingMode(SmoothingModeAntiAlias);gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-        const float width=item->CtlID==110 ? 290.f : 140.f;
-        const bool enabled=(item->itemState & ODS_DISABLED)==0;
-        const auto color=!enabled ? kArcadeCardSub : item->CtlID==109 ? kArcadePink : kArcadeCyan;
-        fill_round(gr,rect(0,0,width,32),9,SolidBrush(Color(color)));
-        const auto label=tr(item->CtlID==110 ? L"COPY MY CODE" : item->CtlID==111 ? L"ADD" : L"REMOVE");
-        text(gr,label,1,12,FontStyleBold,rect(0,0,width,32),enabled ? kArcadeDark : kTextMuted,StringAlignmentCenter);
-        if(item->itemState & (ODS_FOCUS|ODS_SELECTED))stroke_round(gr,rect(2,2,width-4,28),7,kArcadeGold,2);
+        const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lp);
+        Graphics gr(item->hDC);
+        gr.Clear(Color(kArcadeCard));
+        gr.ScaleTransform(g.scale, g.scale);
+        gr.SetSmoothingMode(SmoothingModeAntiAlias);
+        gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
+        const float width = item->CtlID == 110 ? 290.f : 140.f;
+        const bool enabled = (item->itemState & ODS_DISABLED) == 0;
+        const auto color = !enabled ? kArcadeCardSub : item->CtlID == 109 ? kArcadePink : kArcadeCyan;
+        fill_round(gr, rect(0, 0, width, 32), 9, SolidBrush(Color(color)));
+        const auto label = tr(item->CtlID == 110 ? L"COPY MY CODE" : item->CtlID == 111 ? L"ADD" : L"REMOVE");
+        text(gr, label, 1, 12, FontStyleBold, rect(0, 0, width, 32), enabled ? kArcadeDark : kTextMuted,
+             StringAlignmentCenter);
+        if (item->itemState & (ODS_FOCUS | ODS_SELECTED))
+            stroke_round(gr, rect(2, 2, width - 4, 28), 7, kArcadeGold, 2);
         return TRUE;
     }
-    case WM_ERASEBKGND:
-        return 1;
+    case WM_ERASEBKGND: return 1;
     case WM_TIMER:
         if (wp == kFriendsTimer && g.friends_animating) {
             const float elapsed = static_cast<float>(GetTickCount64() - g.friends_started);
@@ -923,9 +1070,7 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
         if (pt.x < px(38) && (pt.y < px(18) || pt.y > px(172))) return HTTRANSPARENT;
         break;
     }
-    case WM_DESTROY:
-        KillTimer(window, kFriendsTimer);
-        return 0;
+    case WM_DESTROY: KillTimer(window, kFriendsTimer); return 0;
     case WM_PAINT: {
         PAINTSTRUCT ps{};
         HDC target = BeginPaint(window, &ps);
@@ -934,112 +1079,149 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
         const HGDIOBJ previous = SelectObject(dc, bitmap);
         // Composite onto the exact Home background so curves have smooth edge
         // pixels instead of the old mismatched GDI region radius (diameter).
-        HDC backdrop=CreateCompatibleDC(target);const auto backdrop_old=SelectObject(backdrop,g.base_layer);
-        BitBlt(dc,0,0,px(370),px(530),backdrop,px(kWidth-(classic_skin?38.f:0.f)-g.friends_reveal),px(classic_skin?62.f:100.f),SRCCOPY);
-        SelectObject(backdrop,backdrop_old);DeleteDC(backdrop);
+        HDC backdrop = CreateCompatibleDC(target);
+        const auto backdrop_old = SelectObject(backdrop, g.base_layer);
+        BitBlt(dc, 0, 0, px(370), px(530), backdrop, px(kWidth - (classic_skin ? 38.f : 0.f) - g.friends_reveal),
+               px(classic_skin ? 62.f : 100.f), SRCCOPY);
+        SelectObject(backdrop, backdrop_old);
+        DeleteDC(backdrop);
         {
             Graphics gr(dc);
             gr.ScaleTransform(g.scale, g.scale);
             gr.SetSmoothingMode(SmoothingModeAntiAlias);
             gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
             gr.SetPixelOffsetMode(PixelOffsetModeHalf);
-            fill_round(gr, rect(0,23,46,150),12,SolidBrush(Color(kArcadeDark)));
-            fill_round(gr, rect(4,19,44,148),12,SolidBrush(Color(kArcadePink)));
-            stroke_round(gr, rect(4,19,44,148),12,kArcadeDark,3);
-            text(gr, g.friends_open ? L">" : L"<",1,18,FontStyleBold,rect(4,26,30,26),kArcadeDark,StringAlignmentCenter);
+            fill_round(gr, rect(0, 23, 46, 150), 12, SolidBrush(Color(kArcadeDark)));
+            fill_round(gr, rect(4, 19, 44, 148), 12, SolidBrush(Color(kArcadePink)));
+            stroke_round(gr, rect(4, 19, 44, 148), 12, kArcadeDark, 3);
+            text(gr, g.friends_open ? L">" : L"<", 1, 18, FontStyleBold, rect(4, 26, 30, 26), kArcadeDark,
+                 StringAlignmentCenter);
             const auto saved = gr.Save();
-            gr.TranslateTransform(4,154);
+            gr.TranslateTransform(4, 154);
             gr.RotateTransform(-90);
-            text(gr,tr(L"FRIENDS"),0,16,FontStyleBold,rect(0,0,102,30),kArcadeDark,StringAlignmentCenter);
+            text(gr, tr(L"FRIENDS"), 0, 16, FontStyleBold, rect(0, 0, 102, 30), kArcadeDark, StringAlignmentCenter);
             gr.Restore(saved);
             if (g.friends_reveal > 0) {
-                fill_round(gr,rect(33,7,330,520),16,SolidBrush(Color(kArcadeDark)));
-                fill_round(gr,rect(39,2,320,518),16,SolidBrush(Color(kArcadeCard)));
-                stroke_round(gr,rect(39,2,320,518),16,kArcadeDark,3);
+                fill_round(gr, rect(33, 7, 330, 520), 16, SolidBrush(Color(kArcadeDark)));
+                fill_round(gr, rect(39, 2, 320, 518), 16, SolidBrush(Color(kArcadeCard)));
+                stroke_round(gr, rect(39, 2, 320, 518), 16, kArcadeDark, 3);
                 Pen highlight(Color(0xFF473B91), 1.f);
                 gr.DrawLine(&highlight, 57.f, 6.f, 346.f, 6.f);
-                text(gr,tr(L"FRIENDS"),0,22,FontStyleBold,rect(50,14,145,30),kArcadeGold);
-                std::size_t playing=0;
-                for(const auto& f:g.friends) if(f.online) ++playing;
-                fill_round(gr,rect(286,18,50,24),6,SolidBrush(Color(kArcadeLime)));
-                text(gr,std::to_wstring(playing)+L"/"+std::to_wstring(g.friends.size()),1,12,FontStyleBold,rect(286,18,50,24),kArcadeDark,StringAlignmentCenter);
-                const std::wstring service_label=tr(!g.cfg.online ? L"Online is off" :
-                    g.host_busy ? L"Connecting..." : !g.host_status.running ? L"Online service not started" : L"Online");
-                text(gr,service_label,1,11,FontStyleRegular,rect(50,47,290,22),kTextMuted);
+                text(gr, tr(L"FRIENDS"), 0, 22, FontStyleBold, rect(50, 14, 145, 30), kArcadeGold);
+                std::size_t playing = 0;
+                for (const auto& f : g.friends)
+                    if (f.online) ++playing;
+                fill_round(gr, rect(286, 18, 50, 24), 6, SolidBrush(Color(kArcadeLime)));
+                text(gr, std::to_wstring(playing) + L"/" + std::to_wstring(g.friends.size()), 1, 12, FontStyleBold,
+                     rect(286, 18, 50, 24), kArcadeDark, StringAlignmentCenter);
+                const std::wstring service_label = tr(!g.cfg.online            ? L"Online is off"
+                                                      : g.host_busy            ? L"Connecting..."
+                                                      : !g.host_status.running ? L"Online service not started"
+                                                                               : L"Online");
+                text(gr, service_label, 1, 11, FontStyleRegular, rect(50, 47, 290, 22), kTextMuted);
                 if (g.friends.empty()) {
-                    text(gr,tr(L"No friends yet."),1,13,FontStyleRegular,rect(54,100,280,100),kTextMuted);
+                    text(gr, tr(L"No friends yet."), 1, 13, FontStyleRegular, rect(54, 100, 280, 100), kTextMuted);
                 }
-                for (int row=0; row<4 && row+g.friends_scroll<static_cast<int>(g.friends.size()); ++row) {
-                    const int index=row+g.friends_scroll;
-                    const auto& f=g.friends[index];
-                    const float y=78.f+row*42.f;
-                    const float width=g.friends.size()>4 ? 272.f : 291.f;
-                    fill_round(gr,rect(49,y,width,38),10,SolidBrush(Color(kArcadeBg)));
-                    if(index==g.friends_selected) stroke_round(gr,rect(49,y,width,38),10,kArcadeGold,2);
-                    const auto dot=f.in_game ? kArcadeLime : f.online ? kArcadeCyan : kTextOff;
-                    fill_round(gr,rect(57,y+5,28,28),9,SolidBrush(Color(dot)));
-                    const auto name=friend_label(f);
-                    text(gr,name.substr(0,1),0,17,FontStyleBold,rect(57,y+5,28,28),kArcadeDark,StringAlignmentCenter);
-                    text(gr,name,1,13,FontStyleBold,rect(96,y+1,215,20),kTextLight);
-                    const std::wstring status=tr(f.in_game ? L"In game" : f.online ? L"Online (game closed)" :
-                        f.name.empty() && g.host_status.running ? L"Offline \u00b7 must add your code" : L"Offline");
-                    text(gr,status,1,10,FontStyleRegular,rect(96,y+20,215,16),f.in_game ? kArcadeLime : kTextMuted);
+                for (int row = 0; row < 4 && row + g.friends_scroll < static_cast<int>(g.friends.size()); ++row) {
+                    const int index = row + g.friends_scroll;
+                    const auto& f = g.friends[index];
+                    const float y = 78.f + row * 42.f;
+                    const float width = g.friends.size() > 4 ? 272.f : 291.f;
+                    fill_round(gr, rect(49, y, width, 38), 10, SolidBrush(Color(kArcadeBg)));
+                    if (index == g.friends_selected) stroke_round(gr, rect(49, y, width, 38), 10, kArcadeGold, 2);
+                    const auto dot = f.in_game ? kArcadeLime : f.online ? kArcadeCyan : kTextOff;
+                    fill_round(gr, rect(57, y + 5, 28, 28), 9, SolidBrush(Color(dot)));
+                    const auto name = friend_label(f);
+                    text(gr, name.substr(0, 1), 0, 17, FontStyleBold, rect(57, y + 5, 28, 28), kArcadeDark,
+                         StringAlignmentCenter);
+                    text(gr, name, 1, 13, FontStyleBold, rect(96, y + 1, 215, 20), kTextLight);
+                    const std::wstring status =
+                        tr(f.in_game                                 ? L"In game"
+                           : f.online                                ? L"Online (game closed)"
+                           : f.name.empty() && g.host_status.running ? L"Offline \u00b7 must add your code"
+                                                                     : L"Offline");
+                    text(gr, status, 1, 10, FontStyleRegular, rect(96, y + 20, 215, 16),
+                         f.in_game ? kArcadeLime : kTextMuted);
                 }
-                if(g.friends.size()>4) {
-                    fill_round(gr,rect(327,76,14,168),7,SolidBrush(Color(kArcadeDark)));
-                    fill_round(gr,lobby_scroll_thumb(),5,SolidBrush(Color(g.lobby_scroll_drag ? kArcadeGold : kArcadeCyan)));
+                if (g.friends.size() > 4) {
+                    fill_round(gr, rect(327, 76, 14, 168), 7, SolidBrush(Color(kArcadeDark)));
+                    fill_round(gr, lobby_scroll_thumb(), 5,
+                               SolidBrush(Color(g.lobby_scroll_drag ? kArcadeGold : kArcadeCyan)));
                 }
-                text(gr,tr(L"ADD A FRIEND"),1,10,FontStyleBold,rect(52,307,288,16),kTextMuted);
-                draw_field(gr,rect(50,324,290,32),g.friend_code_edit);
-                text(gr,g.friends_notice,1,11,FontStyleRegular,rect(52,410,286,54),g.friends_notice_error ? kArcadePink : kArcadeLime);
+                text(gr, tr(L"ADD A FRIEND"), 1, 10, FontStyleBold, rect(52, 307, 288, 16), kTextMuted);
+                draw_field(gr, rect(50, 324, 290, 32), g.friend_code_edit);
+                text(gr, g.friends_notice, 1, 11, FontStyleRegular, rect(52, 410, 286, 54),
+                     g.friends_notice_error ? kArcadePink : kArcadeLime);
             }
         }
-        BitBlt(target,0,0,px(370),px(530),dc,0,0,SRCCOPY);
-        SelectObject(dc,previous);
+        BitBlt(target, 0, 0, px(370), px(530), dc, 0, 0, SRCCOPY);
+        SelectObject(dc, previous);
         DeleteObject(bitmap);
         DeleteDC(dc);
-        EndPaint(window,&ps);
+        EndPaint(window, &ps);
         return 0;
     }
     case WM_LBUTTONDOWN: {
-        const float x=static_cast<float>(static_cast<short>(LOWORD(lp)))/g.scale;
-        const float y=static_cast<float>(static_cast<short>(HIWORD(lp)))/g.scale;
-        if(g.friends_open && !g.friends_animating && x>=49 && x<(g.friends.size()>4 ? 321.f : 340.f) && y>=78 && y<246) {
-            const int row=static_cast<int>((y-78.f)/42.f);
-            const int index=row+g.friends_scroll;
-            if(row<4 && std::fmod(y-78.f,42.f)<38.f && index<static_cast<int>(g.friends.size())) {
-                g.friends_selected=index==g.friends_selected ? -1 : index;
-                update_friend_controls();InvalidateRect(window,nullptr,FALSE);return 0;
+        const float x = static_cast<float>(static_cast<short>(LOWORD(lp))) / g.scale;
+        const float y = static_cast<float>(static_cast<short>(HIWORD(lp))) / g.scale;
+        if (g.friends_open && !g.friends_animating && x >= 49 && x < (g.friends.size() > 4 ? 321.f : 340.f) &&
+            y >= 78 && y < 246) {
+            const int row = static_cast<int>((y - 78.f) / 42.f);
+            const int index = row + g.friends_scroll;
+            if (row < 4 && std::fmod(y - 78.f, 42.f) < 38.f && index < static_cast<int>(g.friends.size())) {
+                g.friends_selected = index == g.friends_selected ? -1 : index;
+                update_friend_controls();
+                InvalidateRect(window, nullptr, FALSE);
+                return 0;
             }
         }
-        if(g.friends_open && !g.friends_animating && g.friends.size()>4 && x>=324 && x<=344 && y>=76 && y<=244) {
-            const auto thumb=lobby_scroll_thumb();
-            g.lobby_scroll_grab=y>=thumb.Y && y<=thumb.GetBottom() ? y-thumb.Y : thumb.Height/2;
-            g.lobby_scroll_drag=true;SetCapture(window);SetFocus(window);
-            drag_lobby_scroll(window,y);InvalidateRect(window,nullptr,FALSE);return 0;
+        if (g.friends_open && !g.friends_animating && g.friends.size() > 4 && x >= 324 && x <= 344 && y >= 76 &&
+            y <= 244) {
+            const auto thumb = lobby_scroll_thumb();
+            g.lobby_scroll_grab = y >= thumb.Y && y <= thumb.GetBottom() ? y - thumb.Y : thumb.Height / 2;
+            g.lobby_scroll_drag = true;
+            SetCapture(window);
+            SetFocus(window);
+            drag_lobby_scroll(window, y);
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
         }
         break;
     }
     case WM_MOUSEMOVE:
-        if(g.lobby_scroll_drag) {
-            drag_lobby_scroll(window,static_cast<float>(static_cast<short>(HIWORD(lp)))/g.scale);return 0;
+        if (g.lobby_scroll_drag) {
+            drag_lobby_scroll(window, static_cast<float>(static_cast<short>(HIWORD(lp))) / g.scale);
+            return 0;
         }
         break;
     case WM_CAPTURECHANGED:
-        g.lobby_scroll_drag=false;InvalidateRect(window,nullptr,FALSE);return 0;
+        g.lobby_scroll_drag = false;
+        InvalidateRect(window, nullptr, FALSE);
+        return 0;
     case WM_LBUTTONUP:
-        if(g.lobby_scroll_drag){g.lobby_scroll_drag=false;ReleaseCapture();InvalidateRect(window,nullptr,FALSE);return 0;}
+        if (g.lobby_scroll_drag) {
+            g.lobby_scroll_drag = false;
+            ReleaseCapture();
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
         if (static_cast<short>(LOWORD(lp)) < px(38)) {
             SetFocus(window);
             animate_friends(!g.friends_open);
         }
         return 0;
     case WM_KEYDOWN:
-        if(g.friends_open && (wp==VK_UP || wp==VK_DOWN || wp==VK_HOME || wp==VK_END || wp==VK_PRIOR || wp==VK_NEXT)) {
-            if(wp==VK_HOME)g.friends_scroll=0;
-            else if(wp==VK_END)g.friends_scroll=static_cast<int>(g.friends.size());
-            else g.friends_scroll+=wp==VK_UP ? -1 : wp==VK_DOWN ? 1 : wp==VK_PRIOR ? -4 : 4;
-            reload_friends();InvalidateRect(window,nullptr,FALSE);return 0;
+        if (g.friends_open &&
+            (wp == VK_UP || wp == VK_DOWN || wp == VK_HOME || wp == VK_END || wp == VK_PRIOR || wp == VK_NEXT)) {
+            if (wp == VK_HOME)
+                g.friends_scroll = 0;
+            else if (wp == VK_END)
+                g.friends_scroll = static_cast<int>(g.friends.size());
+            else
+                g.friends_scroll += wp == VK_UP ? -1 : wp == VK_DOWN ? 1 : wp == VK_PRIOR ? -4 : 4;
+            reload_friends();
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
         }
         if (wp == VK_ESCAPE || wp == VK_SPACE || wp == VK_RETURN) {
             animate_friends(wp == VK_ESCAPE ? false : !g.friends_open);
@@ -1047,12 +1229,14 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
         }
         break;
     case WM_MOUSEWHEEL:
-        g.lobby_wheel_delta+=static_cast<short>(HIWORD(wp));
-        g.friends_scroll-=g.lobby_wheel_delta/WHEEL_DELTA;
-        g.lobby_wheel_delta%=WHEEL_DELTA;
-        reload_friends(); InvalidateRect(window,nullptr,FALSE); return 0;
+        g.lobby_wheel_delta += static_cast<short>(HIWORD(wp));
+        g.friends_scroll -= g.lobby_wheel_delta / WHEEL_DELTA;
+        g.lobby_wheel_delta %= WHEEL_DELTA;
+        reload_friends();
+        InvalidateRect(window, nullptr, FALSE);
+        return 0;
     }
-    return DefWindowProcW(window,message,wp,lp);
+    return DefWindowProcW(window, message, wp, lp);
 }
 
 // Settings tab scroll position (page coordinates), launcher_graphics.hpp
@@ -1073,7 +1257,8 @@ HWND add_button(int id, Kind kind, const RectF& box, const wchar_t* label, bool*
 std::unique_ptr<Bitmap> load_png(const fs::path& path) {
     std::unique_ptr<Bitmap> file(Bitmap::FromFile(path.c_str()));
     if (!file || file->GetLastStatus() != Ok) return nullptr;
-    auto copy = std::make_unique<Bitmap>(static_cast<INT>(file->GetWidth()), static_cast<INT>(file->GetHeight()), PixelFormat32bppPARGB);
+    auto copy = std::make_unique<Bitmap>(static_cast<INT>(file->GetWidth()), static_cast<INT>(file->GetHeight()),
+                                         PixelFormat32bppPARGB);
     Graphics gr(copy.get());
     gr.DrawImage(file.get(), 0, 0, static_cast<INT>(file->GetWidth()), static_cast<INT>(file->GetHeight()));
     return copy;
@@ -1090,11 +1275,17 @@ std::unique_ptr<Bitmap> load_launcher_logo() {
     HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, size);
     if (!memory) return nullptr;
     void* destination = GlobalLock(memory);
-    if (!destination) { GlobalFree(memory); return nullptr; }
+    if (!destination) {
+        GlobalFree(memory);
+        return nullptr;
+    }
     std::memcpy(destination, data, size);
     GlobalUnlock(memory);
     IStream* stream = nullptr;
-    if (FAILED(CreateStreamOnHGlobal(memory, TRUE, &stream))) { GlobalFree(memory); return nullptr; }
+    if (FAILED(CreateStreamOnHGlobal(memory, TRUE, &stream))) {
+        GlobalFree(memory);
+        return nullptr;
+    }
     std::unique_ptr<Bitmap> copy;
     {
         Bitmap source(stream);
@@ -1137,8 +1328,10 @@ void request_fonts() {
     for (const wchar_t* name : {L"update.pak", L"permanent.pak"}) {
         const auto relative = fs::path("archives") / name;
         fs::path source;
-        if (g.cfg.use_patch && !g.cfg.patch_dir.empty() && fs::is_regular_file(patch / relative, ec)) source = patch / relative;
-        else if (!g.cfg.base_dir.empty() && fs::is_regular_file(base / relative, ec)) source = base / relative;
+        if (g.cfg.use_patch && !g.cfg.patch_dir.empty() && fs::is_regular_file(patch / relative, ec))
+            source = patch / relative;
+        else if (!g.cfg.base_dir.empty() && fs::is_regular_file(base / relative, ec))
+            source = base / relative;
         if (source.empty()) continue;
         sources.push_back(source);
         const auto stamp = fs::last_write_time(source, ec);
@@ -1158,7 +1351,10 @@ void refresh_artwork() {
     std::error_code ec;
     fs::path folder;
     for (const fs::path candidate : {g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path(), resolve(g.cfg.base_dir)})
-        if (!candidate.empty() && fs::exists(candidate / "sce_sys/pic1.png", ec)) { folder = candidate; break; }
+        if (!candidate.empty() && fs::exists(candidate / "sce_sys/pic1.png", ec)) {
+            folder = candidate;
+            break;
+        }
     if (g.art_checked && folder == g.art_source) return;
     g.art_checked = true;
     g.art_source = folder;
@@ -1179,7 +1375,9 @@ void refresh_artwork() {
 
 // Validation
 bool parse_size(const std::wstring& value, int low, int high, int& out) {
-    if (value.empty() || value.size() > 5 || !std::all_of(value.begin(), value.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; })) return false;
+    if (value.empty() || value.size() > 5 ||
+        !std::all_of(value.begin(), value.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; }))
+        return false;
     out = std::stoi(value);
     return out >= low && out <= high;
 }
@@ -1192,11 +1390,14 @@ void validate() {
     const bool base_eboot = !g.cfg.base_dir.empty() && fs::exists(base / "eboot.bin", ec);
     const bool base_modules = base_eboot && fs::exists(base / "sce_module", ec);
     const bool patch_ok = !g.cfg.patch_dir.empty() && fs::exists(patch / "eboot.bin", ec);
-    g.base_status = !base_eboot ? Status{tr(L"eboot.bin not found in the base folder"), 2}
-                  : !base_modules ? Status{tr(L"sce_module folder missing from the base game"), 2}
-                                  : Status{tr(L"Base game found"), 1};
-    if (!g.cfg.use_patch) g.patch_status = {tr(L"Update disabled: v01.00 will be started"), 0};
-    else g.patch_status = patch_ok ? Status{tr(L"Title update found"), 1} : Status{tr(L"Update folder or eboot.bin missing"), 2};
+    g.base_status = !base_eboot     ? Status{tr(L"eboot.bin not found in the base folder"), 2}
+                    : !base_modules ? Status{tr(L"sce_module folder missing from the base game"), 2}
+                                    : Status{tr(L"Base game found"), 1};
+    if (!g.cfg.use_patch)
+        g.patch_status = {tr(L"Update disabled: v01.00 will be started"), 0};
+    else
+        g.patch_status =
+            patch_ok ? Status{tr(L"Title update found"), 1} : Status{tr(L"Update folder or eboot.bin missing"), 2};
     EnableWindow(g.patch_edit, g.cfg.use_patch);
     EnableWindow(g.patch_browse, g.cfg.use_patch);
     EnableWindow(g.fps_toggle, g.cfg.use_patch);
@@ -1211,36 +1412,45 @@ void validate() {
     EnableWindow(g.width_edit, !g.cfg.fullscreen && g.resolution == 4);
     EnableWindow(g.height_edit, !g.cfg.fullscreen && g.resolution == 4);
     int width = 0, height = 0;
-    const bool size_ok = g.cfg.fullscreen || (parse_size(window_text(g.width_edit), 320, 7680, width) && parse_size(window_text(g.height_edit), 240, 4320, height));
+    const bool size_ok = g.cfg.fullscreen || (parse_size(window_text(g.width_edit), 320, 7680, width) &&
+                                              parse_size(window_text(g.height_edit), 240, 4320, height));
     const bool runtime_ok = !g.root.empty() && fs::exists(g.runtime_exe, ec);
-    const auto player_name=g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
-    const bool name_ok=player_name.size()>=3 && player_name.size()<=16 &&
-        player_name.find_first_not_of(L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")==std::wstring::npos;
+    const auto player_name = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
+    const bool name_ok = player_name.size() >= 3 && player_name.size() <= 16 &&
+                         player_name.find_first_not_of(
+                             L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") == std::wstring::npos;
     g.can_launch = runtime_ok && base_modules && (!g.cfg.use_patch || patch_ok) && size_ok && name_ok;
-    if (!runtime_ok) g.global = {tr(L"Runtime not found: ctrport.exe and ctr_gpu.dll required"), 2};
-    else if (!base_modules || (g.cfg.use_patch && !patch_ok)) g.global = {tr(L"Select valid dump folders to start the game"), 2};
-    else if (!size_ok) g.global = {tr(L"Invalid resolution (320\u00d7240 to 7680\u00d74320)"), 2};
-    else if (!name_ok) g.global = {tr(L"Player name: 3-16 letters, digits, hyphen or underscore"), 2};
+    if (!runtime_ok)
+        g.global = {tr(L"Runtime not found: ctrport.exe and ctr_gpu.dll required"), 2};
+    else if (!base_modules || (g.cfg.use_patch && !patch_ok))
+        g.global = {tr(L"Select valid dump folders to start the game"), 2};
+    else if (!size_ok)
+        g.global = {tr(L"Invalid resolution (320\u00d7240 to 7680\u00d74320)"), 2};
+    else if (!name_ok)
+        g.global = {tr(L"Player name: 3-16 letters, digits, hyphen or underscore"), 2};
     else {
         std::wstring summary = std::wstring(tr(L"Ready")) + L" \u00b7 ";
         summary += g.cfg.use_patch ? L"v01.21 (Nitro Tour)" : L"v01.00 (Classic)";
         if (g.cfg.use_patch && g.cfg.fps_60) summary += L" · 60 FPS";
-        summary += g.cfg.fullscreen ? L" \u00b7 " + std::wstring(tr(L"Fullscreen")) : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
+        summary += g.cfg.fullscreen ? L" \u00b7 " + std::wstring(tr(L"Fullscreen"))
+                                    : L" · " + std::to_wstring(width) + L"×" + std::to_wstring(height);
         if (g.cfg.renderer == L"d3d11") summary += L" · Direct3D 11";
         for (size_t i = 0; i < std::size(kUpscalers); ++i)
-            if (g.cfg.upscaler != L"off" && g.cfg.upscaler == kUpscalers[i]) summary += std::wstring(L" · ") + kUpscalerLabels[i];
+            if (g.cfg.upscaler != L"off" && g.cfg.upscaler == kUpscalers[i])
+                summary += std::wstring(L" · ") + kUpscalerLabels[i];
         for (size_t i = 0; i < std::size(kModes); ++i)
-            if (g.cfg.upscaler != L"off" && g.cfg.upscaling_mode == kModes[i]) summary += std::wstring(L" ") + tr(kModeLabels[i]);
+            if (g.cfg.upscaler != L"off" && g.cfg.upscaling_mode == kModes[i])
+                summary += std::wstring(L" ") + tr(kModeLabels[i]);
         if (g.cfg.online) {
             const std::wstring id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
             summary += L" · Online (" + (id.empty() ? L"CTRPlayer" : id) + L")";
         }
         g.global = {summary, 1};
     }
-    EnableWindow(g.online_toggle,!g.process && !g.host_busy);
-    EnableWindow(g.online_id_edit,!g.process);
+    EnableWindow(g.online_toggle, !g.process && !g.host_busy);
+    EnableWindow(g.online_id_edit, !g.process);
     EnableWindow(g.launch, g.can_launch);
-    for (const auto& row : graphics_section::rows) {  // 60 FPS mode: v01.21; upscaling mode: with a method
+    for (const auto& row : graphics_section::rows) { // 60 FPS mode: v01.21; upscaling mode: with a method
         if (row.control->key == "fps_60") EnableWindow(row.combo, g.cfg.use_patch);
         if (row.control->key == "upscaling_mode") EnableWindow(row.combo, g.cfg.upscaler != L"off");
     }
@@ -1264,7 +1474,12 @@ void select_resolution(int index) {
     validate();
 }
 
-void select_tab(int tab) { if(classic_skin)select_tab_now(tab);else nitro_begin(tab); }
+void select_tab(int tab) {
+    if (classic_skin)
+        select_tab_now(tab);
+    else
+        nitro_begin(tab);
+}
 
 void select_tab_now(int tab) {
     if (tab < 0 || tab >= TAB_COUNT) return;
@@ -1282,14 +1497,15 @@ void select_tab_now(int tab) {
             ShowWindow(hwnd, ctrl.tab == tab ? SW_SHOW : SW_HIDE);
         }
     }
-    sync_mod_rows();  // hides the unused rows of the MODS page
+    sync_mod_rows(); // hides the unused rows of the MODS page
     ShowWindow(g.base_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
     ShowWindow(g.trophy_key_edit, tab == TAB_TROPHIES ? SW_SHOW : SW_HIDE);
     ShowWindow(g.patch_edit, tab == TAB_ADVANCED ? SW_SHOW : SW_HIDE);
 
     const bool show_settings = (tab == TAB_SETTINGS);
     ShowWindow(g.language_combo, show_settings ? SW_SHOW : SW_HIDE);
-    for (HWND combo : g.player_combo) if (combo) ShowWindow(combo, show_settings ? SW_SHOW : SW_HIDE);
+    for (HWND combo : g.player_combo)
+        if (combo) ShowWindow(combo, show_settings ? SW_SHOW : SW_HIDE);
     // upscaling method and mode: in the GRAPHICS section (launcher_graphics.hpp)
     ShowWindow(g.scene_combo, SW_HIDE);
     ShowWindow(g.upscaler_combo, SW_HIDE);
@@ -1345,80 +1561,109 @@ void backup_save_data() {
     fs::create_directories(backup.parent_path(), ec);
     fs::copy(saves, backup, fs::copy_options::recursive, ec);
     if (ec) {
-        MessageBoxW(g.window, (std::wstring(tr(L"Save backup failed:")) + L"\n" + widen(ec.message())).c_str(), kTitle, MB_ICONERROR);
+        MessageBoxW(g.window, (std::wstring(tr(L"Save backup failed:")) + L"\n" + widen(ec.message())).c_str(), kTitle,
+                    MB_ICONERROR);
     } else {
-        MessageBoxW(g.window, (std::wstring(tr(L"Backup completed:")) + L"\n" + backup.wstring()).c_str(), kTitle, MB_ICONINFORMATION);
+        MessageBoxW(g.window, (std::wstring(tr(L"Backup completed:")) + L"\n" + backup.wstring()).c_str(), kTitle,
+                    MB_ICONINFORMATION);
     }
 }
 
 // Hosting: the project server runs in this process while the launcher is open.
 bool copy_to_clipboard(const std::wstring& value) {
-    const auto bytes=(value.size()+1)*sizeof(wchar_t);
-    HGLOBAL memory=GlobalAlloc(GMEM_MOVEABLE,bytes);if(!memory)return false;
-    void* data=GlobalLock(memory);if(!data){GlobalFree(memory);return false;}
-    std::memcpy(data,value.c_str(),bytes);GlobalUnlock(memory);
-    if(!OpenClipboard(g.window)){GlobalFree(memory);return false;}
-    const bool ok=EmptyClipboard() && SetClipboardData(CF_UNICODETEXT,memory);
-    CloseClipboard();if(!ok)GlobalFree(memory);return ok;
+    const auto bytes = (value.size() + 1) * sizeof(wchar_t);
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (!memory) return false;
+    void* data = GlobalLock(memory);
+    if (!data) {
+        GlobalFree(memory);
+        return false;
+    }
+    std::memcpy(data, value.c_str(), bytes);
+    GlobalUnlock(memory);
+    if (!OpenClipboard(g.window)) {
+        GlobalFree(memory);
+        return false;
+    }
+    const bool ok = EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, memory);
+    CloseClipboard();
+    if (!ok) GlobalFree(memory);
+    return ok;
 }
 
 void host_toggled(bool = false) {
-    if(g.host_busy) return;
-    g.host_busy=true;
-    g.cfg.online_host=g.cfg.online;
+    if (g.host_busy) return;
+    g.host_busy = true;
+    g.cfg.online_host = g.cfg.online;
     g.friends_notice.clear();
-    EnableWindow(g.online_toggle,FALSE);
-    std::thread([start=g.cfg.online,root=g.root,window=g.window,name=narrow(g.cfg.online_id)] {
-        if(start) g.host.start(root,{},true,name); else g.host.stop();
-        PostMessageW(window,WM_APP_HOST_READY,start ? 1 : 0,0);
+    EnableWindow(g.online_toggle, FALSE);
+    std::thread([start = g.cfg.online, root = g.root, window = g.window, name = narrow(g.cfg.online_id)] {
+        if (start)
+            g.host.start(root, {}, true, name);
+        else
+            g.host.stop();
+        PostMessageW(window, WM_APP_HOST_READY, start ? 1 : 0, 0);
     }).detach();
     validate();
 }
 void host_ready(bool started) {
-    g.host_busy=false;EnableWindow(g.online_toggle,TRUE);
-    g.host_status=g.host.status();
-    if(started && !g.host_status.running) {
-        g.friends_notice=widen(g.host_status.error);g.friends_notice_error=true;
-        if(g.current_tab==TAB_HOME)animate_friends(true);
+    g.host_busy = false;
+    EnableWindow(g.online_toggle, TRUE);
+    g.host_status = g.host.status();
+    if (started && !g.host_status.running) {
+        g.friends_notice = widen(g.host_status.error);
+        g.friends_notice_error = true;
+        if (g.current_tab == TAB_HOME) animate_friends(true);
     }
-    reload_friends();update_friend_controls();validate();InvalidateRect(g.friends_drawer,nullptr,FALSE);
+    reload_friends();
+    update_friend_controls();
+    validate();
+    InvalidateRect(g.friends_drawer, nullptr, FALSE);
 }
 // 110: copy the own friend code; 111: add the code typed in the drawer; 109: remove the selected friend.
 void friend_action(int action) {
-    g.friends_notice_error=false;
-    if(action==110) {
-        const auto own=g.host_status.friend_code.empty() ? ctr_online::local_friend_code(g.root) : g.host_status.friend_code;
-        const bool copied=!own.empty() && copy_to_clipboard(widen(own));
-        g.friends_notice=tr(copied ? L"Code copied. You must add each other." : L"Could not copy the code.");
-        g.friends_notice_error=!copied;
-    } else if(action==111) {
-        auto code=narrow(window_text(g.friend_code_edit));
-        code.erase(0,code.find_first_not_of(" \t\r\n"));code.erase(code.find_last_not_of(" \t\r\n")+1);
+    g.friends_notice_error = false;
+    if (action == 110) {
+        const auto own =
+            g.host_status.friend_code.empty() ? ctr_online::local_friend_code(g.root) : g.host_status.friend_code;
+        const bool copied = !own.empty() && copy_to_clipboard(widen(own));
+        g.friends_notice = tr(copied ? L"Code copied. You must add each other." : L"Could not copy the code.");
+        g.friends_notice_error = !copied;
+    } else if (action == 111) {
+        auto code = narrow(window_text(g.friend_code_edit));
+        code.erase(0, code.find_first_not_of(" \t\r\n"));
+        code.erase(code.find_last_not_of(" \t\r\n") + 1);
         ctr_online::FriendCodeInfo info;
         std::string error;
-        if(ctr_online::parse_friend_code(code,info)!=ctr_online::CodeParseError::Ok) {
-            g.friends_notice=tr(L"Invalid friend code.");g.friends_notice_error=true;
-        } else if(info.code==ctr_online::local_friend_code(g.root)) {
-            g.friends_notice=tr(L"This is your own code.");g.friends_notice_error=true;
-        } else if(!ctr_online::FriendStore(friends_path()).add_or_update(info.code,"",&error)) {
-            g.friends_notice=widen(error);g.friends_notice_error=true;
+        if (ctr_online::parse_friend_code(code, info) != ctr_online::CodeParseError::Ok) {
+            g.friends_notice = tr(L"Invalid friend code.");
+            g.friends_notice_error = true;
+        } else if (info.code == ctr_online::local_friend_code(g.root)) {
+            g.friends_notice = tr(L"This is your own code.");
+            g.friends_notice_error = true;
+        } else if (!ctr_online::FriendStore(friends_path()).add_or_update(info.code, "", &error)) {
+            g.friends_notice = widen(error);
+            g.friends_notice_error = true;
         } else {
-            SetWindowTextW(g.friend_code_edit,L"");
-            g.friends_notice=tr(L"Friend added.");
+            SetWindowTextW(g.friend_code_edit, L"");
+            g.friends_notice = tr(L"Friend added.");
         }
-    } else if(action==109 && g.friends_selected>=0 && g.friends_selected<static_cast<int>(g.friends.size())) {
-        const auto row=g.friends[g.friends_selected];
-        const auto question=trf(L"Remove {0} from friends?",friend_label(row));
-        if(MessageBoxW(g.window,question.c_str(),kTitle,MB_YESNO|MB_ICONQUESTION)!=IDYES) return;
+    } else if (action == 109 && g.friends_selected >= 0 && g.friends_selected < static_cast<int>(g.friends.size())) {
+        const auto row = g.friends[g.friends_selected];
+        const auto question = trf(L"Remove {0} from friends?", friend_label(row));
+        if (MessageBoxW(g.window, question.c_str(), kTitle, MB_YESNO | MB_ICONQUESTION) != IDYES) return;
         ctr_online::FriendStore(friends_path()).remove(row.code);
-        g.friends_selected=-1;
-        g.friends_notice=trf(L"{0} removed.",friend_label(row));
+        g.friends_selected = -1;
+        g.friends_notice = trf(L"{0} removed.", friend_label(row));
     }
-    reload_friends();update_friend_controls();InvalidateRect(g.friends_drawer,nullptr,FALSE);
+    reload_friends();
+    update_friend_controls();
+    InvalidateRect(g.friends_drawer, nullptr, FALSE);
 }
 
 // Launching ctrport.exe
-std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring>& set, const std::vector<std::wstring>& remove) {
+std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring>& set,
+                                       const std::vector<std::wstring>& remove) {
     std::vector<std::wstring> entries;
     if (wchar_t* strings = GetEnvironmentStringsW()) {
         for (const wchar_t* p = strings; *p; p += wcslen(p) + 1) entries.emplace_back(p);
@@ -1428,11 +1673,17 @@ std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring
     std::vector<std::wstring> drop;
     for (const auto& name : remove) drop.push_back(lower(name));
     for (const auto& item : set) drop.push_back(lower(item.first));
-    std::erase_if(entries, [&](const std::wstring& entry) { return std::find(drop.begin(), drop.end(), key(entry)) != drop.end(); });
+    std::erase_if(entries, [&](const std::wstring& entry) {
+        return std::find(drop.begin(), drop.end(), key(entry)) != drop.end();
+    });
     for (const auto& item : set) entries.push_back(item.first + L"=" + item.second);
-    std::sort(entries.begin(), entries.end(), [&](const std::wstring& a, const std::wstring& b) { return key(a) < key(b); });
+    std::sort(entries.begin(), entries.end(),
+              [&](const std::wstring& a, const std::wstring& b) { return key(a) < key(b); });
     std::vector<wchar_t> block;
-    for (const auto& entry : entries) { block.insert(block.end(), entry.begin(), entry.end()); block.push_back(L'\0'); }
+    for (const auto& entry : entries) {
+        block.insert(block.end(), entry.begin(), entry.end());
+        block.push_back(L'\0');
+    }
     block.push_back(L'\0');
     return block;
 }
@@ -1441,31 +1692,51 @@ std::vector<wchar_t> environment_block(const std::map<std::wstring, std::wstring
 // Loose-file mods in runtime/mods with runtime/user/mods.json, and patch XML files in
 // runtime/patches with runtime/user/patches.json: the formats of SacredFire / GetLostIn
 // CTR-NitroFueled-PC. The runtime reads the same files (mod_overlay.hpp, guest_patch_xml.hpp).
-fs::path mods_dir() { return g.root / "runtime/mods"; }
-fs::path mods_config_path() { return g.root / "runtime/user/mods.json"; }
-fs::path patches_dir() { return g.root / "runtime/patches"; }
-fs::path patches_config_path() { return g.root / "runtime/user/patches.json"; }
+fs::path mods_dir() {
+    return g.root / "runtime/mods";
+}
+fs::path mods_config_path() {
+    return g.root / "runtime/user/mods.json";
+}
+fs::path patches_dir() {
+    return g.root / "runtime/patches";
+}
+fs::path patches_config_path() {
+    return g.root / "runtime/user/patches.json";
+}
 // What was installed from GameBanana, and the folder for downloads and extraction.
-fs::path gamebanana_registry() { return g.root / "runtime/user/gamebanana.json"; }
-fs::path gamebanana_work() { return g.root / "runtime/user/gamebanana"; }
+fs::path gamebanana_registry() {
+    return g.root / "runtime/user/gamebanana.json";
+}
+fs::path gamebanana_work() {
+    return g.root / "runtime/user/gamebanana";
+}
 
 void reload_mods() {
     namespace mods = ctrport::mods;
     namespace patches = ctrport::guest_patches;
     g.mods_notice.clear();
     g.mods_notice_error = false;
-    g.mod_list.clear(); g.mod_details.clear(); g.mod_bad.clear();
-    g.patch_list.clear(); g.patch_details.clear(); g.patch_warn.clear();
+    g.mod_list.clear();
+    g.mod_details.clear();
+    g.mod_bad.clear();
+    g.patch_list.clear();
+    g.patch_details.clear();
+    g.patch_warn.clear();
     try {
         g.mod_list = mods::list_mods(mods_dir(), mods::read_config(mods_config_path()));
-    } catch (const std::exception& e) { g.mods_notice = widen(e.what()); g.mods_notice_error = true; }
+    } catch (const std::exception& e) {
+        g.mods_notice = widen(e.what());
+        g.mods_notice_error = true;
+    }
     // What the runtime did with each mod at the last start (mods_status.json, mod_overlay.hpp):
     // not applied, or adapted from the other region of the game.
     std::map<std::wstring, std::wstring> skipped, adapted;
     try {
         const auto list = ctr_online::parse_json(mods::read_text(g.root / "runtime/user/logs/mods_status.json"));
         for (const auto& item : list.items) {
-            const auto mod = widen(ctrport::gamebanana::text_of(item, "mod")), reason = widen(ctrport::gamebanana::text_of(item, "reason"));
+            const auto mod = widen(ctrport::gamebanana::text_of(item, "mod")),
+                       reason = widen(ctrport::gamebanana::text_of(item, "reason"));
             auto& into = ctrport::gamebanana::text_of(item, "state") == "adapted" ? adapted[mod] : skipped[mod];
             into += (into.empty() ? L"" : L"; ") + reason;
         }
@@ -1476,14 +1747,20 @@ void reload_mods() {
             single.enabled = true;
             const auto index = mods::build_index({single}, {});
             const auto inner = mods::content_root(mod.folder).lexically_relative(mod.folder).generic_wstring();
-            g.mod_details.push_back(trf(L"{0} game files", std::to_wstring(index.files.size())) + (inner.empty() || inner == L"." ? L"" : L" \u00b7 " + inner + L"/"));
+            g.mod_details.push_back(trf(L"{0} game files", std::to_wstring(index.files.size())) +
+                                    (inner.empty() || inner == L"." ? L"" : L" \u00b7 " + inner + L"/"));
             g.mod_bad.push_back(index.files.empty());
             if (const auto root = mods::content_root(mod.folder); mods::octr_mod(root)) {
                 // octr-mod: the runtime applies its manifest (octr_mods.hpp)
                 const auto manifest = ctrport::gamebanana::read_manifest(root / L"mod.json");
-                g.mod_details.back() = !manifest.problem.empty() ? widen(manifest.problem)
-                    : trf(L"{0} asset changes", std::to_wstring(manifest.operations)) + L" \u00b7 " + trf(L"{0} patch files", std::to_wstring(manifest.patches)) +
-                      (index.files.empty() ? L"" : L" \u00b7 " + trf(L"{0} game files", std::to_wstring(index.files.size())));
+                g.mod_details.back() =
+                    !manifest.problem.empty()
+                        ? widen(manifest.problem)
+                        : trf(L"{0} asset changes", std::to_wstring(manifest.operations)) + L" \u00b7 " +
+                              trf(L"{0} patch files", std::to_wstring(manifest.patches)) +
+                              (index.files.empty()
+                                   ? L""
+                                   : L" \u00b7 " + trf(L"{0} game files", std::to_wstring(index.files.size())));
                 g.mod_bad.back() = !manifest.problem.empty();
                 if (const auto why = skipped.find(mod.name); why != skipped.end() && mod.enabled) {
                     g.mod_details.back() = trf(L"Not applied at the last start: {0}", why->second);
@@ -1499,8 +1776,14 @@ void reload_mods() {
             g.mod_bad.push_back(true);
         }
     }
-    try { g.gb_installed = ctrport::gamebanana::read_installed(gamebanana_registry()); }
-    catch (const std::exception& e) { if (g.mods_notice.empty()) { g.mods_notice = widen(e.what()); g.mods_notice_error = true; } }
+    try {
+        g.gb_installed = ctrport::gamebanana::read_installed(gamebanana_registry());
+    } catch (const std::exception& e) {
+        if (g.mods_notice.empty()) {
+            g.mods_notice = widen(e.what());
+            g.mods_notice_error = true;
+        }
+    }
     // The game the patches are checked against: TITLE_ID and APP_VER of the eboot that will run.
     std::string title, version;
     g.mods_game.clear();
@@ -1517,10 +1800,15 @@ void reload_mods() {
         g.patch_selection = patches::read_selection(patches_config_path());
         std::wstring unreadable;
         for (auto& file : patches::load_folder(patches_dir())) {
-            if (!file.error.empty()) { unreadable += (unreadable.empty() ? L"" : L", ") + file.file; continue; }
+            if (!file.error.empty()) {
+                unreadable += (unreadable.empty() ? L"" : L", ") + file.file;
+                continue;
+            }
             for (auto& patch : file.patches) {
-                const auto why = title.empty() ? std::string("game version unknown") : patches::mismatch(patch, title, version);
-                std::wstring detail = why.empty() ? std::wstring() : trf(L"Not for this game: {0}", widen(why)) + L"  \u00b7  ";
+                const auto why =
+                    title.empty() ? std::string("game version unknown") : patches::mismatch(patch, title, version);
+                std::wstring detail =
+                    why.empty() ? std::wstring() : trf(L"Not for this game: {0}", widen(why)) + L"  \u00b7  ";
                 if (!patch.author.empty()) detail += widen(patch.author) + L"  ·  ";
                 if (!patch.app_ver.empty()) detail += L"AppVer " + widen(patch.app_ver) + L"  ·  ";
                 detail += patch.file;
@@ -1534,7 +1822,10 @@ void reload_mods() {
             g.mods_notice_error = true;
         }
     } catch (const std::exception& e) {
-        if (g.mods_notice.empty()) { g.mods_notice = widen(e.what()); g.mods_notice_error = true; }
+        if (g.mods_notice.empty()) {
+            g.mods_notice = widen(e.what());
+            g.mods_notice_error = true;
+        }
     }
 }
 
@@ -1549,7 +1840,8 @@ std::vector<App::PadOption> detect_pads() {
             for (DWORD slot = 0; slot < 4; ++slot) {
                 XINPUT_STATE state{};
                 if (get(slot, &state) == ERROR_SUCCESS)
-                    found.push_back({L"xinput:" + std::to_wstring(slot), trf(L"Xbox controller {0}", std::to_wstring(slot + 1))});
+                    found.push_back(
+                        {L"xinput:" + std::to_wstring(slot), trf(L"Xbox controller {0}", std::to_wstring(slot + 1))});
             }
         FreeLibrary(xinput);
     }
@@ -1567,8 +1859,9 @@ std::vector<App::PadOption> detect_pads() {
             detail->cbSize = sizeof(*detail);
             if (!size || !SetupDiGetDeviceInterfaceDetailW(set, &item, detail, size, nullptr, nullptr)) continue;
             const std::wstring path = detail->DevicePath;
-            if (lower(path).find(L"ig_") != std::wstring::npos) continue;  // an XInput controller, listed above
-            const HANDLE device = CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+            if (lower(path).find(L"ig_") != std::wstring::npos) continue; // an XInput controller, listed above
+            const HANDLE device =
+                CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
             if (device == INVALID_HANDLE_VALUE) continue;
             HIDD_ATTRIBUTES attributes{sizeof(attributes)};
             PHIDP_PREPARSED_DATA preparsed = nullptr;
@@ -1582,9 +1875,13 @@ std::vector<App::PadOption> detect_pads() {
             if (!ok || caps.UsagePage != 1 || (caps.Usage != 4 && caps.Usage != 5)) continue;
             std::wstring label = product[0] ? product : L"Gamepad";
             if (attributes.VendorID == 0x054C) {
-                if (attributes.ProductID == 0x0CE6) label = L"DualSense";
-                else if (attributes.ProductID == 0x0DF2) label = L"DualSense Edge";
-                else if (attributes.ProductID == 0x05C4 || attributes.ProductID == 0x09CC || attributes.ProductID == 0x0BA0) label = L"DualShock 4";
+                if (attributes.ProductID == 0x0CE6)
+                    label = L"DualSense";
+                else if (attributes.ProductID == 0x0DF2)
+                    label = L"DualSense Edge";
+                else if (attributes.ProductID == 0x05C4 || attributes.ProductID == 0x09CC ||
+                         attributes.ProductID == 0x0BA0)
+                    label = L"DualShock 4";
             }
             if (const int n = ++seen[label]; n > 1) label += L" (" + std::to_wstring(n) + L")";
             found.push_back({L"hid:" + path, label});
@@ -1636,8 +1933,9 @@ void reload_trophies() {
     g.trophy_notice_error = false;
     try {
         const int language = kGameLanguages[game_language_index(g.cfg.game_language)].system_id;
-        g.trophy_set = ctr_trophy::load({g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path(), resolve(g.cfg.base_dir)},
-                                        narrow(g.cfg.trophy_key), language);
+        g.trophy_set =
+            ctr_trophy::load({g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path(), resolve(g.cfg.base_dir)},
+                             narrow(g.cfg.trophy_key), language);
         const fs::path user = g.root / "runtime/user";
         const auto file = ctr_trophy::unlock_file(user, g.trophy_set.np_comm_id);
         ctr_trophy::import_jsonl(user, file);
@@ -1653,15 +1951,21 @@ void reload_trophies() {
                 }
             g.trophy_icons.push_back(std::move(image));
         }
-        if (!g.trophy_set.error.empty()) { g.trophy_notice = widen(g.trophy_set.error); g.trophy_notice_error = true; }
+        if (!g.trophy_set.error.empty()) {
+            g.trophy_notice = widen(g.trophy_set.error);
+            g.trophy_notice_error = true;
+        }
         // No key: the wiki's texts, from the local copy, refreshed at most once a week.
         g.trophy_wiki = false;
         if (!g.trophy_set.texts && !g.trophy_set.trophies.empty()) {
             std::int64_t fetched = 0;
             std::vector<ctr_trophy::wiki::Row> rows;
-            try { rows = ctr_trophy::wiki::read_cache(ctr_trophy::wiki::cache_file(user), &fetched); } catch (const std::exception&) {}
+            try {
+                rows = ctr_trophy::wiki::read_cache(ctr_trophy::wiki::cache_file(user), &fetched);
+            } catch (const std::exception&) {}
             g.trophy_wiki = ctr_trophy::wiki::apply(g.trophy_set, rows);
-            if (!g.trophy_wiki_tried && (!g.trophy_wiki || std::time(nullptr) - fetched > 7 * 24 * 3600)) load_trophy_wiki();
+            if (!g.trophy_wiki_tried && (!g.trophy_wiki || std::time(nullptr) - fetched > 7 * 24 * 3600))
+                load_trophy_wiki();
         }
     } catch (const std::exception&) {
         g.trophy_set = {};
@@ -1677,8 +1981,11 @@ void load_trophy_wiki() {
     const fs::path file = ctr_trophy::wiki::cache_file(g.root / "runtime/user");
     std::thread([window, file] {
         auto* error = new std::wstring;
-        try { ctr_trophy::wiki::write_cache(file, ctr_trophy::wiki::fetch()); }
-        catch (const std::exception& e) { *error = widen(e.what()); }
+        try {
+            ctr_trophy::wiki::write_cache(file, ctr_trophy::wiki::fetch());
+        } catch (const std::exception& e) {
+            *error = widen(e.what());
+        }
         if (!PostMessageW(window, WM_APP_TROPHY_WIKI, 0, reinterpret_cast<LPARAM>(error))) delete error;
     }).detach();
 }
@@ -1700,7 +2007,8 @@ void import_trophy_key() {
             std::stringstream buffer;
             buffer << in.rdbuf();
             try {
-                const auto keys = ctr_online::parse_json(buffer.str().rfind("\xEF\xBB\xBF", 0) == 0 ? buffer.str().substr(3) : buffer.str());
+                const auto keys = ctr_online::parse_json(
+                    buffer.str().rfind("\xEF\xBB\xBF", 0) == 0 ? buffer.str().substr(3) : buffer.str());
                 if (const auto* set = keys.find("TrophyKeySet"))
                     if (const auto* value = set->find("ReleaseTrophyKey")) key = value->text;
             } catch (const std::exception&) {}
@@ -1713,7 +2021,7 @@ void import_trophy_key() {
         InvalidateRect(g.window, nullptr, FALSE);
         return;
     }
-    SetWindowTextW(g.trophy_key_edit, widen(key).c_str());  // EN_CHANGE saves and reloads
+    SetWindowTextW(g.trophy_key_edit, widen(key).c_str()); // EN_CHANGE saves and reloads
 }
 
 // Saves the order and switches of the file mods, or the patch choices.
@@ -1734,7 +2042,8 @@ void save_mods_choice(int index, bool toggle, int move) {
         } else {
             if (index < 0 || index >= static_cast<int>(g.patch_list.size())) return;
             const auto& patch = g.patch_list[index];
-            ctrport::guest_patches::choose(g.patch_selection, patch, !ctrport::guest_patches::selected(patch, g.patch_selection));
+            ctrport::guest_patches::choose(g.patch_selection, patch,
+                                           !ctrport::guest_patches::selected(patch, g.patch_selection));
             ctrport::guest_patches::write_selection(patches_config_path(), g.patch_selection);
         }
     } catch (const std::exception& e) {
@@ -1756,9 +2065,9 @@ int slot_index(int slot) {
 // archive or folder). The result comes back to the window with WM_APP_GB_CATALOG / _DONE.
 struct ModsJob {
     std::vector<ctrport::gamebanana::Entry> catalog;
-    std::uint64_t id = 0;               // GameBanana id, 0 for a dropped file
-    ctrport::gamebanana::File file;     // the GameBanana file
-    fs::path source;                    // the dropped archive or folder
+    std::uint64_t id = 0;           // GameBanana id, 0 for a dropped file
+    ctrport::gamebanana::File file; // the GameBanana file
+    fs::path source;                // the dropped archive or folder
     std::wstring title;
     bool has_previous = false;
     ctrport::gamebanana::Installed previous, installed;
@@ -1772,8 +2081,11 @@ void load_gamebanana(bool force) {
     const HWND window = g.window;
     std::thread([window] {
         auto* job = new ModsJob;
-        try { job->catalog = ctrport::gamebanana::fetch_catalog(); }
-        catch (const std::exception& e) { job->error = widen(e.what()); }
+        try {
+            job->catalog = ctrport::gamebanana::fetch_catalog();
+        } catch (const std::exception& e) {
+            job->error = widen(e.what());
+        }
         if (!PostMessageW(window, WM_APP_GB_CATALOG, 0, reinterpret_cast<LPARAM>(job))) delete job;
     }).detach();
     sync_mod_rows();
@@ -1812,7 +2124,8 @@ void start_mods_job(std::unique_ptr<ModsJob> job) {
                 int shown = -1;
                 gb::http_get(widen(job->file.url), &archive, [&](std::uint64_t received, std::uint64_t total) {
                     const int percent = total ? static_cast<int>(received * 100 / total) : 0;
-                    if (percent != shown) PostMessageW(window, WM_APP_GB_PROGRESS, static_cast<WPARAM>(shown = percent), 0);
+                    if (percent != shown)
+                        PostMessageW(window, WM_APP_GB_PROGRESS, static_cast<WPARAM>(shown = percent), 0);
                 });
                 PostMessageW(window, WM_APP_GB_PROGRESS, static_cast<WPARAM>(-1), 0);
                 if (!job->file.md5.empty() && gb::md5_hex(archive) != job->file.md5)
@@ -1824,7 +2137,8 @@ void start_mods_job(std::unique_ptr<ModsJob> job) {
                 from = staging;
             }
             const std::wstring prefix = job->id ? L"gb" + std::to_wstring(job->id) + L"-" : L"";
-            job->installed = gb::install_extracted(from, mods, patches, prefix, job->title, job->has_previous ? &job->previous : nullptr);
+            job->installed = gb::install_extracted(from, mods, patches, prefix, job->title,
+                                                   job->has_previous ? &job->previous : nullptr);
             job->installed.file = job->id ? job->file.name : narrow(job->source.filename().wstring());
         } catch (const std::exception& e) {
             job->error = widen(e.what());
@@ -1837,7 +2151,7 @@ void start_mods_job(std::unique_ptr<ModsJob> job) {
     sync_mod_rows();
 }
 
-std::vector<fs::path> dropped_queue;  // dropped while another install runs
+std::vector<fs::path> dropped_queue; // dropped while another install runs
 void install_dropped(const std::vector<fs::path>& paths);
 
 void mods_install_done(ModsJob* job) {
@@ -1852,19 +2166,26 @@ void mods_install_done(ModsJob* job) {
     } else {
         if (job->id) {
             g.gb_installed[job->id] = job->installed;
-            try { ctrport::gamebanana::write_installed(gamebanana_registry(), g.gb_installed); }
-            catch (const std::exception& e) { notice = widen(e.what()); error = true; }
+            try {
+                ctrport::gamebanana::write_installed(gamebanana_registry(), g.gb_installed);
+            } catch (const std::exception& e) {
+                notice = widen(e.what());
+                error = true;
+            }
         }
         if (!error)
-            notice = job->installed.patches.empty() ? trf(L"Installed: {0}", job->title)
-                                                    : trf(L"Installed: {0}. Turn its patches on under PATCHES.", job->title);
+            notice = job->installed.patches.empty()
+                         ? trf(L"Installed: {0}", job->title)
+                         : trf(L"Installed: {0}. Turn its patches on under PATCHES.", job->title);
     }
     reload_mods();
     g.mods_notice = notice;
     g.mods_notice_error = error;
     sync_mod_rows();
-    if (error) dropped_queue.clear();  // the notice shows what failed
-    else if (!dropped_queue.empty()) install_dropped({});
+    if (error)
+        dropped_queue.clear(); // the notice shows what failed
+    else if (!dropped_queue.empty())
+        install_dropped({});
 }
 
 // INSTALL or REMOVE of a GameBanana row.
@@ -1874,7 +2195,9 @@ void gamebanana_get(int index) {
     const gb::Entry& entry = g.gb_list[index];
     const auto found = g.gb_installed.find(entry.id);
     if (found != g.gb_installed.end()) {
-        if (MessageBoxW(g.window, trf(L"Remove {0}?", gb::wide(entry.name)).c_str(), kTitle, MB_YESNO | MB_ICONQUESTION) != IDYES) return;
+        if (MessageBoxW(g.window, trf(L"Remove {0}?", gb::wide(entry.name)).c_str(), kTitle,
+                        MB_YESNO | MB_ICONQUESTION) != IDYES)
+            return;
         try {
             gb::remove_installed(found->second, mods_dir(), patches_dir());
             g.gb_installed.erase(found);
@@ -1894,10 +2217,12 @@ void gamebanana_get(int index) {
     if (entry.files.size() > 1) {
         const HMENU menu = CreatePopupMenu();
         for (std::size_t i = 0; i < entry.files.size(); ++i)
-            AppendMenuW(menu, MF_STRING, i + 1, (gb::wide(entry.files[i].name) + L"\t" + gb::size_text(entry.files[i].size)).c_str());
+            AppendMenuW(menu, MF_STRING, i + 1,
+                        (gb::wide(entry.files[i].name) + L"\t" + gb::size_text(entry.files[i].size)).c_str());
         POINT at{};
         GetCursorPos(&at);
-        const int picked = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, at.x, at.y, 0, g.window, nullptr);
+        const int picked =
+            TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, at.x, at.y, 0, g.window, nullptr);
         DestroyMenu(menu);
         if (picked <= 0) return;
         chosen = static_cast<std::size_t>(picked - 1);
@@ -1911,15 +2236,29 @@ void gamebanana_get(int index) {
 
 // Archives (.zip, .7z, .rar) and folders dropped on the launcher, installed one after another.
 void install_dropped(const std::vector<fs::path>& paths) {
-    if (g.current_tab != TAB_MODS) { reload_mods(); load_gamebanana(false); select_tab(TAB_MODS); }
-    if (g.mods_view != 0) { g.mods_view = 0; g.mods_scroll = 0; }
+    if (g.current_tab != TAB_MODS) {
+        reload_mods();
+        load_gamebanana(false);
+        select_tab(TAB_MODS);
+    }
+    if (g.mods_view != 0) {
+        g.mods_view = 0;
+        g.mods_scroll = 0;
+    }
     for (const auto& path : paths) {
         std::error_code ec;
         const auto ext = ctrport::mods::fold(path.extension().wstring());
-        if (fs::is_directory(path, ec) || ext == L".zip" || ext == L".7z" || ext == L".rar") dropped_queue.push_back(path);
-        else { g.mods_notice = trf(L"Not a mod archive or folder: {0}", path.filename().wstring()); g.mods_notice_error = true; }
+        if (fs::is_directory(path, ec) || ext == L".zip" || ext == L".7z" || ext == L".rar")
+            dropped_queue.push_back(path);
+        else {
+            g.mods_notice = trf(L"Not a mod archive or folder: {0}", path.filename().wstring());
+            g.mods_notice_error = true;
+        }
     }
-    if (g.mods_busy || dropped_queue.empty()) { sync_mod_rows(); return; }
+    if (g.mods_busy || dropped_queue.empty()) {
+        sync_mod_rows();
+        return;
+    }
     auto job = std::make_unique<ModsJob>();
     job->source = dropped_queue.front();
     dropped_queue.erase(dropped_queue.begin());
@@ -1931,11 +2270,12 @@ void install_dropped(const std::vector<fs::path>& paths) {
 bool check_mods_before_launch(const fs::path& base, const fs::path& patch) {
     if (!g.cfg.mods_enabled) return true;
     try {
-        ctrport::mods::build_index(ctrport::mods::list_mods(mods_dir(), ctrport::mods::read_config(mods_config_path())), {patch, base});
+        ctrport::mods::build_index(ctrport::mods::list_mods(mods_dir(), ctrport::mods::read_config(mods_config_path())),
+                                   {patch, base});
         return true;
     } catch (const std::exception& e) {
-        MessageBoxW(g.window, (std::wstring(tr(L"A mod cannot be loaded:")) + L"\n" + widen(e.what())).c_str(),
-                    kTitle, MB_ICONERROR);
+        MessageBoxW(g.window, (std::wstring(tr(L"A mod cannot be loaded:")) + L"\n" + widen(e.what())).c_str(), kTitle,
+                    MB_ICONERROR);
         return false;
     }
 }
@@ -1964,8 +2304,10 @@ std::vector<fs::path> xbox_prompt_sources() {
     const fs::path base = resolve(g.cfg.base_dir), patch = resolve(g.cfg.patch_dir);
     for (const wchar_t* name : {L"permanent.pak", L"languagestartup.pak", L"update.pak"}) {
         const fs::path relative = fs::path(L"archives") / name;
-        if (g.cfg.use_patch && fs::is_regular_file(patch / relative, ec)) sources.push_back(patch / relative);
-        else if (fs::is_regular_file(base / relative, ec)) sources.push_back(base / relative);
+        if (g.cfg.use_patch && fs::is_regular_file(patch / relative, ec))
+            sources.push_back(patch / relative);
+        else if (fs::is_regular_file(base / relative, ec))
+            sources.push_back(base / relative);
     }
     return sources;
 }
@@ -1995,8 +2337,10 @@ void xbox_prompts_ready(std::wstring* raw_error) {
     g.xbox_busy = false;
     InvalidateRect(g.launch, nullptr, FALSE);
     if (!error->empty()) {
-        MessageBoxW(g.window, (tr(L"Xbox button icon preparation failed:") + std::wstring(L"\n") + *error + L"\n\n" +
-                               tr(L"Turn off the Xbox icons in Settings to use the PS4 button icons.")).c_str(),
+        MessageBoxW(g.window,
+                    (tr(L"Xbox button icon preparation failed:") + std::wstring(L"\n") + *error + L"\n\n" +
+                     tr(L"Turn off the Xbox icons in Settings to use the PS4 button icons."))
+                        .c_str(),
                     kTitle, MB_ICONERROR);
         return;
     }
@@ -2013,7 +2357,8 @@ void prepare_d3d_shaders() {
     fs::create_directories(logs, ec);
     std::wstring command = L"\"" + (g.runtime_exe.parent_path() / "ctr_shaders.exe").wstring() + L"\" --base \"" +
                            resolve(g.cfg.base_dir).wstring() + L"\" --user \"" + user.wstring() + L"\"";
-    if (g.cfg.use_patch && !g.cfg.patch_dir.empty()) command += L" --patch \"" + resolve(g.cfg.patch_dir).wstring() + L"\"";
+    if (g.cfg.use_patch && !g.cfg.patch_dir.empty())
+        command += L" --patch \"" + resolve(g.cfg.patch_dir).wstring() + L"\"";
     g.shaders_busy = true;
     g.shaders_percent = 0;
     InvalidateRect(g.launch, nullptr, FALSE);
@@ -2029,7 +2374,8 @@ void prepare_d3d_shaders() {
         si.dwFlags = STARTF_USESTDHANDLES;
         if (CreatePipe(&read, &write, &sa, 0) && SetHandleInformation(read, HANDLE_FLAG_INHERIT, 0)) {
             si.hStdOutput = si.hStdError = write;
-            if (CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, cwd.c_str(), &si, &pi)) {
+            if (CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, cwd.c_str(),
+                               &si, &pi)) {
                 CloseHandle(write);
                 write = nullptr;
                 std::ofstream out(log, std::ios::binary);
@@ -2076,8 +2422,10 @@ void d3d_shaders_ready(DWORD code, std::wstring* raw_error) {
     std::error_code ec;
     if (code || !fs::exists(g.root / "runtime/user/gpu_d3d/shaders.bin", ec)) {
         const std::wstring log = (g.root / "runtime/user/logs/ctr_shaders.log").wstring();
-        MessageBoxW(g.window, trf(L"The Direct3D 11 shaders could not be built from your dump:\n{0}\n\nLog: {1}", *error, log).c_str(),
-                    tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
+        MessageBoxW(
+            g.window,
+            trf(L"The Direct3D 11 shaders could not be built from your dump:\n{0}\n\nLog: {1}", *error, log).c_str(),
+            tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
         return;
     }
     g.shaders_ready = true;
@@ -2101,15 +2449,18 @@ bool d3d11_ready() {
     std::error_code ec;
     const fs::path runtime = g.runtime_exe.parent_path();
     if (!fs::exists(runtime / "ctr_d3d.dll", ec) || !fs::exists(runtime / "ctr_shaders.exe", ec)) {
-        MessageBoxW(g.window, tr(L"Direct3D 11 needs ctr_d3d.dll and ctr_shaders.exe next to ctrport.exe."), tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
+        MessageBoxW(g.window, tr(L"Direct3D 11 needs ctr_d3d.dll and ctr_shaders.exe next to ctrport.exe."),
+                    tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
         return false;
     }
     const fs::path shaders = g.root / "runtime/user/gpu_d3d/shaders.bin";
     if (g.shaders_ready) {
         g.shaders_ready = false;
     } else if (!fs::exists(shaders, ec)) {
-        if (MessageBoxW(g.window, tr(L"Direct3D 11 first translates the game's shaders from your dump. This takes a few minutes and is done once. Translate them now?"),
-                        tr(L"Direct3D 11"), MB_OKCANCEL | MB_ICONINFORMATION) == IDOK)
+        if (MessageBoxW(
+                g.window,
+                tr(L"Direct3D 11 first translates the game's shaders from your dump. This takes a few minutes and is done once. Translate them now?"),
+                tr(L"Direct3D 11"), MB_OKCANCEL | MB_ICONINFORMATION) == IDOK)
             prepare_d3d_shaders();
         return false;
     } else if (d3d_shaders_outdated(shaders)) {
@@ -2118,7 +2469,8 @@ bool d3d11_ready() {
     }
     // the temporal upscalers need the GPU library's Vulkan integration
     if (g.cfg.upscaler == L"fsr3" || g.cfg.upscaler == L"dlss") {
-        MessageBoxW(g.window, tr(L"With Direct3D 11, choose Scene upscaling Off or AMD FSR 1."), tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
+        MessageBoxW(g.window, tr(L"With Direct3D 11, choose Scene upscaling Off or AMD FSR 1."),
+                    tr(L"Direct3D 11 unavailable"), MB_ICONERROR);
         return false;
     }
     return true;
@@ -2132,16 +2484,21 @@ void launch_game() {
         MessageBoxW(g.window, tr(L"Wait until the mod is installed."), kTitle, MB_ICONINFORMATION);
         return;
     }
-    if (g.cfg.upscaler == L"dlss" &&
-        (!fs::exists(g.runtime_exe.parent_path() / "ctr_dlss.dll") ||
-         !fs::exists(g.runtime_exe.parent_path() / "nvngx_dlss.dll"))) {
-        MessageBoxW(g.window, tr(L"DLSS needs ctr_dlss.dll and nvngx_dlss.dll next to ctrport.exe. Choose Off or AMD FSR 1."), tr(L"DLSS unavailable"), MB_ICONERROR);
+    if (g.cfg.upscaler == L"dlss" && (!fs::exists(g.runtime_exe.parent_path() / "ctr_dlss.dll") ||
+                                      !fs::exists(g.runtime_exe.parent_path() / "nvngx_dlss.dll"))) {
+        MessageBoxW(g.window,
+                    tr(L"DLSS needs ctr_dlss.dll and nvngx_dlss.dll next to ctrport.exe. Choose Off or AMD FSR 1."),
+                    tr(L"DLSS unavailable"), MB_ICONERROR);
         return;
     }
     if (g.cfg.renderer == L"d3d11" && !d3d11_ready()) return;
-    if (g.cfg.xbox_prompts && !g.xbox_ready) { prepare_xbox_prompts(); return; }
+    if (g.cfg.xbox_prompts && !g.xbox_ready) {
+        prepare_xbox_prompts();
+        return;
+    }
     g.xbox_ready = false;
-    if (!check_mods_before_launch(resolve(g.cfg.base_dir), g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path())) return;
+    if (!check_mods_before_launch(resolve(g.cfg.base_dir), g.cfg.use_patch ? resolve(g.cfg.patch_dir) : fs::path()))
+        return;
     if (!save_config()) return;
     std::error_code ec;
     const std::wstring stamp = timestamp();
@@ -2149,9 +2506,12 @@ void launch_game() {
     fs::create_directories(logs, ec);
     ctrport::bounded_log::prune(logs);
     g.log_stem = logs / (L"play_" + stamp);
-    try { ctr_online::backup_savedata(g.root, "before_launch"); }
-    catch (const std::exception& error) {
-        MessageBoxW(g.window, (tr(L"Save backup failed; launch cancelled:") + std::wstring(L"\n") + widen(error.what())).c_str(), kTitle, MB_ICONERROR);
+    try {
+        ctr_online::backup_savedata(g.root, "before_launch");
+    } catch (const std::exception& error) {
+        MessageBoxW(g.window,
+                    (tr(L"Save backup failed; launch cancelled:") + std::wstring(L"\n") + widen(error.what())).c_str(),
+                    kTitle, MB_ICONERROR);
         return;
     }
     const fs::path base = resolve(g.cfg.base_dir), patch = resolve(g.cfg.patch_dir);
@@ -2159,12 +2519,17 @@ void launch_game() {
     std::vector<fs::path> modules;
     for (const auto& entry : fs::directory_iterator(base / "sce_module", ec))
         if (lower(entry.path().extension().wstring()) == L".prx") modules.push_back(entry.path());
-    std::sort(modules.begin(), modules.end(), [](const fs::path& a, const fs::path& b) { return lower(a.wstring()) < lower(b.wstring()); });
-    std::wstring command = quote_argument(g.runtime_exe.wstring()) + L" --entry-after-libc-init-images " + quote_argument(eboot.wstring());
+    std::sort(modules.begin(), modules.end(),
+              [](const fs::path& a, const fs::path& b) { return lower(a.wstring()) < lower(b.wstring()); });
+    std::wstring command =
+        quote_argument(g.runtime_exe.wstring()) + L" --entry-after-libc-init-images " + quote_argument(eboot.wstring());
     for (const auto& module : modules) command += L" " + quote_argument(module.wstring());
 
-    std::map<std::wstring, std::wstring> set{{L"CTR_GPU_LIBRARY", L"1"}, {L"CTR_TLS_PATCH", L"1"}, {L"CTR_GPU_LOG", L"error"},
-                                             {L"CTR_NO_FRAME_OBSERVATION", L"1"}, {L"CTR_BASE_DIR", base.wstring()}};
+    std::map<std::wstring, std::wstring> set{{L"CTR_GPU_LIBRARY", L"1"},
+                                             {L"CTR_TLS_PATCH", L"1"},
+                                             {L"CTR_GPU_LOG", L"error"},
+                                             {L"CTR_NO_FRAME_OBSERVATION", L"1"},
+                                             {L"CTR_BASE_DIR", base.wstring()}};
     set[L"CTR_SYSTEM_LANGUAGE"] = std::to_wstring(kGameLanguages[game_language_index(g.cfg.game_language)].system_id);
     bool fixed_guest = false;
     std::wstring players;
@@ -2188,7 +2553,8 @@ void launch_game() {
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
     // the keys chosen in the Advanced tab (launcher_keyboard.hpp); without the file, the defaults
     std::error_code keyboard_error;
-    if (fs::exists(keyboard_section::file(), keyboard_error)) set[L"CTR_KEYBOARD_MAP"] = keyboard_section::file().wstring();
+    if (fs::exists(keyboard_section::file(), keyboard_error))
+        set[L"CTR_KEYBOARD_MAP"] = keyboard_section::file().wstring();
     if (!g.cfg.trophy_key.empty()) set[L"CTR_TROPHY_KEY"] = g.cfg.trophy_key;
     if (g.cfg.mods_enabled) {
         set[L"CTR_MODS_DIR"] = mods_dir().wstring();
@@ -2196,42 +2562,83 @@ void launch_game() {
         set[L"CTR_PATCHES_DIR"] = patches_dir().wstring();
         set[L"CTR_PATCHES_CONFIG"] = patches_config_path().wstring();
     }
-    if (g.cfg.fullscreen) set[L"CTR_GPU_FULLSCREEN"] = L"1";
-    else { set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit); set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit); }
+    if (g.cfg.fullscreen)
+        set[L"CTR_GPU_FULLSCREEN"] = L"1";
+    else {
+        set[L"CTR_GPU_WIDTH"] = window_text(g.width_edit);
+        set[L"CTR_GPU_HEIGHT"] = window_text(g.height_edit);
+    }
     if (g.cfg.online) {
-        if(g.host_busy || !g.host_status.running) {
-            g.friends_notice=tr(L"Wait for Online to connect.");
-            g.friends_notice_error=true;animate_friends(true);return;
+        if (g.host_busy || !g.host_status.running) {
+            g.friends_notice = tr(L"Wait for Online to connect.");
+            g.friends_notice_error = true;
+            animate_friends(true);
+            return;
         }
         try {
             // The game always talks to this PC's own service, which reaches friends' services
             // and the public matchmaking by itself.
-            const std::string server_ip="127.0.0.1";
-            const auto verified=ctr_online::verify_candidate_endpoint(server_ip+":8780",g.host_status.friend_code);
-            if(verified.status!=ctr_online::VerifyStatus::Verified) throw std::runtime_error("Local service identity not verified");
-            const auto online_dir=g.root / "runtime/user/online";
+            const std::string server_ip = "127.0.0.1";
+            const auto verified = ctr_online::verify_candidate_endpoint(server_ip + ":8780", g.host_status.friend_code);
+            if (verified.status != ctr_online::VerifyStatus::Verified)
+                throw std::runtime_error("Local service identity not verified");
+            const auto online_dir = g.root / "runtime/user/online";
             fs::create_directories(online_dir);
-            const auto key_path=online_dir / "party_traffic_key.der";
-            std::ofstream key(key_path,std::ios::binary|std::ios::trunc);
-            key.write(reinterpret_cast<const char*>(verified.traffic_key.data()),static_cast<std::streamsize>(verified.traffic_key.size()));
-            key.close();if(!key) throw std::runtime_error("Could not save the lobby key");
-            set[L"CTR_ONLINE"]=L"1";
-            set[L"CTR_ONLINE_SERVER"]=widen(server_ip);
-            set[L"CTR_ONLINE_TRAFFIC_KEY"]=key_path.wstring();
-            set[L"CTR_ONLINE_PORT_OFFSET"]=std::to_wstring(ctr_online::kHostGamePortOffset);
-            set[L"CTR_ONLINE_ACCOUNT"]=std::to_wstring(ctr_online::player_account(g.host_status.friend_code,narrow(g.cfg.online_id)));
-        } catch(const std::exception& e) {
-            g.friends_notice=widen(e.what());g.friends_notice_error=true;
-            animate_friends(true);return;
+            const auto key_path = online_dir / "party_traffic_key.der";
+            std::ofstream key(key_path, std::ios::binary | std::ios::trunc);
+            key.write(reinterpret_cast<const char*>(verified.traffic_key.data()),
+                      static_cast<std::streamsize>(verified.traffic_key.size()));
+            key.close();
+            if (!key) throw std::runtime_error("Could not save the lobby key");
+            set[L"CTR_ONLINE"] = L"1";
+            set[L"CTR_ONLINE_SERVER"] = widen(server_ip);
+            set[L"CTR_ONLINE_TRAFFIC_KEY"] = key_path.wstring();
+            set[L"CTR_ONLINE_PORT_OFFSET"] = std::to_wstring(ctr_online::kHostGamePortOffset);
+            set[L"CTR_ONLINE_ACCOUNT"] =
+                std::to_wstring(ctr_online::player_account(g.host_status.friend_code, narrow(g.cfg.online_id)));
+        } catch (const std::exception& e) {
+            g.friends_notice = widen(e.what());
+            g.friends_notice_error = true;
+            animate_friends(true);
+            return;
         }
     }
-    auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR", L"CTR_STARTUP_MUTEX_DLL_DIR", L"CTR_PARK_MISSING_NID",
-        L"CTR_PARK_MISSING_SERVICE", L"CTR_TILING_TIMING", L"CTR_60FPS_PATCH", L"CTR_NEO_MODE", L"CTR_NATIVE_4K", L"CTR_UNLOCK_ALL",
-        L"CTR_SETTINGS_PATH", L"CTR_SCENE_HEIGHT", L"CTR_GPU_INTERNAL_WIDTH", L"CTR_GPU_INTERNAL_HEIGHT",
-        L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION", L"CTR_GPU_BACKEND",
-        L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
-        L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT",
-        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG", L"CTR_ONLINE_ACCOUNT", L"CTR_TROPHY_KEY", L"CTR_PAD_PLAYERS", L"CTR_KEYBOARD_MAP"});
+    auto environment = environment_block(set, {L"CTR_STARTUP_WRITE_DLL_DIR",
+                                               L"CTR_STARTUP_MUTEX_DLL_DIR",
+                                               L"CTR_PARK_MISSING_NID",
+                                               L"CTR_PARK_MISSING_SERVICE",
+                                               L"CTR_TILING_TIMING",
+                                               L"CTR_60FPS_PATCH",
+                                               L"CTR_NEO_MODE",
+                                               L"CTR_NATIVE_4K",
+                                               L"CTR_UNLOCK_ALL",
+                                               L"CTR_SETTINGS_PATH",
+                                               L"CTR_SCENE_HEIGHT",
+                                               L"CTR_GPU_INTERNAL_WIDTH",
+                                               L"CTR_GPU_INTERNAL_HEIGHT",
+                                               L"CTR_GPU_FULLSCREEN",
+                                               L"CTR_GPU_WIDTH",
+                                               L"CTR_GPU_HEIGHT",
+                                               L"CTR_PATCH_DIR",
+                                               L"CTR_VERSION",
+                                               L"CTR_GPU_BACKEND",
+                                               L"CTR_ONLINE",
+                                               L"CTR_ONLINE_ID",
+                                               L"CTR_ONLINE_SERVER",
+                                               L"CTR_ONLINE_TRAFFIC_KEY",
+                                               L"CTR_ONLINE_PASSWORD",
+                                               L"CTR_ONLINE_ROOM_TOKEN",
+                                               L"CTR_ONLINE_PORT_OFFSET",
+                                               L"CTR_ONLINE_NAT_TRANSPORT",
+                                               L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT",
+                                               L"CTR_MODS_DIR",
+                                               L"CTR_MODS_CONFIG",
+                                               L"CTR_PATCHES_DIR",
+                                               L"CTR_PATCHES_CONFIG",
+                                               L"CTR_ONLINE_ACCOUNT",
+                                               L"CTR_TROPHY_KEY",
+                                               L"CTR_PAD_PLAYERS",
+                                               L"CTR_KEYBOARD_MAP"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     // Bounded capture (bounded_log.hpp): the game writes into pipes, not into the files.
@@ -2239,7 +2646,8 @@ void launch_game() {
     auto err_log = std::make_shared<ctrport::bounded_log::Capture>(g.log_stem.wstring() + L".stderr.log");
     const HANDLE out = out_log->valid() ? out_log->write() : INVALID_HANDLE_VALUE;
     const HANDLE err = err_log->valid() ? err_log->write() : INVALID_HANDLE_VALUE;
-    const HANDLE nul = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &inherit, OPEN_EXISTING, 0, nullptr);
+    const HANDLE nul =
+        CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &inherit, OPEN_EXISTING, 0, nullptr);
     STARTUPINFOW startup{sizeof(startup)};
     startup.dwFlags = STARTF_USESTDHANDLES;
     startup.hStdInput = nul;
@@ -2251,17 +2659,21 @@ void launch_game() {
     AllowSetForegroundWindow(ASFW_ANY);
     SetLastError(ERROR_SUCCESS);
     const BOOL started = out != INVALID_HANDLE_VALUE && err != INVALID_HANDLE_VALUE &&
-        CreateProcessW(g.runtime_exe.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
-                       environment.data(), g.root.c_str(), &startup, &info);
+                         CreateProcessW(g.runtime_exe.c_str(), command.data(), nullptr, nullptr, TRUE,
+                                        CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW, environment.data(),
+                                        g.root.c_str(), &startup, &info);
     const DWORD error = GetLastError();
-    out_log->close_writer(); err_log->close_writer();
+    out_log->close_writer();
+    err_log->close_writer();
     if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
     if (!started) {
-        MessageBoxW(g.window, trf(L"Unable to start ctrport.exe (error {0}).", std::to_wstring(error)).c_str(), kTitle, MB_ICONERROR);
+        MessageBoxW(g.window, trf(L"Unable to start ctrport.exe (error {0}).", std::to_wstring(error)).c_str(), kTitle,
+                    MB_ICONERROR);
         return;
     }
     CloseHandle(info.hThread);
-    out_log->start(); err_log->start();
+    out_log->start();
+    err_log->start();
     g.process = info.hProcess;
     InvalidateRect(g.launch, nullptr, FALSE);
     ShowWindow(g.window, SW_HIDE);
@@ -2270,11 +2682,13 @@ void launch_game() {
         DWORD code = 0;
         GetExitCodeProcess(process, &code);
         // The crash report reads the log tails: let both captures finish writing first.
-        out_log->wait(10000); err_log->wait(10000);
+        out_log->wait(10000);
+        err_log->wait(10000);
         try {
             ctr_online::backup_savedata(root, "after_exit");
         } catch (const std::exception& error) {
-            MessageBoxW(window, (tr(L"Local backup incomplete:") + std::wstring(L"\n") + widen(error.what())).c_str(), kTitle, MB_ICONWARNING);
+            MessageBoxW(window, (tr(L"Local backup incomplete:") + std::wstring(L"\n") + widen(error.what())).c_str(),
+                        kTitle, MB_ICONWARNING);
         }
         PostMessageW(window, WM_APP_FINISHED, code, 0);
     }).detach();
@@ -2284,15 +2698,15 @@ void game_finished(DWORD code) {
     CloseHandle(g.process);
     g.process = nullptr;
     load_config();
-    reload_mods();  // mods the runtime did not apply are marked
+    reload_mods(); // mods the runtime did not apply are marked
     sync_mod_rows();
-    for (int i=0; i<static_cast<int>(std::size(kModes)); ++i)
-        if(g.cfg.upscaling_mode==kModes[i]) SendMessageW(g.scene_combo,CB_SETCURSEL,i,0);
-    for (int i=0; i<static_cast<int>(std::size(kUpscalers)); ++i)
-        if(g.cfg.upscaler==kUpscalers[i]) SendMessageW(g.upscaler_combo,CB_SETCURSEL,i,0);
-    for (int i=0; i<static_cast<int>(std::size(kRenderers)); ++i)
-        if(g.cfg.renderer==kRenderers[i]) SendMessageW(g.renderer_combo,CB_SETCURSEL,i,0);
-    SendMessageW(g.language_combo,CB_SETCURSEL,game_language_index(g.cfg.game_language),0);
+    for (int i = 0; i < static_cast<int>(std::size(kModes)); ++i)
+        if (g.cfg.upscaling_mode == kModes[i]) SendMessageW(g.scene_combo, CB_SETCURSEL, i, 0);
+    for (int i = 0; i < static_cast<int>(std::size(kUpscalers)); ++i)
+        if (g.cfg.upscaler == kUpscalers[i]) SendMessageW(g.upscaler_combo, CB_SETCURSEL, i, 0);
+    for (int i = 0; i < static_cast<int>(std::size(kRenderers)); ++i)
+        if (g.cfg.renderer == kRenderers[i]) SendMessageW(g.renderer_combo, CB_SETCURSEL, i, 0);
+    SendMessageW(g.language_combo, CB_SETCURSEL, game_language_index(g.cfg.game_language), 0);
     InvalidateRect(g.window, nullptr, FALSE);
     std::vector<std::string> reasons;
     for (const wchar_t* suffix : {L".stdout.log", L".stderr.log"}) {
@@ -2301,9 +2715,13 @@ void game_finished(DWORD code) {
         for (std::string line; std::getline(lines, line);) all.push_back(line);
         for (std::size_t i = all.size() > 4000 ? all.size() - 4000 : 0; i < all.size(); ++i) {
             const std::string& line = all[i];
-            const bool reason = line.find("startup_libc_dependency_boundary") != std::string::npos || line.find("unresolved_access") != std::string::npos ||
-                                line.find("unsupported:") != std::string::npos || line.find("STOP:") != std::string::npos || line.find("window closed") != std::string::npos;
-            const bool ignored = line.find("obuxdTiwkF8") != std::string::npos || line.find("PlayGo") != std::string::npos || line.find("fZo48un7LK4") != std::string::npos;
+            const bool reason =
+                line.find("startup_libc_dependency_boundary") != std::string::npos ||
+                line.find("unresolved_access") != std::string::npos || line.find("unsupported:") != std::string::npos ||
+                line.find("STOP:") != std::string::npos || line.find("window closed") != std::string::npos;
+            const bool ignored = line.find("obuxdTiwkF8") != std::string::npos ||
+                                 line.find("PlayGo") != std::string::npos ||
+                                 line.find("fZo48un7LK4") != std::string::npos;
             if (reason && !ignored) reasons.push_back(line.substr(0, 300));
         }
     }
@@ -2314,7 +2732,8 @@ void game_finished(DWORD code) {
     if (code == 0 && (reasons.empty() || closed_by_user)) return;
     std::wstring message = trf(L"The game stopped (exit code {0}).", std::to_wstring(code)) + L"\n\n";
     if (reasons.empty()) message += tr(L"No specific error found in the logs.") + std::wstring(L"\n");
-    for (std::size_t i = reasons.size() > 5 ? reasons.size() - 5 : 0; i < reasons.size(); ++i) message += widen(reasons[i]) + L"\n";
+    for (std::size_t i = reasons.size() > 5 ? reasons.size() - 5 : 0; i < reasons.size(); ++i)
+        message += widen(reasons[i]) + L"\n";
     message += L"\nLog: " + g.log_stem.wstring() + L".stdout.log";
     MessageBoxW(g.window, message.c_str(), kTitle, MB_ICONWARNING);
 }
@@ -2334,7 +2753,10 @@ LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM wparam, LPARAM l
         }
         break;
     case WM_MOUSELEAVE:
-        if (g.hot == window) { g.hot = nullptr; InvalidateRect(window, nullptr, FALSE); }
+        if (g.hot == window) {
+            g.hot = nullptr;
+            InvalidateRect(window, nullptr, FALSE);
+        }
         break;
     case WM_SETCURSOR:
         if (IsWindowEnabled(window)) {
@@ -2343,15 +2765,16 @@ LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM wparam, LPARAM l
         }
         SetCursor(LoadCursorW(nullptr, IDC_ARROW));
         return TRUE;
-    case WM_ERASEBKGND:
-        return 1;
+    case WM_ERASEBKGND: return 1;
     }
     return DefSubclassProc(window, message, wparam, lparam);
 }
 
-HWND add_button(int id, Kind kind, const RectF& box, const wchar_t* label, bool* value = nullptr, int pill = -1, int tab = -1) {
-    HWND button = CreateWindowExW(0, L"BUTTON", tr(label), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, px(box.X), px(box.Y),
-                                  px(box.Width), px(box.Height), g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
+HWND add_button(int id, Kind kind, const RectF& box, const wchar_t* label, bool* value = nullptr, int pill = -1,
+                int tab = -1) {
+    HWND button = CreateWindowExW(0, L"BUTTON", tr(label), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, px(box.X),
+                                  px(box.Y), px(box.Width), px(box.Height), g.window,
+                                  reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
     SetWindowSubclass(button, control_proc, 1, 0);
     g.controls[button] = Control{kind, label, value, pill, box, tab};
     return button;
@@ -2365,8 +2788,8 @@ HWND add_edit(int id, const RectF& field, const std::wstring& value, DWORD extra
     ReleaseDC(g.window, dc);
     const int height = metrics.tmHeight + 2;
     HWND edit = CreateWindowExW(0, L"EDIT", value.c_str(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | extra,
-                                px(field.X + 10), px(field.Y) + (px(field.Height) - height) / 2, px(field.Width - 20), height,
-                                g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
+                                px(field.X + 10), px(field.Y) + (px(field.Height) - height) / 2, px(field.Width - 20),
+                                height, g.window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
     SendMessageW(edit, WM_SETFONT, reinterpret_cast<WPARAM>(g.edit_font), FALSE);
     SendMessageW(edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, 0);
     return edit;
@@ -2403,9 +2826,9 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         render_base_layer();
         g.updating = true;
         create_controls();
-        DragAcceptFiles(window, TRUE);  // mods dropped on the launcher (WM_DROPFILES)
-        for(HWND child=GetWindow(window,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT))
-            SetWindowLongPtrW(child,GWL_STYLE,GetWindowLongPtrW(child,GWL_STYLE)|WS_CLIPSIBLINGS);
+        DragAcceptFiles(window, TRUE); // mods dropped on the launcher (WM_DROPFILES)
+        for (HWND child = GetWindow(window, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT))
+            SetWindowLongPtrW(child, GWL_STYLE, GetWindowLongPtrW(child, GWL_STYLE) | WS_CLIPSIBLINGS);
         g.updating = false;
         WNDCLASSW friends_class{};
         friends_class.lpfnWndProc = friends_drawer_proc;
@@ -2414,15 +2837,16 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         friends_class.hCursor = LoadCursorW(nullptr, IDC_HAND);
         RegisterClassW(&friends_class);
         g.friends_drawer = CreateWindowExW(WS_EX_CONTROLPARENT, friends_class.lpszClassName, L"Friends",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS,0,0,0,0,window,nullptr,friends_class.hInstance,nullptr);
-        SetTimer(window,20,1000,nullptr); // friends' presence, fonts
+                                           WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS, 0, 0, 0, 0, window,
+                                           nullptr, friends_class.hInstance, nullptr);
+        SetTimer(window, 20, 1000, nullptr); // friends' presence, fonts
         reload_friends();
         position_friends();
         select_tab(TAB_HOME);
         select_resolution(g.resolution);
         if (g.cfg.online) host_toggled(true);
         SetFocus(IsWindowEnabled(g.launch) ? g.launch : g.window);
-        SendMessageW(window,WM_CHANGEUISTATE,MAKEWPARAM(UIS_SET,UISF_HIDEFOCUS),0);
+        SendMessageW(window, WM_CHANGEUISTATE, MAKEWPARAM(UIS_SET, UISF_HIDEFOCUS), 0);
         SetTimer(window, 31, 250, nullptr);
         if (ctr_update::portable(g.root, g.exe_dir)) check_launcher_update(false);
         return 0;
@@ -2432,49 +2856,68 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         break;
     case WM_MOUSEMOVE:
         if (g.current_tab == TAB_TROPHIES) {
-            const float mouse_x=static_cast<short>(LOWORD(lparam))/g.scale, mouse_y=static_cast<short>(HIWORD(lparam))/g.scale;
-            const float x=(classic_skin?mouse_x:(mouse_x-40)/1.73f+296)-kTrophyLeft;
-            const float y=mouse_y-(classic_skin?0.f:40.f)-kTrophyTop;
+            const float mouse_x = static_cast<short>(LOWORD(lparam)) / g.scale,
+                        mouse_y = static_cast<short>(HIWORD(lparam)) / g.scale;
+            const float x = (classic_skin ? mouse_x : (mouse_x - 40) / 1.73f + 296) - kTrophyLeft;
+            const float y = mouse_y - (classic_skin ? 0.f : 40.f) - kTrophyTop;
             int hot = -1;
-            if (x >= 0 && y >= 0 && std::fmod(x, kTrophyCell) < kTrophyIcon/(classic_skin?1.f:1.73f) && std::fmod(y, kTrophyCell) < kTrophyIcon) {
-                const int index = static_cast<int>(y / kTrophyCell) * kTrophyColumns + static_cast<int>(x / kTrophyCell);
-                if (static_cast<int>(x / kTrophyCell) < kTrophyColumns && index < static_cast<int>(g.trophy_set.trophies.size())) hot = index;
+            if (x >= 0 && y >= 0 && std::fmod(x, kTrophyCell) < kTrophyIcon / (classic_skin ? 1.f : 1.73f) &&
+                std::fmod(y, kTrophyCell) < kTrophyIcon) {
+                const int index =
+                    static_cast<int>(y / kTrophyCell) * kTrophyColumns + static_cast<int>(x / kTrophyCell);
+                if (static_cast<int>(x / kTrophyCell) < kTrophyColumns &&
+                    index < static_cast<int>(g.trophy_set.trophies.size()))
+                    hot = index;
             }
-            if (hot >= 0 && hot != g.trophy_hot) { g.trophy_hot = hot; InvalidateRect(window, nullptr, FALSE); }
+            if (hot >= 0 && hot != g.trophy_hot) {
+                g.trophy_hot = hot;
+                InvalidateRect(window, nullptr, FALSE);
+            }
         }
         break;
     case WM_NCHITTEST: {
         POINT pt{static_cast<short>(LOWORD(lparam)), static_cast<short>(HIWORD(lparam))};
         ScreenToClient(window, &pt);
-        if (pt.y < px(24) || (!classic_skin && pt.y<px(nitro::header) && pt.x<px(215))) return HTCAPTION;
+        if (pt.y < px(24) || (!classic_skin && pt.y < px(nitro::header) && pt.x < px(215))) return HTCAPTION;
         return HTCLIENT;
     }
-    case WM_ERASEBKGND:
-        return 1;
+    case WM_ERASEBKGND: return 1;
     case WM_PAINT: {
         PAINTSTRUCT paint;
         HDC dc = BeginPaint(window, &paint);
-        const bool indicator=nitro_animating && paint.rcPaint.top>=px(51) && paint.rcPaint.bottom<=px(nitro::header);
-        const bool drawer=!classic_skin && g.current_tab==TAB_HOME && paint.rcPaint.left>=px(kWidth-kFriendsTravel)
-            && paint.rcPaint.top>=px(100) && paint.rcPaint.bottom<=px(630);
-        if(nitro_finishing && nitro_to_dc){BitBlt(dc,0,0,px(kWidth),px(kHeight),nitro_to_dc,0,0,SRCCOPY);}
-        else if(indicator||drawer){
-            HDC source=CreateCompatibleDC(dc);const auto old=SelectObject(source,g.base_layer);
-            const auto& r=paint.rcPaint;BitBlt(dc,r.left,r.top,r.right-r.left,r.bottom-r.top,source,r.left,r.top,SRCCOPY);
-            SelectObject(source,old);DeleteDC(source);
-            if(indicator){Graphics gr(dc);gr.ScaleTransform(g.scale,g.scale);gr.SetSmoothingMode(SmoothingModeAntiAlias);
-                const float n=nitro_nav_from+(nitro_nav_to-nitro_nav_from)*nitro_progress();
-                fill_round(gr,rect(nitro::nav_center(n)-33,53,66,5),2.5f,SolidBrush(Color(kArcadeGold)));}
-        } else if(nitro_preparing && nitro_page_background && nitro_page_background_tab==g.current_tab){
-            HDC cache=CreateCompatibleDC(dc);const auto old=SelectObject(cache,nitro_page_background);
-            BitBlt(dc,0,0,px(kWidth),px(kHeight),cache,0,0,SRCCOPY);SelectObject(cache,old);DeleteDC(cache);
-        } else paint_window(dc);
+        const bool indicator =
+            nitro_animating && paint.rcPaint.top >= px(51) && paint.rcPaint.bottom <= px(nitro::header);
+        const bool drawer = !classic_skin && g.current_tab == TAB_HOME &&
+                            paint.rcPaint.left >= px(kWidth - kFriendsTravel) && paint.rcPaint.top >= px(100) &&
+                            paint.rcPaint.bottom <= px(630);
+        if (nitro_finishing && nitro_to_dc) {
+            BitBlt(dc, 0, 0, px(kWidth), px(kHeight), nitro_to_dc, 0, 0, SRCCOPY);
+        } else if (indicator || drawer) {
+            HDC source = CreateCompatibleDC(dc);
+            const auto old = SelectObject(source, g.base_layer);
+            const auto& r = paint.rcPaint;
+            BitBlt(dc, r.left, r.top, r.right - r.left, r.bottom - r.top, source, r.left, r.top, SRCCOPY);
+            SelectObject(source, old);
+            DeleteDC(source);
+            if (indicator) {
+                Graphics gr(dc);
+                gr.ScaleTransform(g.scale, g.scale);
+                gr.SetSmoothingMode(SmoothingModeAntiAlias);
+                const float n = nitro_nav_from + (nitro_nav_to - nitro_nav_from) * nitro_progress();
+                fill_round(gr, rect(nitro::nav_center(n) - 33, 53, 66, 5), 2.5f, SolidBrush(Color(kArcadeGold)));
+            }
+        } else if (nitro_preparing && nitro_page_background && nitro_page_background_tab == g.current_tab) {
+            HDC cache = CreateCompatibleDC(dc);
+            const auto old = SelectObject(cache, nitro_page_background);
+            BitBlt(dc, 0, 0, px(kWidth), px(kHeight), cache, 0, 0, SRCCOPY);
+            SelectObject(cache, old);
+            DeleteDC(cache);
+        } else
+            paint_window(dc);
         EndPaint(window, &paint);
         return 0;
     }
-    case WM_DRAWITEM:
-        draw_control(*reinterpret_cast<const DRAWITEMSTRUCT*>(lparam));
-        return TRUE;
+    case WM_DRAWITEM: draw_control(*reinterpret_cast<const DRAWITEMSTRUCT*>(lparam)); return TRUE;
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORSTATIC: {
         const bool enabled = IsWindowEnabled(reinterpret_cast<HWND>(lparam)) != FALSE;
@@ -2485,35 +2928,65 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     }
     case WM_COMMAND: {
         const int id = LOWORD(wparam), code = HIWORD(wparam);
-        if(g.updating)return 0;
-        if(id==ID_LAUNCHER_SKIN && code==BN_CLICKED){switch_launcher_skin();return 0;}
-        if(graphics_section_command(id,code))return 0;
-        if(keyboard_section_command(id,code))return 0;
-        if(id==ID_NITRO_FRIENDS) {nitro_finish();if(g.current_tab!=TAB_HOME)select_tab_now(TAB_HOME);nitro_nav_from=nitro_nav_to=0;animate_friends(!g.friends_open);return 0;}
-        if(id==ID_NITRO_MOTION) {nitro_motion=!nitro_motion;nitro_finish();if(!save_launcher_appearance())nitro_motion=!nitro_motion;InvalidateRect(reinterpret_cast<HWND>(lparam),nullptr,FALSE);return 0;}
-        if (id == ID_CHECK_UPDATE) {
-            if (update_offer.is_object()) offer_launcher_update(); else check_launcher_update(true);
+        if (g.updating) return 0;
+        if (id == ID_LAUNCHER_SKIN && code == BN_CLICKED) {
+            switch_launcher_skin();
             return 0;
         }
-        if(id==IDOK && GetFocus()==g.friend_code_edit){friend_action(111);return 0;}
-        if(id==IDCANCEL && g.friends_open){animate_friends(false);return 0;}
-        if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) { launch_game(); return 0; }
+        if (graphics_section_command(id, code)) return 0;
+        if (keyboard_section_command(id, code)) return 0;
+        if (id == ID_NITRO_FRIENDS) {
+            nitro_finish();
+            if (g.current_tab != TAB_HOME) select_tab_now(TAB_HOME);
+            nitro_nav_from = nitro_nav_to = 0;
+            animate_friends(!g.friends_open);
+            return 0;
+        }
+        if (id == ID_NITRO_MOTION) {
+            nitro_motion = !nitro_motion;
+            nitro_finish();
+            if (!save_launcher_appearance()) nitro_motion = !nitro_motion;
+            InvalidateRect(reinterpret_cast<HWND>(lparam), nullptr, FALSE);
+            return 0;
+        }
+        if (id == ID_CHECK_UPDATE) {
+            if (update_offer.is_object())
+                offer_launcher_update();
+            else
+                check_launcher_update(true);
+            return 0;
+        }
+        if (id == IDOK && GetFocus() == g.friend_code_edit) {
+            friend_action(111);
+            return 0;
+        }
+        if (id == IDCANCEL && g.friends_open) {
+            animate_friends(false);
+            return 0;
+        }
+        if (id == IDOK || (id == ID_LAUNCH && (code == BN_CLICKED || code == BN_DOUBLECLICKED))) {
+            launch_game();
+            return 0;
+        }
         if (id == ID_SCENE_RES && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.scene_combo, CB_GETCURSEL, 0, 0);
-            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kModes))) g.cfg.upscaling_mode = kModes[selected];
+            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kModes)))
+                g.cfg.upscaling_mode = kModes[selected];
             validate();
             return 0;
         }
         if (id == ID_UPSCALER && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.upscaler_combo, CB_GETCURSEL, 0, 0);
-            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kUpscalers))) g.cfg.upscaler = kUpscalers[selected];
+            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kUpscalers)))
+                g.cfg.upscaler = kUpscalers[selected];
             validate();
             return 0;
         }
         if (id == ID_RENDERER && code == CBN_SELCHANGE) {
             const auto selected = SendMessageW(g.renderer_combo, CB_GETCURSEL, 0, 0);
-            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kRenderers))) g.cfg.renderer = kRenderers[selected];
-            graphics_section_refresh();  // the choices this renderer provides
+            if (selected >= 0 && selected < static_cast<LRESULT>(std::size(kRenderers)))
+                g.cfg.renderer = kRenderers[selected];
+            graphics_section_refresh(); // the choices this renderer provides
             validate();
             InvalidateRect(g.window, nullptr, FALSE);
             return 0;
@@ -2562,17 +3035,29 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             validate();
             return 0;
         }
-        if (code == EN_SETFOCUS || code == EN_KILLFOCUS) { InvalidateRect(window, nullptr, FALSE); return 0; }
+        if (code == EN_SETFOCUS || code == EN_KILLFOCUS) {
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
         if (code != BN_CLICKED && code != BN_DOUBLECLICKED) break;
 
-        if (id == ID_MINIMIZE) { ShowWindow(window, SW_MINIMIZE); return 0; }
-        if (id == ID_CLOSE) { SendMessageW(window, WM_CLOSE, 0, 0); return 0; }
+        if (id == ID_MINIMIZE) {
+            ShowWindow(window, SW_MINIMIZE);
+            return 0;
+        }
+        if (id == ID_CLOSE) {
+            SendMessageW(window, WM_CLOSE, 0, 0);
+            return 0;
+        }
 
         // Tab selection
         if (id >= ID_TAB_BASE && id < ID_TAB_BASE + static_cast<int>(TAB_COUNT)) {
             const int tab = id - ID_TAB_BASE;
-            if (tab == TAB_MODS) { reload_mods(); load_gamebanana(false); }  // folders may have changed outside the launcher
-            if (tab == TAB_TROPHIES) reload_trophies();  // the game may have unlocked trophies
+            if (tab == TAB_MODS) {
+                reload_mods();
+                load_gamebanana(false);
+            }                                           // folders may have changed outside the launcher
+            if (tab == TAB_TROPHIES) reload_trophies(); // the game may have unlocked trophies
             if (tab == TAB_SETTINGS) refresh_pads();
             select_tab(tab);
             return 0;
@@ -2593,7 +3078,8 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         }
         if (id >= ID_GB_ROW_PAGE && id < ID_GB_ROW_PAGE + kModRows) {
             const int index = slot_index(id - ID_GB_ROW_PAGE);
-            if (index >= 0 && index < static_cast<int>(g.gb_list.size()) && g.gb_list[index].profile.rfind("https://gamebanana.com/", 0) == 0)
+            if (index >= 0 && index < static_cast<int>(g.gb_list.size()) &&
+                g.gb_list[index].profile.rfind("https://gamebanana.com/", 0) == 0)
                 ShellExecuteW(nullptr, L"open", widen(g.gb_list[index].profile).c_str(), nullptr, nullptr, SW_SHOW);
             return 0;
         }
@@ -2607,8 +3093,16 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             sync_mod_rows();
             return 0;
         }
-        if (id == ID_MODS_REFRESH) { reload_mods(); load_gamebanana(true); sync_mod_rows(); return 0; }
-        if (id == ID_TROPHY_IMPORT) { import_trophy_key(); return 0; }
+        if (id == ID_MODS_REFRESH) {
+            reload_mods();
+            load_gamebanana(true);
+            sync_mod_rows();
+            return 0;
+        }
+        if (id == ID_TROPHY_IMPORT) {
+            import_trophy_key();
+            return 0;
+        }
         if (id == ID_MODS_MASTER) {
             g.cfg.mods_enabled = !g.cfg.mods_enabled;
             save_config();
@@ -2624,7 +3118,10 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             ShellExecuteW(nullptr, L"open", folder.c_str(), nullptr, nullptr, SW_SHOW);
             return 0;
         }
-        if (id == ID_SAVE_BACKUP) { backup_save_data(); return 0; }
+        if (id == ID_SAVE_BACKUP) {
+            backup_save_data();
+            return 0;
+        }
         if (id == ID_OPEN_SAVES) {
             const fs::path saves = g.root / "runtime/user/savedata";
             std::error_code ec;
@@ -2644,11 +3141,17 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
             return 0;
         }
 
-        if(id==ID_ONLINE_FRIENDS){animate_friends(true);return 0;}
+        if (id == ID_ONLINE_FRIENDS) {
+            animate_friends(true);
+            return 0;
+        }
 
-        if (id == ID_BASE_BROWSE) browse(g.base_edit, tr(L"Base game folder (CUSA14876 or CUSA13795)"));
-        else if (id == ID_PATCH_BROWSE) browse(g.patch_edit, tr(L"Update folder (v01.21)"));
-        else if (id >= ID_PILL && id < ID_PILL + 5) select_resolution(id - ID_PILL);
+        if (id == ID_BASE_BROWSE)
+            browse(g.base_edit, tr(L"Base game folder (CUSA14876 or CUSA13795)"));
+        else if (id == ID_PATCH_BROWSE)
+            browse(g.patch_edit, tr(L"Update folder (v01.21)"));
+        else if (id >= ID_PILL && id < ID_PILL + 5)
+            select_resolution(id - ID_PILL);
         else {
             const auto found = g.controls.find(reinterpret_cast<HWND>(lparam));
             if (found != g.controls.end() && found->second.kind == Kind::Toggle) {
@@ -2663,23 +3166,20 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         return 0;
     }
     case WM_TIMER:
-        if(wparam==kNitroTimer) {nitro_tick();return 0;}
-        if(wparam==31) poll_launcher_update();
-        if(wparam==20) {
+        if (wparam == kNitroTimer) {
+            nitro_tick();
+            return 0;
+        }
+        if (wparam == 31) poll_launcher_update();
+        if (wparam == 20) {
             reload_friends();
-            if(g.friends_open) InvalidateRect(g.friends_drawer,nullptr,FALSE);
+            if (g.friends_open) InvalidateRect(g.friends_drawer, nullptr, FALSE);
             poll_fonts();
         }
         return 0;
-    case WM_APP_FINISHED:
-        game_finished(static_cast<DWORD>(wparam));
-        return 0;
-    case WM_APP_HOST_READY:
-        host_ready(wparam != 0);
-        return 0;
-    case WM_APP_XBOX_READY:
-        xbox_prompts_ready(reinterpret_cast<std::wstring*>(lparam));
-        return 0;
+    case WM_APP_FINISHED: game_finished(static_cast<DWORD>(wparam)); return 0;
+    case WM_APP_HOST_READY: host_ready(wparam != 0); return 0;
+    case WM_APP_XBOX_READY: xbox_prompts_ready(reinterpret_cast<std::wstring*>(lparam)); return 0;
     case WM_APP_SHADERS_PROGRESS:
         g.shaders_percent = static_cast<int>(wparam);
         InvalidateRect(g.launch, nullptr, FALSE);
@@ -2688,31 +3188,23 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     case WM_APP_SHADERS_READY:
         d3d_shaders_ready(static_cast<DWORD>(wparam), reinterpret_cast<std::wstring*>(lparam));
         return 0;
-    case WM_APP_GB_CATALOG:
-        gamebanana_catalog_ready(reinterpret_cast<ModsJob*>(lparam));
-        return 0;
+    case WM_APP_GB_CATALOG: gamebanana_catalog_ready(reinterpret_cast<ModsJob*>(lparam)); return 0;
     case WM_APP_GB_PROGRESS:
         g.mods_busy_percent = static_cast<int>(wparam);
         InvalidateRect(g.window, nullptr, FALSE);
         return 0;
-    case WM_APP_GB_DONE:
-        mods_install_done(reinterpret_cast<ModsJob*>(lparam));
-        return 0;
-    case WM_APP_TROPHY_WIKI:
-        trophy_wiki_ready(reinterpret_cast<std::wstring*>(lparam));
-        return 0;
+    case WM_APP_GB_DONE: mods_install_done(reinterpret_cast<ModsJob*>(lparam)); return 0;
+    case WM_APP_TROPHY_WIKI: trophy_wiki_ready(reinterpret_cast<std::wstring*>(lparam)); return 0;
     case WM_CLOSE:
         if (g.process || g.host_busy || g.xbox_busy || g.shaders_busy || g.mods_busy || update_preparing) return 0;
         nitro_finish();
         save_config();
-        KillTimer(window,20);
-        KillTimer(window,31);
+        KillTimer(window, 20);
+        KillTimer(window, 31);
         g.host.stop(); // closes the router ports opened for hosting
         DestroyWindow(window);
         return 0;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
+    case WM_DESTROY: PostQuitMessage(0); return 0;
     }
     return DefWindowProcW(window, message, wparam, lparam);
 }
@@ -2720,12 +3212,13 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
 fs::path find_root(const fs::path& start) {
     std::error_code ec;
     for (fs::path folder = start; !folder.empty(); folder = folder.parent_path()) {
-        if (fs::exists(folder / "ctr_gpu.dll", ec) || fs::exists(folder / "build/CTRPort-gpu/ctr_gpu.dll", ec)) return folder;
+        if (fs::exists(folder / "ctr_gpu.dll", ec) || fs::exists(folder / "build/CTRPort-gpu/ctr_gpu.dll", ec))
+            return folder;
         if (folder == folder.parent_path()) break;
     }
     return {};
 }
-}  // namespace
+} // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
@@ -2749,7 +3242,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
             if (fs::exists(pending)) {
                 const fs::path txn = ctr_update::wide(ctr_update::read(pending).at("transaction").text);
                 const auto name = txn.filename().wstring();
-                if (txn.parent_path() != pending.parent_path() || name.size() != 36 || name.substr(0,4) != L"txn-" ||
+                if (txn.parent_path() != pending.parent_path() || name.size() != 36 || name.substr(0, 4) != L"txn-" ||
                     name.substr(4).find_first_not_of(L"0123456789abcdef") != std::wstring::npos)
                     throw std::runtime_error("Invalid update recovery path.");
                 ctr_update::assert_plain_path(txn / "apply.ps1");
@@ -2771,13 +3264,21 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     } else {
         g.runtime_exe = g.root / "build/CTRPort-dev/ctrport.exe";
     }
-    { std::ifstream prefs(g.root/"runtime/user/nitro-ui.txt");
-      std::string data((std::istreambuf_iterator<char>(prefs)),{});
-      const auto appearance=ctrport::launcher_appearance::parse(data);
-      classic_skin=appearance.classic;nitro_motion=appearance.motion; }
+    {
+        std::ifstream prefs(g.root / "runtime/user/nitro-ui.txt");
+        std::string data((std::istreambuf_iterator<char>(prefs)), {});
+        const auto appearance = ctrport::launcher_appearance::parse(data);
+        classic_skin = appearance.classic;
+        nitro_motion = appearance.motion;
+    }
     apply_launcher_palette();
     g.scale = static_cast<float>(GetDpiForSystem()) / 96.f;
-    {RECT work{};SystemParametersInfoW(SPI_GETWORKAREA,0,&work,0);g.scale=std::min(g.scale,std::min((work.right-work.left-32)/kWidth,(work.bottom-work.top-40)/kHeight));}
+    {
+        RECT work{};
+        SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+        g.scale = std::min(g.scale,
+                           std::min((work.right - work.left - 32) / kWidth, (work.bottom - work.top - 40) / kHeight));
+    }
     load_config();
     g.logo = load_launcher_logo();
 
@@ -2793,8 +3294,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     RECT work{};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
     const int fw = frame.right - frame.left, fh = frame.bottom - frame.top;
-    HWND window = CreateWindowExW(0, window_class.lpszClassName, kTitle, style, work.left + (work.right - work.left - fw) / 2,
-                                  work.top + std::max(0L, (work.bottom - work.top - fh) / 2), fw, fh, nullptr, nullptr, instance, nullptr);
+    HWND window = CreateWindowExW(
+        0, window_class.lpszClassName, kTitle, style, work.left + (work.right - work.left - fw) / 2,
+        work.top + std::max(0L, (work.bottom - work.top - fh) / 2), fw, fh, nullptr, nullptr, instance, nullptr);
 
     SetWindowRgn(window, CreateRoundRectRgn(0, 0, px(kWidth) + 1, px(kHeight) + 1, px(24), px(24)), TRUE);
     const BOOL dark = TRUE;
@@ -2803,7 +3305,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     DwmSetWindowAttribute(window, 35, &caption, sizeof(caption));
     DwmSetWindowAttribute(window, 36, &caption_text, sizeof(caption_text));
     DwmSetWindowAttribute(window, 34, &border, sizeof(border));
-    SetWindowTextW(window,classic_skin?L"CTR Native Ported — Classic":L"CTR Native Ported — Nitro Cinema");
+    SetWindowTextW(window, classic_skin ? L"CTR Native Ported — Classic" : L"CTR Native Ported — Nitro Cinema");
     ShowWindow(window, show);
     UpdateWindow(window);
 
@@ -2819,7 +3321,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     g.art.reset();
     g.icon.reset();
     g.trophy_icons.clear();
-    if (font_load.valid()) { auto pending = font_load.get(); }
+    if (font_load.valid()) {
+        auto pending = font_load.get();
+    }
     retail_fonts = {};
     for (auto& cached : family_cache) cached.reset();
     GdiplusShutdown(gdiplus);

@@ -40,12 +40,12 @@ struct File {
 struct Entry {
     std::uint64_t id = 0;
     std::string model, name, author, profile;
-    std::wstring platform;  // L"PS4", L"Switch" or L"PC"
+    std::wstring platform; // L"PS4", L"Switch" or L"PC"
     std::vector<File> files;
 };
 struct Installed {
     std::string file;
-    std::vector<std::wstring> mods, patches;  // folder names in runtime/mods, file names in runtime/patches
+    std::vector<std::wstring> mods, patches; // folder names in runtime/mods, file names in runtime/patches
 };
 
 inline std::wstring wide(const std::string& text) {
@@ -65,8 +65,10 @@ inline std::uint64_t number_of(const Json& object, const char* key) {
 }
 inline std::wstring size_text(std::uint64_t bytes) {
     wchar_t out[32];
-    if (bytes >= 1024 * 1024) swprintf(out, 32, L"%.1f MB", bytes / 1048576.0);
-    else swprintf(out, 32, L"%.0f KB", bytes / 1024.0 + 0.5);
+    if (bytes >= 1024 * 1024)
+        swprintf(out, 32, L"%.1f MB", bytes / 1048576.0);
+    else
+        swprintf(out, 32, L"%.0f KB", bytes / 1024.0 + 0.5);
     return out;
 }
 
@@ -78,26 +80,40 @@ inline std::string http_get(const std::wstring& url, const fs::path* to_file = n
                             const std::atomic<bool>* cancel = nullptr) {
     URL_COMPONENTS parts{sizeof(parts)};
     wchar_t host[256]{}, path[2048]{};
-    parts.lpszHostName = host; parts.dwHostNameLength = 256;
-    parts.lpszUrlPath = path; parts.dwUrlPathLength = 2048;
+    parts.lpszHostName = host;
+    parts.dwHostNameLength = 256;
+    parts.lpszUrlPath = path;
+    parts.dwUrlPathLength = 2048;
     if (!WinHttpCrackUrl(url.c_str(), 0, 0, &parts) || parts.nScheme != INTERNET_SCHEME_HTTPS)
         throw std::runtime_error("not an https address: " + mods::utf8(url));
-    struct Handle { HINTERNET h = nullptr; ~Handle() { if (h) WinHttpCloseHandle(h); } };
-    Handle session{WinHttpOpen(L"CTRNativePorted", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)};
+    struct Handle {
+        HINTERNET h = nullptr;
+        ~Handle() {
+            if (h) WinHttpCloseHandle(h);
+        }
+    };
+    Handle session{WinHttpOpen(L"CTRNativePorted", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME,
+                               WINHTTP_NO_PROXY_BYPASS, 0)};
     if (!session.h) throw std::runtime_error("WinHttpOpen failed");
     WinHttpSetTimeouts(session.h, 15000, 15000, 30000, 60000);
     Handle connect{WinHttpConnect(session.h, host, parts.nPort, 0)};
-    Handle request{connect.h ? WinHttpOpenRequest(connect.h, L"GET", path, nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE) : nullptr};
-    if (!request.h || !WinHttpSendRequest(request.h, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+    Handle request{connect.h ? WinHttpOpenRequest(connect.h, L"GET", path, nullptr, WINHTTP_NO_REFERER,
+                                                  WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE)
+                             : nullptr};
+    if (!request.h ||
+        !WinHttpSendRequest(request.h, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
         !WinHttpReceiveResponse(request.h, nullptr))
-        throw std::runtime_error("cannot reach " + mods::utf8(host) + " (error " + std::to_string(GetLastError()) + ")");
+        throw std::runtime_error("cannot reach " + mods::utf8(host) + " (error " + std::to_string(GetLastError()) +
+                                 ")");
     DWORD status = 0, size = sizeof(status);
-    WinHttpQueryHeaders(request.h, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX);
+    WinHttpQueryHeaders(request.h, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,
+                        &status, &size, WINHTTP_NO_HEADER_INDEX);
     if (status != 200) throw std::runtime_error(mods::utf8(host) + " answered HTTP " + std::to_string(status));
     std::uint64_t total = 0;
     wchar_t length[32]{};
     DWORD length_size = sizeof(length);
-    if (WinHttpQueryHeaders(request.h, WINHTTP_QUERY_CONTENT_LENGTH, WINHTTP_HEADER_NAME_BY_INDEX, length, &length_size, WINHTTP_NO_HEADER_INDEX))
+    if (WinHttpQueryHeaders(request.h, WINHTTP_QUERY_CONTENT_LENGTH, WINHTTP_HEADER_NAME_BY_INDEX, length, &length_size,
+                            WINHTTP_NO_HEADER_INDEX))
         total = _wcstoui64(length, nullptr, 10);
     std::string body;
     std::ofstream out;
@@ -113,8 +129,10 @@ inline std::string http_get(const std::wstring& url, const fs::path* to_file = n
         if (!WinHttpReadData(request.h, buffer.data(), static_cast<DWORD>(buffer.size()), &read))
             throw std::runtime_error("download interrupted (error " + std::to_string(GetLastError()) + ")");
         if (!read) break;
-        if (to_file) out.write(buffer.data(), read);
-        else body.append(buffer.data(), read);
+        if (to_file)
+            out.write(buffer.data(), read);
+        else
+            body.append(buffer.data(), read);
         received += read;
         if (progress) progress(received, total);
     }
@@ -125,7 +143,8 @@ inline std::string http_get(const std::wstring& url, const fs::path* to_file = n
 inline std::string md5_hex(const fs::path& file) {
     BCRYPT_ALG_HANDLE algorithm = nullptr;
     BCRYPT_HASH_HANDLE hash = nullptr;
-    if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_MD5_ALGORITHM, nullptr, 0) < 0) throw std::runtime_error("MD5 unavailable");
+    if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_MD5_ALGORITHM, nullptr, 0) < 0)
+        throw std::runtime_error("MD5 unavailable");
     BCryptCreateHash(algorithm, &hash, nullptr, 0, nullptr, 0, 0);
     std::ifstream in(file, std::ios::binary);
     std::vector<char> buffer(1 << 16);
@@ -136,7 +155,11 @@ inline std::string md5_hex(const fs::path& file) {
     BCryptDestroyHash(hash);
     BCryptCloseAlgorithmProvider(algorithm, 0);
     std::string hex;
-    for (unsigned char byte : digest) { char two[3]; std::snprintf(two, 3, "%02x", byte); hex += two; }
+    for (unsigned char byte : digest) {
+        char two[3];
+        std::snprintf(two, 3, "%02x", byte);
+        hex += two;
+    }
     return hex;
 }
 
@@ -154,7 +177,8 @@ inline std::vector<Entry> parse_subfeed(const Json& page, int game, bool* comple
     for (const Json& record : records->items) {
         const auto model = text_of(record, "_sModelName");
         const Json* has_files = record.find("_bHasFiles");
-        if ((model != "Mod" && model != "Sound") || !has_files || !has_files->is_bool() || !has_files->boolean) continue;
+        if ((model != "Mod" && model != "Sound") || !has_files || !has_files->is_bool() || !has_files->boolean)
+            continue;
         Entry entry;
         entry.id = number_of(record, "_idRow");
         entry.model = model;
@@ -172,7 +196,8 @@ inline std::vector<File> parse_download_page(const Json& page) {
     const Json* list = page.find("_aFiles");
     if (!list || !list->is_array()) return files;
     for (const Json& item : list->items) {
-        File file{number_of(item, "_idRow"), text_of(item, "_sFile"), text_of(item, "_sMd5Checksum"), text_of(item, "_sDownloadUrl"), number_of(item, "_nFilesize")};
+        File file{number_of(item, "_idRow"), text_of(item, "_sFile"), text_of(item, "_sMd5Checksum"),
+                  text_of(item, "_sDownloadUrl"), number_of(item, "_nFilesize")};
         if (file.url.rfind("https://gamebanana.com/", 0) == 0 && !file.name.empty()) files.push_back(std::move(file));
     }
     return files;
@@ -182,15 +207,20 @@ inline std::vector<Entry> fetch_catalog(const std::atomic<bool>* cancel = nullpt
     for (const int game : {kPcGame}) {
         bool complete = false;
         for (int page = 1; !complete && page <= 20; ++page) {
-            const auto body = http_get(L"https://gamebanana.com/apiv11/Game/" + std::to_wstring(game) + L"/Subfeed?_nPage=" + std::to_wstring(page) + L"&_sSort=new", nullptr, {}, cancel);
-            for (auto& entry : parse_subfeed(ctr_online::parse_json(body), game, &complete)) all.push_back(std::move(entry));
+            const auto body = http_get(L"https://gamebanana.com/apiv11/Game/" + std::to_wstring(game) +
+                                           L"/Subfeed?_nPage=" + std::to_wstring(page) + L"&_sSort=new",
+                                       nullptr, {}, cancel);
+            for (auto& entry : parse_subfeed(ctr_online::parse_json(body), game, &complete))
+                all.push_back(std::move(entry));
         }
     }
     std::vector<std::future<std::vector<File>>> pages;
     for (const auto& entry : all)
         pages.push_back(std::async(std::launch::async, [&entry, cancel] {
-            return parse_download_page(ctr_online::parse_json(http_get(
-                L"https://gamebanana.com/apiv11/" + wide(entry.model) + L"/" + std::to_wstring(entry.id) + L"/DownloadPage", nullptr, {}, cancel)));
+            return parse_download_page(
+                ctr_online::parse_json(http_get(L"https://gamebanana.com/apiv11/" + wide(entry.model) + L"/" +
+                                                    std::to_wstring(entry.id) + L"/DownloadPage",
+                                                nullptr, {}, cancel)));
         }));
     for (std::size_t i = 0; i < all.size(); ++i) all[i].files = pages[i].get();
     all.erase(std::remove_if(all.begin(), all.end(), [](const Entry& e) { return e.files.empty(); }), all.end());
@@ -246,12 +276,15 @@ inline void extract(const fs::path& archive, const fs::path& into) {
     GetSystemDirectoryW(system, MAX_PATH);
     const fs::path tar = fs::path(system) / L"tar.exe";
     std::error_code ec;
-    if (!fs::exists(tar, ec)) throw std::runtime_error("Windows tar.exe not found: extract the archive into runtime/mods by hand");
+    if (!fs::exists(tar, ec))
+        throw std::runtime_error("Windows tar.exe not found: extract the archive into runtime/mods by hand");
     fs::create_directories(into);
-    std::wstring command = L"\"" + tar.wstring() + L"\" -xf \"" + archive.wstring() + L"\" -C \"" + into.wstring() + L"\"";
+    std::wstring command =
+        L"\"" + tar.wstring() + L"\" -xf \"" + archive.wstring() + L"\" -C \"" + into.wstring() + L"\"";
     STARTUPINFOW startup{sizeof(startup)};
     PROCESS_INFORMATION process{};
-    if (!CreateProcessW(tar.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
+    if (!CreateProcessW(tar.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr,
+                        &startup, &process))
         throw std::runtime_error("cannot start tar.exe");
     WaitForSingleObject(process.hProcess, INFINITE);
     DWORD code = 1;
@@ -260,7 +293,8 @@ inline void extract(const fs::path& archive, const fs::path& into) {
     CloseHandle(process.hProcess);
     if (code != 0)
         throw std::runtime_error("tar.exe cannot extract " + mods::utf8(archive.filename().wstring()) +
-                                 " (this Windows version may not read ." + mods::utf8(archive.extension().wstring()).substr(archive.has_extension() ? 1 : 0) +
+                                 " (this Windows version may not read ." +
+                                 mods::utf8(archive.extension().wstring()).substr(archive.has_extension() ? 1 : 0) +
                                  " archives): extract it into runtime/mods by hand");
 }
 
@@ -279,7 +313,8 @@ inline bool switch_title(const std::wstring& name) {
 inline fs::path long_path(const fs::path& path) {
     std::wstring text = fs::absolute(path).lexically_normal().wstring();
     if (text.rfind(LR"(\\?\)", 0) == 0) return text;
-    for (auto& c : text) if (c == L'/') c = L'\\';
+    for (auto& c : text)
+        if (c == L'/') c = L'\\';
     return text.rfind(LR"(\\)", 0) == 0 ? LR"(\\?\UNC\)" + text.substr(2) : LR"(\\?\)" + text;
 }
 
@@ -290,7 +325,7 @@ inline bool supported_capability(const std::string& name) {
 }
 struct ManifestSummary {
     std::size_t operations = 0, patches = 0;
-    std::string problem;  // empty when the runtime can apply the manifest
+    std::string problem; // empty when the runtime can apply the manifest
 };
 inline ManifestSummary read_manifest(const fs::path& file) {
     ManifestSummary summary;
@@ -304,7 +339,9 @@ inline ManifestSummary read_manifest(const fs::path& file) {
         return summary;
     }
     std::string missing;
-    const auto add = [&](const std::string& name) { if (missing.find(name) == std::string::npos) missing += (missing.empty() ? "" : ", ") + name; };
+    const auto add = [&](const std::string& name) {
+        if (missing.find(name) == std::string::npos) missing += (missing.empty() ? "" : ", ") + name;
+    };
     if (const Json* capabilities = manifest.find("requiresCapabilities"); capabilities && capabilities->is_array())
         for (const Json& capability : capabilities->items)
             if (capability.is_string() && !supported_capability(capability.text)) add(capability.text);
@@ -314,7 +351,8 @@ inline ManifestSummary read_manifest(const fs::path& file) {
             if (kind != "archive_asset") add("operation " + (kind.empty() ? std::string("?") : kind));
             ++summary.operations;
         }
-    if (const Json* patches = manifest.find("patches"); patches && patches->is_array()) summary.patches = patches->items.size();
+    if (const Json* patches = manifest.find("patches"); patches && patches->is_array())
+        summary.patches = patches->items.size();
     const bool nitro = mods::fold(file.filename().wstring()) == L"nitro-mod.json";
     if (nitro && summary.operations) add("operations");
     if (!missing.empty()) summary.problem = "it needs features (" + missing + ") that the runtime cannot apply yet";
@@ -325,7 +363,9 @@ inline bool is_patch_xml(const fs::path& file) {
     try {
         const auto text = mods::read_text(file);
         return text.find("<Patch>") != std::string::npos || text.find("<Patch ") != std::string::npos;
-    } catch (const std::exception&) { return false; }
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 // Installs the extracted files of `staging` (a download, or a folder dropped on the launcher):
@@ -336,18 +376,23 @@ inline bool is_patch_xml(const fs::path& file) {
 // `previous` (the earlier install of the same download) is removed first. Throws before writing
 // anything when the download holds links, code (eboot.bin, sce_module, sce_sys), a manifest the
 // runtime cannot apply, or nothing that can be installed.
-inline Installed install_extracted(const fs::path& staging_folder, const fs::path& mods_dir, const fs::path& patches_dir,
-                                   const std::wstring& patch_prefix, const std::wstring& title, const Installed* previous = nullptr) {
+inline Installed install_extracted(const fs::path& staging_folder, const fs::path& mods_dir,
+                                   const fs::path& patches_dir, const std::wstring& patch_prefix,
+                                   const std::wstring& title, const Installed* previous = nullptr) {
     const fs::path staging = long_path(staging_folder);
-    std::vector<fs::path> octr, roots, patches, loose;  // loose: folders holding .pak files outside a game folder
+    std::vector<fs::path> octr, roots, patches, loose; // loose: folders holding .pak files outside a game folder
     for (auto it = fs::recursive_directory_iterator(staging); it != fs::recursive_directory_iterator(); ++it) {
         const auto& path = it->path();
-        if (mods::is_reparse(path)) throw std::runtime_error("the download contains a link: " + mods::utf8(path.lexically_relative(staging).generic_wstring()));
+        if (mods::is_reparse(path))
+            throw std::runtime_error("the download contains a link: " +
+                                     mods::utf8(path.lexically_relative(staging).generic_wstring()));
         const auto name = mods::fold(path.filename().wstring());
         if (name == L"eboot.bin" || name == L"sce_module" || name == L"sce_sys")
-            throw std::runtime_error("the download contains game code (" + mods::utf8(path.filename().wstring()) + "), which mods cannot replace");
+            throw std::runtime_error("the download contains game code (" + mods::utf8(path.filename().wstring()) +
+                                     "), which mods cannot replace");
         if (it->is_regular_file() && (name == L"mod.json" || name == L"nitro-mod.json")) {
-            if (const auto summary = read_manifest(path); !summary.problem.empty()) throw std::runtime_error(summary.problem);
+            if (const auto summary = read_manifest(path); !summary.problem.empty())
+                throw std::runtime_error(summary.problem);
             if (name == L"mod.json") octr.push_back(path.parent_path());
         }
     }
@@ -360,25 +405,30 @@ inline Installed install_extracted(const fs::path& staging_folder, const fs::pat
     };
     for (auto it = fs::recursive_directory_iterator(staging); it != fs::recursive_directory_iterator(); ++it) {
         const auto& path = it->path();
-        if (inside_octr(path)) { it.disable_recursion_pending(); continue; }
+        if (inside_octr(path)) {
+            it.disable_recursion_pending();
+            continue;
+        }
         if (it->is_directory() && mods::game_folder(path.filename().wstring())) {
             const auto root = path.parent_path();
             if (std::find(roots.begin(), roots.end(), root) == roots.end()) roots.push_back(root);
-            it.disable_recursion_pending();  // game folders inside game folders are game content
+            it.disable_recursion_pending(); // game folders inside game folders are game content
         } else if (it->is_regular_file() && is_patch_xml(path)) {
             patches.push_back(path);
         } else if (it->is_regular_file() && mods::fold(path.extension().wstring()) == L".pak") {
-            if (std::find(loose.begin(), loose.end(), path.parent_path()) == loose.end()) loose.push_back(path.parent_path());
+            if (std::find(loose.begin(), loose.end(), path.parent_path()) == loose.end())
+                loose.push_back(path.parent_path());
         }
     }
     // Loose .pak files count only when the download has no game folder.
     const bool loose_paks = roots.empty() && !loose.empty();
     if (loose_paks) roots = loose;
-    std::vector<std::pair<fs::path, bool>> units;  // folder, octr-mod
+    std::vector<std::pair<fs::path, bool>> units; // folder, octr-mod
     for (const auto& root : octr) units.push_back({root, true});
     for (const auto& root : roots) units.push_back({root, false});
     if (units.empty() && patches.empty())
-        throw std::runtime_error("the download has no mod.json, game folders (archives/, icons/, ...), .pak files or patch files");
+        throw std::runtime_error(
+            "the download has no mod.json, game folders (archives/, icons/, ...), .pak files or patch files");
     if (previous) remove_installed(*previous, mods_dir, patches_dir);
     Installed done;
     std::error_code ec;
@@ -388,8 +438,9 @@ inline Installed install_extracted(const fs::path& staging_folder, const fs::pat
         if (units.size() > 1) {
             // Variants of one download: named after the nearest folder that is not a layout folder.
             fs::path label = root;
-            while (label != staging && (mods::layout_folder(label.filename().wstring()) || mods::fold(label.filename().wstring()) == L"romfs" ||
-                                        switch_title(label.filename().wstring())))
+            while (label != staging &&
+                   (mods::layout_folder(label.filename().wstring()) ||
+                    mods::fold(label.filename().wstring()) == L"romfs" || switch_title(label.filename().wstring())))
                 label = label.parent_path();
             name += L" - " + (label == staging ? std::to_wstring(i + 1) : safe_name(label.filename().wstring()));
         }
@@ -420,4 +471,4 @@ inline Installed install_extracted(const fs::path& staging_folder, const fs::pat
     }
     return done;
 }
-}  // namespace ctrport::gamebanana
+} // namespace ctrport::gamebanana

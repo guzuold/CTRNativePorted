@@ -30,7 +30,7 @@ std::mutex pad_lock;
 std::vector<SDL_Gamepad*> pads;
 CtrGpuGamepad pad_snapshot{};
 int pad_count = 0;
-std::vector<CtrGpuGamepadEntry> pad_entries;  // one per connected controller, for split screen
+std::vector<CtrGpuGamepadEntry> pad_entries; // one per connected controller, for split screen
 
 // Every SDL gamepad except Xbox ones, which the runtime reads through XInput: compatible
 // DualShock 4 pads often report another vendor ID and an SDL type other than PS4.
@@ -40,15 +40,22 @@ bool playstation(SDL_Gamepad* pad) {
 }
 CtrGpuGamepad read_pad(SDL_Gamepad* pad) {
     static const std::pair<SDL_GamepadButton, WORD> map[] = {
-        {SDL_GAMEPAD_BUTTON_SOUTH, XINPUT_GAMEPAD_A}, {SDL_GAMEPAD_BUTTON_EAST, XINPUT_GAMEPAD_B},
-        {SDL_GAMEPAD_BUTTON_WEST, XINPUT_GAMEPAD_X}, {SDL_GAMEPAD_BUTTON_NORTH, XINPUT_GAMEPAD_Y},
-        {SDL_GAMEPAD_BUTTON_START, XINPUT_GAMEPAD_START}, {SDL_GAMEPAD_BUTTON_BACK, XINPUT_GAMEPAD_BACK},
+        {SDL_GAMEPAD_BUTTON_SOUTH, XINPUT_GAMEPAD_A},
+        {SDL_GAMEPAD_BUTTON_EAST, XINPUT_GAMEPAD_B},
+        {SDL_GAMEPAD_BUTTON_WEST, XINPUT_GAMEPAD_X},
+        {SDL_GAMEPAD_BUTTON_NORTH, XINPUT_GAMEPAD_Y},
+        {SDL_GAMEPAD_BUTTON_START, XINPUT_GAMEPAD_START},
+        {SDL_GAMEPAD_BUTTON_BACK, XINPUT_GAMEPAD_BACK},
         // the runtime maps XINPUT_GAMEPAD_BACK to the PS4 touch pad button
         {SDL_GAMEPAD_BUTTON_TOUCHPAD, XINPUT_GAMEPAD_BACK},
-        {SDL_GAMEPAD_BUTTON_LEFT_STICK, XINPUT_GAMEPAD_LEFT_THUMB}, {SDL_GAMEPAD_BUTTON_RIGHT_STICK, XINPUT_GAMEPAD_RIGHT_THUMB},
-        {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, XINPUT_GAMEPAD_LEFT_SHOULDER}, {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, XINPUT_GAMEPAD_RIGHT_SHOULDER},
-        {SDL_GAMEPAD_BUTTON_DPAD_UP, XINPUT_GAMEPAD_DPAD_UP}, {SDL_GAMEPAD_BUTTON_DPAD_DOWN, XINPUT_GAMEPAD_DPAD_DOWN},
-        {SDL_GAMEPAD_BUTTON_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_LEFT}, {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, XINPUT_GAMEPAD_DPAD_RIGHT}};
+        {SDL_GAMEPAD_BUTTON_LEFT_STICK, XINPUT_GAMEPAD_LEFT_THUMB},
+        {SDL_GAMEPAD_BUTTON_RIGHT_STICK, XINPUT_GAMEPAD_RIGHT_THUMB},
+        {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, XINPUT_GAMEPAD_LEFT_SHOULDER},
+        {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, XINPUT_GAMEPAD_RIGHT_SHOULDER},
+        {SDL_GAMEPAD_BUTTON_DPAD_UP, XINPUT_GAMEPAD_DPAD_UP},
+        {SDL_GAMEPAD_BUTTON_DPAD_DOWN, XINPUT_GAMEPAD_DPAD_DOWN},
+        {SDL_GAMEPAD_BUTTON_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_LEFT},
+        {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, XINPUT_GAMEPAD_DPAD_RIGHT}};
     CtrGpuGamepad out{};
     for (const auto& [button, bit] : map)
         if (SDL_GetGamepadButton(pad, button)) out.buttons |= bit;
@@ -66,7 +73,8 @@ CtrGpuGamepad read_pad(SDL_Gamepad* pad) {
 // same merge as the runtime's XInput slots: buttons OR-ed, larger trigger, larger stick deflection
 void merge(CtrGpuGamepad& into, const CtrGpuGamepad& pad) {
     const auto stick = [](int16_t& x, int16_t& y, int16_t nx, int16_t ny) {
-        if (static_cast<long long>(nx) * nx + static_cast<long long>(ny) * ny > static_cast<long long>(x) * x + static_cast<long long>(y) * y) {
+        if (static_cast<long long>(nx) * nx + static_cast<long long>(ny) * ny >
+            static_cast<long long>(x) * x + static_cast<long long>(y) * y) {
             x = nx;
             y = ny;
         }
@@ -170,9 +178,10 @@ void show(HWND owner) {
     }
     RECT r{};
     GetWindowRect(owner, &r);
-    dialog = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"CTRPortExitConfirmation", ctr_ui::ui_text(ctr_ui::Text::ExitTitle), WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-                             r.left + (r.right - r.left - 520) / 2, r.top + (r.bottom - r.top - 220) / 2, 520, 220, owner, nullptr,
-                             GetModuleHandleW(nullptr), nullptr);
+    dialog = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"CTRPortExitConfirmation",
+                             ctr_ui::ui_text(ctr_ui::Text::ExitTitle), WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+                             r.left + (r.right - r.left - 520) / 2, r.top + (r.bottom - r.top - 220) / 2, 520, 220,
+                             owner, nullptr, GetModuleHandleW(nullptr), nullptr);
     if (!dialog) {
         gesture.cancel();
         return;
@@ -238,7 +247,7 @@ bool poll_exit() {
     }
     return false;
 }
-}  // namespace
+} // namespace
 
 // ctr_gpu_init: the SDL gamepad subsystem and its polling thread (every 4 ms), which also owns the
 // exit confirmation window.
@@ -262,7 +271,7 @@ void StartPads() {
                 }
                 if (!closing && poll_exit()) {
                     closing = true;
-                    PostMessageW(VideoOutHwnd(), WM_CLOSE, 0, 0);  // the window's own close path
+                    PostMessageW(VideoOutHwnd(), WM_CLOSE, 0, 0); // the window's own close path
                 }
                 Sleep(4);
             }
@@ -271,7 +280,9 @@ void StartPads() {
 }
 
 // The exit confirmation takes the controllers' input while it is shown.
-extern "C" CTR_GPU_API int ctr_gpu_input_captured() { return captured.load(std::memory_order_relaxed) ? 1 : 0; }
+extern "C" CTR_GPU_API int ctr_gpu_input_captured() {
+    return captured.load(std::memory_order_relaxed) ? 1 : 0;
+}
 extern "C" CTR_GPU_API int ctr_gpu_gamepad_state(CtrGpuGamepad* out) {
     std::lock_guard<std::mutex> guard(pad_lock);
     if (out) *out = pad_count ? pad_snapshot : CtrGpuGamepad{};
@@ -280,7 +291,8 @@ extern "C" CTR_GPU_API int ctr_gpu_gamepad_state(CtrGpuGamepad* out) {
 extern "C" CTR_GPU_API void ctr_gpu_gamepad_rumble(uint16_t low_frequency, uint16_t high_frequency) {
     std::lock_guard<std::mutex> guard(pad_lock);
     // the game sets a level and keeps it until it sets another; SDL needs a duration
-    for (auto* pad : pads) SDL_RumbleGamepad(pad, low_frequency, high_frequency, (low_frequency || high_frequency) ? 10000 : 0);
+    for (auto* pad : pads)
+        SDL_RumbleGamepad(pad, low_frequency, high_frequency, (low_frequency || high_frequency) ? 10000 : 0);
 }
 extern "C" CTR_GPU_API int ctr_gpu_gamepad_list(CtrGpuGamepadEntry* out, int capacity) {
     std::lock_guard<std::mutex> guard(pad_lock);
@@ -294,7 +306,8 @@ extern "C" CTR_GPU_API int ctr_gpu_gamepad_list(CtrGpuGamepadEntry* out, int cap
 extern "C" CTR_GPU_API void ctr_gpu_gamepad_rumble_one(uint32_t id, uint16_t low_frequency, uint16_t high_frequency) {
     std::lock_guard<std::mutex> guard(pad_lock);
     for (auto* pad : pads)
-        if (SDL_GetGamepadID(pad) == id) SDL_RumbleGamepad(pad, low_frequency, high_frequency, (low_frequency || high_frequency) ? 10000 : 0);
+        if (SDL_GetGamepadID(pad) == id)
+            SDL_RumbleGamepad(pad, low_frequency, high_frequency, (low_frequency || high_frequency) ? 10000 : 0);
 }
 extern "C" CTR_GPU_API int ctr_gpu_gamepad_path(uint32_t id, char* out, int capacity) {
     std::lock_guard<std::mutex> guard(pad_lock);
@@ -304,7 +317,8 @@ extern "C" CTR_GPU_API int ctr_gpu_gamepad_path(uint32_t id, char* out, int capa
         if (SDL_GetGamepadID(pad) == id) {
             const char* path = SDL_GetGamepadPath(pad);
             if (!path) return 0;
-            const int length = static_cast<int>(std::min<std::size_t>(std::strlen(path), static_cast<std::size_t>(capacity - 1)));
+            const int length =
+                static_cast<int>(std::min<std::size_t>(std::strlen(path), static_cast<std::size_t>(capacity - 1)));
             std::memcpy(out, path, static_cast<std::size_t>(length));
             out[length] = 0;
             return length;

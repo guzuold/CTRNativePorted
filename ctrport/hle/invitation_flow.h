@@ -15,7 +15,7 @@ struct Outcome {
 Outcome send(std::string session, std::vector<std::uint64_t> recipients, unsigned pick_maximum,
              std::atomic<unsigned long>& ui_thread);
 Outcome receive(std::atomic<unsigned long>& ui_thread);
-void set_owner(int(*operation)(int));
+void set_owner(int (*operation)(int));
 void post_accepted(const Outcome& outcome);
 void tick();
 }

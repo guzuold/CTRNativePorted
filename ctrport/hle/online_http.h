@@ -11,15 +11,15 @@
 namespace ctr_hle::online {
 struct HttpResponse {
     int status = 0;
-    std::string header_block;                    // header lines after the status line
-    std::map<std::string, std::string> headers;  // lower-case names
+    std::string header_block;                   // header lines after the status line
+    std::map<std::string, std::string> headers; // lower-case names
     std::string body;
 };
 // Sends "<method> <target>" with the given headers and body; Connection: close. Adds
 // X-Ctr-Online-Id. Returns false when the server cannot be reached or does not answer HTTP.
 bool http_exchange(const std::string& method, const std::string& target,
-                   const std::vector<std::pair<std::string, std::string>>& headers,
-                   const std::string& body, HttpResponse* response);
+                   const std::vector<std::pair<std::string, std::string>>& headers, const std::string& body,
+                   HttpResponse* response);
 std::string lower(std::string text);
 std::string json_escape(const std::string& text);
 } // namespace ctr_hle::online

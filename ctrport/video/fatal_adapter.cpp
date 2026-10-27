@@ -12,5 +12,9 @@ namespace {
 }
 }
 
-void assert_fail_impl() { shader_fatal("assert_fail_impl"); }
-[[noreturn]] void unreachable_impl() { shader_fatal("unreachable_impl"); }
+void assert_fail_impl() {
+    shader_fatal("assert_fail_impl");
+}
+[[noreturn]] void unreachable_impl() {
+    shader_fatal("unreachable_impl");
+}

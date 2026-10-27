@@ -41,14 +41,14 @@ bool ends_with(const std::string& value, const char* suffix) {
 
 bool private_or_local(std::uint32_t network_order) {
     const std::uint32_t a = ntohl(network_order);
-    return (a >> 24) == 127 ||            // loopback
-           (a >> 24) == 10 ||             // 10.0.0.0/8
-           (a >> 20) == 0xAC1 ||          // 172.16.0.0/12
-           (a >> 16) == 0xC0A8 ||         // 192.168.0.0/16
-           (a >> 16) == 0xA9FE ||         // 169.254.0.0/16 link-local
+    return (a >> 24) == 127 ||             // loopback
+           (a >> 24) == 10 ||              // 10.0.0.0/8
+           (a >> 20) == 0xAC1 ||           // 172.16.0.0/12
+           (a >> 16) == 0xC0A8 ||          // 192.168.0.0/16
+           (a >> 16) == 0xA9FE ||          // 169.254.0.0/16 link-local
            (a >> 22) == (100u << 2 | 1) || // 100.64.0.0/10 (CGNAT, VPN overlays)
-           (a >> 28) == 0xE ||            // 224.0.0.0/4 multicast (LAN discovery: SSDP/UPnP)
-           a == 0 || a == 0xFFFFFFFFu;    // any / limited broadcast
+           (a >> 28) == 0xE ||             // 224.0.0.0/4 multicast (LAN discovery: SSDP/UPnP)
+           a == 0 || a == 0xFFFFFFFFu;     // any / limited broadcast
 }
 } // namespace
 
@@ -80,8 +80,8 @@ const std::string& room_token() {
         const char* configured = std::getenv("CTR_ONLINE_ROOM_TOKEN");
         if (!configured || std::strlen(configured) != 64) return std::string{};
         for (unsigned i = 0; i < 64; ++i)
-            if (!((configured[i] >= '0' && configured[i] <= '9') ||
-                  (configured[i] >= 'a' && configured[i] <= 'f'))) return std::string{};
+            if (!((configured[i] >= '0' && configured[i] <= '9') || (configured[i] >= 'a' && configured[i] <= 'f')))
+                return std::string{};
         return std::string(configured);
     }();
     return value;
@@ -107,8 +107,7 @@ std::uint32_t local_address() {
         // Route lookup only: a UDP connect sends nothing.
         const SOCKET probe = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (probe != INVALID_SOCKET) {
-            for (const std::uint32_t destination :
-                 {server_address(), static_cast<std::uint32_t>(htonl(0xC6336401u))}) {
+            for (const std::uint32_t destination : {server_address(), static_cast<std::uint32_t>(htonl(0xC6336401u))}) {
                 // 198.51.100.1 (TEST-NET-2) only selects the default route; nothing is sent.
                 sockaddr_in target{};
                 target.sin_family = AF_INET;
@@ -184,8 +183,7 @@ bool peer_allowed(std::uint32_t address) {
         }
     }
     HttpResponse response;
-    const bool reached = http_exchange("GET", "/ctr/v1/peer-allowed?ip=" + format_address(address),
-                                       {}, "", &response);
+    const bool reached = http_exchange("GET", "/ctr/v1/peer-allowed?ip=" + format_address(address), {}, "", &response);
     const bool allowed = reached && response.status == 200;
     {
         std::scoped_lock lock{mutex};
@@ -193,8 +191,8 @@ bool peer_allowed(std::uint32_t address) {
         cache[address] = {allowed, clock::now() + std::chrono::milliseconds(allowed ? 1000 : 250)};
     }
     ctr_hle::log_call("ctr_online", "peer_allowed", allowed ? 1 : 0,
-                      (",\"address\":\"" + format_address(address) + "\",\"server_status\":" +
-                       std::to_string(reached ? response.status : 0))
+                      (",\"address\":\"" + format_address(address) +
+                       "\",\"server_status\":" + std::to_string(reached ? response.status : 0))
                           .c_str());
     return allowed;
 }
@@ -227,7 +225,6 @@ bool destination_allowed(std::uint32_t address) {
     return true;
 }
 
-
 namespace {
 // One worker, bounded cache/queues. No HTTP or thread creation per datagram.
 // Unknown sources fail closed and are asked at most four times per second.
@@ -243,102 +240,144 @@ struct IncomingPolicy {
     static constexpr auto kActiveWithin = std::chrono::milliseconds(1000);
     static constexpr auto kDeniedFor = std::chrono::milliseconds(250);
     static constexpr auto kUnknownInterval = std::chrono::milliseconds(250);
-    struct Entry { bool allowed=false, pending=false; Clock::time_point until{}, renew{}, seen{}; };
+    struct Entry {
+        bool allowed = false, pending = false;
+        Clock::time_point until{}, renew{}, seen{};
+    };
     std::mutex mutex;
     std::condition_variable wake;
-    std::map<std::uint32_t,Entry> entries;
+    std::map<std::uint32_t, Entry> entries;
     std::deque<std::uint32_t> renewals; // authorized peers
     std::deque<std::uint32_t> queue;    // unknown sources
     std::set<std::uint32_t> logged;
-    std::uint64_t dropped=0;
+    std::uint64_t dropped = 0;
     Clock::time_point next_unknown{};
-    bool stop=false;
+    bool stop = false;
     std::thread worker;
-    IncomingPolicy():worker([this]{run();}) {}
-    ~IncomingPolicy() { {std::lock_guard lock(mutex); stop=true;} wake.notify_all(); worker.join(); }
+    IncomingPolicy() : worker([this] { run(); }) {}
+    ~IncomingPolicy() {
+        {
+            std::lock_guard lock(mutex);
+            stop = true;
+        }
+        wake.notify_all();
+        worker.join();
+    }
     void run() {
         std::unique_lock lock(mutex);
         while (!stop) {
-            if(renewals.empty() && (queue.empty() || Clock::now()<next_unknown)) {
-                if(queue.empty()) wake.wait(lock);
-                else wake.wait_until(lock,next_unknown);
+            if (renewals.empty() && (queue.empty() || Clock::now() < next_unknown)) {
+                if (queue.empty())
+                    wake.wait(lock);
+                else
+                    wake.wait_until(lock, next_unknown);
                 continue;
             }
             std::uint32_t address;
-            if(!renewals.empty()) { address=renewals.front(); renewals.pop_front(); }
-            else { address=queue.front(); queue.pop_front(); next_unknown=Clock::now()+kUnknownInterval; }
+            if (!renewals.empty()) {
+                address = renewals.front();
+                renewals.pop_front();
+            } else {
+                address = queue.front();
+                queue.pop_front();
+                next_unknown = Clock::now() + kUnknownInterval;
+            }
             lock.unlock();
-            int status=0; // 0: no answer
-            try { HttpResponse response; if(http_exchange("GET","/ctr/v1/peer-allowed?ip="+format_address(address),{},"",&response)) status=response.status; }
-            catch(...) {}
+            int status = 0; // 0: no answer
+            try {
+                HttpResponse response;
+                if (http_exchange("GET", "/ctr/v1/peer-allowed?ip=" + format_address(address), {}, "", &response))
+                    status = response.status;
+            } catch (...) {}
             lock.lock();
-            auto& entry=entries[address];
-            const auto now=Clock::now();
-            entry.pending=false;
-            if(status==200) { entry.allowed=true; entry.renew=now+kRenewAfter; entry.until=now+kValidFor; }
-            else if(status || !entry.allowed || entry.until<=now) { entry.allowed=false; entry.until=entry.renew=now+kDeniedFor; }
-            else entry.renew=now+kDeniedFor; // no answer: keep the authorization until `until`, ask again soon
+            auto& entry = entries[address];
+            const auto now = Clock::now();
+            entry.pending = false;
+            if (status == 200) {
+                entry.allowed = true;
+                entry.renew = now + kRenewAfter;
+                entry.until = now + kValidFor;
+            } else if (status || !entry.allowed || entry.until <= now) {
+                entry.allowed = false;
+                entry.until = entry.renew = now + kDeniedFor;
+            } else
+                entry.renew = now + kDeniedFor; // no answer: keep the authorization until `until`, ask again soon
         }
     }
     bool check(std::uint32_t address) {
         std::unique_lock lock(mutex);
-        const auto now=Clock::now();
-        auto it=entries.find(address);
-        if(it==entries.end() && entries.size()==256) {
+        const auto now = Clock::now();
+        auto it = entries.find(address);
+        if (it == entries.end() && entries.size() == 256) {
             // Do not evict in-flight entries or valid positive authorizations under a flood.
-            auto victim=entries.end();
-            for(auto p=entries.begin();p!=entries.end();++p)
-                if(!p->second.pending && p->second.until<=now &&
-                   (victim==entries.end() || p->second.until<victim->second.until)) victim=p;
-            if(victim!=entries.end()) entries.erase(victim);
+            auto victim = entries.end();
+            for (auto p = entries.begin(); p != entries.end(); ++p)
+                if (!p->second.pending && p->second.until <= now &&
+                    (victim == entries.end() || p->second.until < victim->second.until))
+                    victim = p;
+            if (victim != entries.end()) entries.erase(victim);
         }
-        if(it==entries.end() && entries.size()<256) it=entries.emplace(address,Entry{}).first;
-        if(it!=entries.end()) {
-            auto& entry=it->second;
-            const auto seen=entry.seen;
-            entry.seen=now;
-            if(entry.allowed && entry.until>now) {
-                if(entry.renew>now) return true;
-                if(!entry.pending) { entry.pending=true; renewals.push_back(address); wake.notify_one(); }
-                if(now-seen<=kActiveWithin) return true;
+        if (it == entries.end() && entries.size() < 256) it = entries.emplace(address, Entry{}).first;
+        if (it != entries.end()) {
+            auto& entry = it->second;
+            const auto seen = entry.seen;
+            entry.seen = now;
+            if (entry.allowed && entry.until > now) {
+                if (entry.renew > now) return true;
+                if (!entry.pending) {
+                    entry.pending = true;
+                    renewals.push_back(address);
+                    wake.notify_one();
+                }
+                if (now - seen <= kActiveWithin) return true;
             }
-            if(!entry.pending && entry.until<=now) {
-                entry.pending=true; entry.allowed=false; queue.push_back(address); wake.notify_one();
+            if (!entry.pending && entry.until <= now) {
+                entry.pending = true;
+                entry.allowed = false;
+                queue.push_back(address);
+                wake.notify_one();
             }
         }
         ++dropped;
         // Bounded exact log-once set; after saturation suppress new address logs, keep counting.
-        if(logged.size()<4096 && logged.insert(address).second) {
-            auto count=dropped;
+        if (logged.size() < 4096 && logged.insert(address).second) {
+            auto count = dropped;
             lock.unlock();
-            ctr_hle::log_call("ctr_online","incoming_blocked",static_cast<long long>(count),
-                (",\"address\":\""+format_address(address)+"\",\"log_address_limit\":4096").c_str());
+            ctr_hle::log_call("ctr_online", "incoming_blocked", static_cast<long long>(count),
+                              (",\"address\":\"" + format_address(address) + "\",\"log_address_limit\":4096").c_str());
         }
         return false;
     }
     // An address the game was just allowed to send to: accepted at once, as a peer that sent.
     void grant(std::uint32_t address) {
         std::lock_guard lock(mutex);
-        auto it=entries.find(address);
-        if(it==entries.end()) {
-            if(entries.size()>=256) return; // the check path evicts; a full cache falls back to it
-            it=entries.emplace(address,Entry{}).first;
+        auto it = entries.find(address);
+        if (it == entries.end()) {
+            if (entries.size() >= 256) return; // the check path evicts; a full cache falls back to it
+            it = entries.emplace(address, Entry{}).first;
         }
-        const auto now=Clock::now();
-        auto& entry=it->second;
-        entry.allowed=true; entry.seen=now; entry.until=now+kValidFor;
-        if(!entry.pending) entry.renew=now+kRenewAfter;
+        const auto now = Clock::now();
+        auto& entry = it->second;
+        entry.allowed = true;
+        entry.seen = now;
+        entry.until = now + kValidFor;
+        if (!entry.pending) entry.renew = now + kRenewAfter;
     }
 };
-IncomingPolicy& incoming_policy() { static IncomingPolicy policy; return policy; }
-void grant_incoming(std::uint32_t address) { incoming_policy().grant(address); }
+IncomingPolicy& incoming_policy() {
+    static IncomingPolicy policy;
+    return policy;
+}
+void grant_incoming(std::uint32_t address) {
+    incoming_policy().grant(address);
+}
 }
 bool source_allowed(std::uint32_t address) {
-    const auto a=ntohl(address);
-    if(address==server_address() || (a>>24)==127) return true;
+    const auto a = ntohl(address);
+    if (address == server_address() || (a >> 24) == 127) return true;
     // Source addresses cannot be wildcard, multicast or broadcast.
-    if(a==0 || a==0xffffffffu || (a>>28)==0xe) return false;
-    if(!strict_peers() && private_or_local(address)) return true;
+    if (a == 0 || a == 0xffffffffu || (a >> 28) == 0xe) return false;
+    if (!strict_peers() && private_or_local(address)) return true;
     return incoming_policy().check(address);
 }
 
@@ -363,8 +402,9 @@ std::uint16_t discovery_port() {
                 port = value;
             }
             const auto public_key = response.body.find("\"public_host\"");
-            const auto quote = public_key == std::string::npos ? public_key
-                                                                : response.body.find('"', response.body.find(':', public_key));
+            const auto quote = public_key == std::string::npos
+                                   ? public_key
+                                   : response.body.find('"', response.body.find(':', public_key));
             const auto end = quote == std::string::npos ? quote : response.body.find('"', quote + 1);
             in_addr parsed{};
             if (end != std::string::npos &&

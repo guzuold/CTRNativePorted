@@ -7,6 +7,7 @@ public:
         : dump_(dump_shaders), direct_(direct_memory_access) {}
     bool IsDumpShaders() const noexcept { return dump_; }
     bool IsDirectMemoryAccessEnabled() const noexcept { return direct_; }
+
 private:
     const bool dump_;
     const bool direct_;

@@ -9,15 +9,15 @@ typedef struct CtrHostApi {
     uint32_t size;
     uint32_t version;
     void* context;
-    void (*log)(void* context,const char* bytes,uint32_t size);
+    void (*log)(void* context, const char* bytes, uint32_t size);
 } CtrHostApi;
 /* Signature2: integer3 -> integer result with explicit host transport status.
    status0 produces *result (including guest errno bits). Any other status is
    unsupported/failure, handled by the resident bridge with caller diagnostics. */
-typedef uint32_t (*CtrInteger3Transport)(uint64_t a,uint64_t b,uint64_t c,uint64_t* result);
+typedef uint32_t (*CtrInteger3Transport)(uint64_t a, uint64_t b, uint64_t c, uint64_t* result);
 /* Signature9: nine captured SysV integer arguments, copied into resident host
    storage. Transport status0 alone publishes *result; no borrowed guest stack. */
-typedef uint32_t (*CtrInteger9Transport)(const uint64_t arguments[9],uint64_t caller,uint64_t* result);
+typedef uint32_t (*CtrInteger9Transport)(const uint64_t arguments[9], uint64_t caller, uint64_t* result);
 
 typedef struct CtrServiceEntry {
     uint32_t size;

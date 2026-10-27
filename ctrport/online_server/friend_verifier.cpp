@@ -19,8 +19,7 @@ const char* verify_status_string(VerifyStatus status) {
     }
 }
 
-VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint,
-                                       const FriendCodeInfo& friend_info,
+VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint, const FriendCodeInfo& friend_info,
                                        int timeout_ms) {
     VerifyResult res;
     std::string ip = candidate_endpoint;
@@ -77,80 +76,82 @@ VerifyResult verify_friend_document(const std::string& body, const FriendCodeInf
     }
 
     try {
-    const std::string protocol = doc.at("protocol").text;
-    if (protocol != "ctr-friend-auth-v1") {
-        res.status = VerifyStatus::MalformedResponse;
-        res.detail = "Unexpected protocol: " + protocol;
-        return res;
-    }
+        const std::string protocol = doc.at("protocol").text;
+        if (protocol != "ctr-friend-auth-v1") {
+            res.status = VerifyStatus::MalformedResponse;
+            res.detail = "Unexpected protocol: " + protocol;
+            return res;
+        }
 
-    const auto ver_val = doc.at("version").as_u64();
-    if (ver_val != 1) {
-        res.status = VerifyStatus::MalformedResponse;
-        res.detail = "Unexpected protocol version";
-        return res;
-    }
+        const auto ver_val = doc.at("version").as_u64();
+        if (ver_val != 1) {
+            res.status = VerifyStatus::MalformedResponse;
+            res.detail = "Unexpected protocol version";
+            return res;
+        }
 
-    const auto server_ts = doc.at("timestamp").as_u64();
-    const auto now_sec = static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
-    // Allow up to 15 minutes of clock drift
-    const std::uint64_t diff = server_ts > now_sec ? server_ts - now_sec : now_sec - server_ts;
-    if (diff > 900) {
-        res.status = VerifyStatus::MalformedResponse;
-        res.detail = "Timestamp drift exceeds 15 minutes";
-        return res;
-    }
+        const auto server_ts = doc.at("timestamp").as_u64();
+        const auto now_sec = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count());
+        // Allow up to 15 minutes of clock drift
+        const std::uint64_t diff = server_ts > now_sec ? server_ts - now_sec : now_sec - server_ts;
+        if (diff > 900) {
+            res.status = VerifyStatus::MalformedResponse;
+            res.detail = "Timestamp drift exceeds 15 minutes";
+            return res;
+        }
 
-    const std::string traffic_key_b64 = doc.at("traffic_key").text;
-    const std::string traffic_key_sha256 = doc.at("traffic_key_sha256").text;
-    const std::string sig_hex = doc.at("signature").text;
+        const std::string traffic_key_b64 = doc.at("traffic_key").text;
+        const std::string traffic_key_sha256 = doc.at("traffic_key_sha256").text;
+        const std::string sig_hex = doc.at("signature").text;
 
-    Bytes traffic_key;
-    try {
-        traffic_key = base64_decode(traffic_key_b64);
-    } catch (...) {
-        res.status = VerifyStatus::InvalidTrafficKey;
-        res.detail = "Invalid base64 traffic key";
-        return res;
-    }
+        Bytes traffic_key;
+        try {
+            traffic_key = base64_decode(traffic_key_b64);
+        } catch (...) {
+            res.status = VerifyStatus::InvalidTrafficKey;
+            res.detail = "Invalid base64 traffic key";
+            return res;
+        }
 
-    if (traffic_key.size() != 0x126) {
-        res.status = VerifyStatus::InvalidTrafficKey;
-        res.detail = "Traffic key size is not 0x126 bytes";
-        return res;
-    }
+        if (traffic_key.size() != 0x126) {
+            res.status = VerifyStatus::InvalidTrafficKey;
+            res.detail = "Traffic key size is not 0x126 bytes";
+            return res;
+        }
 
-    if (hex(sha256(traffic_key)) != traffic_key_sha256) {
-        res.status = VerifyStatus::InvalidTrafficKey;
-        res.detail = "Traffic key does not match traffic_key_sha256";
-        return res;
-    }
+        if (hex(sha256(traffic_key)) != traffic_key_sha256) {
+            res.status = VerifyStatus::InvalidTrafficKey;
+            res.detail = "Traffic key does not match traffic_key_sha256";
+            return res;
+        }
 
-    Bytes signature;
-    try {
-        signature = from_hex(sig_hex);
-    } catch (...) {
-        res.status = VerifyStatus::InvalidIdentity;
-        res.detail = "Invalid signature hex";
-        return res;
-    }
+        Bytes signature;
+        try {
+            signature = from_hex(sig_hex);
+        } catch (...) {
+            res.status = VerifyStatus::InvalidIdentity;
+            res.detail = "Invalid signature hex";
+            return res;
+        }
 
-    if (signature.size() != 64) {
-        res.status = VerifyStatus::InvalidIdentity;
-        res.detail = "Signature size must be 64 bytes";
-        return res;
-    }
+        if (signature.size() != 64) {
+            res.status = VerifyStatus::InvalidIdentity;
+            res.detail = "Signature size must be 64 bytes";
+            return res;
+        }
 
-    // Authenticate signature against the EXPECTED friend public key
-    const bool valid_sig = verify_friend_response(friend_info.public_key, nonce_hex, traffic_key, server_ts, signature);
-    if (!valid_sig) {
-        res.status = VerifyStatus::InvalidIdentity;
-        res.detail = "Cryptographic signature verification failed against friend's identity";
-        return res;
-    }
+        // Authenticate signature against the EXPECTED friend public key
+        const bool valid_sig =
+            verify_friend_response(friend_info.public_key, nonce_hex, traffic_key, server_ts, signature);
+        if (!valid_sig) {
+            res.status = VerifyStatus::InvalidIdentity;
+            res.detail = "Cryptographic signature verification failed against friend's identity";
+            return res;
+        }
 
-    res.traffic_key = std::move(traffic_key);
+        res.traffic_key = std::move(traffic_key);
     } catch (const std::exception& error) {
         res.status = VerifyStatus::MalformedResponse;
         res.detail = error.what();
@@ -162,8 +163,7 @@ VerifyResult verify_friend_document(const std::string& body, const FriendCodeInf
     return res;
 }
 
-VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint,
-                                       const std::string& friend_code,
+VerifyResult verify_candidate_endpoint(const std::string& candidate_endpoint, const std::string& friend_code,
                                        int timeout_ms) {
     FriendCodeInfo info;
     const CodeParseError err = parse_friend_code(friend_code, info);
@@ -194,7 +194,8 @@ VerifyResult identify_endpoint(const std::string& candidate_endpoint, std::strin
     }
     FriendCodeInfo info;
     try {
-        if (parse_friend_code(parse_json(body).at("friend_code").text, info) != CodeParseError::Ok) throw std::runtime_error("code");
+        if (parse_friend_code(parse_json(body).at("friend_code").text, info) != CodeParseError::Ok)
+            throw std::runtime_error("code");
     } catch (const std::exception&) {
         res.status = VerifyStatus::MalformedResponse;
         res.detail = "Identity answer without a valid friend code";

@@ -6,10 +6,8 @@
 
 namespace ctr_hle {
 static Registration* registrations = nullptr;
-Registration::Registration(const char* nid_, const char* library_, const void* function_,
-                           bool online_only_)
-    : nid{nid_}, library{library_}, function{function_}, online_only{online_only_},
-      next{registrations} {
+Registration::Registration(const char* nid_, const char* library_, const void* function_, bool online_only_)
+    : nid{nid_}, library{library_}, function{function_}, online_only{online_only_}, next{registrations} {
     registrations = this;
 }
 bool online_enabled() {
