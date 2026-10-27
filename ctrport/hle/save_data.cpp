@@ -7,7 +7,10 @@
 // runtime/user/savedata/<user>/<title>/<dir>/ with sce_sys/param.bin (the guest
 // OrbisSaveDataParam plus block count) and sce_sys/icon0.png.
 #include <algorithm>
+#include <chrono>
+#include <iterator>
 #include <array>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -158,6 +161,48 @@ bool write_stored(const fs::path& dir, const Stored& stored) {
     std::ofstream out(dir / "sce_sys" / "param.bin", std::ios::binary | std::ios::trunc);
     return static_cast<bool>(out.write(reinterpret_cast<const char*>(&stored), sizeof(stored)));
 }
+// A save directory copied from shadPS4 (or a console backup) describes itself in
+// sce_sys/param.sfo instead: MAINTITLE, SUBTITLE, DETAIL, SAVEDATA_LIST_PARAM and
+// SAVEDATA_BLOCKS become param.bin, the file time its mtime. The directory is otherwise kept.
+bool adopt_sfo(const fs::path& dir) {
+    std::ifstream in(dir / "sce_sys" / "param.sfo", std::ios::binary);
+    std::vector<char> b((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    auto u32 = [&](std::size_t at) { std::uint32_t v = 0; if (at + 4 <= b.size()) std::memcpy(&v, b.data() + at, 4); return v; };
+    if (b.size() < 20 || u32(0) != 0x46535000) return false;  // "\0PSF"
+    const std::uint32_t keys = u32(8), values = u32(12), count = u32(16);
+    if (count > 64 || 20 + count * 16ull > b.size()) return false;
+    Stored stored{};
+    stored.blocks = BLOCKS_MIN2;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const std::size_t entry = 20 + i * 16ull;
+        const std::uint16_t key_offset = static_cast<std::uint16_t>(u32(entry) & 0xffff);
+        const std::uint32_t length = u32(entry + 4), value = values + u32(entry + 12);
+        const std::size_t key_at = keys + std::size_t(key_offset);
+        if (key_at >= b.size() || value > b.size() || length > b.size() - value) return false;
+        const std::string key(b.data() + key_at, strnlen(b.data() + key_at, b.size() - key_at));
+        const char* data = b.data() + value;
+        auto text = [&](char* target, std::size_t size) { std::memcpy(target, data, std::min<std::size_t>(length, size - 1)); };
+        if (key == "MAINTITLE") text(stored.param.title, sizeof(stored.param.title));
+        else if (key == "SUBTITLE") text(stored.param.subTitle, sizeof(stored.param.subTitle));
+        else if (key == "DETAIL") text(stored.param.detail, sizeof(stored.param.detail));
+        else if (key == "SAVEDATA_LIST_PARAM" && length >= 4) std::memcpy(&stored.param.userParam, data, 4);
+        else if (key == "SAVEDATA_BLOCKS" && length >= 8) std::memcpy(&stored.blocks, data, 8);
+    }
+    stored.blocks = std::max<std::uint64_t>(stored.blocks, BLOCKS_MIN2);
+    std::error_code ec;
+    const auto time = fs::last_write_time(dir / "sce_sys" / "param.sfo", ec);
+    stored.param.mtime = ec ? static_cast<std::int64_t>(std::time(nullptr))
+                            : std::chrono::duration_cast<std::chrono::seconds>(
+                                  std::chrono::clock_cast<std::chrono::system_clock>(time).time_since_epoch()).count();
+    if (!write_stored(dir, stored)) return false;
+    std::printf("{\"scope\":\"savedata_adopted_param_sfo\",\"dir\":\"%s\"}\n", dir.filename().string().c_str());
+    std::fflush(stdout);
+    return true;
+}
+bool has_stored(const fs::path& dir) {
+    std::error_code ec;
+    return fs::exists(dir / "sce_sys" / "param.bin", ec) || adopt_sfo(dir);
+}
 std::uint64_t directory_bytes(const fs::path& dir) {
     std::uint64_t total = 0;
     std::error_code ec;
@@ -236,8 +281,7 @@ CTR_SYSV int sceSaveDataDirNameSearch(const SearchCond* cond, SearchResult* resu
     if (fs::exists(root, ec)) {
         for (const auto& entry : fs::directory_iterator(root, ec)) {
             const auto name = entry.path().filename().string();
-            if (entry.is_directory(ec) && !name.starts_with("sce_") &&
-                fs::exists(entry.path() / "sce_sys" / "param.bin", ec)) {
+            if (entry.is_directory(ec) && !name.starts_with("sce_") && has_stored(entry.path())) {
                 names.push_back(name);
             }
         }
@@ -325,7 +369,7 @@ CTR_SYSV int sceSaveDataMount2(const Mount2* mount, MountResult* result) {
     }
     const auto path = title_path(mount->userId, title_id()) / dir;
     std::error_code ec;
-    const bool exists = fs::exists(path / "sce_sys" / "param.bin", ec);
+    const bool exists = has_stored(path);
     if (!create && !create2 && !exists) {
         return log("sceSaveDataMount2", NOT_FOUND, quoted("dir", dir));
     }

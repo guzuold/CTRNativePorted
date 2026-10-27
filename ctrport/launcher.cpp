@@ -585,10 +585,12 @@ ctr_online::Json settings_ui_snapshot();
 
 void load_config() {
     std::error_code ec;
-    for (const fs::path candidate : {fs::path(L"dump\\CUSA14876")})
+    // EU CUSA14876 or US CUSA13795, each with its own update folder.
+    for (const fs::path candidate : {fs::path(L"dump\\CUSA14876"), fs::path(L"dump\\CUSA13795")})
         if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.base_dir = candidate.wstring(); break; }
-    for (const fs::path candidate : {fs::path(L"dump\\CUSA14876-patch"),
-                                     resolve(g.cfg.base_dir).parent_path() / L"CUSA14876-patch"})
+    const std::wstring title = fs::path(g.cfg.base_dir).filename().wstring() == L"CUSA13795" ? L"CUSA13795" : L"CUSA14876";
+    for (const fs::path candidate : {fs::path(L"dump") / (title + L"-patch"),
+                                     resolve(g.cfg.base_dir).parent_path() / (title + L"-patch")})
         if (!candidate.empty() && fs::exists(resolve(candidate.wstring()) / "eboot.bin", ec)) { g.cfg.patch_dir = candidate.wstring(); g.cfg.use_patch = true; break; }
     ctr_online::Json document = ctr_online::Json::object();
     try { document = ctrport::settings::Store(config_path()).read(); }
@@ -2735,7 +2737,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
 
         if(id==ID_ONLINE_FRIENDS){animate_friends(true);return 0;}
 
-        if (id == ID_BASE_BROWSE) browse(g.base_edit, tr(L"Base game folder (CUSA14876)"));
+        if (id == ID_BASE_BROWSE) browse(g.base_edit, tr(L"Base game folder (CUSA14876 or CUSA13795)"));
         else if (id == ID_PATCH_BROWSE) browse(g.patch_edit, tr(L"Update folder (v01.21)"));
         else if (id >= ID_PILL && id < ID_PILL + 5) select_resolution(id - ID_PILL);
         else {

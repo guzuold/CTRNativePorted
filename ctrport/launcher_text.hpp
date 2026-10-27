@@ -67,8 +67,8 @@ inline const std::map<std::wstring, Entry>& table() {
         {L"Split screen (2-4)", {L"Écran partagé (2-4)", L"Schermo diviso (2-4)", L"Splitscreen (2-4)", L"Pantalla dividida (2-4)"}},
         {L"Test audio", {L"Tester l'audio", L"Prova audio", L"Audio testen", L"Probar audio"}},
         // Advanced
-        {L"Base game folder (CUSA14876 v01.00):", {L"Dossier du jeu de base (CUSA14876 v01.00) :", L"Cartella del gioco base (CUSA14876 v01.00):", L"Basisspiel-Ordner (CUSA14876 v01.00):", L"Carpeta del juego base (CUSA14876 v01.00):"}},
-        {L"Update folder (v01.21 CUSA14876-patch):", {L"Dossier de mise à jour (v01.21 CUSA14876-patch) :", L"Cartella aggiornamento (v01.21 CUSA14876-patch):", L"Update-Ordner (v01.21 CUSA14876-patch):", L"Carpeta de actualización (v01.21 CUSA14876-patch):"}},
+        {L"Base game folder (v01.00, CUSA14876 or CUSA13795):", {L"Dossier du jeu de base (v01.00, CUSA14876 ou CUSA13795) :", L"Cartella del gioco base (v01.00, CUSA14876 o CUSA13795):", L"Basisspiel-Ordner (v01.00, CUSA14876 oder CUSA13795):", L"Carpeta del juego base (v01.00, CUSA14876 o CUSA13795):"}},
+        {L"Update folder (v01.21, CUSA14876-patch or CUSA13795-patch):", {L"Dossier de mise à jour (v01.21, CUSA14876-patch ou CUSA13795-patch) :", L"Cartella aggiornamento (v01.21, CUSA14876-patch o CUSA13795-patch):", L"Update-Ordner (v01.21, CUSA14876-patch oder CUSA13795-patch):", L"Carpeta de actualización (v01.21, CUSA14876-patch o CUSA13795-patch):"}},
         {L"SESSION LOG", {L"JOURNAL", L"LOG SESSIONE", L"SITZUNGSLOG", L"REGISTRO"}},
         {L"No session yet.", {L"Aucune session.", L"Nessuna sessione.", L"Noch keine Sitzung.", L"Ninguna sesión todavía."}},
         {L"Waiting for the game...", {L"En attente du jeu...", L"In attesa del gioco...", L"Warte auf das Spiel...", L"Esperando al juego..."}},
@@ -76,7 +76,7 @@ inline const std::map<std::wstring, Entry>& table() {
         {L"Back up saves", {L"Sauvegarder", L"Backup salvataggi", L"Spielstände sichern", L"Copiar partidas"}},
         {L"Open saves", {L"Ouvrir les sauvegardes", L"Apri salvataggi", L"Spielstände öffnen", L"Abrir partidas"}},
         {L"Open logs folder", {L"Ouvrir les journaux", L"Apri cartella log", L"Log-Ordner öffnen", L"Abrir registros"}},
-        {L"Base game folder (CUSA14876)", {L"Dossier du jeu de base (CUSA14876)", L"Cartella del gioco base (CUSA14876)", L"Basisspiel-Ordner (CUSA14876)", L"Carpeta del juego base (CUSA14876)"}},
+        {L"Base game folder (CUSA14876 or CUSA13795)", {L"Dossier du jeu de base (CUSA14876 ou CUSA13795)", L"Cartella del gioco base (CUSA14876 o CUSA13795)", L"Basisspiel-Ordner (CUSA14876 oder CUSA13795)", L"Carpeta del juego base (CUSA14876 o CUSA13795)"}},
         {L"Update folder (v01.21)", {L"Dossier de mise à jour (v01.21)", L"Cartella aggiornamento (v01.21)", L"Update-Ordner (v01.21)", L"Carpeta de actualización (v01.21)"}},
         // Mods
         {L"REFRESH", {L"ACTUALISER", L"AGGIORNA", L"NEU LADEN", L"ACTUALIZAR"}},

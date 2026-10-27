@@ -1,4 +1,6 @@
 #include "settings/renderer_startup.hpp"
+#include "retail_profiles.hpp"
+#include "save_import.hpp"
 // SPDX-License-Identifier: GPL-2.0-only
 // Optional GPU library (ctrport/gpu, build/CTRPort-gpu/ctr_gpu.dll): shadPS4 v0.18.0's
 // Liverpool command processor, Vulkan renderer, GnmDriver, VideoOut and kernel event
@@ -146,7 +148,13 @@ inline void route_hle_imports(const std::vector<ImageMetadata>& metadata,std::ve
     if(!resolve || !count)throw std::runtime_error("ctr_hle exports missing");
     // Host services for ctr_hle: save data mount points in ctrport's file system.
     struct CtrHleHostV1{std::uint32_t version;const char* title_id;int(*mount)(const char*,const char*);int(*unmount)(const char*);};
-    static const CtrHleHostV1 host{1,"CUSA14876",
+    // Save data under the running game's title: EU CUSA14876 or US CUSA13795 (retail_profiles.hpp).
+    static const char* const title=[&]{
+        for(const auto& m:metadata) if(const auto* profile=retail_profile(m.sha256)) return profile->title_id;
+        return "CUSA14876";
+    }();
+    save_import::run(title);
+    static const CtrHleHostV1 host{1,title,
         [](const char* point,const char* root)->int{try{kernel_files.mount(point,std::filesystem::u8path(root));return 0;}catch(const std::exception& e){std::fprintf(stderr,"ctr_hle mount %s failed: %s\n",point,e.what());return -1;}},
         [](const char* point)->int{kernel_files.unmount(point);return 0;}};
     const auto set_host=reinterpret_cast<int(*)(const CtrHleHostV1*)>(GetProcAddress(hle_library,"ctr_hle_set_host"));

@@ -107,11 +107,11 @@ void classic_paint_window(HDC target) {
             } else if (g.current_tab == TAB_ADVANCED) {
                 text(gr, tr(L"ADVANCED"), 0, 36.0f, FontStyleBold, rect(296, 76, 300, 40), kArcadeGold);
 
-                text(gr, tr(L"Base game folder (CUSA14876 v01.00):"), 1, 11.5f, FontStyleBold, rect(296, 122, 600, 18), kTextMuted);
+                text(gr, tr(L"Base game folder (v01.00, CUSA14876 or CUSA13795):"), 1, 11.5f, FontStyleBold, rect(296, 122, 600, 18), kTextMuted);
                 draw_field(gr, rect(296, 144, 580, 34), g.base_edit);
                 draw_status(gr, g.base_status, 296, 182, 580);
 
-                text(gr, tr(L"Update folder (v01.21 CUSA14876-patch):"), 1, 11.5f, FontStyleBold, rect(296, 208, 600, 18), kTextMuted);
+                text(gr, tr(L"Update folder (v01.21, CUSA14876-patch or CUSA13795-patch):"), 1, 11.5f, FontStyleBold, rect(296, 208, 600, 18), kTextMuted);
                 draw_field(gr, rect(296, 230, 580, 34), g.patch_edit);
                 draw_status(gr, g.patch_status, 296, 268, 580);
 
