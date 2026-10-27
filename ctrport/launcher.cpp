@@ -41,6 +41,7 @@ namespace Gdiplus { using std::min; using std::max; }
 #include "launcher_font.hpp"
 #include "launcher_update.hpp"
 #include "bounded_log.hpp"
+#include "keyboard_keys.hpp"
 #include "settings/store.hpp"
 #include "settings/menu_catalog.hpp"
 #include "guest_patch_xml.hpp"
@@ -1153,6 +1154,8 @@ LRESULT CALLBACK friends_drawer_proc(HWND window, UINT message, WPARAM wp, LPARA
 inline float settings_scroll = 0;
 void validate();
 #include "launcher_graphics.hpp"
+HWND add_button(int id, Kind kind, const RectF& box, const wchar_t* label, bool* value, int pill, int tab);
+#include "launcher_keyboard.hpp"
 #include "launcher_mods.hpp"
 #include "launcher_trophies.hpp"
 #include "classic_pages.hpp"
@@ -1392,6 +1395,7 @@ void select_tab_now(int tab) {
     ShowWindow(g.width_edit, show_custom ? SW_SHOW : SW_HIDE);
     ShowWindow(g.height_edit, show_custom ? SW_SHOW : SW_HIDE);
     graphics_section_apply_scroll();
+    keyboard_section_apply_scroll();
 
     for (const auto& entry : g.controls) InvalidateRect(entry.first, nullptr, FALSE);
     InvalidateRect(g.window, nullptr, FALSE);
@@ -2279,6 +2283,9 @@ void launch_game() {
     if (g.cfg.renderer == L"d3d11") set[L"CTR_GPU_BACKEND"] = L"d3d11";
     set[L"CTR_GPU_FSR"] = L"0"; // Scene upscale replaces the final-frame FSR path.
     if (g.cfg.unlock_all) set[L"CTR_UNLOCK_ALL"] = L"1";
+    // the keys chosen in the Advanced tab (launcher_keyboard.hpp); without the file, the defaults
+    std::error_code keyboard_error;
+    if (fs::exists(keyboard_section::file(), keyboard_error)) set[L"CTR_KEYBOARD_MAP"] = keyboard_section::file().wstring();
     if (!g.cfg.trophy_key.empty()) set[L"CTR_TROPHY_KEY"] = g.cfg.trophy_key;
     if (g.cfg.mods_enabled) {
         set[L"CTR_MODS_DIR"] = mods_dir().wstring();
@@ -2321,7 +2328,7 @@ void launch_game() {
         L"CTR_GPU_FULLSCREEN", L"CTR_GPU_WIDTH", L"CTR_GPU_HEIGHT", L"CTR_PATCH_DIR", L"CTR_VERSION", L"CTR_GPU_BACKEND",
         L"CTR_ONLINE", L"CTR_ONLINE_ID", L"CTR_ONLINE_SERVER", L"CTR_ONLINE_TRAFFIC_KEY", L"CTR_ONLINE_PASSWORD", L"CTR_ONLINE_ROOM_TOKEN",
         L"CTR_ONLINE_PORT_OFFSET", L"CTR_ONLINE_NAT_TRANSPORT", L"CTR_ONLINE_RELAY_TEST_BLOCK_DIRECT",
-        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG", L"CTR_ONLINE_ACCOUNT", L"CTR_TROPHY_KEY", L"CTR_PAD_PLAYERS"});
+        L"CTR_MODS_DIR", L"CTR_MODS_CONFIG", L"CTR_PATCHES_DIR", L"CTR_PATCHES_CONFIG", L"CTR_ONLINE_ACCOUNT", L"CTR_TROPHY_KEY", L"CTR_PAD_PLAYERS", L"CTR_KEYBOARD_MAP"});
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     // Bounded capture (bounded_log.hpp): the game writes into pipes, not into the files.
@@ -2472,6 +2479,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
     switch (message) {
     case WM_MOUSEWHEEL:
         if (graphics_section_wheel(GET_WHEEL_DELTA_WPARAM(wparam))) return 0;
+        if (keyboard_section_wheel(GET_WHEEL_DELTA_WPARAM(wparam))) return 0;
         if (mods_list_wheel(GET_WHEEL_DELTA_WPARAM(wparam))) return 0;
         break;
     case WM_DROPFILES: {
@@ -2579,6 +2587,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
         if(g.updating)return 0;
         if(id==ID_LAUNCHER_SKIN && code==BN_CLICKED){switch_launcher_skin();return 0;}
         if(graphics_section_command(id,code))return 0;
+        if(keyboard_section_command(id,code))return 0;
         if(id==ID_NITRO_FRIENDS) {nitro_finish();if(g.current_tab!=TAB_HOME)select_tab_now(TAB_HOME);nitro_nav_from=nitro_nav_to=0;animate_friends(!g.friends_open);return 0;}
         if(id==ID_NITRO_MOTION) {nitro_motion=!nitro_motion;nitro_finish();if(!save_launcher_appearance())nitro_motion=!nitro_motion;InvalidateRect(reinterpret_cast<HWND>(lparam),nullptr,FALSE);return 0;}
         if (id == ID_CHECK_UPDATE) {

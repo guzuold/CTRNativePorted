@@ -100,6 +100,10 @@ void paint_window(HDC target) {
                 gr.Restore(unscrolled);
                 graphics_section_paint_scrollbar(gr);
             } else if (g.current_tab == TAB_ADVANCED) {
+                // the tab scrolls (mouse wheel) to its KEYBOARD section
+                const GraphicsState unscrolled = gr.Save();
+                gr.SetClip(RectF(0.f, nitro::header, kWidth, nitro::footer - nitro::header));
+                gr.TranslateTransform(0, -settings_scroll);
                 text(gr, tr(L"ADVANCED"), 0, 36.0f, FontStyleBold, page_rect(296, 76, 300, 40), kArcadeGold);
 
                 text(gr, tr(L"Base game folder (v01.00, CUSA14876 or CUSA13795):"), 1, 11.5f, FontStyleBold, page_rect(296, 122, 600, 18), kTextMuted);
@@ -122,6 +126,9 @@ void paint_window(HDC target) {
                     if (log.empty()) log = tr(L"Waiting for the game...");
                 }
                 text(gr, log, 1, 11, FontStyleRegular, page_rect(312, 412, 660, 150), kTextMuted);
+                keyboard_section_paint(gr);
+                gr.Restore(unscrolled);
+                keyboard_section_paint_scrollbar(gr);
             }
         }
     }

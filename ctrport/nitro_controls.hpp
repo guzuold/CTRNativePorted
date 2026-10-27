@@ -14,7 +14,7 @@ void draw_control(const DRAWITEMSTRUCT& item) {
     {
         Graphics gr(dc);gr.ScaleTransform(g.scale*nitro::samples,g.scale*nitro::samples);gr.SetSmoothingMode(SmoothingModeAntiAlias);
         gr.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-        if(g.current_tab==TAB_SETTINGS && c.tab==TAB_SETTINGS)gr.Clear(Color(kArcadeCard));
+        if((g.current_tab==TAB_SETTINGS && c.tab==TAB_SETTINGS) || (g.current_tab==TAB_ADVANCED && keyboard_section::owns(id)))gr.Clear(Color(kArcadeCard));
         const float lw=float(w)/g.scale,lh=float(h)/g.scale;
         const bool disabled=(item.itemState&ODS_DISABLED)!=0,pressed=(item.itemState&ODS_SELECTED)!=0;
         const bool hot=g.hot==item.hwndItem&&!disabled;

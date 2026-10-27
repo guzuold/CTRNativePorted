@@ -13,7 +13,7 @@ servers with a small service that runs inside every player's launcher.
 > video from the game. You need your own legally obtained dump. Not affiliated with
 > Activision, Beenox, Sony Interactive Entertainment or Nintendo.
 
-**Latest release: [v0.7.11](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.11-u2)** (settings, PC Settings menu and saves on the US version)
+**Latest release: [v0.7.11](https://github.com/guzuold/CTRNativePorted/releases/tag/v0.7.11-u2)** (US version: settings, PC Settings menu and saves; keyboard keys you choose)
 
 v0.7.1 makes the **Direct3D 11 renderer** the default and lays out the graphics settings like current PC games: upscaling method (FSR 1, FSR 3,
 DLSS) with Quality/Balanced/Performance modes and sharpness, a single shadow quality, and the
@@ -87,7 +87,9 @@ complete, in private matches and in public matchmaking; see the
   drives player 1.
 - **PlayStation controllers:** DualShock 4 and DualSense, over USB or Bluetooth, with
   vibration and no DS4Windows needed.
-- **Keyboard input.**
+- **Keyboard input, with keys you choose:** the KEYBOARD section of the Advanced tab (scroll
+  down) gives each of the 24 pad inputs its key: click it, then press the new key. It works with
+  every game version and both renderers, from the next start of the game.
 - **Controller per player:** Settings detects the connected controllers. It shows each
   controller's type: Xbox controller on its XInput slot, DualShock 4, DualSense or another
   gamepad. Each of players 1–4 gets a menu: Auto, None, Keyboard or one of the controllers.

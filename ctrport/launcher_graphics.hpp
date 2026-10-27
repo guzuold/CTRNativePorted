@@ -103,9 +103,10 @@ inline void graphics_section_refresh() {
 // hidden (and all of them outside the Settings tab).
 inline void graphics_section_apply_scroll() {
     using namespace graphics_section;
-    settings_scroll = std::clamp(settings_scroll, 0.f, max_scroll());
+    // the scroll position is the current tab's (the Advanced tab scrolls too)
     const bool shown = g.current_tab == TAB_SETTINGS;
-    const int shift = px(settings_scroll), top = px(classic_skin ? view_top() : view_top() + 40.f),
+    if (shown) settings_scroll = std::clamp(settings_scroll, 0.f, max_scroll());
+    const int shift = shown ? px(settings_scroll) : 0, top = px(classic_skin ? view_top() : view_top() + 40.f),
               end = px(classic_skin ? view_bottom() : view_bottom() + 40.f);
     for (const auto& c : children) {
         const int y = c.base.top - shift;

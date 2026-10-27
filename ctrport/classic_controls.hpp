@@ -14,7 +14,8 @@ void classic_draw_control(const DRAWITEMSTRUCT& item) {
     const HGDIOBJ previous_source = SelectObject(source, g.base_layer);
     BitBlt(dc, 0, 0, w, h, source, origin.x, origin.y, SRCCOPY);
     const int control_id = GetDlgCtrlID(item.hwndItem);
-    if (control.tab == TAB_SETTINGS || (control_id >= ID_MOD_ROW_TOGGLE && control_id < ID_MOD_ROW_DOWN + kModRows)) {
+    if (control.tab == TAB_SETTINGS || keyboard_section::owns(control_id) ||
+        (control_id >= ID_MOD_ROW_TOGGLE && control_id < ID_MOD_ROW_DOWN + kModRows)) {
         HBRUSH card = CreateSolidBrush(RGB(42, 33, 112));
         FillRect(dc, &item.rcItem, card);
         DeleteObject(card);

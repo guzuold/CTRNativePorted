@@ -1,9 +1,10 @@
 ## v0.7.11 — 2026-10-27
 
-The US version gets the same settings and saves as the EU version.
+The US version gets the same settings and saves as the EU version, and the keyboard keys can be changed in the launcher.
 
 - **Graphics settings and PC Settings menu on the US version (issue #4):** they were made for the EU v01.21 game, so with a US dump every graphics setting stayed at its console value and the PC Settings menu was missing. The runtime now finds the same game code in the US game by its bytes and applies the settings there, after checking each setting's own instructions as on the EU game. A setting whose code is not found keeps its console value and the log says which; nothing is guessed. The same works on the EU v01.00 game (without the menu, which v01.00 does not have). The Wumpa Coin rewards and shop of online play use the same search.
 - **Saves:** the US game now keeps its saves in its own folder, `runtime/user/savedata/1/CUSA13795`, as on PS4 and in shadPS4. If the game has no save there yet, the runtime copies in your shadPS4 save for the same game once (from `%APPDATA%\shadPS4`). If there is none, on the US game it copies the saves this runtime wrote before under the EU folder. Nothing is moved or deleted. A save folder copied by hand from shadPS4 works too.
+- **Keyboard keys you choose:** the Advanced tab has a new KEYBOARD section; scroll down with the mouse wheel to reach it. Click the key of an input (Cross, Options, D-pad, sticks...), then press the new key; Esc cancels. A key taken from another input leaves that one without a key. **Reset keys** brings back the default layout. The choice is saved at once and used from the next start of the game, with every game version (EU and US) and both renderers. Checked: with Cross on O and Options on P, the game got past the title screen and loaded its save with only those two keys pressed.
 - **Launcher:** it also finds a `dump\CUSA13795` folder and its update folder, and the folder labels name both editions.
 - **Tested** on the EU game with 13 graphics settings changed:
   - v01.21: same result as before;

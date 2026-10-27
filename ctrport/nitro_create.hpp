@@ -103,4 +103,5 @@ void create_controls() {
     add_button(ID_OPEN_SAVES, Kind::ActionBtn, page_rect(520, 304, 210, 36), L"Open saves", nullptr, -1, TAB_ADVANCED);
     add_button(ID_OPEN_LOGS, Kind::ActionBtn, page_rect(744, 304, 246, 36), L"Open logs folder", nullptr, -1, TAB_ADVANCED);
     graphics_section_create();
+    keyboard_section_create();
 }

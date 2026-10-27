@@ -12,6 +12,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include "keyboard_keys.hpp"
 #include "pad_test_input.hpp"
 #include "user_service.hpp"
 extern "C" std::uint64_t ctr_kernel_process_time();
@@ -56,38 +57,20 @@ inline DWORD merge_xinput(const std::array<DWORD,4>& results,const std::array<XI
  return merged;
 }
 
-// Keyboard as a controller, in the XINPUT_GAMEPAD layout of the other devices. Default keys
-// as SacredFire's runtime_pad.c (GPL-2.0-or-later) so players of both ports find the same
-// layout: WASD left stick, arrow keys right stick, Space Cross, LShift Circle, E Square,
-// Q Triangle, 1 L1, 3 R1, R L2, F R2, Z L3, C R3, Enter Options, Tab touch pad, IJKL d-pad.
-// CTR_KEYBOARD_MAP names a file of "input=Key,Key" lines that replace an input's keys.
+// Keyboard as a controller, in the XINPUT_GAMEPAD layout of the other devices. Inputs, default
+// keys and key names: keyboard_keys.hpp. CTR_KEYBOARD_MAP names a file of "input=Key,Key" lines
+// that replace an input's keys (the launcher's KEYBOARD section writes it).
 class KeyboardMap {
 public:
  enum Input {CROSS,CIRCLE,SQUARE,TRIANGLE,L1,R1,L2,R2,L3,R3,OPTIONS,TOUCHPAD,UP,DOWN,LEFT,RIGHT,
   MOVE_UP,MOVE_DOWN,MOVE_LEFT,MOVE_RIGHT,LOOK_UP,LOOK_DOWN,LOOK_LEFT,LOOK_RIGHT,COUNT};
- static constexpr const char* names[COUNT]={"cross","circle","square","triangle","l1","r1","l2","r2","l3","r3","options","touchpad",
-  "up","down","left","right","move_up","move_down","move_left","move_right","look_up","look_down","look_left","look_right"};
+ static_assert(COUNT==keyboard_keys::count);
+ static constexpr const auto& names=keyboard_keys::names;
  std::array<std::vector<int>,COUNT> keys;
  KeyboardMap(){
-  const int defaults[COUNT]={VK_SPACE,VK_LSHIFT,'E','Q','1','3','R','F','Z','C',VK_RETURN,VK_TAB,'I','K','J','L','W','S','A','D',VK_UP,VK_DOWN,VK_LEFT,VK_RIGHT};
-  for(int i=0;i<COUNT;++i)keys[i]={defaults[i]};
+  for(int i=0;i<COUNT;++i)keys[i]={keyboard_keys::defaults[i]};
  }
- // Virtual-key code of a key name (letters, digits, F1-F24, named keys), 0 when unknown.
- static int key_code(std::string name){
-  for(auto& c:name)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  if(name.size()==1 && std::isalnum(static_cast<unsigned char>(name[0])))return std::toupper(static_cast<unsigned char>(name[0]));
-  if(name.size()>=2 && name.size()<=3 && name[0]=='f' && std::all_of(name.begin()+1,name.end(),[](char c){return std::isdigit(static_cast<unsigned char>(c))!=0;})){
-   const int n=std::stoi(name.substr(1));if(n>=1 && n<=24)return VK_F1+n-1;
-  }
-  if(name.size()==7 && name.rfind("numpad",0)==0 && std::isdigit(static_cast<unsigned char>(name[6])))return VK_NUMPAD0+(name[6]-'0');
-  static const std::pair<const char*,int> named[]={{"space",VK_SPACE},{"enter",VK_RETURN},{"return",VK_RETURN},{"tab",VK_TAB},
-   {"backspace",VK_BACK},{"escape",VK_ESCAPE},{"shift",VK_SHIFT},{"lshift",VK_LSHIFT},{"rshift",VK_RSHIFT},{"ctrl",VK_CONTROL},
-   {"lctrl",VK_LCONTROL},{"rctrl",VK_RCONTROL},{"alt",VK_MENU},{"lalt",VK_LMENU},{"ralt",VK_RMENU},{"up",VK_UP},{"down",VK_DOWN},
-   {"left",VK_LEFT},{"right",VK_RIGHT},{"insert",VK_INSERT},{"delete",VK_DELETE},{"home",VK_HOME},{"end",VK_END},
-   {"pageup",VK_PRIOR},{"pagedown",VK_NEXT},{"capslock",VK_CAPITAL}};
-  for(const auto& [n,code]:named)if(name==n)return code;
-  return 0;
- }
+ static int key_code(const std::string& name){return keyboard_keys::key_code(name);}
  // Applies "input=Key,Key" lines; returns the lines it could not use (logged by the caller).
  std::vector<std::string> load(std::istream& in){
   std::vector<std::string> rejected;std::string line;
