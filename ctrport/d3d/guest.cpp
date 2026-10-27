@@ -125,6 +125,29 @@ bool GuestWrittenSince(u64 addr, u64 size, bool reset) {
     return changed;
 }
 
+namespace {
+constexpr u64 kPage = 4096; // write watch granularity
+u64 EdgeHash(u64 addr, u64 size, u64 inner_begin, u64 inner_end) {
+    if (!GuestReadable(addr, size)) return 0;
+    if (inner_begin >= inner_end) return Fnv((const u8*)addr, size);
+    return Fnv((const u8*)addr, inner_begin - addr) * 31 ^ Fnv((const u8*)inner_end, addr + size - inner_end);
+}
+} // namespace
+
+GuestWatch GuestWatchStart(u64 addr, u64 size) {
+    GuestWatch w;
+    w.inner_begin = (addr + kPage - 1) & ~(kPage - 1);
+    w.inner_end = (addr + size) & ~(kPage - 1);
+    if (w.inner_begin < w.inner_end) GuestResetWritten(w.inner_begin, w.inner_end - w.inner_begin);
+    w.edge_hash = EdgeHash(addr, size, w.inner_begin, w.inner_end);
+    return w;
+}
+
+bool GuestWatchChanged(const GuestWatch& w, u64 addr, u64 size) {
+    if (w.inner_begin < w.inner_end && GuestWrittenSince(w.inner_begin, w.inner_end - w.inner_begin, false)) return true;
+    return EdgeHash(addr, size, w.inner_begin, w.inner_end) != w.edge_hash;
+}
+
 void GuestResetWritten(u64 addr, u64 size) {
     if (ResetWriteWatch((void*)addr, size) == 0) return;
     if (!GuestReadable(addr, size)) return;

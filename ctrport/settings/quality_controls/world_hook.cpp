@@ -28,19 +28,21 @@ void absolute_jump(unsigned char* p, const void* target) {
 extern "C" void world_callback(WorldHook* owner, const unsigned long long* args) noexcept {
     owner->invoke(args);
 }
-bool readable(const unsigned char* p, std::size_t bytes) noexcept {
-    if (!p) return false;
-    MEMORY_BASIC_INFORMATION r{};
-    return VirtualQuery(p, &r, sizeof(r)) && r.State == MEM_COMMIT && !(r.Protect & (PAGE_GUARD | PAGE_NOACCESS)) &&
-           (r.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE |
-                         PAGE_EXECUTE_WRITECOPY)) &&
-           reinterpret_cast<std::uintptr_t>(p) >= reinterpret_cast<std::uintptr_t>(r.BaseAddress) &&
-           reinterpret_cast<std::uintptr_t>(p) - reinterpret_cast<std::uintptr_t>(r.BaseAddress) <= r.RegionSize &&
-           bytes <=
-               r.RegionSize - (reinterpret_cast<std::uintptr_t>(p) - reinterpret_cast<std::uintptr_t>(r.BaseAddress));
+// Copies guest memory, false when it is not readable. Runs for every world draw, so it must not
+// make a system call (VirtualQuery here cost three per draw): the read is guarded instead.
+bool copy(void* to, const void* from, std::size_t bytes) noexcept {
+    if (!from) return false;
+    __try {
+        std::memcpy(to, from, bytes);
+        return true;
+    } __except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER
+                                                                  : EXCEPTION_CONTINUE_SEARCH) {
+        return false;
+    }
 }
+// draw, data and alternate are local copies of the guest objects.
 bool eligible(const unsigned char* draw, const unsigned char* data, const unsigned char* alternate) noexcept {
-    if (!readable(alternate, 0x48) || read<std::uint64_t>(draw, 0x28) || read<std::uint64_t>(draw, 0x30) ||
+    if (read<std::uint64_t>(draw, 0x28) || read<std::uint64_t>(draw, 0x30) ||
         read<std::int32_t>(data, 0x78) != -1)
         return false;
     const auto count = read<std::uint32_t>(alternate, 0x20), original_count = read<std::uint32_t>(data, 0x68);
@@ -53,20 +55,18 @@ bool eligible(const unsigned char* draw, const unsigned char* data, const unsign
 void WorldHook::invoke(const unsigned long long* arguments) noexcept {
     std::array<std::uint64_t, 6> args{};
     std::memcpy(args.data(), arguments, 2 * sizeof(std::uint64_t));
-    const auto* draw = reinterpret_cast<const unsigned char*>(args[1]);
-    const auto* data = readable(draw, 0x80) ? read<const unsigned char*>(draw, 0x10) : nullptr;
-    const bool valid = readable(data, 0x98);
-    const auto* alternate = valid ? read<const unsigned char*>(data, 0x58) : nullptr;
     alignas(16) std::array<unsigned char, 0x80> call_draw{};
     alignas(16) std::array<unsigned char, 0x98> call_data{};
-    if (valid && eligible(draw, data, alternate)) {
-        std::memcpy(call_draw.data(), draw, call_draw.size());
-        std::memcpy(call_data.data(), data, call_data.size());
+    std::array<unsigned char, 0x48> alternate{};
+    if (copy(call_draw.data(), reinterpret_cast<const void*>(args[1]), call_draw.size()) &&
+        copy(call_data.data(), read<const unsigned char*>(call_draw.data(), 0x10), call_data.size()) &&
+        copy(alternate.data(), read<const unsigned char*>(call_data.data(), 0x58), alternate.size()) &&
+        eligible(call_draw.data(), call_data.data(), alternate.data())) {
         const auto* replacement = call_data.data();
         std::memcpy(call_draw.data() + 0x10, &replacement, sizeof(replacement));
-        std::memcpy(call_data.data() + 0x68, alternate + 0x20, 4);
-        std::memcpy(call_data.data() + 0x80, alternate + 0x30, 8);
-        std::memcpy(call_data.data() + 0x90, alternate + 0x40, 8);
+        std::memcpy(call_data.data() + 0x68, alternate.data() + 0x20, 4);
+        std::memcpy(call_data.data() + 0x80, alternate.data() + 0x30, 8);
+        std::memcpy(call_data.data() + 0x90, alternate.data() + 0x40, 8);
         args[1] = reinterpret_cast<std::uintptr_t>(call_draw.data());
     }
     std::array<std::uint64_t, 8> fp{};

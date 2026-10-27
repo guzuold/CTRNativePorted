@@ -1032,9 +1032,11 @@ ID3D11ShaderResourceView* GetTexture(const u32* tsharp, int dims) {
         obj.checked_frame = g_frame;
         tx = g_textures.emplace(key, std::move(obj)).first;
     } else if (tx->second.srv && tx->second.checked_frame != g_frame) {
-        // CPU-written textures (video frames, runtime atlases): rebuild when the guest wrote them
+        // CPU-written textures (video frames, runtime atlases): rebuild when the guest wrote them.
+        // Small textures (fewer mip levels with lower texture quality) share pages with data the
+        // game rewrites every frame; GuestWatch tells their own writes from the neighbours'.
         tx->second.checked_frame = g_frame;
-        if (GuestWrittenSince(tx->second.mem_base, tx->second.mem_size, false) &&
+        if (GuestWatchChanged(tx->second.watch, tx->second.mem_base, tx->second.mem_size) &&
             RefreshTexture(g_ctx.Get(), t, &tx->second))
             g_stats.texture_refresh++;
     }

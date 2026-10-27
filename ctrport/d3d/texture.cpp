@@ -189,7 +189,7 @@ bool BuildTexture(ID3D11Device* dev, const TSharp& t, TextureObject* out) {
     if (!GetLayout(t, &l)) return false;
     out->mem_base = t.base;
     out->mem_size = l.total;
-    GuestResetWritten(out->mem_base, out->mem_size); // later guest writes mark the copy stale
+    out->watch = GuestWatchStart(out->mem_base, out->mem_size); // later guest writes mark the copy stale
     std::vector<u8> linear;
     std::vector<D3D11_SUBRESOURCE_DATA> init;
     Detile(t, l, linear, init);
@@ -235,7 +235,7 @@ bool BuildTexture(ID3D11Device* dev, const TSharp& t, TextureObject* out) {
 bool RefreshTexture(ID3D11DeviceContext* ctx, const TSharp& t, TextureObject* obj) {
     Layout l;
     if (!obj->tex || !GetLayout(t, &l)) return false;
-    GuestResetWritten(obj->mem_base, obj->mem_size);
+    obj->watch = GuestWatchStart(obj->mem_base, obj->mem_size);
     static thread_local std::vector<u8> linear;
     static thread_local std::vector<D3D11_SUBRESOURCE_DATA> init;
     Detile(t, l, linear, init);
