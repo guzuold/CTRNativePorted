@@ -309,9 +309,11 @@ EXPORT("DYhhWbJSeRg", "libSceVideoOut", sceVideoOutColorSettingsSetGamma_);
 EXPORT("pv9CI5VC+R0", "libSceVideoOut", sceVideoOutAdjustColor_);
 
 // Flip pacing: the flip rate the game asked for, as the console's vblank-timed flips (debugging:
-// CTR_D3D_FpsLimit, 0 = unlimited). The PC settings presentation limit is applied at present.
+// CTR_D3D_FpsLimit, 0 = unlimited). A frame rate limit other than "Console" unlocks the game:
+// no console pacing here, the PC settings limit (or nothing) is applied at present.
 void PaceFrame() {
     static const int forced = ConfigInt("FpsLimit", -1);
+    if (forced < 0 && !ctrport::settings::pacing::console_pacing()) return;
     const int limit = forced >= 0 ? forced : 60 / (g_flip_rate + 1);
     if (limit <= 0) return;
     static HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);

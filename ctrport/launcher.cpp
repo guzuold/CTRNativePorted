@@ -2334,8 +2334,11 @@ void launch_game() {
     startup.hStdOutput = out;
     startup.hStdError = err;
     PROCESS_INFORMATION info{};
+    // The game window comes in front of the launcher. This fails when the launcher is not in the
+    // foreground, which must not count as a failed start.
+    AllowSetForegroundWindow(ASFW_ANY);
+    SetLastError(ERROR_SUCCESS);
     const BOOL started = out != INVALID_HANDLE_VALUE && err != INVALID_HANDLE_VALUE &&
-        AllowSetForegroundWindow(ASFW_ANY);  // the game window comes in front of the launcher
         CreateProcessW(g.runtime_exe.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
                        environment.data(), g.root.c_str(), &startup, &info);
     const DWORD error = GetLastError();

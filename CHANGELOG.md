@@ -1,3 +1,8 @@
+## Unreleased
+
+- **Frame rate above 60 with Direct3D 11:** the 60 FPS mode only made the game ask for 60 instead of 30, so the frame rate limit could never go higher. Now any **Frame rate limit** other than **Console** frees the game from the console's 60 Hz pacing and caps it at the chosen value. The new values are 144, 165, 240 and **Unlimited**; with Unlimited, **V-Sync On** caps at your display's refresh rate. The game keeps real time: a race timer matched the wall clock with no limit. **Console** (the default) keeps the old behaviour. With Vulkan, values above 60 still change nothing.
+- **"Unable to start ctrport.exe (error 0)":** since v0.7.3 the launcher sometimes showed this message although the game was starting, when the launcher was not the window in front. Fixed.
+
 ## v0.7.9 — 2026-10-27
 
 Mods made for the US game on the EU game, and mods that do not fit no longer stop the game.

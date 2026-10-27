@@ -112,7 +112,7 @@ inline unsigned count(Option option) {
     case Option::window_resolution: return 8;
     case Option::window_mode: return 4;
     case Option::present_mode: return 4;
-    case Option::presentation_limit: return 5;
+    case Option::presentation_limit: return 9;
     case Option::display_refresh: return 7;
     case Option::fps_60: return 2;
     case Option::upscaler: return 4;
@@ -186,6 +186,10 @@ inline Json value(Option option, unsigned index) {
         case 2: return Json::of("60");
         case 3: return Json::of("90");
         case 4: return Json::of("120");
+        case 5: return Json::of("144");
+        case 6: return Json::of("165");
+        case 7: return Json::of("240");
+        case 8: return Json::of("unlimited");
         } break;
     case Option::display_refresh: switch(index) {
         case 0: return Json::of("original");

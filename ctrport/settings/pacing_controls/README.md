@@ -5,13 +5,24 @@ identifies this implementation; it does not prove monitor mode availability.
 
 | Key | Domain | Actual consumer |
 |---|---|---|
-| presentation_limit | original/30/60/90/120 | normal and generated-frame presentation boundaries, before Vulkan submit mutex |
+| presentation_limit | original/30/60/90/120/144/165/240/unlimited | Direct3D 11: game pacing and presentation; Vulkan: normal and generated-frame presentation boundaries, before Vulkan submit mutex |
 | window_mode | original/windowed/borderless/exclusive | SDL window construction and fullscreen mode transition |
 | display_refresh | original/60/90/120/144/165/240 | enumerated SDL exclusive fullscreen mode, matching requested output dimensions |
 
-Original presentation timing does no additional wait. Higher limits do not increase
-simulation FPS or generate frames. They cap host presentation attempts (including
-existing generated frames); the existing30/60 game patch remains independent.
+Original presentation timing does no additional wait and keeps the console's
+vblank pacing (30, or 60 with the 60 FPS patch).
+
+Direct3D 11: any other value removes the console pacing in `d3d/videoout.cpp`
+(`PaceFrame`), so the game runs as fast as the PC allows and the value caps it;
+`unlimited` sets no cap and V-Sync On caps at the display refresh. The game keeps
+real time: with no limit a race ran at about 150 FPS and its timer counted 20.09 s
+in 20.08 s of wall clock. Measured on an RTX 4070 Ti SUPER in the menus: Console
+60, 144 → 144, Unlimited about 370, Unlimited with V-Sync On 120 on a 120 Hz display.
+
+Vulkan: limits do not increase simulation FPS or generate frames. They cap host
+presentation attempts (including existing generated frames); shadPS4 still presents
+at most one flip per vblank, so values above 60 change nothing there.
+
 The steady-clock deadline sequence uses absolute integer-nanosecond targets,
 preserves phase under small scheduling jitter and rebases after a full missed
 period instead of catching up in bursts. No sleep holds Scheduler::submit_mutex;
