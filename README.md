@@ -64,8 +64,8 @@ complete, in private matches and in public matchmaking; see the
 ### Graphics
 - **PC Settings in the game's Options menu** (v01.21): native pages in the game's language
   for display, graphics, resolution and upscaling, quality, shadows and effects, and
-  quality presets. Anti-aliasing (FXAA, off, SMAA), bloom, motion blur, depth of field,
-  fur detail and view distance apply at once; the other settings at the next start. The
+  quality presets. Bloom, motion blur, depth of field, fur detail and view distance apply
+  at once; the other settings at the next start. Anti-aliasing stays the game's FXAA. The
   menu is built at startup from your own game archives, which are only read; nothing from
   the game is distributed. See [`ctrport/settings/README.md`](ctrport/settings/README.md).
 - **Internal 3D resolution** from 720p to native 4K (720p, 900p, 1080p, 1440p, 1800p,

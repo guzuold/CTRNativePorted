@@ -8,7 +8,7 @@ native pages built from the game's menu templates, in the game's language:
 | Display | resolution (as in the launcher, the monitor's native one, or 720p to 2160p), display mode (windowed, borderless window, exclusive fullscreen), V-Sync, frame rate limit, refresh rate in exclusive fullscreen, 60 FPS mode |
 | Upscaling | method (off, AMD FSR 1, AMD FSR 3, NVIDIA DLSS), mode (Native 100%, Quality 67%, Balanced 58%, Performance 50%, Ultra performance 33%), sharpness (0-100%) |
 | Geometry and textures | texture quality, anisotropic filtering, shadow quality (off, low, medium, high, ultra), kart and driver detail, scenery detail, view distance, effects quality |
-| Effects and lighting | anti-aliasing (FXAA, off, SMAA), ambient occlusion, character shadows, bloom, motion blur, depth of field, fur detail |
+| Effects and lighting | ambient occlusion, character shadows, bloom, motion blur, depth of field, fur detail |
 | Quality presets | Original, Low, Medium, High, Ultra |
 
 The launcher shows the same pages in the GRAPHICS section of its Settings tab (scroll with the
@@ -29,8 +29,9 @@ nearest shadow quality, FSR 1 sharpness a percentage.
 
 Settings marked "(restart)" apply at the next start of the game; the others apply at
 once. Graphics page settings write the same values as the game's own graphics debug
-options and "Original" leaves the game's value untouched. SMAA may not engage with
-PS4 Pro mode. Saving happens in the background and never blocks the menu; choices are
+options and "Original" leaves the game's value untouched. Anti-aliasing is not offered:
+turning FXAA off or switching to SMAA left the 3D scene black on every renderer and game
+version, so an older stored value is ignored and the game keeps its FXAA. Saving happens in the background and never blocks the menu; choices are
 stored in `runtime/user/launcher_config.json`, the same file the launcher uses.
 
 ## How the menu is made

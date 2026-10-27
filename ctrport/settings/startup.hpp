@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
-#include "graphics_override.hpp"
 #include "renderer_startup.hpp"
 #include "retail_graphics/overrides.hpp"
 #include "geometry_controls/distance_hook.hpp"
@@ -160,11 +159,12 @@ inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image, std
             return false;
         }
     };
-    const auto* aa = document.find("antialiasing");
-    bool disable = aa && aa->text == "off";
-    if (disable)
-        disable =
-            optional("antialiasing", [&] { graphics::require_gate(image, extent, sha, graphics::aa_gate_original); });
+    // Anti-aliasing stays the game's FXAA: turning it off (or switching to SMAA) left the 3D scene
+    // black on every renderer and game version, so a stored "off" is ignored.
+    if (const auto* aa = document.find("antialiasing"); aa && aa->text != "original") {
+        std::fprintf(stderr, "settings: antialiasing=%s ignored, the game keeps its FXAA\n", aa->text.c_str());
+        std::fflush(stderr);
+    }
     auto selected = retail_graphics_selection(document);
     if (strict)
         retail_graphics::verify(image, extent, sha, selected, false);
@@ -194,7 +194,7 @@ inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image, std
         menu->install();
         adapter->menu = std::move(menu);
     });
-    bool aa_installed = false, retail_installed = false;
+    bool retail_installed = false;
     try {
         const auto* hero = document.find("hero_shadows");
         if (hero && hero->text == "off")
@@ -261,24 +261,18 @@ inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image, std
         optional("distance_scale", [&] { adapter->distance = geometry_controls::install(image, extent, sha, scale); });
         std::printf("settings_distance_applied requested=%s application=restart override_applied=%s\n",
                     distance_value.c_str(), adapter->distance ? "true" : "false");
-        const auto applied = graphics::apply_aa(image, extent, sha, disable);
-        aa_installed = applied.override_applied;
         const auto effects = retail_graphics::apply(image, extent, sha, selected);
         retail_installed = effects.controls_applied != 0;
         for (std::size_t i = 0; i < selected.size(); ++i)
             std::printf("settings_graphics_applied key=%s requested=%s application=restart override_applied=%s\n",
                         retail_graphics::descriptors[i].key, selected[i] ? "off" : "original",
                         selected[i] ? "true" : "false");
-        std::printf(
-            "{\"scope\":\"settings_antialiasing_applied\",\"requested\":\"%s\",\"application\":\"restart\",\"override_applied\":%s,\"changed_bytes\":%zu,\"reconstructed\":0}\n",
-            disable ? "off" : "original", applied.override_applied ? "true" : "false", applied.changed_bytes);
         std::printf("{\"scope\":\"settings_original_menu_bridge\",\"installed\":%s,\"reconstructed\":0}\n",
                     adapter->menu ? "true" : "false");
         FlushInstructionCache(GetCurrentProcess(), image, extent);
         std::fflush(stdout);
     } catch (...) {
         if (retail_installed) retail_graphics::rollback(image, extent, sha, selected);
-        if (aa_installed) graphics::rollback_aa(image, extent, sha);
         adapter->uninstall();
         throw;
     }

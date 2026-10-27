@@ -2,10 +2,11 @@
 #pragma once
 // Live native graphics options for retail CUSA14876 v1.21. They write the same fields the
 // game's own "Options > Graphics" debug page edits (registered by the retail renderer setup
-// at 0xb45e80, page body 0xb48b30): render debug data at *(*(0x2a7f420)+0x1d8) and the
-// FXAA/SMAA statics. No code is patched. Values marked original are never written, so the
-// game keeps its own value; any other value is re-asserted every frame because scene data
-// may rewrite render state on load.
+// at 0xb45e80, page body 0xb48b30): render debug data at *(*(0x2a7f420)+0x1d8). No code is
+// patched. Values marked original are never written, so the game keeps its own value; any
+// other value is re-asserted every frame because scene data may rewrite render state on load.
+// The same page's FXAA/SMAA statics are not written: FXAA off or SMAA on left the 3D scene
+// black on every renderer and game version, so a stored native_antialiasing is ignored.
 #include "control_schema.hpp"
 #include "../retail_map.hpp"
 #ifndef NOMINMAX
@@ -20,17 +21,15 @@
 namespace ctrport::settings::native_graphics {
 using ctr_online::Json;
 constexpr const char* pinned_sha = "39d716b70a299b2546bd39996c8592f9375d3f18f9bb8bf11f9139e9af1eb3f5";
-constexpr std::uintptr_t render_static = 0x2a7f420, render_data = 0x1d8, fxaa_static = 0x2a608b0,
-                         smaa_static = 0x2a27865;
+constexpr std::uintptr_t render_static = 0x2a7f420, render_data = 0x1d8;
 constexpr std::uintptr_t defocus = 0x58, motion_blur = 0x70, bloom = 0x71, clip_override = 0x128, far_clip = 0x130,
                          fur = 0x178;
-// Retail originals, read from a running 1.21 session: FXAA on, SMAA off, bloom/motion blur/DoF
-// on, 7 fur shells, track-defined far clip (override off).
+// Retail originals, read from a running 1.21 session: bloom/motion blur/DoF on, 7 fur shells,
+// track-defined far clip (override off).
 constexpr int original_fur = 7;
 
 // -1 = original (leave the game alone); otherwise the requested value.
 struct State {
-    std::atomic<int> antialiasing{-1};                               // 0 off, 2 smaa
     std::atomic<int> bloom{-1}, motion_blur{-1}, depth_of_field{-1}; // 0 off
     std::atomic<int> fur_detail{-1};                                 // shell count
     std::atomic<int> view_distance{-1};                              // far clip
@@ -38,8 +37,8 @@ struct State {
 };
 inline State state;
 inline unsigned char* image = nullptr;
-// Where render_static, fxaa_static and smaa_static are in the running eboot (retail_map.hpp).
-inline std::uintptr_t render_at = 0, fxaa_at = 0, smaa_at = 0;
+// Where render_static is in the running eboot (retail_map.hpp).
+inline std::uintptr_t render_at = 0;
 
 inline bool owns(const std::string& key) {
     return key == "native_antialiasing" || key == "native_bloom" || key == "native_motion_blur" ||
@@ -52,9 +51,15 @@ inline bool set(const std::string& key, const Json& value) {
     const auto& v = value.text;
     const bool original = v == "original";
     if (original) state.restore = true;
-    if (key == "native_antialiasing")
-        state.antialiasing = original ? -1 : v == "off" ? 0 : 2;
-    else if (key == "native_bloom")
+    if (key == "native_antialiasing") {
+        // Kept so an older settings file still loads; the game keeps its FXAA (see above).
+        if (!original) {
+            std::fprintf(stderr, "settings: native_antialiasing=%s ignored, the game keeps its FXAA\n", v.c_str());
+            std::fflush(stderr);
+        }
+        return true;
+    }
+    if (key == "native_bloom")
         state.bloom = original ? -1 : 0;
     else if (key == "native_motion_blur")
         state.motion_blur = original ? -1 : 0;
@@ -78,12 +83,8 @@ inline void load(const Json& document) {
 
 // Loader barrier: before guest threads start.
 inline void configure(unsigned char* retail_image, const std::string& sha, const Json& document) {
-    if (!retail_map::bound(sha) || !retail_map::has(render_static) || !retail_map::has(fxaa_static) ||
-        !retail_map::has(smaa_static))
-        return;
+    if (!retail_map::bound(sha) || !retail_map::has(render_static)) return;
     render_at = retail_map::at(render_static);
-    fxaa_at = retail_map::at(fxaa_static);
-    smaa_at = retail_map::at(smaa_static);
     image = retail_image;
     load(document);
 }
@@ -106,23 +107,13 @@ inline void apply() {
     auto byte = [&](std::uintptr_t offset) -> unsigned char& {
         return *reinterpret_cast<unsigned char*>(data + offset);
     };
-    auto& fxaa = *reinterpret_cast<unsigned char*>(image + fxaa_at);
-    auto& smaa = *reinterpret_cast<unsigned char*>(image + smaa_at);
     if (state.restore.exchange(false)) {
         // Switching an option back to original restores the retail value once.
-        if (state.antialiasing < 0) {
-            fxaa = 1;
-            smaa = 0;
-        }
         if (state.bloom < 0) byte(bloom) = 1;
         if (state.motion_blur < 0) byte(motion_blur) = 1;
         if (state.depth_of_field < 0) byte(defocus) = 1;
         if (state.fur_detail < 0) *reinterpret_cast<int*>(data + fur) = original_fur;
         if (state.view_distance < 0) byte(clip_override) = 0;
-    }
-    if (const int aa = state.antialiasing; aa >= 0) {
-        fxaa = 0;
-        smaa = aa == 2;
     }
     if (state.bloom == 0) byte(bloom) = 0;
     if (state.motion_blur == 0) byte(motion_blur) = 0;
