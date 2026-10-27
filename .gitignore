@@ -15,3 +15,5 @@
 *.prx
 *.sprx
 *.pkg
+__pycache__/
+*.pyc
