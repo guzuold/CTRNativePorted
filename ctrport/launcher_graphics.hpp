@@ -66,6 +66,10 @@ inline bool available(const std::string& key, unsigned index) {
     const bool d3d11 = g.cfg.renderer == L"d3d11";
     if (key == "upscaler") return !d3d11 || index < 2;      // Direct3D 11: Off, FSR 1
     if (key == "shadow_quality") return index < 4 || d3d11; // Ultra: Direct3D 11 shadow maps
+    // Direct3D 11 scene post-processing and supersampling
+    if (key == "post_antialiasing" || key.rfind("color_", 0) == 0) return index == 0 || d3d11;
+    if (key == "upscaling_mode") return index < 5 || d3d11;
+    if (key == "ambient_occlusion") return index < 2 || d3d11; // XeGTAO
     return true;
 }
 inline std::wstring label(const catalog::Control& c, unsigned index) {

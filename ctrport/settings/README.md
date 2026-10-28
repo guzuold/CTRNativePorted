@@ -1,14 +1,15 @@
 # PC Settings
 
-The game's own Options menu has a **PC Settings** entry (retail 01.21 only). It opens
+The game's own Options menu has a **PC Settings** entry (retail 01.21 only), both from the
+main menu and from the pause menu (adventure, races and the other modes). It opens
 native pages built from the game's menu templates, in the game's language:
 
 | Page | Settings |
 |---|---|
 | Display | resolution (as in the launcher, the monitor's native one, or 720p to 2160p), display mode (windowed, borderless window, exclusive fullscreen), V-Sync, frame rate limit, refresh rate in exclusive fullscreen, 60 FPS mode |
-| Upscaling | method (off, AMD FSR 1, AMD FSR 3, NVIDIA DLSS), mode (Native 100%, Quality 67%, Balanced 58%, Performance 50%, Ultra performance 33%), sharpness (0-100%) |
-| Geometry and textures | texture quality, anisotropic filtering, shadow quality (off, low, medium, high, ultra), kart and driver detail, scenery detail, view distance, effects quality |
-| Effects and lighting | ambient occlusion, character shadows, bloom, motion blur, depth of field, fur detail |
+| Upscaling | method (off, AMD FSR 1, AMD FSR 3, NVIDIA DLSS), mode (Native 100%, Quality 67%, Balanced 58%, Performance 50%, Ultra performance 33%, Supersampling 150% and 200% with Direct3D 11), sharpness (0-100%) |
+| Geometry and textures | texture quality, anisotropic filtering, shadow quality (off, low, medium, high, ultra), kart and driver detail, scenery detail, view distance, detail distance (50% to 200%), effects quality |
+| Effects and lighting | ambient occlusion (on, off, XeGTAO and XeGTAO Ultra with Direct3D 11), character shadows, bloom, motion blur, depth of field, fur detail; with Direct3D 11: anti-aliasing (the game's FXAA, SMAA, SMAA Ultra), saturation, contrast, vibrance, colour temperature |
 | Quality presets | Original, Low, Medium, High, Ultra |
 
 The launcher shows the same pages in the GRAPHICS section of its Settings tab (scroll with the
@@ -19,7 +20,25 @@ of the Resolution height and reconstructed by the chosen method (with no method 
 rendered at the output resolution). NVIDIA DLSS in Native mode is DLAA. Each method and level
 appears only where the renderer provides it: with Direct3D 11 the methods are Off and AMD FSR 1
 and Ultra shadows are available (shadow maps at twice the PS4 size); with Vulkan, FSR 3 and DLSS.
-Sharpness drives FSR 1 RCAS (0% turns it off) and FSR 3; DLSS has no sharpness control.
+Sharpness drives FSR 1 RCAS (0% turns it off) and FSR 3; DLSS has no sharpness control. With
+Direct3D 11 and no upscaler, Sharpness drives AMD CAS on the finished 3D scene instead (Original and
+0% leave it unsharpened), and it changes at once from the game menu.
+
+Supersampling (Direct3D 11) renders the 3D scene at 150% or 200% of the output height through the
+game's own scene scale, up to 2160 lines, and the presentation filters it down: at 1080p output,
+200% is a 3840x2160 scene. Above 1440p output 200% reaches that limit, and at 2160p supersampling
+renders the scene at the output size.
+
+The Direct3D 11 renderer also post-processes the finished 3D scene before the HUD is drawn (see
+`../d3d/VENDOR.md`): SMAA (the game's FXAA pass then copies its input unchanged, so SMAA sees the
+unblurred edges), saturation, contrast, vibrance and colour temperature. XeGTAO replaces the game's
+ambient occlusion with Intel's ground-truth AO, computed from the game's own full-resolution depth
+and camera and handed to the game's blur and lighting in place of its own. Detail distance scales
+the distances at which the game fades and swaps object classes (the original setter runs with the
+scaled values); it works with both renderers. Above 100% it draws more objects: measured with
+Direct3D 11 in the adventure hub, 200% raised the draws from about 3,700 to 5,200 per frame and the
+frame rate from 60 to about 35 FPS, while supersampling 200%, SMAA Ultra, CAS, colour and XeGTAO Ultra
+together stayed at 60 FPS.
 
 Shadow quality sets the shadow controls of earlier versions: Off = no cascaded shadows, Low = 50%
 resolution and 2 cascades, Medium = 75% and 3 cascades, High = the original shadows, Ultra = High
@@ -29,9 +48,10 @@ nearest shadow quality, FSR 1 sharpness a percentage.
 
 Settings marked "(restart)" apply at the next start of the game; the others apply at
 once. Graphics page settings write the same values as the game's own graphics debug
-options and "Original" leaves the game's value untouched. Anti-aliasing is not offered:
-turning FXAA off or switching to SMAA left the 3D scene black on every renderer and game
-version, so an older stored value is ignored and the game keeps its FXAA. Saving happens in the background and never blocks the menu; choices are
+options and "Original" leaves the game's value untouched. The game's own anti-aliasing
+switch is not offered: turning FXAA off or switching to its SMAA left the 3D scene black on
+every renderer and game version, so an older stored value is ignored and the game keeps its
+FXAA. The Direct3D 11 anti-aliasing setting above is the renderer's own and does not use it. Saving happens in the background and never blocks the menu; choices are
 stored in `runtime/user/launcher_config.json`, the same file the launcher uses.
 
 ## How the menu is made
@@ -43,6 +63,13 @@ to the game as part of `archives/juicedomain_permanent.pak`, `archives/update.pa
 Every menu template is checked against the retail 01.21 contents: with another game
 version, or a mod that replaces those archives, the menu is left out and the game
 reads its files unchanged. Set `CTR_PC_MENU=0` to start without it.
+
+Outside the main menu the game shows the same Options menu with fewer rows: it plays one
+of three layout animations (tags `NoExtraAndTutorialsButtons`, `NoExtraButton`,
+`NXLayout`) that move each row to its place in the shorter list. The PC Settings row and
+the rows of the PC Settings lists are copies of the Gameplay row, so their copies of
+those animations are edited: the PC Settings row goes under the last visible row of
+each layout, and the list rows keep their main-menu places.
 
 Sources: `menu_assets.hpp` (menu resources), `menu_overlay.hpp` (served archives),
 `menu_catalog.hpp` (entries and translations, generated from the development

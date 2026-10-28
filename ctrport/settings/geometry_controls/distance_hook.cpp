@@ -76,7 +76,8 @@ void DistanceHook::invoke(const unsigned long long* arguments) noexcept {
 std::unique_ptr<DistanceHook> install(unsigned char* base, std::size_t extent, const std::string& sha,
                                       DistanceScale selected) {
     if (selected != DistanceScale::original && selected != DistanceScale::half &&
-        selected != DistanceScale::three_quarters)
+        selected != DistanceScale::three_quarters && selected != DistanceScale::one_and_half &&
+        selected != DistanceScale::twice)
         throw std::invalid_argument("invalid distance scale");
     if (selected == DistanceScale::original) return {};
     if (!retail_map::bound(sha) || !base || !retail_map::has(site) || retail_map::at(site) > extent ||
@@ -93,7 +94,10 @@ std::unique_ptr<DistanceHook> install(unsigned char* base, std::size_t extent, c
         throw std::invalid_argument("distance setter prologue mismatch");
     auto hook = std::unique_ptr<DistanceHook>(new DistanceHook());
     hook->image_ = base;
-    hook->factor_ = selected == DistanceScale::half ? 0.5f : 0.75f;
+    hook->factor_ = selected == DistanceScale::half             ? 0.5f
+                    : selected == DistanceScale::three_quarters ? 0.75f
+                    : selected == DistanceScale::one_and_half   ? 1.5f
+                                                                : 2.0f;
     hook->code_ = static_cast<unsigned char*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
     if (!hook->code_) throw std::runtime_error("distance thunk allocation failed");
     // SysV arguments -> call-local array after Win64 shadow space. Subtracting

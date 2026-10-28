@@ -59,6 +59,26 @@ inline void prepare_renderer_environment() {
     const auto* shadow_maps = document->find("shadow_map_quality");
     if (!SetEnvironmentVariableA("CTR_D3D_ShadowQuality", shadow_maps && shadow_maps->text == "high" ? "2" : nullptr))
         win_error("settings shadow map environment");
+    // Direct3D 11 scene post-processing (ctrport/d3d/post.cpp): SMAA, colour, and CAS sharpening
+    // with the Sharpness setting when no upscaler sharpens the scene; Original sets nothing
+    const auto post = [&](const char* key, const char* variable, auto convert) {
+        const auto* v = document->find(key);
+        const std::string value = v && v->text != "original" ? convert(v->text) : std::string();
+        if (!SetEnvironmentVariableA(variable, value.empty() ? nullptr : value.c_str()))
+            win_error("settings post-processing environment");
+    };
+    const auto same = [](const std::string& text) { return text; };
+    post("post_antialiasing", "CTR_D3D_PostAA",
+         [](const std::string& text) { return std::string(text == "smaa_ultra" ? "2" : "1"); });
+    post("color_saturation", "CTR_D3D_Saturation", same);
+    post("color_contrast", "CTR_D3D_Contrast", same);
+    post("color_vibrance", "CTR_D3D_Vibrance", same);
+    post("color_warmth", "CTR_D3D_Warmth", same);
+    post("ambient_occlusion", "CTR_D3D_AO", [](const std::string& text) {
+        return std::string(text == "gtao" ? "1" : text == "gtao_ultra" ? "2" : "");
+    });
+    const bool upscaling = up && up->text != "off";
+    post(upscaling ? "" : "upscaling_sharpness", "CTR_D3D_Sharpen", same);
     auto values = renderer::environment(*document, true);
     const auto display_values = display::environment(*document, true);
     values.insert(values.end(), display_values.begin(), display_values.end());

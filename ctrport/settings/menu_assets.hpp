@@ -1054,6 +1054,14 @@ inline Bytes make_hub121(const Bytes& source, const std::string& project, const 
         const uint32_t p = remap(0xeb0), nav = remap(0x1010), opening = remap(0x32e8);
         put32(f.data, opening + 0x30, f.add_external(children[i].project, children[i].project, true));
         putf(f.data, p + 0x64, -210.0 + double(i) * 105.0);
+        // Every row is a clone of the Gameplay row, so the layouts the game picks outside the
+        // front end (pause menus) would stack them all on Gameplay's place: keep each row where
+        // the front end shows it (keyframes of make_menu121).
+        for (uint32_t keyframe : {0x3490u, 0x3570u, 0x3650u}) {
+            require(f, keyframe, "igGuiVec3LinearKeyframe");
+            putf(f.data, remap(keyframe) + 0x18, getf(f.data, p + 0x60));
+            putf(f.data, remap(keyframe) + 0x1c, getf(f.data, p + 0x64));
+        }
         const std::string name = "CTRPort_Category_" + std::to_string(i + 1);
         n.set(name, p);
         n.set(name + "_Navigation", nav);
@@ -1231,6 +1239,18 @@ inline Bytes make_menu121(const Bytes& source) {
     put32(f.data, 0x2c28 + 0x118, p);
     // PS4 hides its platform-language row; use the sixth visible row location.
     putf(f.data, p + 0x64, 315.0);
+    // The cloned Gameplay animations would move the row onto Gameplay's place in the layouts
+    // the game picks outside the front end (pause menu during races, adventure, battles): its
+    // three animations (tags NXLayout, NoExtraAndTutorialsButtons, NoExtraButton) each hold one
+    // Vec3 keyframe, x then y at +0x18. Place it after the last visible row of each layout:
+    // Gameplay / Audio / Controls at -105 / 0 / 105 without Extras and Hints, -157.5 .. 157.5
+    // with Hints, -262.5 .. 262.5 with the NX language row; rows lean 12 px per 105 down.
+    const std::array<std::pair<uint32_t, double>, 3> layouts{{{0x3490, 367.5}, {0x3570, 210.0}, {0x3650, 262.5}}};
+    for (const auto& [keyframe, y] : layouts) {
+        require(f, keyframe, "igGuiVec3LinearKeyframe");
+        putf(f.data, remap(keyframe) + 0x18, y * 12.0 / 105.0);
+        putf(f.data, remap(keyframe) + 0x1c, y);
+    }
     put32(f.data, opening + 0x30, f.add_external(kCustom, kCustom, true));
     n.set("CTRPort_PC_Settings_Button", p);
     n.set("CTRPort_PC_Settings_Navigation", nav);

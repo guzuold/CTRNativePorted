@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 namespace ctrport::settings::geometry_controls {
-enum class DistanceScale { original, half, three_quarters };
+enum class DistanceScale { original, half, three_quarters, one_and_half, twice };
 class DistanceHook {
 public:
     ~DistanceHook();

@@ -112,8 +112,10 @@ const wchar_t* const kTabNames[TAB_COUNT] = {L"HOME", L"MODS", L"TROPHIES", L"SE
 const wchar_t* const kResolutions[] = {L"1280x720 (720p)", L"1920x1080 (1080p)", L"2560x1440 (1440p)",
                                        L"3840x2160 (4K)", L"Custom"};
 // Upscaling mode: the share of the output resolution the 3D scene is rendered at
-// (ctrport/settings/store.hpp upscaling_scale); used only with an upscaling method.
-const wchar_t* const kModes[] = {L"native", L"quality", L"balanced", L"performance", L"ultra_performance"};
+// (ctrport/settings/store.hpp upscaling_scale); used only with an upscaling method, except
+// supersampling (Direct3D 11), which renders the scene larger than the output with or without one.
+const wchar_t* const kModes[] = {L"native",      L"quality", L"balanced", L"performance", L"ultra_performance",
+                                 L"ss_150", L"ss_200"};
 constexpr int ID_UPSCALER = 905;
 const wchar_t* const kUpscalers[] = {L"off", L"fsr1", L"fsr3", L"dlss"};
 const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3", L"NVIDIA DLSS"};
@@ -121,8 +123,9 @@ const wchar_t* const kUpscalerLabels[] = {L"Off", L"AMD FSR 1", L"AMD FSR 3", L"
 constexpr int ID_RENDERER = 910;
 const wchar_t* const kRenderers[] = {L"vulkan", L"d3d11"};
 const wchar_t* const kRendererLabels[] = {L"Vulkan (shadPS4)", L"Direct3D 11 (native)"};
-const wchar_t* const kModeLabels[] = {L"Native (100%)", L"Quality (67%)", L"Balanced (58%)", L"Performance (50%)",
-                                      L"Ultra performance (33%)"};
+const wchar_t* const kModeLabels[] = {L"Native (100%)",           L"Quality (67%)",          L"Balanced (58%)",
+                                      L"Performance (50%)",       L"Ultra performance (33%)", L"Supersampling (150%)",
+                                      L"Supersampling (200%)"};
 const wchar_t* const kPills[] = {L"720p", L"1080p", L"1440p", L"4K", L"Custom"};
 const int kPresetSize[][2] = {{1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
 
@@ -1439,7 +1442,7 @@ void validate() {
             if (g.cfg.upscaler != L"off" && g.cfg.upscaler == kUpscalers[i])
                 summary += std::wstring(L" · ") + kUpscalerLabels[i];
         for (size_t i = 0; i < std::size(kModes); ++i)
-            if (g.cfg.upscaler != L"off" && g.cfg.upscaling_mode == kModes[i])
+            if ((g.cfg.upscaler != L"off" || i >= 5) && g.cfg.upscaling_mode == kModes[i])
                 summary += std::wstring(L" ") + tr(kModeLabels[i]);
         if (g.cfg.online) {
             const std::wstring id = g.online_id_edit ? window_text(g.online_id_edit) : g.cfg.online_id;
@@ -1452,7 +1455,8 @@ void validate() {
     EnableWindow(g.launch, g.can_launch);
     for (const auto& row : graphics_section::rows) { // 60 FPS mode: v01.21; upscaling mode: with a method
         if (row.control->key == "fps_60") EnableWindow(row.combo, g.cfg.use_patch);
-        if (row.control->key == "upscaling_mode") EnableWindow(row.combo, g.cfg.upscaler != L"off");
+        if (row.control->key == "upscaling_mode")
+            EnableWindow(row.combo, g.cfg.upscaler != L"off" || g.cfg.renderer == L"d3d11");
     }
     graphics_section_apply_scroll();
     refresh_artwork();

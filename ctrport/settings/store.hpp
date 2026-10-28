@@ -153,7 +153,12 @@ inline double upscaling_scale(const std::string& mode) {
     if (mode == "balanced") return 0.58;
     if (mode == "performance") return 0.5;
     if (mode == "ultra_performance") return 1.0 / 3.0;
+    if (mode == "ss_150") return 1.5;
+    if (mode == "ss_200") return 2.0;
     return 1.0;
+}
+inline bool supersampling(const std::string& mode) {
+    return mode == "ss_150" || mode == "ss_200";
 }
 
 // Composite and replaced controls (2026-10 settings layout). shadow_quality sets the four shadow
@@ -213,11 +218,13 @@ inline const Json* runtime_snapshot() {
 // Read migration is side-effect free; the next successful write records schema 1.
 inline int scene_height(const Json& doc) {
     validate(doc);
-    // Upscaling mode: that share of the output height (none with the upscaler off), rounded so the
-    // 16:9 scene width stays a whole multiple of 32 pixels.
+    // Upscaling mode: that share of the output height (none with the upscaler off; supersampling
+    // with or without it), rounded so the 16:9 scene width stays a whole multiple of 32 pixels.
+    // The scene is at most 2160 lines, the largest the game's scene scale patch allows.
     if (const auto* mode = doc.find("upscaling_mode")) {
         const auto* up = doc.find("upscaler");
-        const double share = up && up->text != "off" ? upscaling_scale(mode->text) : 1.0;
+        const double share =
+            (up && up->text != "off") || supersampling(mode->text) ? upscaling_scale(mode->text) : 1.0;
         const int height = int(std::lround(output_height(doc) * share / 18.0)) * 18;
         return std::clamp(height, 540, 2160);
     }

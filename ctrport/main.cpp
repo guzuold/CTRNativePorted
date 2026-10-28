@@ -992,6 +992,10 @@ extern "C" void* ctr_tls_address(const CtrTlsIndex* index, std::uint64_t caller)
 // ctrport.exe <eboot> <modules...> starts the game (the launcher and play_gpu.py build this
 // command line). The other two commands are maintenance tools.
 int main(int argc, char** argv) {
+    // Physical pixels for the game window and the display queries (output height, monitor size):
+    // a DPI-unaware process on a scaled display (a 4K monitor at 150%) sees 2560x1440 and Windows
+    // stretches its window, so the Direct3D 11 output was blurry. SDL3 (Vulkan) declares the same.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const std::string command = argc >= 2 ? argv[1] : "";
     if (argc == 3 && command == "--settings-reset-graphics") {
         try {

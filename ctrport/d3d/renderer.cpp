@@ -29,6 +29,7 @@
 #include "formats.h"
 #include "gfx.h"
 #include "guest.h"
+#include "post.h"
 #include "texture.h"
 #include "videoout.h"
 #include "../settings/display_controls/gpu_policy.hpp"
@@ -167,6 +168,8 @@ Surface g_placeholder;
 // ctrport: render-target memory (2D macro tiling) sampled before this backend rendered it holds
 // nothing the GPU wrote - transparent black, not the grey placeholder of unconverted assets
 Surface g_unwritten;
+// the same two as cubes, for TextureCube slots (dims 4) without a cube texture to bind
+ComPtr<ID3D11ShaderResourceView> g_placeholder_cube, g_unwritten_cube;
 ComPtr<ID3D11VertexShader> g_blit_vs;
 ComPtr<ID3D11PixelShader> g_blit_ps, g_copy_ps, g_present_ps;
 ComPtr<ID3D11Buffer> g_present_cb;
@@ -178,6 +181,11 @@ Stats g_stats;
 u64 g_frame = 0;
 double g_present_ms = 0; // time blocked in Present (GPU-bound when large)
 bool g_capture = false;  // logging every draw of the captured frame
+// For XeGTAO (post.cpp): the game's full-resolution linear depth of this frame (the target of its
+// LinearizeDepth pass, drawn before its AO pass) and the AO pass's constants (cb0)
+ID3D11ShaderResourceView* g_linear_depth = nullptr;
+const float* g_ao_cb = nullptr;
+u32 g_ao_cb_floats = 0;
 u64 g_capture_frame = [] {
     char v[32] = {};
     return GetEnvironmentVariableA("CTR_CAPTURE", v, sizeof(v)) ? strtoull(v, nullptr, 10) : 0ull;
@@ -712,6 +720,20 @@ bool Init() {
     g_dev->CreateTexture2D(&td, &zinit2, &g_unwritten.tex);
     g_dev->CreateShaderResourceView(g_unwritten.tex.Get(), nullptr, &g_unwritten.srv);
     g_dev->CreateShaderResourceView(g_unwritten.tex.Get(), &av, &g_unwritten.srv_array);
+    {
+        D3D11_TEXTURE2D_DESC cd = td;
+        cd.ArraySize = 6;
+        cd.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+        const u32* faces[] = {&grey, &zero};
+        ComPtr<ID3D11ShaderResourceView>* views[] = {&g_placeholder_cube, &g_unwritten_cube};
+        for (int k = 0; k < 2; k++) {
+            D3D11_SUBRESOURCE_DATA ci[6];
+            for (auto& c : ci) c = {faces[k], 4};
+            ComPtr<ID3D11Texture2D> cube;
+            g_dev->CreateTexture2D(&cd, ci, &cube);
+            g_dev->CreateShaderResourceView(cube.Get(), nullptr, views[k]->ReleaseAndGetAddressOf());
+        }
+    }
 
     ComPtr<ID3DBlob> vsb, psb, cpb, ppb, err;
     D3DCompile(kBlitHlsl, strlen(kBlitHlsl), "blit", nullptr, nullptr, "vsmain", "vs_5_0", 0, 0, &vsb, &err);
@@ -1004,12 +1026,20 @@ ID3D11DepthStencilState* GetDepthState(u32 ctl, u32 refmask, u32 ops) {
     return d.Get();
 }
 
+// The view of a texture for a shader slot declared with `dims` (2 Texture2D, 3 Texture2DArray,
+// 4 TextureCube); a slot needing a cube view that the texture lacks gets the cube `fallback`.
+template <class T>
+ID3D11ShaderResourceView* ViewFor(const T& t, int dims, ID3D11ShaderResourceView* fallback) {
+    if (dims == 4) return fallback;
+    return dims == 3 ? t.srv_array.Get() : t.srv.Get();
+}
+
 ID3D11ShaderResourceView* GetTexture(const u32* tsharp, int dims) {
-    if (!tsharp) return dims == 3 ? g_placeholder.srv_array.Get() : g_placeholder.srv.Get();
+    if (!tsharp) return ViewFor(g_placeholder, dims, g_placeholder_cube.Get());
     TSharp t = DecodeTSharp(tsharp);
     auto it = g_surfaces.find(t.base);
     if (it != g_surfaces.end() && it->second.srv) {
-        return dims == 3 ? it->second.srv_array.Get() : it->second.srv.Get();
+        return ViewFor(it->second, dims, g_placeholder_cube.Get());
     }
     u64 key = Fnv((const u8*)tsharp, 24);
     auto tx = g_textures.find(key);
@@ -1040,9 +1070,10 @@ ID3D11ShaderResourceView* GetTexture(const u32* tsharp, int dims) {
             RefreshTexture(g_ctx.Get(), t, &tx->second))
             g_stats.texture_refresh++;
     }
-    if (tx->second.srv) return dims == 3 ? tx->second.srv_array.Get() : tx->second.srv.Get();
-    if (!TextureSupported(t)) return dims == 3 ? g_unwritten.srv_array.Get() : g_unwritten.srv.Get();
-    return dims == 3 ? g_placeholder.srv_array.Get() : g_placeholder.srv.Get();
+    if (tx->second.srv)
+        return ViewFor(tx->second, dims, tx->second.srv_cube ? tx->second.srv_cube.Get() : g_placeholder_cube.Get());
+    if (!TextureSupported(t)) return ViewFor(g_unwritten, dims, g_unwritten_cube.Get());
+    return ViewFor(g_placeholder, dims, g_placeholder_cube.Get());
 }
 
 // ------------------------------------------------------------------ fixed function state
@@ -1284,6 +1315,8 @@ void UpdateCBuffers(int stage, u64 shader, const ShaderInfo* si) {
                 data = (u64)patched;
             }
             parts[np++] = {(int)slot, (const void*)data, size};
+            if (stage == 1 && slot == 0 && PostAmbientOcclusionFor(si->name))
+                g_ao_cb = (const float*)data, g_ao_cb_floats = size / 4;
             static const std::string after = [] {
                 char v[128] = {};
                 return GetEnvironmentVariableA("CTR_CAPTURE_AFTER", v, sizeof(v)) ? std::string(v) : std::string();
@@ -1490,6 +1523,7 @@ struct SceneUpscale {
     ComPtr<ID3D11UnorderedAccessView> uav[2];
     u32 w = 0, h = 0;
     ID3D11ShaderResourceView* result = nullptr;
+    float result_width = 0; // physical width of `result`, for the texel scale of the display pass
     u64 frames = 0;
 } g_up;
 
@@ -1514,6 +1548,7 @@ struct FsrInclude : ID3DInclude {
 };
 
 void InitSceneUpscale() {
+    PostInit(g_dev.Get(), g_ctx.Get());
     const char* up = getenv("CTR_UPSCALER");
     const std::string mode = up && up[0] ? up : "off";
     if (mode == "off") return;
@@ -1549,7 +1584,7 @@ void InitSceneUpscale() {
 
 // Per draw, before its textures are bound: the display-pass transition and G-buffer passes.
 void SceneUpscaleTrack(Surface* color0, u64 color0_base, u32 targets, bool depth) {
-    if (!g_up.enabled) return;
+    if (!g_up.enabled && !PostActive()) return;
     const bool display = color0 && VideoOutIsBuffer(color0_base);
     if (display && !g_up.last_display) {
         g_up.pending = g_up.gbuffer_seen && g_up.last_color && g_up.last_color != color0;
@@ -1566,13 +1601,21 @@ void SceneUpscaleTrack(Surface* color0, u64 color0_base, u32 targets, bool depth
     if (color0) g_up.last_color = color0;
 }
 
-// The upscaled scene for the display pass (made at its first use in the frame), or null when the
-// sizes are not an upscale the GPU library would do.
+// The finished scene for the display pass (made at its first use in the frame): post-processed
+// (post.cpp) at its own size, then FSR 1 upscaled when that is selected and the sizes are an
+// upscale the GPU library would do. Null when neither applies.
 ID3D11ShaderResourceView* SceneUpscaled(Surface& src) {
     if (g_up.done) return g_up.result;
     g_up.done = true;
     const u32 iw = Scaled(src.w, src.scale), ih = Scaled(src.h, src.scale), ow = g_up.out_w, oh = g_up.out_h;
-    if (iw >= ow || ih >= oh || iw * 4 < ow || std::fabs(double(iw) / ih - double(ow) / oh) > 0.02) return nullptr;
+    const bool upscale = g_up.enabled && iw < ow && ih < oh && iw * 4 >= ow &&
+                         std::fabs(double(iw) / ih - double(ow) / oh) <= 0.02;
+    ID3D11ShaderResourceView* scene = PostRun(src.srv.Get(), iw, ih, !upscale);
+    if (!upscale) {
+        g_up.result = scene != src.srv.Get() ? scene : nullptr;
+        g_up.result_width = (float)iw;
+        return g_up.result;
+    }
     if (g_up.w != ow || g_up.h != oh) {
         for (int i = 0; i < 2; i++) {
             D3D11_TEXTURE2D_DESC td{};
@@ -1606,10 +1649,11 @@ ID3D11ShaderResourceView* SceneUpscaled(Surface& src) {
         g_ctx->CSSetShaderResources(0, 1, &no_srv);
         g_ctx->CSSetUnorderedAccessViews(0, 1, &no_uav, nullptr);
     };
-    pass(g_up.easu.Get(), src.srv.Get(), g_up.uav[0].Get());
+    pass(g_up.easu.Get(), scene, g_up.uav[0].Get());
     if (sharpness.enabled) pass(g_up.rcas.Get(), g_up.srv[0].Get(), g_up.uav[1].Get());
     g_ctx->CSSetShader(nullptr, nullptr, 0);
     g_up.result = g_up.srv[sharpness.enabled ? 1 : 0].Get();
+    g_up.result_width = (float)g_up.w;
     if (++g_up.frames <= 3 || g_up.frames % 600 == 0)
         LOG("CTR_UPSCALE_DISPATCH mode=fsr1 frame=%llu input=%ux%u output=%ux%u rcas=%d before_hud=1",
             (unsigned long long)g_up.frames, iw, ih, ow, oh, int(sharpness.enabled));
@@ -1633,12 +1677,13 @@ void BindTextures(int stage, u64 ctx, u64 dev, const ShaderInfo* si) {
             auto it = g_surfaces.find(DecodeTSharp((const u32*)t).base);
             if (it != g_surfaces.end()) {
                 g_tscale[stage][slot] = it->second.scale;
-                // the display pass samples the finished scene: FSR 1 upscale in its place, with
-                // the scale that maps the game's texel coordinates onto it
+                // the display pass samples the finished scene: the post-processed or FSR 1
+                // upscaled scene in its place, with the scale that maps the game's texel
+                // coordinates onto it
                 if (stage == 1 && g_up.pending && &it->second == g_up.source && dims == 2 && !it->second.dsv)
                     if (ID3D11ShaderResourceView* up = SceneUpscaled(it->second)) {
                         srv[slot] = up;
-                        g_tscale[stage][slot] = (float)g_up.w / it->second.w;
+                        g_tscale[stage][slot] = g_up.result_width / it->second.w;
                     }
             }
         }
@@ -2158,7 +2203,10 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
     SECTION(2);
     // shaders, constants, textures
     g_ctx->VSSetShader(vs->vs.Get(), nullptr, 0);
-    g_ctx->PSSetShader(ps ? ps->ps.Get() : nullptr, nullptr, 0);
+    ID3D11PixelShader* pixel = ps ? ps->ps.Get() : nullptr;
+    if (ps)
+        if (ID3D11PixelShader* replacement = PostReplacement(ps->name)) pixel = replacement;
+    g_ctx->PSSetShader(pixel, nullptr, 0);
     g_ctx->GSSetShader(gs ? gs->gs.Get() : nullptr, nullptr, 0);
     SECTION(6);
     CbRingReserve(CbBytes(gs ? gsh : 0) + CbBytes(vsh) + CbBytes(ps ? psh : 0) + 3 * (u32)sizeof(InfoCB));
@@ -2286,6 +2334,12 @@ void GfxDraw(u32 count, u64 index_addr, bool indexed) {
         g_ctx->Draw(count, 0);
     }
     g_stats.drawn++;
+    // XeGTAO in place of the game's AO, written over its result in the same target
+    if (ps && color0 && ps->name.rfind("LinearizeDepth_", 0) == 0) g_linear_depth = color0->srv.Get();
+    if (ps && nrt >= 1 && rtv[0] && PostAmbientOcclusionFor(ps->name)) {
+        PostAmbientOcclusion(rtv[0], g_linear_depth, g_ao_cb, g_ao_cb_floats);
+        g_linear_depth = nullptr, g_ao_cb = nullptr;
+    }
     if (g_capture) DrainDebugMessages(64); // hazards next to the draw that caused them (CTR_D3D_DEBUG=1)
     // debugging aid: CTR_CAPTURE_AFTER=<shader name part> saves render target 0 right after each
     // matching draw of the captured frame

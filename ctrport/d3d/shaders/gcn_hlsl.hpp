@@ -199,6 +199,9 @@ public:
     std::set<int64_t> cube_face_vgprs, lane_addr_vgprs, lds_slots;
     std::map<int64_t, int> force_dims;
     std::map<int64_t, std::set<int>> dims_seen;
+    // slots read through cube face coordinates, and slots read any other way: a slot only in the
+    // first set is declared TextureCube (dims 4), so filtering and mip selection cross face edges
+    std::set<int64_t> cube_slots, plain_slots;
     bool exec_written = false;
     std::map<int64_t, size_t> idx;
     std::map<int64_t, Tag> tags;
@@ -225,7 +228,8 @@ public:
             if (t.first == slot) return &t.second;
         return nullptr;
     }
-    void set_texture(int64_t slot, int dims, const char* use) {
+    void set_texture(int64_t slot, int dims, const char* use, bool cube = false) {
+        (cube ? cube_slots : plain_slots).insert(slot);
         if (auto* t = texture(slot))
             *t = {dims, use};
         else
@@ -1256,10 +1260,15 @@ public:
             k += 4;
         }
         std::string coord;
+        bool cube = false;
         if (cube_face_vgprs.count(a + k + 2)) {
-            // GCN cube lookup: (s, t) in [1, 2] + face index; the cube is bound as a 6-slice array
+            // GCN cube lookup: (s, t) in [1, 2] + face index. ctr_cube<slot> turns it back into a
+            // direction when the slot is declared TextureCube (assemble), else keeps the 6-slice array
+            // coordinate; explicit gradients and offsets are face-space, so they keep the array
             dims = 3;
             coord = "float3(" + av(k) + " - 1.0f, " + av(k + 1) + " - 1.0f, " + av(k + 2) + ")";
+            cube = grads.empty() && !offset;
+            if (cube) coord = "ctr_cube" + num(slot) + "(" + coord + ")";
         } else {
             std::vector<std::string> cs;
             for (int j = 0; j < dims; j++) cs.push_back(av(k + j));
@@ -1277,7 +1286,7 @@ public:
         std::optional<std::string> lod;
         if (contains(mods, "_l") && !contains(mods, "_lz")) lod = av(k);
         if (contains(mods, "_lz")) lod = "0.0f";
-        set_texture(slot, dims, "sample");
+        set_texture(slot, dims, "sample", cube);
         const std::string tex = "t" + num(slot);
         if (cmp_) {
             auto it = samplers.find(smp);
@@ -1436,11 +1445,25 @@ public:
                           "[4096]; };");
             out.push_back("uint cbload" + num(slot) + "(uint dw) { return cb" + num(slot) + "[dw >> 2][dw & 3u]; }");
         }
+        for (auto& [slot, du] : textures)
+            if (cube_slots.count(slot) && !plain_slots.count(slot)) du.first = 4;
         auto sorted_textures = textures;
         std::sort(sorted_textures.begin(), sorted_textures.end(), [](auto& x, auto& y) { return x.first < y.first; });
         for (const auto& [slot, du] : sorted_textures)
-            out.push_back(std::string(du.first == 2 ? "Texture2D" : "Texture2DArray") + "<float4> t" + num(slot) +
-                          " : register(t" + num(slot) + ");");
+            out.push_back(std::string(du.first == 2   ? "Texture2D"
+                                      : du.first == 4 ? "TextureCube"
+                                                      : "Texture2DArray") +
+                          "<float4> t" + num(slot) + " : register(t" + num(slot) + ");");
+        if (!cube_slots.empty())
+            // (s, t) in [0, 1] and face index (v_cubeid order +X -X +Y -Y +Z -Z) back to a direction,
+            // inverting cubesc / cubetc above
+            out.push_back("float3 ctr_cubedir(float3 c) { float sc = c.x * 2.0f - 1.0f, tc = c.y * 2.0f - 1.0f; "
+                          "uint f = (uint)(c.z + 0.5f); return f == 0u ? float3(1, -tc, -sc) : f == 1u ? float3(-1, -tc, sc) "
+                          ": f == 2u ? float3(sc, 1, tc) : f == 3u ? float3(sc, -1, -tc) : f == 4u ? float3(sc, -tc, 1) "
+                          ": float3(-sc, -tc, -1); }");
+        for (int64_t slot : cube_slots)
+            out.push_back("float3 ctr_cube" + num(slot) + "(float3 c) { return " +
+                          (plain_slots.count(slot) ? "c" : "ctr_cubedir(c)") + "; }");
         if (uses_swizzle || uses_vin || uses_scale)
             out.push_back("cbuffer CTRSwizzle : register(b13) { uint4 ctr_swz[8]; uint4 ctr_vin[8]; "
                           "float4 ctr_scale; float4 ctr_tscale[8]; };");

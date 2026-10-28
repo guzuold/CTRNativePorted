@@ -52,8 +52,13 @@ enum class Option : std::uint32_t {
     shadow_resolution = 0x4354001a,
     shadow_cascade_limit = 0x4354001b,
     shadow_map_quality = 0x43540029,
+    post_antialiasing = 0x4354002d,
+    color_saturation = 0x4354002e,
+    color_contrast = 0x4354002f,
+    color_vibrance = 0x43540030,
+    color_warmth = 0x43540031,
 };
-inline constexpr Option options[] = {Option::window_resolution,Option::window_mode,Option::present_mode,Option::presentation_limit,Option::display_refresh,Option::fps_60,Option::upscaler,Option::upscaling_mode,Option::upscaling_sharpness,Option::texture_quality,Option::anisotropy,Option::shadow_quality,Option::racer_mesh_lod,Option::static_mesh_lod,Option::native_view_distance,Option::vfx_quality,Option::native_antialiasing,Option::ambient_occlusion,Option::hero_shadows,Option::native_bloom,Option::native_motion_blur,Option::native_depth_of_field,Option::native_fur_detail,Option::quality_preset,Option::scene_height,Option::fullscreen,Option::game_language,Option::xbox_prompts,Option::antialiasing,Option::fsr1_sharpen,Option::screen_space_reflections,Option::bloom,Option::motion_blur,Option::vignette,Option::depth_of_field,Option::distance_scale,Option::cascaded_shadows,Option::hdr_output,Option::display_gamma,Option::hdr_peak_nits,Option::hdr_exposure,Option::shadow_resolution,Option::shadow_cascade_limit,Option::shadow_map_quality};
+inline constexpr Option options[] = {Option::window_resolution,Option::window_mode,Option::present_mode,Option::presentation_limit,Option::display_refresh,Option::fps_60,Option::upscaler,Option::upscaling_mode,Option::upscaling_sharpness,Option::texture_quality,Option::anisotropy,Option::shadow_quality,Option::racer_mesh_lod,Option::static_mesh_lod,Option::native_view_distance,Option::vfx_quality,Option::native_antialiasing,Option::ambient_occlusion,Option::hero_shadows,Option::native_bloom,Option::native_motion_blur,Option::native_depth_of_field,Option::native_fur_detail,Option::quality_preset,Option::scene_height,Option::fullscreen,Option::game_language,Option::xbox_prompts,Option::antialiasing,Option::fsr1_sharpen,Option::screen_space_reflections,Option::bloom,Option::motion_blur,Option::vignette,Option::depth_of_field,Option::distance_scale,Option::cascaded_shadows,Option::hdr_output,Option::display_gamma,Option::hdr_peak_nits,Option::hdr_exposure,Option::shadow_resolution,Option::shadow_cascade_limit,Option::shadow_map_quality,Option::post_antialiasing,Option::color_saturation,Option::color_contrast,Option::color_vibrance,Option::color_warmth};
 constexpr bool owns(std::uint32_t id) {
     for (auto option : options) if (static_cast<std::uint32_t>(option) == id) return true;
     return false;
@@ -104,6 +109,11 @@ inline const char* key(Option option) {
     case Option::shadow_resolution: return "shadow_resolution";
     case Option::shadow_cascade_limit: return "shadow_cascade_limit";
     case Option::shadow_map_quality: return "shadow_map_quality";
+    case Option::post_antialiasing: return "post_antialiasing";
+    case Option::color_saturation: return "color_saturation";
+    case Option::color_contrast: return "color_contrast";
+    case Option::color_vibrance: return "color_vibrance";
+    case Option::color_warmth: return "color_warmth";
     }
     throw std::invalid_argument("settings: unknown PC option");
 }
@@ -116,7 +126,7 @@ inline unsigned count(Option option) {
     case Option::display_refresh: return 7;
     case Option::fps_60: return 2;
     case Option::upscaler: return 4;
-    case Option::upscaling_mode: return 5;
+    case Option::upscaling_mode: return 7;
     case Option::upscaling_sharpness: return 12;
     case Option::texture_quality: return 3;
     case Option::anisotropy: return 5;
@@ -126,7 +136,7 @@ inline unsigned count(Option option) {
     case Option::native_view_distance: return 3;
     case Option::vfx_quality: return 3;
     case Option::native_antialiasing: return 3;
-    case Option::ambient_occlusion: return 2;
+    case Option::ambient_occlusion: return 4;
     case Option::hero_shadows: return 2;
     case Option::native_bloom: return 2;
     case Option::native_motion_blur: return 2;
@@ -144,7 +154,7 @@ inline unsigned count(Option option) {
     case Option::motion_blur: return 2;
     case Option::vignette: return 2;
     case Option::depth_of_field: return 2;
-    case Option::distance_scale: return 3;
+    case Option::distance_scale: return 5;
     case Option::cascaded_shadows: return 2;
     case Option::hdr_output: return 3;
     case Option::display_gamma: return 5;
@@ -153,6 +163,11 @@ inline unsigned count(Option option) {
     case Option::shadow_resolution: return 3;
     case Option::shadow_cascade_limit: return 4;
     case Option::shadow_map_quality: return 2;
+    case Option::post_antialiasing: return 3;
+    case Option::color_saturation: return 6;
+    case Option::color_contrast: return 6;
+    case Option::color_vibrance: return 6;
+    case Option::color_warmth: return 7;
     }
     throw std::invalid_argument("settings: unknown PC option");
 }
@@ -216,6 +231,8 @@ inline Json value(Option option, unsigned index) {
         case 2: return Json::of("balanced");
         case 3: return Json::of("performance");
         case 4: return Json::of("ultra_performance");
+        case 5: return Json::of("ss_150");
+        case 6: return Json::of("ss_200");
         } break;
     case Option::upscaling_sharpness: switch(index) {
         case 0: return Json::of("original");
@@ -276,6 +293,8 @@ inline Json value(Option option, unsigned index) {
     case Option::ambient_occlusion: switch(index) {
         case 0: return Json::of("original");
         case 1: return Json::of("off");
+        case 2: return Json::of("gtao");
+        case 3: return Json::of("gtao_ultra");
         } break;
     case Option::hero_shadows: switch(index) {
         case 0: return Json::of("original");
@@ -367,6 +386,8 @@ inline Json value(Option option, unsigned index) {
         case 0: return Json::of("original");
         case 1: return Json::of("0.5");
         case 2: return Json::of("0.75");
+        case 3: return Json::of("1.5");
+        case 4: return Json::of("2");
         } break;
     case Option::cascaded_shadows: switch(index) {
         case 0: return Json::of("original");
@@ -411,6 +432,44 @@ inline Json value(Option option, unsigned index) {
     case Option::shadow_map_quality: switch(index) {
         case 0: return Json::of("original");
         case 1: return Json::of("high");
+        } break;
+    case Option::post_antialiasing: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("smaa");
+        case 2: return Json::of("smaa_ultra");
+        } break;
+    case Option::color_saturation: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("80");
+        case 2: return Json::of("90");
+        case 3: return Json::of("110");
+        case 4: return Json::of("120");
+        case 5: return Json::of("130");
+        } break;
+    case Option::color_contrast: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("90");
+        case 2: return Json::of("95");
+        case 3: return Json::of("105");
+        case 4: return Json::of("110");
+        case 5: return Json::of("115");
+        } break;
+    case Option::color_vibrance: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("10");
+        case 2: return Json::of("20");
+        case 3: return Json::of("30");
+        case 4: return Json::of("40");
+        case 5: return Json::of("50");
+        } break;
+    case Option::color_warmth: switch(index) {
+        case 0: return Json::of("original");
+        case 1: return Json::of("-30");
+        case 2: return Json::of("-20");
+        case 3: return Json::of("-10");
+        case 4: return Json::of("10");
+        case 5: return Json::of("20");
+        case 6: return Json::of("30");
         } break;
     }
     throw std::invalid_argument("settings: selection outside verified domain");

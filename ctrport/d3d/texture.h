@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // From FrankHUN88453/CTR-NitroFueled-PC 96b4aa5474b1d42b0d9f383349dc091ea9a2d385 port/src/gfx/texture.h
-// (MIT, ctrport/d3d/LICENSE.FrankHUN88453); unchanged.
+// (MIT, ctrport/d3d/LICENSE.FrankHUN88453); ctrport adds the cube view `srv_cube`.
 #pragma once
 #include "guest.h"
 #include <d3d11.h>
@@ -11,6 +11,7 @@
 struct TextureObject {
     Microsoft::WRL::ComPtr<ID3D11Texture2D> tex;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv, srv_array;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv_cube; // cube textures: for TextureCube slots
     u64 mem_base = 0, mem_size = 0; // guest memory the texture was built from
     u64 checked_frame = 0;          // last frame the guest copy was checked for writes
     GuestWatch watch;               // guest writes since the copy was made

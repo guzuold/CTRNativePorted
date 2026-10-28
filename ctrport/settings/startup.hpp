@@ -75,8 +75,15 @@ inline bridge::Hooks startup_hooks() {
         if (option == menu::Option::upscaler) return index < 2 || display_extensions_confirmed;
         if (option == menu::Option::hero_shadows) return index == 0 || hero_extensions_confirmed;
         if (option == menu::Option::quality_preset) return index < 2 || renderer_extensions_confirmed;
-        if (option == menu::Option::ambient_occlusion) return index == 0 || ao_extensions_confirmed;
+        if (option == menu::Option::ambient_occlusion)
+            return index == 0 || (index == 1 && ao_extensions_confirmed) || (index >= 2 && d3d_extensions_confirmed);
         if (option == menu::Option::shadow_map_quality) return index == 0 || d3d_extensions_confirmed;
+        // Direct3D 11 scene post-processing (ctrport/d3d/post.cpp) and supersampling
+        if (option == menu::Option::post_antialiasing || option == menu::Option::color_saturation ||
+            option == menu::Option::color_contrast || option == menu::Option::color_vibrance ||
+            option == menu::Option::color_warmth)
+            return index == 0 || d3d_extensions_confirmed;
+        if (option == menu::Option::upscaling_mode && index >= 5) return d3d_extensions_confirmed;
         if (option == menu::Option::hdr_output || option == menu::Option::display_gamma ||
             option == menu::Option::hdr_peak_nits || option == menu::Option::hdr_exposure)
             return index == 0 || display_extensions_confirmed;
@@ -257,6 +264,8 @@ inline std::unique_ptr<StartupAdapter> install_startup(unsigned char* image, std
         const auto distance_value = distance ? distance->text : "original";
         const auto scale = distance_value == "0.5"    ? geometry_controls::DistanceScale::half
                            : distance_value == "0.75" ? geometry_controls::DistanceScale::three_quarters
+                           : distance_value == "1.5"  ? geometry_controls::DistanceScale::one_and_half
+                           : distance_value == "2"    ? geometry_controls::DistanceScale::twice
                                                       : geometry_controls::DistanceScale::original;
         optional("distance_scale", [&] { adapter->distance = geometry_controls::install(image, extent, sha, scale); });
         std::printf("settings_distance_applied requested=%s application=restart override_applied=%s\n",

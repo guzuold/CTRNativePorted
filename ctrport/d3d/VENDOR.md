@@ -20,9 +20,27 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
   `import_runtime_shaders.py`. Their output is byte-identical to the Python translator: same HLSL and
   same DXBC for all 3202 shaders it handles. They also read one more shader, the Fur GS of
   `update2.pak`, which the Python IGA reader could not read. `shaders/ctr_shaders.cpp` (GPL-2.0-or-later) is the tool.
+  - ctrport change: a texture read only through cube-face coordinates (`v_cubeid` and the rest) is declared
+    `TextureCube`, and the face coordinates are turned back into a direction; the renderer binds a cube view.
+    The 6-slice array read before chose a far too small mip level and did not filter across face edges, which
+    drew a seam on reflective surfaces such as the trophies (110 of 3203 shaders).
 - FSR 1: `fsr/ffx_a.h`, `fsr/ffx_fsr1.h` (AMD FidelityFX, MIT), copied unchanged from shadPS4 v0.18.0
   `src/video_core/host_shaders/fsr` (SHA256 `94d8d663…`, `4dc2022e…`). `fsr/fsr1.hlsl` is the D3D11 form
   of shadPS4's `fsr.comp` (32-bit float path); CMake embeds the three into the DLL.
+- Scene post-processing and ambient occlusion (`post.cpp`, `post/post.hlsl`, `post/gtao.hlsl`, GPL-2.0-or-later),
+  embedded by CMake and compiled by the renderer at startup:
+  - `smaa/SMAA.hlsl`, `smaa/AreaTex.h`, `smaa/SearchTex.h`: SMAA by Jimenez et al. (MIT, `smaa/LICENSE.SMAA`),
+    iryoku/smaa revision `71c806a838bdd7d517df19192a20f0c61b3ca29d`, unchanged. Its pixel shader functions are
+    called from compute shaders through its `SMAA_CUSTOM_SL` porting macros.
+  - `cas/ffx_cas.h`, `cas/ffx_a.h`: AMD FidelityFX Contrast Adaptive Sharpening (MIT,
+    `cas/LICENSE.AMD-FidelityFX-CAS`), GPUOpen-Effects/FidelityFX-CAS revision
+    `9fabcc9a2c45f958aff55ddfda337e74ef894b7f`, unchanged (its `ffx_a.h` is an older version than FSR 1's, so it is
+    kept apart).
+  - `gtao/XeGTAO.h`, `gtao/XeGTAO.hlsli`: Intel XeGTAO (MIT, `gtao/LICENSE.XeGTAO`), GameTechDev/XeGTAO revision
+    `a5b1686c7ea37788eeb3576b5be47f7c03db532c`. Changed for this renderer: `XE_GTAO_LINEAR_DEPTH_INPUT` (the source
+    is the game's linear depth, scaled by `DepthUnpackConsts.x`), and integer/float literal swizzles such as `2.xx`
+    written as `((uint)(2)).xx` so fxc (Shader Model 5) compiles them. The Hilbert noise follows Intel's sample
+    `vaGTAO.hlsl`.
 - `pads.cpp` (GPL-2.0-only): PlayStation controllers through SDL 3 (zlib licence, linked statically from
   the GPU library's pinned `engine/shadPS4/externals/sdl3`), the same reading and exports as
   `ctrport/gpu/shim/controller_exit.cpp`, polled on a thread of its own.
@@ -38,6 +56,11 @@ layout in `engine.h`) with shaders translated ahead of time from the user's dump
 | native HDR, HDR peak, HDR exposure | HDR10 is offered to the game (capability BT.2020 PQ) when the setting asks for it and the window's display uses the HDR10 color space; the swap chain then switches to R10G10B10A2 with `DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020`, and the present shader applies peak / exposure as `color_math.inc` does |
 | scene upscaling FSR 1, FSR 1 sharpness | the finished scene (color target before the first draw into a flip buffer, after a four-target G-buffer pass) is upscaled with EASU + RCAS to the display target and sampled by the display pass in its place, before the HUD; sharpness is read every frame (live) |
 | scene upscaling FSR 3, DLSS | not available: logged, the game's own scaling shows the scene; the launcher asks for Off or FSR 1 |
+| anti-aliasing SMAA / SMAA Ultra (`CTR_D3D_PostAA` 1 / 2) | the game's FXAA pass draws a plain copy instead, and SMAA 1x runs on the finished scene before the HUD (`post.cpp`) |
+| saturation, contrast, vibrance, colour temperature (`CTR_D3D_Saturation`, `_Contrast`, `_Vibrance`, `_Warmth`) | one compute pass on the finished scene before the HUD |
+| sharpness without an upscaler (`CTR_D3D_Sharpen`, live from the game menu) | AMD CAS on the finished scene before the HUD; with FSR 1 its RCAS sharpens instead |
+| ambient occlusion XeGTAO / XeGTAO Ultra (`CTR_D3D_AO` 1 / 2) | after the game's AO pass, XeGTAO (3 or 9 slices, one denoise pass) on the game's full-resolution linear depth with the camera of the AO pass's constants, averaged to the pass size and written into its AO channel; the game's blur and lighting use it. `CTR_D3D_AODebug` 1–3 shows the term before denoising, the depth XeGTAO reads, the game's depth |
+| supersampling 150% / 200% | the upscaling mode sets the game's scene height above the output (at most 2160); the presentation filters it down |
 
 ## Engine addresses (per eboot SHA256, `engine.h`)
 

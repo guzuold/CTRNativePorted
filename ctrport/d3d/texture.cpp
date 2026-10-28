@@ -229,6 +229,12 @@ bool BuildTexture(ID3D11Device* dev, const TSharp& t, TextureObject* out) {
     sv.Texture2DArray.ArraySize = l.slices;
     dev->CreateShaderResourceView(out->tex.Get(), &sv, &out->srv_array);
     if (!out->srv) out->srv = out->srv_array;
+    if (l.cube) {
+        sv.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+        sv.TextureCube.MostDetailedMip = first;
+        sv.TextureCube.MipLevels = l.levels - first;
+        dev->CreateShaderResourceView(out->tex.Get(), &sv, &out->srv_cube);
+    }
     return true;
 }
 
