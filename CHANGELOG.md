@@ -1,3 +1,10 @@
+## v0.9.1 — 2026-10-28
+
+Anti-aliasing can be turned off with Direct3D 11 (issue #4).
+
+- **Anti-aliasing: Off** (Direct3D 11, in the launcher and in PC Settings): no anti-aliasing at all, for the sharpest picture, at the price of jagged edges. The game's FXAA pass cannot simply be skipped (that is what left the 3D scene black with the option removed in v0.8.0), so it now draws an unchanged copy of the scene, as it already does with SMAA, and nothing smooths the edges afterwards. Checked in the adventure hub: the scene is complete and the edges are no longer softened.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.9.0 — 2026-10-28
 
 New graphics options for the Direct3D 11 renderer, PC Settings in the pause menu, and fixes for the blurry 4K picture and the reflection seam reported on issue #4.
