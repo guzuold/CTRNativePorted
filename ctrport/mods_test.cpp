@@ -325,6 +325,96 @@ int main() {
               "port: original bytes must match ExpectedSHA256");
     }
 
+    // --- instruction lengths (x86_length.hpp) ------------------------------------------------
+    {
+        const auto len = [](std::vector<unsigned char> b) { return x86::decode(b.data(), b.size()); };
+        const auto call = len({0xE8, 1, 2, 3, 4});
+        const auto rip = len({0x48, 0x8B, 0x05, 1, 2, 3, 4});
+        const auto mov16 = len({0x66, 0xC7, 0x05, 1, 2, 3, 4, 0x34, 0x12}); // mov word [rip+d], imm16
+        const auto vex = len({0xC5, 0xF9, 0x7F, 0x85, 0x40, 0xFF, 0xFF, 0xFF});
+        const auto imm64 = len({0x48, 0xB8, 1, 2, 3, 4, 5, 6, 7, 8});
+        const auto sse4a = len({0xF2, 0x0F, 0x78, 0xE1, 0x10, 0x10});
+        check(call.length == 5 && call.relative && call.imm_offset == 1 && call.imm_size == 4 && rip.length == 7 &&
+                  rip.rip && rip.disp_offset == 3 && mov16.length == 9 && mov16.rip && mov16.disp_size == 4 &&
+                  mov16.imm_offset == 7 && mov16.imm_size == 2 && vex.length == 8 && vex.disp_size == 4 &&
+                  imm64.length == 10 && sse4a.length == 6 && len({0x0F, 0x84, 0, 0}).length == 0,
+              "x86: lengths, displacements and immediates");
+    }
+
+    // --- ports through the EU/US address map (port_by_map) ----------------------------------
+    {
+        // The running (EU) eboot: function F at 0x1000, function G at 0x1100 (je; mov eax,[rip];
+        // ret), free executable space at 0x2800, data at 0x3000. The US eboot has the same code
+        // 0x10 later and the rest in place.
+        std::vector<unsigned char> eboot(0x4000, 0xCC);
+        const unsigned char g[] = {0x0F, 0x84, 0x10, 0, 0, 0, 0x8B, 0x05, 0xF4, 0x1E, 0, 0, 0xC3}; // [rip] -> 0x3000
+        std::memcpy(&eboot[0x1100], g, sizeof(g));
+        std::fill(eboot.begin() + 0x2800, eboot.begin() + 0x2900, static_cast<unsigned char>(0));
+        std::fill(eboot.begin() + 0x3000, eboot.begin() + 0x3100, static_cast<unsigned char>(0));
+        region_port::Functions functions;
+        functions.list = {{0x1000, 0x1010}, {0x1100, 0x1100 + sizeof(g)}};
+        region_port::Map map;
+        map.version = "01.21";
+        map.code = {{0x1010, 0x2010, -0x10}};
+        map.data = {{0x2800, 0x2900, 0}, {0x3000, 0x3100, 0}};
+        map.differs = {{0x3080, 0x3090}};
+        const Spans all{{0, eboot.size()}}, executable{{0, 0x3000}};
+        const auto us = [](const std::string& lines) {
+            return parse_patches("<Patch><TitleID><ID>CUSA13795</ID></TitleID><Metadata Name=\"P\" AppVer=\"01.21\" "
+                                 "AppElf=\"eboot.bin\"><PatchList>" +
+                                     lines + "</PatchList></Metadata></Patch>",
+                                 L"us.xml")[0];
+        };
+        // G's first instruction becomes "call F" (US: F at 0x1010 from 0x1110), its je becomes jne
+        const auto port = port_by_map(
+            us("<Line Type=\"bytes\" Address=\"0x401116\" Value=\"488b05e31e0000\"/>" // mov rax,[rip] -> US 0x3000
+               "<Line Type=\"bytes\" Address=\"0x401111\" Value=\"85\"/>"             // je -> jne
+               "<Line Type=\"bytes\" Address=\"0x402840\" Value=\"e8cbe7ffff\"/>"     // cave: call US F (0x1010)
+               "<Line Type=\"float32\" Address=\"0x403010\" Value=\"2.0\"/>"),
+            eboot.data(), all, executable, functions, map);
+        std::int32_t disp = 0, call = 0;
+        std::memcpy(&disp, &port.writes[0].bytes[3], 4);
+        std::memcpy(&call, &port.writes[2].bytes[1], 4);
+        check(port.writes.size() == 4 && port.writes[0].offset == 0x1106 && 0x1106 + 7 + disp == 0x3000 &&
+                  port.writes[1].offset == 0x1101 && port.writes[1].bytes == std::vector<unsigned char>{0x85} &&
+                  port.writes[2].offset == 0x2840 && 0x2840 + 5 + call == 0x1000 && port.writes[3].offset == 0x3010,
+              "map port: code moved with its function, references and cave call retargeted, data in place");
+        check(throws(
+                  [&] {
+                      port_by_map(us("<Line Type=\"bytes\" Address=\"0x405000\" Value=\"90\"/>"), eboot.data(), all,
+                                  executable, functions, map);
+                  },
+                  "not in code or data"),
+              "map port: an address outside the map refuses the port");
+        check(throws(
+                  [&] {
+                      port_by_map(us("<Line Type=\"bytes\" Address=\"0x403084\" Value=\"01\"/>"), eboot.data(), all,
+                                  executable, functions, map);
+                  },
+                  "not the same in both regions"),
+              "map port: data that differs between the regions refuses the port");
+        check(throws(
+                  [&] {
+                      port_by_map(us("<Line Type=\"bytes\" Address=\"0x401111\" Value=\"9090909090909090\"/>"),
+                                  eboot.data(), all, executable, functions, map);
+                  },
+                  "goes past it"),
+              "map port: a line starting inside an instruction must stay inside it");
+        check(throws(
+                  [&] {
+                      port_by_map(us("<Line Type=\"bytes\" Address=\"0x402840\" Value=\"e8bb270000\"/>"), eboot.data(),
+                                  all, executable, functions, map);
+                  },
+                  "no known counterpart"),
+              "map port: a call to an unmapped place refuses the port");
+        // a line of the running region written into the middle of an instruction
+        check(region_port::check_write(eboot.data(), functions, 0x1101, 1).empty() &&
+                  region_port::check_write(eboot.data(), functions, 0x1106, 7).empty() &&
+                  region_port::check_write(eboot.data(), functions, 0x3000, 64).empty() &&
+                  region_port::check_write(eboot.data(), functions, 0x1101, 35).find("middle") != std::string::npos,
+              "check_write: instruction starts and in-place edits pass, a write running over instructions does not");
+    }
+
     // --- param.sfo ---------------------------------------------------------------------------
     std::string sfo("\0PSF\x01\x01\0\0", 8);
     const auto u32 = [](std::uint32_t v) { return std::string{char(v), char(v >> 8), char(v >> 16), char(v >> 24)}; };

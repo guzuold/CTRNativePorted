@@ -9,7 +9,7 @@ import os, shutil, subprocess, sys
 
 VENDOR = ('ctrport/d3d/fsr/', 'ctrport/gpu/shim/', 'ctrport/dht/', 'ctrport/video/adapted/', 'ctrport/video/shim/',
           'ctrport/gpu/upscaling/', 'ctrport/hle/shadps4/')
-KEEP = {'ctrport/retail_anchors.hpp', 'ctrport/launcher_text.hpp', 'ctrport/settings/control_schema.hpp',
+KEEP = {'ctrport/retail_anchors.hpp', 'ctrport/region_map_data.hpp', 'ctrport/launcher_text.hpp', 'ctrport/settings/control_schema.hpp',
         'ctrport/settings/menu_catalog.hpp'}
 
 

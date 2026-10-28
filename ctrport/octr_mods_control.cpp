@@ -24,6 +24,9 @@ int main(int argc, char** argv) {
     ImageMetadata info;
     auto image = load_retail_image((patch / "eboot.bin").string().c_str(), false, &info);
     std::cout << "game " << title_id << " " << app_ver << ", eboot " << info.sha256.substr(0, 12) << "\n";
+    std::uint64_t image_end = 0;
+    for (const auto& span : info.spans) image_end = (std::max)(image_end, span.second);
+    const auto functions = region_port::read_functions(image.get(), image_end);
     int failed = 0;
     for (const auto& entry : fs::directory_iterator(mods_dir)) {
         if (!entry.is_directory()) continue;
@@ -73,11 +76,15 @@ int main(int argc, char** argv) {
                     std::vector<guest_patches::Write> writes;
                     if (guest_patches::mismatch(p, title_id, app_ver).empty()) {
                         writes = guest_patches::plan(p, image.get(), info.spans, true);
+                        if (const auto bad = guest_patches::misplaced(writes, image.get(), functions); !bad.empty())
+                            throw std::runtime_error(bad);
                         std::cout << "  patch " << p.name << ": planned as written\n";
                     } else {
-                        auto port = guest_patches::port_region(p, image.get(), info.spans, info.executable_spans);
-                        std::cout << "  patch " << p.name << ": ported, " << port.note << "\n";
-                        writes = std::move(port.writes);
+                        std::string why, note;
+                        writes = guest_patches::try_port(p, image.get(), info.spans, info.executable_spans, functions,
+                                                         title_id, app_ver, why, note);
+                        if (!why.empty()) throw std::runtime_error(why);
+                        std::cout << "  patch " << p.name << ": ported, " << note << "\n";
                     }
                     for (const auto& w : writes) {
                         std::cout << "    write 0x" << std::hex << (w.offset + 0x400000) << std::dec << " "

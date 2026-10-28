@@ -119,6 +119,7 @@ class Image:
                     struct.pack_into('<Q', memory, offset, value)
         self.memory = bytes(memory)
         self.code = [(h[3], h[3] + h[5]) for h in loads if h[1] & 1]
+        self.segments = sorted((h[3], h[3] + h[6]) for h in loads)
 
 
 def disassembler():

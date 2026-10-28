@@ -12,6 +12,7 @@
 // and ctrport.exe (C++17).
 #pragma once
 #include "mod_overlay.hpp"
+#include "region_port.hpp"
 #include <bcrypt.h>
 #include <cstdint>
 #include <cstring>
@@ -484,13 +485,19 @@ inline std::vector<Write> plan(const Patch& patch, const unsigned char* image, c
 // - RIP-relative loads, stores and LEAs (REX.W 8B/89/8D, ModRM mod=00 rm=101) to the image:
 //   the address must be used at least 4 times by this eboot's own code, else refused.
 // Nothing is guessed: a line or reference without such evidence refuses the whole port.
+// Patches without ExpectedSHA256 are moved through the EU/US address map instead (port_by_map).
+inline bool with_original_bytes(const Patch& patch) {
+    return !patch.lines.empty() && std::all_of(patch.lines.begin(), patch.lines.end(), [](const Line& l) {
+        return l.type == "bytes" && l.expected_sha256.size() == 64;
+    });
+}
+// A patch for the other region (EU CUSA14876 / US CUSA13795) of the running version, which
+// port_region or port_by_map may move onto this eboot.
 inline bool other_region(const Patch& patch, const std::string& title_id, const std::string& app_ver) {
     if (patch.app_ver != app_ver || (title_id != "CUSA14876" && title_id != "CUSA13795")) return false;
     const std::string other = title_id == "CUSA14876" ? "CUSA13795" : "CUSA14876";
     if (std::find(patch.title_ids.begin(), patch.title_ids.end(), other) == patch.title_ids.end()) return false;
-    return !patch.lines.empty() && std::all_of(patch.lines.begin(), patch.lines.end(), [](const Line& l) {
-        return l.type == "bytes" && l.expected_sha256.size() == 64;
-    });
+    return with_original_bytes(patch) || (!patch.lines.empty() && region_port::has_map(title_id, app_ver));
 }
 struct Port {
     std::vector<Write> writes;
@@ -623,6 +630,149 @@ inline Port port_region(const Patch& patch, const unsigned char* image, const Sp
     return port;
 }
 
+// --- Ports through the EU/US address map (region_port.hpp, tools/region_map.py) -------------
+// Every line must lie inside one range that the map proves the same in both regions:
+// - code: the line moves with its function. A write that starts an instruction is decoded and
+//   its RIP-relative references and rel32 branches are moved to reach the same places (a place
+//   written by the patch itself follows that line); one that changes part of an instruction must
+//   stay inside it, and a reference field it rewrites is moved the same way.
+// - data: the line moves with its data, which must have the same bytes in both regions. A write
+//   into unused executable space (all 00 or CC: a code cave) is decoded and moved as code.
+// "mask" lines search their pattern in this eboot as usual. ExpectedSHA256, when given, is
+// checked at the new place. Any line without such evidence refuses the whole port.
+inline Port port_by_map(const Patch& patch, const unsigned char* image, const Spans& spans, const Spans& code,
+                        const region_port::Functions& functions, const region_port::Map& map) {
+    using region_port::hex;
+    constexpr std::uint64_t kBase = 0x400000;
+    struct Moved {
+        std::uint64_t from, to;
+        std::vector<unsigned char> bytes;
+        bool in_code;
+    };
+    std::vector<Moved> lines;
+    Patch masks = patch;
+    masks.lines.clear();
+    std::uint64_t image_end = 0;
+    for (const auto& s : spans) image_end = (std::max)(image_end, s.second);
+    const auto in = [](const Spans& list, std::uint64_t at, std::size_t size) {
+        for (const auto& s : list)
+            if (at >= s.first && at <= s.second && size <= s.second - at) return true;
+        return false;
+    };
+    for (const auto& line : patch.lines) {
+        if (line.type == "mask_jump32") throw std::runtime_error("mask_jump32 lines are not supported");
+        if (line.type == "mask") {
+            masks.lines.push_back(line);
+            continue;
+        }
+        auto bytes = encode(line.type, line.value);
+        const auto address = parse_number(line.address, true);
+        if (address < kBase) throw std::runtime_error("address " + line.address + " is below the 0x400000 eboot base");
+        const std::uint64_t from = address - kBase;
+        const auto* range = region_port::Map::find(map.code, from, bytes.size());
+        const bool in_code = range != nullptr;
+        if (!range) {
+            range = region_port::Map::find(map.data, from, bytes.size());
+            if (range && map.differ(from, bytes.size()))
+                throw std::runtime_error("the data at " + line.address + " is not the same in both regions");
+        }
+        if (!range)
+            throw std::runtime_error("the address " + line.address +
+                                     " is not in code or data known to be the same in both regions");
+        const std::uint64_t to = static_cast<std::uint64_t>(static_cast<std::int64_t>(from) + range->delta);
+        if (!in(spans, to, bytes.size()))
+            throw std::runtime_error("the address " + line.address + " moves outside the eboot's mapped segments");
+        if (!line.expected_sha256.empty() && sha256_hex(image + to, bytes.size()) != line.expected_sha256)
+            throw std::runtime_error("the original bytes of " + line.address + " differ from its ExpectedSHA256 at " +
+                                     hex(to + kBase));
+        lines.push_back({from, to, std::move(bytes), in_code});
+    }
+    // where a place of the patch's eboot is in this one: written by the patch, or mapped
+    const region_port::Target target = [&](std::uint64_t source, std::uint64_t& here) {
+        for (const auto& l : lines)
+            if (source >= l.from && source < l.from + l.bytes.size()) {
+                here = l.to + (source - l.from);
+                return true;
+            }
+        const auto* r = region_port::Map::find(map.code, source, 1);
+        if (!r) r = region_port::Map::find(map.data, source, 1);
+        if (!r) return false;
+        here = static_cast<std::uint64_t>(static_cast<std::int64_t>(source) + r->delta);
+        return true;
+    };
+    Port port;
+    int moved = 0, references = 0;
+    for (auto& l : lines) {
+        moved += l.from != l.to;
+        const auto before = l.bytes;
+        std::uint64_t start;
+        x86::Insn insn;
+        if (l.in_code && region_port::instruction_at(image, functions, l.to, start, insn) && start != l.to) {
+            // part of one instruction: it must stay inside, and a reference it rewrites is moved
+            if (l.to + l.bytes.size() > start + insn.length)
+                throw std::runtime_error("the line at " + hex(l.from + kBase) +
+                                         " starts inside an instruction and goes past it");
+            const std::uint64_t source_start = l.from - (l.to - start);
+            for (const auto& [offset, size, full] :
+                 {std::tuple<int, int, bool>{insn.disp_offset, insn.rip ? insn.disp_size : 0, true},
+                  std::tuple<int, int, bool>{insn.imm_offset, insn.relative ? insn.imm_size : 0, insn.imm_size == 4}}) {
+                if (!size) continue;
+                const std::uint64_t field = start + static_cast<std::uint64_t>(offset);
+                if (l.to >= field + size || field >= l.to + l.bytes.size()) continue;
+                if (l.to > field || field + size > l.to + l.bytes.size())
+                    throw std::runtime_error("the line at " + hex(l.from + kBase) + " rewrites part of a reference");
+                // the field is all the patch's: read it as written at source_start
+                const unsigned char* written = &l.bytes[field - l.to];
+                std::int64_t value = static_cast<std::int8_t>(written[0]);
+                if (size == 4) {
+                    std::int32_t v;
+                    std::memcpy(&v, written, 4);
+                    value = v;
+                }
+                std::uint64_t here;
+                const std::uint64_t source = static_cast<std::uint64_t>(
+                    static_cast<std::int64_t>(source_start + static_cast<std::uint64_t>(insn.length)) + value);
+                if (!target(source, here))
+                    throw std::runtime_error("the line at " + hex(l.from + kBase) + " reaches " + hex(source + kBase) +
+                                             ", which has no known counterpart in this eboot");
+                const std::int64_t d = static_cast<std::int64_t>(here) - static_cast<std::int64_t>(start + insn.length);
+                if (!full) {
+                    if (d != value)
+                        throw std::runtime_error("the short branch at " + hex(l.from + kBase) +
+                                                 " would change its target");
+                    continue;
+                }
+                if (d < INT32_MIN || d > INT32_MAX)
+                    throw std::runtime_error("the line at " + hex(l.from + kBase) + " cannot reach its target");
+                const std::int32_t d32 = static_cast<std::int32_t>(d);
+                std::memcpy(&l.bytes[field - l.to], &d32, 4);
+            }
+        } else {
+            bool cave = !l.in_code && in(code, l.to, l.bytes.size());
+            if (cave)
+                for (std::size_t i = 0; i < l.bytes.size() && cave; ++i)
+                    cave = image[l.to + i] == 0 || image[l.to + i] == 0xCC;
+            if (l.in_code || cave) region_port::relocate(l.bytes, l.from, l.to, image, image_end, target);
+        }
+        references += l.bytes != before;
+        port.writes.push_back({l.to, std::move(l.bytes)});
+    }
+    if (!masks.lines.empty())
+        for (auto& w : plan(masks, image, spans, true)) port.writes.push_back(std::move(w));
+    port.note = std::to_string(lines.size()) + " writes placed by the " + map.version + " EU/US map, " +
+                std::to_string(moved) + " moved, " + std::to_string(references) + " with references moved";
+    return port;
+}
+
+// Why a write planned for this eboot does not fit its code (region_port::check_write); empty
+// when every write fits.
+inline std::string misplaced(const std::vector<Write>& writes, const unsigned char* image,
+                             const region_port::Functions& functions) {
+    for (const auto& w : writes)
+        if (auto why = region_port::check_write(image, functions, w.offset, w.bytes.size()); !why.empty()) return why;
+    return {};
+}
+
 // --- param.sfo (TITLE_ID, APP_VER) --------------------------------------------------------
 inline std::map<std::string, std::string> read_sfo(const fs::path& path) {
     const auto data = mods::read_text(path);
@@ -663,24 +813,40 @@ inline std::vector<std::pair<std::wstring, fs::path>>& mod_patch_files() {
 
 // --- Runtime: apply the selected patches of CTR_PATCHES_DIR to the mapped eboot -----------
 // Returns the number of patches applied. Problems in a selected patch stop the launch.
-// A patch for the other region of the same version moved onto this eboot (port_region), or
-// nothing with the reason in `why`.
+// A patch for the other region of the same version moved onto this eboot (port_region by its
+// original bytes, else port_by_map), or nothing with the reason in `why`.
 inline std::vector<Write> try_port(const Patch& patch, const unsigned char* image, const Spans& spans,
-                                   const Spans& code, std::string& why, std::string& note) {
-    try {
-        auto port = port_region(patch, image, spans, code);
-        note = port.note;
-        return std::move(port.writes);
-    } catch (const std::exception& e) {
-        why = std::string("cannot be ported from the other region: ") + e.what();
-        return {};
-    }
+                                   const Spans& code, const region_port::Functions& functions,
+                                   const std::string& title_id, const std::string& app_ver, std::string& why,
+                                   std::string& note) {
+    std::string first;
+    if (with_original_bytes(patch)) try {
+            auto port = port_region(patch, image, spans, code);
+            note = port.note;
+            return std::move(port.writes);
+        } catch (const std::exception& e) {
+            first = e.what();
+        }
+    region_port::Map map;
+    if (region_port::map_for(title_id, app_ver, map)) try {
+            auto port = port_by_map(patch, image, spans, code, functions, map);
+            note = port.note;
+            return std::move(port.writes);
+        } catch (const std::exception& e) {
+            if (first.empty()) first = e.what();
+        }
+    why = "cannot be ported from the other region: " +
+          (first.empty() ? std::string("no address map for ") + app_ver : first);
+    return {};
 }
 
 inline int apply_selected(unsigned char* image, const Spans& spans, const std::string& title_id,
                           const std::string& app_ver, const fs::path& dir, const fs::path& selection_path,
                           const Spans& code) {
     const auto selection = read_selection(selection_path);
+    std::uint64_t image_end = 0;
+    for (const auto& span : spans) image_end = (std::max)(image_end, span.second);
+    const auto functions = region_port::read_functions(image, image_end);
     // Every selected patch is validated before the first byte is written.
     std::vector<std::pair<std::wstring, std::vector<Write>>> chosen_writes;
     // Patches of enabled octr-mod mods: one that does not fit is not applied and is reported to
@@ -700,12 +866,13 @@ inline int apply_selected(unsigned char* image, const Spans& spans, const std::s
             if (why.empty()) {
                 try {
                     writes = plan(patch, image, spans, patch.app_ver == app_ver);
+                    why = misplaced(writes, image, functions);
                 } catch (const std::exception& e) {
                     why = e.what();
                 }
             } else if (other_region(patch, title_id, app_ver)) {
                 why.clear();
-                writes = try_port(patch, image, spans, code, why, note);
+                writes = try_port(patch, image, spans, code, functions, title_id, app_ver, why, note);
             }
             if (!why.empty()) {
                 std::fprintf(stderr, "Patches: %s: not applied, %s\n", utf8(patch.key()).c_str(), why.c_str());
@@ -736,7 +903,7 @@ inline int apply_selected(unsigned char* image, const Spans& spans, const std::s
             std::string why = mismatch(patch, title_id, app_ver), note;
             if (!why.empty() && other_region(patch, title_id, app_ver)) {
                 why.clear();
-                auto writes = try_port(patch, image, spans, code, why, note);
+                auto writes = try_port(patch, image, spans, code, functions, title_id, app_ver, why, note);
                 if (why.empty()) {
                     std::fprintf(stderr, "Patches: %s: ported to %s: %s\n", utf8(patch.key()).c_str(), title_id.c_str(),
                                  note.c_str());
@@ -751,6 +918,7 @@ inline int apply_selected(unsigned char* image, const Spans& spans, const std::s
             std::vector<Write> writes;
             try {
                 writes = plan(patch, image, spans, patch.app_ver == app_ver);
+                if (const auto bad = misplaced(writes, image, functions); !bad.empty()) throw std::runtime_error(bad);
             } catch (const std::exception& e) {
                 throw std::runtime_error("patch " + utf8(patch.key()) + ": " + e.what());
             }

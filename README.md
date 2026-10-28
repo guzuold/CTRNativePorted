@@ -108,8 +108,12 @@ complete, in private matches and in public matchmaking; see the
   `patches.json`.
 - **Same formats as SacredFire / GetLostIn CTR-NitroFueled-PC,** so the same mod folders
   and patch files work in both.
+- **Patches and mods made for the other region** (US on the EU game, or EU on the US game, same
+  version) are moved onto your game at start, through an address map proven from both games;
+  a line that cannot be placed with certainty refuses the patch instead of guessing.
 - **Game files are never modified.** Every patch is checked against the running executable
-  before it is applied. See [`ctrport/MODS.md`](ctrport/MODS.md).
+  before it is applied, and a line written for another version, which would land in the middle
+  of an instruction, is refused. See [`ctrport/MODS.md`](ctrport/MODS.md).
 
 ### Trophies
 - **The game's 48 trophies unlock during play.** A notice with the trophy icon appears over

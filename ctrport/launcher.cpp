@@ -1809,10 +1809,18 @@ void reload_mods() {
                 continue;
             }
             for (auto& patch : file.patches) {
-                const auto why =
+                auto why =
                     title.empty() ? std::string("game version unknown") : patches::mismatch(patch, title, version);
-                std::wstring detail =
-                    why.empty() ? std::wstring() : trf(L"Not for this game: {0}", widen(why)) + L"  \u00b7  ";
+                // made for the other region of this version: the runtime moves it at start, or logs why not
+                const bool other_region =
+                    !why.empty() && !title.empty() && patches::other_region(patch, title, version);
+                std::wstring detail;
+                if (other_region) {
+                    detail = std::wstring(tr(L"Made for the other region: adapted at start")) + L"  \u00b7  ";
+                    why.clear();
+                } else if (!why.empty()) {
+                    detail = trf(L"Not for this game: {0}", widen(why)) + L"  \u00b7  ";
+                }
                 if (!patch.author.empty()) detail += widen(patch.author) + L"  ·  ";
                 if (!patch.app_ver.empty()) detail += L"AppVer " + widen(patch.app_ver) + L"  ·  ";
                 detail += patch.file;

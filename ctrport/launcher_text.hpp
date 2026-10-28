@@ -95,6 +95,7 @@ inline const std::map<std::wstring, Entry>& table() {
         {L"{0} game files", {L"{0} fichiers du jeu", L"{0} file del gioco", L"{0} Spieldateien", L"{0} archivos del juego"}},
         {L"No game files found", {L"Aucun fichier du jeu", L"Nessun file del gioco", L"Keine Spieldateien", L"Sin archivos del juego"}},
         {L"Not for this game: {0}", {L"Pas pour ce jeu : {0}", L"Non per questo gioco: {0}", L"Nicht für dieses Spiel: {0}", L"No es para este juego: {0}"}},
+        {L"Made for the other region: adapted at start", {L"Fait pour l'autre région : adapté au démarrage", L"Fatta per l'altra regione: adattata all'avvio", L"Für die andere Region: wird beim Start angepasst", L"Hecho para la otra región: se adapta al iniciar"}},
         {L"Unreadable patch files: {0}", {L"Patchs illisibles : {0}", L"Patch illeggibili: {0}", L"Unlesbare Patches: {0}", L"Parches ilegibles: {0}"}},
         {L"A mod cannot be loaded:", {L"Un mod ne peut pas être chargé :", L"Una mod non può essere caricata:", L"Ein Mod kann nicht geladen werden:", L"No se puede cargar un mod:"}},
         {L"INSTALL", {L"INSTALLER", L"INSTALLA", L"INSTALLIEREN", L"INSTALAR"}},
