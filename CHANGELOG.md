@@ -1,3 +1,22 @@
+## v0.9.0 — 2026-10-28
+
+New graphics options for the Direct3D 11 renderer, PC Settings in the pause menu, and fixes for the blurry 4K picture and the reflection seam reported on issue #4.
+
+- **Blurry picture at 4K with Direct3D 11 (issue #4):** the game did not tell Windows that it handles display scaling itself. On a 4K monitor with Windows scaling (for example 150%), Windows made the Direct3D 11 window believe the screen was smaller and then stretched the picture to 4K. Vulkan was not affected. The game now always renders at the real resolution: on our 4K screen at 175% the picture was 2194×1234 before and is 3840×2160 now.
+- **Seam on reflective surfaces with Direct3D 11 (issue #4):** reflections (cube maps) were read as six separate textures, so a line appeared where two faces meet, for example on the gold trophies. They are now read as real cube maps (110 of the game's shaders).
+- **PC Settings in the pause menu:** the PC Settings entry is now also in the Options of the pause menu, during the adventure, races and the other modes, not only in the main menu. Checked in the adventure hub and in a Local Arcade race.
+- **New Direct3D 11 options** (Settings > Graphics in the launcher, and PC Settings in the game):
+  - **Anti-aliasing: SMAA / SMAA Ultra**, in place of the game's FXAA. Unlike the option removed in v0.8.0, the game's FXAA pass still runs and draws an unchanged copy, and SMAA works on the finished 3D scene before the HUD, so the scene is no longer left black.
+  - **Ambient occlusion: XeGTAO / XeGTAO Ultra**, computed from the game's own depth at full resolution and used by the game's lighting in place of its own: contact shadows under the karts and in the scenery, without noise.
+  - **Upscaling mode: Supersampling 150% / 200%**: the 3D scene is drawn larger than the screen (at most 2160 lines) and scaled down, for a sharper picture at 1080p and 1440p.
+  - **Sharpness** now also works without an upscaler (AMD CAS), and can be changed while playing.
+  - **Saturation, Contrast, Vibrance, Color temperature**, applied to the 3D scene only; the HUD keeps its colours.
+- **Detail distance up to 200%** (both renderers): objects keep their full detail farther away. It costs frame rate in busy places (in the adventure hub, from 60 to about 35 FPS at 200%).
+- **Shadows:** **Ultra** already uses the largest shadow maps Direct3D 11 allows, so there is no higher level.
+- **Open-source code used** (MIT): SMAA (Jimenez et al.), AMD FidelityFX CAS, Intel XeGTAO. Their licences are in the package and in the source.
+- **Measured** on the EU v01.21 game in the adventure hub with every new option on (Supersampling 200%, SMAA Ultra, XeGTAO Ultra, sharpening, colour): 60 FPS with the 60 FPS limit. Not tried: the new options on the US game, battles and online races from the pause menu.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.8.0 — 2026-10-27
 
 Fixes for the black screen and the slowdowns reported on issue #4, and a cleaner code base.
