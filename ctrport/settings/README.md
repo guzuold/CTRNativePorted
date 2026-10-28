@@ -9,7 +9,7 @@ native pages built from the game's menu templates, in the game's language:
 | Display | resolution (as in the launcher, the monitor's native one, or 720p to 2160p), display mode (windowed, borderless window, exclusive fullscreen), V-Sync, frame rate limit, refresh rate in exclusive fullscreen, 60 FPS mode |
 | Upscaling | method (off, AMD FSR 1, AMD FSR 3, NVIDIA DLSS), mode (Native 100%, Quality 67%, Balanced 58%, Performance 50%, Ultra performance 33%, Supersampling 150% and 200% with Direct3D 11), sharpness (0-100%) |
 | Geometry and textures | texture quality, anisotropic filtering, shadow quality (off, low, medium, high, ultra), kart and driver detail, scenery detail, view distance, detail distance (50% to 200%), effects quality |
-| Effects and lighting | ambient occlusion (on, off, XeGTAO and XeGTAO Ultra with Direct3D 11), character shadows, bloom, motion blur, depth of field, fur detail; with Direct3D 11: anti-aliasing (the game's FXAA, SMAA, SMAA Ultra), saturation, contrast, vibrance, colour temperature |
+| Effects and lighting | ambient occlusion (on, off, XeGTAO and XeGTAO Ultra with Direct3D 11), character shadows, bloom, motion blur, depth of field, fur detail; with Direct3D 11: anti-aliasing (the game's FXAA, SMAA, SMAA Ultra, off), saturation, contrast, vibrance, colour temperature |
 | Quality presets | Original, Low, Medium, High, Ultra |
 
 The launcher shows the same pages in the GRAPHICS section of its Settings tab (scroll with the
@@ -31,7 +31,7 @@ renders the scene at the output size.
 
 The Direct3D 11 renderer also post-processes the finished 3D scene before the HUD is drawn (see
 `../d3d/VENDOR.md`): SMAA (the game's FXAA pass then copies its input unchanged, so SMAA sees the
-unblurred edges), saturation, contrast, vibrance and colour temperature. XeGTAO replaces the game's
+unblurred edges), anti-aliasing Off (the same copy, without SMAA), saturation, contrast, vibrance and colour temperature. XeGTAO replaces the game's
 ambient occlusion with Intel's ground-truth AO, computed from the game's own full-resolution depth
 and camera and handed to the game's blur and lighting in place of its own. Detail distance scales
 the distances at which the game fades and swaps object classes (the original setter runs with the

@@ -69,7 +69,7 @@ inline void prepare_renderer_environment() {
     };
     const auto same = [](const std::string& text) { return text; };
     post("post_antialiasing", "CTR_D3D_PostAA",
-         [](const std::string& text) { return std::string(text == "smaa_ultra" ? "2" : "1"); });
+         [](const std::string& text) { return std::string(text == "off" ? "3" : text == "smaa_ultra" ? "2" : "1"); });
     post("color_saturation", "CTR_D3D_Saturation", same);
     post("color_contrast", "CTR_D3D_Contrast", same);
     post("color_vibrance", "CTR_D3D_Vibrance", same);

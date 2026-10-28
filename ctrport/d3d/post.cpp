@@ -54,7 +54,7 @@ struct Post {
     float color[4] = {1, 1, 0, 0};
     bool color_on = false;
     ComPtr<ID3D11ComputeShader> edges, weights, blend, color_cs, cas;
-    ComPtr<ID3D11PixelShader> fxaa_copy; // stands in for the game's FXAA with SMAA
+    ComPtr<ID3D11PixelShader> fxaa_copy; // stands in for the game's FXAA with SMAA or anti-aliasing off
     u64 fxaa_replaced = 0;
     ComPtr<ID3D11Buffer> cb;
     ComPtr<ID3D11SamplerState> linear, point;
@@ -247,7 +247,10 @@ void Dispatch(ID3D11ComputeShader* cs, std::initializer_list<ID3D11ShaderResourc
 
 void PostInit(ID3D11Device* dev, ID3D11DeviceContext* ctx) {
     g_post.dev = dev, g_post.ctx = ctx;
-    g_post.aa = std::clamp(ConfigInt("PostAA", 0), 0, 2);
+    // PostAA 3: no anti-aliasing at all. The game's FXAA pass must still draw (skipping it left
+    // the scene black), so it draws the same copy as with SMAA and no SMAA follows.
+    const int aa_setting = std::clamp(ConfigInt("PostAA", 0), 0, 3);
+    g_post.aa = aa_setting == 3 ? 0 : aa_setting;
     g_post.sharpen = SharpenFromPercent(ConfigInt("Sharpen", 0));
     g_post.color[0] = Percent("Saturation", 100, 0, 200);
     g_post.color[1] = Percent("Contrast", 100, 50, 150);
@@ -263,6 +266,8 @@ void PostInit(ID3D11Device* dev, ID3D11DeviceContext* ctx) {
         g_post.blend = Compile("PASS_BLEND", g_post.aa);
         g_post.area = Lookup(areaTexBytes, AREATEX_WIDTH, AREATEX_HEIGHT, AREATEX_PITCH, DXGI_FORMAT_R8G8_UNORM);
         g_post.search = Lookup(searchTexBytes, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT, SEARCHTEX_PITCH, DXGI_FORMAT_R8_UNORM);
+    }
+    if (aa_setting) {
         // the FXAA pass reads the scene (t0) at its own size and writes it at the same size
         static const char kCopy[] = "Texture2D scene : register(t0);\n"
                                     "float4 main(float4 pos : SV_Position) : SV_Target0 {\n"
@@ -288,9 +293,9 @@ void PostInit(ID3D11Device* dev, ID3D11DeviceContext* ctx) {
     dev->CreateSamplerState(&sd, &g_post.linear);
     sd.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
     dev->CreateSamplerState(&sd, &g_post.point);
-    LOG("gfx: scene post-processing: SMAA %s, colour %s (saturation %.2f contrast %.2f vibrance %.2f warmth %.2f), "
+    LOG("gfx: scene post-processing: game FXAA %s, SMAA %s, colour %s (saturation %.2f contrast %.2f vibrance %.2f warmth %.2f), "
         "CAS %s %.2f",
-        g_post.aa == 2 ? "ultra" : g_post.aa ? "high" : "off", g_post.color_on ? "on" : "off", g_post.color[0],
+        aa_setting ? "replaced by a copy" : "on", g_post.aa == 2 ? "ultra" : g_post.aa ? "high" : "off", g_post.color_on ? "on" : "off", g_post.color[0],
         g_post.color[1], g_post.color[2], g_post.color[3], g_post.sharpen >= 0 ? "on" : "off",
         std::max(g_post.sharpen, 0.0f));
 }
@@ -298,7 +303,7 @@ void PostInit(ID3D11Device* dev, ID3D11DeviceContext* ctx) {
 ID3D11PixelShader* PostReplacement(const std::string& name) {
     if (!g_post.fxaa_copy || name.rfind("Fxaa_", 0) != 0) return nullptr;
     if (++g_post.fxaa_replaced <= 1 || g_post.fxaa_replaced % 3600 == 0)
-        LOG("gfx: %s replaced by a copy (SMAA), %llu times", name.c_str(),
+        LOG("gfx: %s replaced by a copy (%s), %llu times", name.c_str(), g_post.aa ? "SMAA" : "anti-aliasing off",
             (unsigned long long)g_post.fxaa_replaced);
     return g_post.fxaa_copy.Get();
 }

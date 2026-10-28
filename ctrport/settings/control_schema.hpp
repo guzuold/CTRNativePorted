@@ -163,7 +163,7 @@ inline unsigned count(Option option) {
     case Option::shadow_resolution: return 3;
     case Option::shadow_cascade_limit: return 4;
     case Option::shadow_map_quality: return 2;
-    case Option::post_antialiasing: return 3;
+    case Option::post_antialiasing: return 4;
     case Option::color_saturation: return 6;
     case Option::color_contrast: return 6;
     case Option::color_vibrance: return 6;
@@ -437,6 +437,7 @@ inline Json value(Option option, unsigned index) {
         case 0: return Json::of("original");
         case 1: return Json::of("smaa");
         case 2: return Json::of("smaa_ultra");
+        case 3: return Json::of("off");
         } break;
     case Option::color_saturation: switch(index) {
         case 0: return Json::of("original");
