@@ -1,3 +1,12 @@
+## v0.9.2 — 2026-10-28
+
+Patches and mods made for the US game now work on the EU game, and the other way round; a patch written for another version is refused instead of crashing the game.
+
+- **Patches and mods for the other region:** a patch file or mod made for the US game (CUSA13795) is moved onto the EU game (CUSA14876) at start, and an EU one onto the US game, for the same version (01.21 or 01.00). Until now only mods whose every line carried its original bytes could be moved; GoldHEN patches, which give only an address and a value, were left out. The two games are built from the same code, with some functions shifted by 16 to 64 bytes: a map made from both games proves where each function and each piece of data is in the other (139,612 of 139,653 functions in 01.21), and the patch is moved with it, calls and references included. A line that cannot be placed with certainty refuses the whole patch, with the reason in the log. In the launcher such patches show "Made for the other region: adapted at start".
+- **Lines written for another version are refused:** a patch line written for the other region or version usually lands in the middle of an instruction of your game and makes it crash some time later. Such a line now stops the patch before anything is written: the launcher shows which patch and why, and a mod is skipped.
+- **Checked** on the 01.21 games: the US "60 FPS Unlock" GoldHEN line lands on the EU line of the same patch and gives 60 FPS on the EU game; a US unlock patch lands on its EU address; an EU patch that still had one US address is refused; the "Reserves + CNK Drift Gauge" mod moved this way reaches the same functions (all 88 calls and references) as with its original bytes. Not tried: patches for 01.00 in a game.
+- **How to update:** with **Check updates**; from v0.6.1 or older, v0.6.2 is installed first.
+
 ## v0.9.1 — 2026-10-28
 
 Anti-aliasing can be turned off with Direct3D 11 (issue #4).
